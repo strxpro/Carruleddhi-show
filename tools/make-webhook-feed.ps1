@@ -126,6 +126,22 @@ $unionPayload = [ordered]@{
   reminderSchedule = '7d,1d,3h'
   # contact
   message       = 'Wiadomosc testowa z formularza kontaktowego.'
+  # Added by the Vercel function, not by the browser.
+  #
+  #   raceNumber comes from the Postgres sequence, so it exists before Make is
+  #   called. Make used to count spreadsheet rows to work it out; now it reads
+  #   {{1.raceNumber}}.
+  #
+  #   branch is "registration-adult", "registration-minor", "reminder" or "contact",
+  #   decided from the age the function computed from the birth date. Every filter in
+  #   the scenario is one text comparison against it, which is why there is no AND
+  #   anywhere and no nested router.
+  #
+  # Both must be in this message. The webhook only learns fields it has actually
+  # received, so leaving them out is how {{1.branch}} ends up unresolved and every
+  # route filters everything out.
+  raceNumber    = '001'
+  branch        = 'registration-minor'
 }
 
 $payloads = [ordered]@{
@@ -155,6 +171,8 @@ $payloads = [ordered]@{
     # would leave the adult branch inferring from an absence.
     isMinor       = $false
     riderAge      = '32'
+    raceNumber    = '001'
+    branch        = 'registration-adult'
   }
 
   # A rider who is 14 on the day of the race. This is the branch that decides who
@@ -196,6 +214,8 @@ $payloads = [ordered]@{
     motherName       = 'Anna Testowa'
     fatherName       = 'Piotr Testowy'
     guardianConsent  = $true
+    raceNumber       = '002'
+    branch           = 'registration-minor'
   }
 
   'reminder' = [ordered]@{
@@ -209,6 +229,7 @@ $payloads = [ordered]@{
     email            = 'test.reminder@example.com'
     consent          = $true
     reminderSchedule = '7d,1d,3h'
+    branch           = 'reminder'
   }
 
   'contact' = [ordered]@{
@@ -221,6 +242,7 @@ $payloads = [ordered]@{
     name        = 'Hans Probe'
     email       = 'test.contact@example.com'
     message     = "Frage zum Helm. Test der Sonderzeichen: $aOgonek $eGrave"
+    branch      = 'contact'
   }
 }
 
