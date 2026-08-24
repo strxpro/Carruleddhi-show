@@ -305,6 +305,16 @@ if ($WorkerBase) {
   Write-Host "Target: $WebhookUrl"
 }
 Write-Host ("Sending {0} message(s): {1}" -f $payloads.Count, ($payloads.Keys -join ', '))
+if (-not $WorkerBase) {
+  Write-Host ''
+  Write-Host 'NOTE: sending straight to Make.' -ForegroundColor Yellow
+  Write-Host '  The scenario now reads fields the Vercel function adds - copy, subject, hi,' -ForegroundColor DarkGray
+  Write-Host '  minHi, pdfUrl and a dozen more - and this script cannot invent them: they are' -ForegroundColor DarkGray
+  Write-Host '  resolved from emails/copy.json in the function itself.' -ForegroundColor DarkGray
+  Write-Host '  To teach the webhook its real structure, run through the deployed site:' -ForegroundColor DarkGray
+  Write-Host '    -WorkerBase "https://your-project.vercel.app"' -ForegroundColor Cyan
+  Write-Host ''
+}
 Write-Host ("Field count of the first message: {0} - this is the number Make must show." -f $unionPayload.Count) -ForegroundColor Cyan
 if ($All) {
   Write-Host 'Messages 2+ may come back as HTTP 410 if the webhook was still listening.' -ForegroundColor DarkGray

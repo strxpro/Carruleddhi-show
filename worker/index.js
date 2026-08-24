@@ -14,6 +14,7 @@
  *   SUPABASE_SERVICE_KEY secret, optional — service role key, wall writes/reads
  *   WALL_SALT          secret, optional — salt for the stored IP hash
  */
+import { COPY_DECK } from './copy-deck.js';
 
 const ALLOWED_TYPES = new Set([
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
@@ -175,6 +176,91 @@ function wallReady(env) {
 
 const STORED_TYPES = new Set(['registration', 'reminder', 'contact']);
 const LOCALES = new Set(['it', 'pl', 'en', 'de', 'es', 'fr']);
+
+/* ============================================================================
+   Wording, resolved here
+   ============================================================================
+   Make used to hold the whole six-language dictionary in one variable and pick from
+   it with get(parseJSON(2.copy); 2.loc) in a second. Every template then quoted
+   {{3.t.something}} — a variable of a variable of a variable, three modules deep,
+   and Make draws those references differently from ordinary webhook fields. Hours
+   went into arguing about whether that difference meant they were broken.
+
+   It does not matter now. The language is decided here, the strings are resolved
+   here, and they arrive at Make as fields of the request: {{1.copy.regLead}},
+   {{1.subject}}. The same kind of field as {{1.firstName}}, which has never been in
+   question. Two modules disappear from the scenario and the dictionary stays in
+   emails/copy.json, where it was always edited.
+   ============================================================================ */
+
+/** Fills in %PLACEHOLDER% style markers. Missing values become an empty string. */
+function fill(text, values) {
+  return String(text || '').replace(/%([A-Z]+)%/g, (_, key) => String(values[key] ?? ''));
+}
+
+/**
+ * Adds the resolved wording to the payload.
+ *
+ * `copy` is the whole language block, so a template can reach any string without a
+ * new field being invented for it here. The handful alongside it are the ones that
+ * need a value substituted, which a template cannot do on its own.
+ */
+function attachCopy(payload) {
+  const locale = localeOf(payload.locale);
+  const deck = COPY_DECK[locale] || COPY_DECK.it;
+  const event = COPY_DECK._event || {};
+
+  const firstName = String(payload.firstName || '').trim();
+  const raceNumber = payload.raceNumber || '';
+
+  payload.copy = deck;
+  payload.ev = event;
+  payload.loc = locale;
+  payload.fullName = `${firstName} ${String(payload.lastName || '').trim()}`.trim();
+  payload.generatedAt = new Intl.DateTimeFormat('pl-PL', {
+    timeZone: 'Europe/Rome',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date()).replace(',', '');
+
+  payload.hi = fill(deck.regHi, { FIRSTNAME: firstName });
+  payload.help = fill(deck.regHelp, { ORGEMAIL: event.email, ORGPHONE: event.phone });
+  payload.printFooter = fill(deck.printFooter, { GENERATEDAT: payload.generatedAt });
+
+  // The subject the branch will actually use, with the number already in it. One
+  // field instead of a replace() in five different Email modules.
+  payload.subject = payload.isMinor
+    ? fill(deck.minSubject, { FIRSTNAME: firstName, RACENUMBER: raceNumber })
+    : fill(deck.regSubject, { FIRSTNAME: firstName, RACENUMBER: raceNumber });
+  payload.remSubject = deck.remSubject7;
+  payload.newsSubject = deck.newsSubject;
+  payload.contactSubject = `Kontakt ze strony — ${String(payload.name || '').trim()}`;
+  payload.newsHi = fill(deck.newsHi, { FIRSTNAME: firstName });
+
+  /* The attachment. Decided here rather than with an if() in Make, for the same
+     reason as everything else on this list: the flag it depends on was computed here
+     from the birth date, and a copy of that decision in a second place is a copy that
+     can disagree. */
+  const base = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
+  payload.pdfUrl = payload.isMinor
+    ? `${base}/emails/Carruleddhi-modulo-minori.pdf`
+    : `${base}/emails/Carruleddhi-modulo.pdf`;
+  payload.pdfName = payload.isMinor ? 'Carruleddhi-minori-' : 'Carruleddhi-modulo-';
+
+  if (!payload.isMinor) return;
+
+  // Under-18 wording. The inflected words come out of the deck by key, so an unknown
+  // value gives the neutral form rather than an empty gap in a sentence.
+  const childWord = deck.minChild?.[payload.childKind] || deck.minChild?.child || '';
+  payload.childWord = childWord;
+  payload.relWord = deck.minRel?.[payload.guardianRelation] || deck.minRel?.guardian || '';
+  payload.minHi = fill(deck.minHi, { GUARDIAN: String(payload.guardianName || '').trim() });
+  payload.minLead = fill(deck.minLead, { CHILD: childWord, FIRSTNAME: firstName });
+  payload.ageNote = fill(deck.minAgeNote, { FIRSTNAME: firstName, AGE: payload.riderAge });
+}
 
 /** The database has a check constraint on locale; a browser can send anything. */
 function localeOf(value) {
@@ -1003,6 +1089,8 @@ export default {
     payload.branch = type === 'registration'
       ? (payload.isMinor ? 'registration-minor' : 'registration-adult')
       : type;
+
+    attachCopy(payload);
 
     const headers = { 'Content-Type': 'application/json' };
     if (env.INTAKE_SHARED_KEY) headers['X-Carruleddhi-Key'] = env.INTAKE_SHARED_KEY;

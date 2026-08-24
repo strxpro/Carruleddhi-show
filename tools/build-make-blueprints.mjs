@@ -50,18 +50,18 @@ function body(file) {
 
 const REG_TEMPLATE = body('emails/make-registration.html')
   // Module 5 in the old note is module 6 here (Sheets row lands in 5).
-  .replace(/\{\{5\.raceNumber\}\}/g, '{{3.raceNumber}}')
+  .replace(/\{\{5\.raceNumber\}\}/g, '{{1.raceNumber}}')
   // These two carry %TOKEN% placeholders, so they are resolved in module 6.
-  .replace(/\{\{3\.t\.regHelp\}\}/g, '{{3.help}}')
-  .replace(/\{\{3\.t\.printFooter\}\}/g, '{{3.printFooter}}');
+  .replace(/\{\{3\.t\.regHelp\}\}/g, '{{1.help}}')
+  .replace(/\{\{3\.t\.printFooter\}\}/g, '{{1.printFooter}}');
 
-/* The minor variant is derived first, while `{{3.t.regHi}}` is still in place —
+/* The minor variant is derived first, while `{{1.copy.regHi}}` is still in place —
    it is one of the anchors minorHtml() swaps. Only then is the adult greeting
    pointed at module 3, and the leftover marker removed from the adult body. */
 const MIN_HTML = minorHtml(REG_TEMPLATE);
 
 const REG_HTML = REG_TEMPLATE
-  .replace(/\{\{3\.t\.regHi\}\}/g, '{{3.hi}}')
+  .replace(/\{\{3\.t\.regHi\}\}/g, '{{1.hi}}')
   .replace('<!--GUARDIAN-ROWS-->', '');
 
 /**
@@ -80,7 +80,7 @@ function minorHtml(adultHtml) {
   const cell = 'padding:9px 0;border-bottom:1px solid #eef2fa;';
   const guardianRows = [
     ['minLabels.guardian', '{{1.guardianName}}'],
-    ['minLabels.relation', '{{3.relWord}}'],
+    ['minLabels.relation', '{{1.relWord}}'],
     ['minLabels.guardianEmail', '{{lower(1.guardianEmail)}}'],
     ['minLabels.guardianPhone', '{{1.guardianPhone}}'],
     ['minLabels.riderAge', '{{1.riderAge}}'],
@@ -88,7 +88,7 @@ function minorHtml(adultHtml) {
     ['minLabels.father', '{{ifempty(1.fatherName; "—")}}']
   ]
     .map(([label, value]) =>
-      `<tr><td style="${cell}color:#5f709a;">{{3.t.${label}}}</td>`
+      `<tr><td style="${cell}color:#5f709a;">{{1.copy.${label}}}</td>`
       + `<td style="${cell}font-weight:700;">${value}</td></tr>`)
     .join('\n      ');
 
@@ -96,14 +96,14 @@ function minorHtml(adultHtml) {
   const swaps = [
     // Greeting and opening line both carry placeholders, so they come from
     // module 3 where the guardian name and the child word are already resolved.
-    ['{{3.t.regHi}}', '{{3.minHi}}'],
-    ['{{3.t.regLead}}', '{{3.minLead}}'],
-    ['{{3.t.regPreheader}}', '{{3.t.minPreheader}}'],
-    ['{{3.t.regPrintTitle}}', '{{3.t.minPrintTitle}}'],
-    ['{{3.t.regPrintBody}}', '{{3.t.minPrintBody}}'],
-    ['{{3.t.regPdfTitle}}', '{{3.t.minPdfTitle}}'],
-    ['{{3.t.regPdfBody}}', '{{3.t.minPdfBody}}'],
-    ['{{3.t.regCta}}', '{{3.t.minCta}}'],
+    ['{{1.copy.regHi}}', '{{1.minHi}}'],
+    ['{{1.copy.regLead}}', '{{1.minLead}}'],
+    ['{{1.copy.regPreheader}}', '{{1.copy.minPreheader}}'],
+    ['{{1.copy.regPrintTitle}}', '{{1.copy.minPrintTitle}}'],
+    ['{{1.copy.regPrintBody}}', '{{1.copy.minPrintBody}}'],
+    ['{{1.copy.regPdfTitle}}', '{{1.copy.minPdfTitle}}'],
+    ['{{1.copy.regPdfBody}}', '{{1.copy.minPdfBody}}'],
+    ['{{1.copy.regCta}}', '{{1.copy.minCta}}'],
     ['<!--GUARDIAN-ROWS-->', guardianRows]
   ];
   for (const [from, to] of swaps) {
@@ -116,8 +116,8 @@ function minorHtml(adultHtml) {
   }
   // The age sentence goes under the opening line, before the number block.
   return html.replace(
-    '{{3.minLead}}',
-    '{{3.minLead}}</p>\n    <p style="margin:8px 0 0;font-size:14px;color:#5f709a;">{{3.ageNote}}'
+    '{{1.minLead}}',
+    '{{1.minLead}}</p>\n    <p style="margin:8px 0 0;font-size:14px;color:#5f709a;">{{1.ageNote}}'
   );
 }
 
@@ -129,7 +129,7 @@ const REM_HTML = body('emails/make-reminder.html')
  * Swaps the %RACENUMBER% placeholder for the real Make expression.
  *
  * The bodies are written with a literal placeholder because the templates are also
- * opened in a browser to check the layout, and {{3.raceNumber}} renders as noise
+ * opened in a browser to check the layout, and {{1.raceNumber}} renders as noise
  * there. The substitution happens here, at build time, rather than with a runtime
  * replace() in Make: a replace() around a whole HTML document was what forced the
  * body into a variable in the first place, and that variable is what Make rejected.
@@ -442,7 +442,7 @@ const regRow = row('Registrations', {
   category: '{{1.category}}',
   team_name: '{{1.teamName}}',
   cart_notes: '{{1.cartNotes}}',
-  locale: '{{2.loc}}',
+  locale: '{{1.loc}}',
   rules_consent: '{{if(1.rulesConsent; "yes"; "no")}}',
   privacy_consent: '{{if(1.privacyConsent; "yes"; "no")}}',
   news_consent: '{{if(1.newsConsent; "yes"; "no")}}',
@@ -467,7 +467,7 @@ const remindRow = row('Reminders', {
   created_at: NOW,
   name: '{{1.name}}',
   email: '{{lower(1.email)}}',
-  locale: '{{2.loc}}',
+  locale: '{{1.loc}}',
   consent_at: NOW,
   // Lets a "stop sending me these" link identify the row without exposing the id.
   unsubscribe_token: '{{md5(lower(1.email))}}',
@@ -479,7 +479,7 @@ const contactRow = row('Contacts', {
   name: '{{1.name}}',
   email: '{{lower(1.email)}}',
   message: '{{1.message}}',
-  locale: '{{2.loc}}',
+  locale: '{{1.loc}}',
   status: 'new'
 });
 
@@ -487,7 +487,7 @@ const newsRow = row('Newsletter', {
   created_at: NOW,
   name: '{{trim(1.firstName)}} {{trim(1.lastName)}}',
   email: '{{lower(1.email)}}',
-  locale: '{{2.loc}}',
+  locale: '{{1.loc}}',
   source: 'registration',
   status: 'active'
 });
@@ -509,113 +509,21 @@ const instantFlow = [
     }
   },
 
-  setVars(2, 300, 0, [
-    {
-      name: 'loc',
-      value:
-        '{{switch(lower(substring(ifempty(1.locale; "it"); 0; 2)); "it"; "it"; "pl"; "pl"; ' +
-        '"en"; "en"; "de"; "de"; "es"; "es"; "fr"; "fr"; "it")}}'
-    },
-    { name: 'copy', value: COPY }
-  ]),
+  /* Modules 2 and 3 used to sit here.
 
-  /**
-   * Module 3 is the only place any e-mail text lives.
-   *
-   * Before this, the wording was spread across four Email modules and changing a
-   * sentence meant finding it four times. Now all three bodies and all three
-   * subjects are built here as variables, and the Email modules downstream just
-   * point at them — one module to open when you want to change what people read.
-   *
-   * The registration body still needs the race number, which does not exist until
-   * the sheet row does. So it carries a literal %RACENUMBER% placeholder, and
-   * module 6 does a single replace() once the row number is known. That keeps the
-   * text here without inventing a separate numbering source.
-   */
-  setVars(3, 600, 0, [
-    { name: 't', value: '{{get(parseJSON(2.copy); 2.loc)}}' },
-    { name: 'tit', value: '{{get(parseJSON(2.copy); "it")}}' },
-    { name: 'ev', value: '{{get(parseJSON(2.copy); "_event")}}' },
-    { name: 'fullName', value: '{{trim(1.firstName)}} {{trim(1.lastName)}}' },
-    { name: 'generatedAt', value: '{{formatDate(now; "DD.MM.YYYY HH:mm"; "Europe/Rome")}}' },
+     Module 2 carried the whole six-language copy deck in one variable; module 3
+     picked the submitter's language out of it and built every subject and greeting.
+     Twenty-six kilobytes of dictionary and forty expressions, inside a tool whose
+     job is sending mail.
 
-    { name: 'hi', value: '{{replace(get(parseJSON(2.copy); 2.loc).regHi; "%FIRSTNAME%"; trim(1.firstName))}}' },
-    {
-      name: 'help',
-      value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).regHelp; "%ORGEMAIL%"; '
-        + 'get(parseJSON(2.copy); "_event").email); "%ORGPHONE%"; '
-        + 'get(parseJSON(2.copy); "_event").phone)}}'
-    },
-    {
-      name: 'printFooter',
-      value: '{{replace(get(parseJSON(2.copy); 2.loc).printFooter; "%GENERATEDAT%"; '
-        + 'formatDate(now; "DD.MM.YYYY HH:mm"; "Europe/Rome"))}}'
-    },
+     The Vercel function does it now. It already knew the language, already had the
+     deck in the repository and already had to compute the age, so it resolves the
+     wording and puts it in the request: {{1.copy.regLead}}, {{1.subject}},
+     {{1.minHi}}. Ordinary webhook fields, the same kind as {{1.firstName}}.
 
-    /* --- subjects ---------------------------------------------------------- */
-    { name: 'regSubject', value: '{{get(parseJSON(2.copy); 2.loc).regSubject}}' },
-    { name: 'minSubject', value: '{{get(parseJSON(2.copy); 2.loc).minSubject}}' },
-    { name: 'remSubject', value: '{{get(parseJSON(2.copy); 2.loc).remSubject7}}' },
-    { name: 'contactSubject', value: 'Kontakt ze strony — {{1.name}}' },
-    { name: 'newsSubject', value: '{{get(parseJSON(2.copy); 2.loc).newsSubject}}' },
-    {
-      name: 'newsHi',
-      value: '{{replace(get(parseJSON(2.copy); 2.loc).newsHi; "%FIRSTNAME%"; trim(1.firstName))}}'
-    },
-
-    /* --- wording for an under-18 entry -------------------------------------
-       These used to live in a module downstream of the spreadsheet write, because
-       they were computed next to the race number and the race number *was* the row
-       number of the sheet that had just been written. The number now arrives from a
-       database sequence as {{1.raceNumber}}, so nothing here waits for anything, and
-       all of it belongs in the one module that holds text.
-
-       minChild is a map, so the word for son / daughter / child is looked up by the
-       submitted value and falls back to the neutral form. An unknown value gives
-       "your child", never an empty gap in the middle of a sentence. */
-    {
-      name: 'childWord',
-      value: '{{get(get(parseJSON(2.copy); 2.loc).minChild; ifempty(1.childKind; "child"))}}'
-    },
-    {
-      name: 'relWord',
-      value: '{{get(get(parseJSON(2.copy); 2.loc).minRel; ifempty(1.guardianRelation; "guardian"))}}'
-    },
-    {
-      name: 'minHi',
-      value: '{{replace(get(parseJSON(2.copy); 2.loc).minHi; "%GUARDIAN%"; trim(1.guardianName))}}'
-    },
-    {
-      name: 'minLead',
-      value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).minLead; "%CHILD%"; '
-        + 'get(get(parseJSON(2.copy); 2.loc).minChild; ifempty(1.childKind; "child"))); '
-        + '"%FIRSTNAME%"; trim(1.firstName))}}'
-    },
-    {
-      name: 'ageNote',
-      value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).minAgeNote; "%FIRSTNAME%"; '
-        + 'trim(1.firstName)); "%AGE%"; 1.riderAge)}}'
-    },
-
-    /* --- the attachment ---------------------------------------------------- */
-    {
-      name: 'pdfUrl',
-      value: `{{if(1.isMinor; "${SITE}/emails/Carruleddhi-modulo-minori.pdf"; `
-        + `"${SITE}/emails/Carruleddhi-modulo.pdf")}}`
-    },
-    { name: 'pdfName', value: '{{if(1.isMinor; "Carruleddhi-minori-"; "Carruleddhi-modulo-")}}' }
-
-    /* --- the bodies are in module 5, one step later ------------------------
-       They cannot be here. Make refuses the scenario:
-
-         [module ID 3] references inaccessible module [module ID 3]
-
-       and it is right — the bodies quote {{3.t.…}} for their wording, which is a
-       variable this very module is still defining. A variable is evaluated when its
-       own module runs, so the value does not exist yet.
-
-       One module later it does. See module 5. */
-  ]),
+     Two fewer modules to configure after every import, one less place for the
+     wording to live, and nothing left in the scenario that reads a variable of a
+     variable of a variable. */
 
   /**
    * Module 5 — the five e-mail bodies, one variable each.
@@ -630,8 +538,8 @@ const instantFlow = [
    *   Here, the Content field of every Email module is one item — {{5.regHtml}} —
    *   and the markup is in one place. Which is where it was before, except that
    *   place was module 3, and module 3 is where the wording the markup quotes is
-   *   still being defined. Module 5 sits after 3, so {{3.t.regPreheader}} and
-   *   {{3.minHi}} are both resolved by the time these are built. Same idea, one
+   *   still being defined. Module 5 sits after 3, so {{1.copy.regPreheader}} and
+   *   {{1.minHi}} are both resolved by the time these are built. Same idea, one
    *   module further along, and Make accepts it.
    */
   setVars(5, 1150, 0, [
@@ -673,15 +581,15 @@ const instantFlow = [
     /* ---- A: adult entry ------------------------------------------------- */
     {
       flow: [
-        httpGetFile(7, 1250, -520, '{{3.pdfUrl}}', eq('adult', '{{1.branch}}', 'registration-adult')),
+        httpGetFile(7, 1250, -520, '{{1.pdfUrl}}', eq('adult', '{{1.branch}}', 'registration-adult')),
         sendEmail(8, 1600, -520, {
           to: '{{lower(1.email)}}',
           // Blind copy so every entry lands in the organiser's inbox as well,
           // without the rider seeing a second address on their own confirmation.
           bcc: [ORG_EMAIL],
-          subject: '{{replace(3.regSubject; "%RACENUMBER%"; 1.raceNumber)}}',
+          subject: '{{1.subject}}',
           html: '{{5.regHtml}}',
-          attachments: [{ fileName: '{{3.pdfName}}{{1.raceNumber}}.pdf', data: '{{7.data}}' }]
+          attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{7.data}}' }]
         })
       ]
     },
@@ -689,16 +597,16 @@ const instantFlow = [
     /* ---- B: under-18 entry ---------------------------------------------- */
     {
       flow: [
-        httpGetFile(19, 1250, -280, '{{3.pdfUrl}}', eq('under 18', '{{1.branch}}', 'registration-minor')),
+        httpGetFile(19, 1250, -280, '{{1.pdfUrl}}', eq('under 18', '{{1.branch}}', 'registration-minor')),
         /* Addressed to the guardian, because they are the one who signs. The rider
            gets a blind copy so they still see their number without becoming a second
            visible recipient on a letter written to their parent. */
         sendEmail(16, 1600, -280, {
           to: '{{lower(1.guardianEmail)}}',
           bcc: ['{{"' + ORG_EMAIL + ', " + lower(1.email)}}'],
-          subject: '{{replace(3.minSubject; "%RACENUMBER%"; 1.raceNumber)}}',
+          subject: '{{1.subject}}',
           html: '{{5.minHtml}}',
-          attachments: [{ fileName: '{{3.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]
+          attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]
         })
       ]
     },
@@ -730,7 +638,7 @@ const instantFlow = [
         sendEmail(12, 1250, 200, {
           filter: eq('reminder', '{{1.branch}}', 'reminder'),
           to: '{{lower(1.email)}}',
-          subject: '{{3.remSubject}}',
+          subject: '{{1.remSubject}}',
           html: '{{5.remHtml}}'
         })
       ]
@@ -743,7 +651,7 @@ const instantFlow = [
           filter: eq('contact', '{{1.branch}}', 'contact'),
           to: ORG_EMAIL,
           replyTo: '{{lower(1.email)}}',
-          subject: '{{3.contactSubject}}',
+          subject: '{{1.contactSubject}}',
           html: '{{5.contactHtml}}'
         })
       ]
@@ -762,7 +670,7 @@ const instantFlow = [
             conditions: [[{ a: '{{1.newsConsent}}', o: 'boolean:equal', b: 'true' }]]
           },
           to: '{{lower(1.email)}}',
-          subject: '{{3.newsSubject}}',
+          subject: '{{1.newsSubject}}',
           html: '{{5.newsHtml}}'
         })
       ]
@@ -784,7 +692,7 @@ function shell(inner) {
     'CARRULEDDHI <span style="color:#ffc928;">SHOW 2026</span></td></tr>',
     inner,
     '<tr><td style="background:#071a3d;padding:20px 32px;font-size:12px;line-height:1.6;color:#8fb0e8;">',
-    '{{3.t.footerNote}}<br>',
+    '{{1.copy.footerNote}}<br>',
     `<a href="mailto:${ORG_EMAIL}" style="color:#ffc928;">${ORG_EMAIL}</a>`,
     '</td></tr></table></td></tr></table></body></html>'
   ].join('');
@@ -795,13 +703,13 @@ function reminderOptInHtml() {
     [
       '<tr><td style="padding:32px 32px 8px;">',
       '<h1 style="margin:0 0 14px;font-size:30px;line-height:1.1;color:#071a3d;font-weight:800;',
-      'letter-spacing:-1px;">{{3.t.remHeading7}}</h1>',
-      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{3.t.remBody7}}</div>',
+      'letter-spacing:-1px;">{{1.copy.remHeading7}}</h1>',
+      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{1.copy.remBody7}}</div>',
       '</td></tr>',
       '<tr><td align="center" style="padding:22px 32px 30px;">',
-      '<a href="{{3.ev.map}}" style="display:inline-block;background:#2469d8;color:#ffffff;',
+      '<a href="{{1.ev.map}}" style="display:inline-block;background:#2469d8;color:#ffffff;',
       'font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;',
-      'text-decoration:none;padding:14px 26px;border-radius:999px;">{{3.t.remCta}} &rarr;</a>',
+      'text-decoration:none;padding:14px 26px;border-radius:999px;">{{1.copy.remCta}} &rarr;</a>',
       '</td></tr>'
     ].join('')
   );
@@ -823,23 +731,23 @@ function newsletterOptInHtml() {
   return shell(
     [
       '<tr><td style="padding:32px 32px 10px;">',
-      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{3.newsHi}}</div>',
+      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{1.newsHi}}</div>',
       '<h1 style="margin:10px 0 14px;font-size:27px;line-height:1.15;color:#071a3d;font-weight:800;',
-      'letter-spacing:-1px;">{{3.t.newsSubject}}</h1>',
-      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{3.t.newsLead}}</div>',
+      'letter-spacing:-1px;">{{1.copy.newsSubject}}</h1>',
+      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{1.copy.newsLead}}</div>',
       '</td></tr>',
       '<tr><td style="padding:6px 32px 4px;">',
       '<div style="background:#fff8e1;border:2px solid #ffc928;border-radius:14px;padding:16px 18px;',
-      'font-size:14px;line-height:1.6;color:#5b4708;">{{3.t.newsBody}}</div>',
+      'font-size:14px;line-height:1.6;color:#5b4708;">{{1.copy.newsBody}}</div>',
       '</td></tr>',
       '<tr><td align="center" style="padding:22px 32px 12px;">',
       `<a href="${SITE}" style="display:inline-block;background:#2469d8;color:#ffffff;`,
       'font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;',
-      'text-decoration:none;padding:14px 26px;border-radius:999px;">{{3.t.newsCta}} &rarr;</a>',
+      'text-decoration:none;padding:14px 26px;border-radius:999px;">{{1.copy.newsCta}} &rarr;</a>',
       '</td></tr>',
       '<tr><td align="center" style="padding:0 32px 28px;font-size:12px;color:#8091b5;">',
       `<a href="mailto:${ORG_EMAIL}?subject=STOP%20newsletter" style="color:#8091b5;">`,
-      '{{3.t.newsUnsub}}</a></td></tr>'
+      '{{1.copy.newsUnsub}}</a></td></tr>'
     ].join('')
   );
 }
@@ -981,6 +889,23 @@ const remindersFlow = [
     metadata: at(1500, 0)
   }
 ];
+
+/* ------------------------------------------------- copy deck for the Worker
+   The Vercel function resolves the wording for the submitter's language and sends it
+   in the webhook payload, so Make holds no dictionary of its own and every reference
+   in the scenario is a plain webhook field.
+
+   Written as a JS module rather than imported as JSON: the function is bundled for
+   the Edge runtime, and a JSON import assertion is one more thing that can differ
+   between bundlers. A generated .js file imports the same everywhere. */
+writeFileSync(
+  resolve(root, 'worker/copy-deck.js'),
+  '/* GENERATED by tools/build-make-blueprints.mjs from emails/copy.json. Do not edit. */\n'
+    + '/* eslint-disable */\n'
+    + `export const COPY_DECK = ${JSON.stringify(copyRaw, null, 0)};\n`,
+  'utf8'
+);
+console.log(`worker/copy-deck.js  ${(Buffer.byteLength(JSON.stringify(copyRaw), 'utf8') / 1024).toFixed(1)} kB`);
 
 /* ------------------------------------------------------------------ write */
 
