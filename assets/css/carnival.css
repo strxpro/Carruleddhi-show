@@ -1,0 +1,2601 @@
+/**
+ * Carnival layer — loaded last, wins every conflict.
+ *
+ * Fixes verified by measurement before this file existed:
+ *   section corner radius 62px  → previous section visible at the corners
+ *   .attendance::before         → animation: spin, background never stood still
+ *   .form-progress__runner      → top -10px inside overflow:hidden, dot cut off
+ *   --font-display              → still resolved to Aptos Display, not changed
+ */
+
+/* ============================================================
+   1. Typography — a real fairground face, self-hosted.
+   ============================================================
+   Bungee is the headline face: chunky signage letters, the closest thing to a
+   painted funfair board that exists under an open licence. Baloo 2 carries the
+   labels and buttons — rounded, friendly, and it has the Polish diacritics.
+
+   Both are served from public/assets/fonts/ rather than the Google CDN. The site
+   collects participant data, so sending every visitor's IP to a third party for
+   a font is not a trade worth making. latin + latin-ext only: that covers
+   Italian accents and Polish ogonek/kreska. 85 kB total for four files.
+
+   Bungee ships one weight (400). Asking for 900 would make the browser fake it
+   with a smear, so the display weight stays at 400 and the face does the work. */
+@font-face {
+  font-family: 'Bungee';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/fonts/bungee-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bungee';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/assets/fonts/bungee-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/assets/fonts/baloo2-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/assets/fonts/baloo2-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  --font-display:
+    'Bungee', 'Segoe UI Black', 'Arial Black', 'Franklin Gothic Heavy',
+    Impact, system-ui, sans-serif;
+  --font-meta:
+    'Baloo 2', 'Segoe UI Semibold', 'Segoe UI', 'Trebuchet MS',
+    -apple-system, system-ui, sans-serif;
+  --font-body:
+    'Baloo 2', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --display-weight: 400;
+
+  --confetti-1: var(--yellow);
+  --confetti-2: var(--coral);
+  --confetti-3: var(--blue-500);
+  --confetti-4: var(--green);
+}
+
+/* Bungee is already uppercase-flavoured and very wide. Negative tracking keeps
+   long Italian and Polish headlines inside their boxes. */
+.hero__title,
+.section-title,
+.stack-card h3,
+.attendance__counter,
+.footer__brand,
+.g3d__heading,
+.form-step h3,
+.modal h2,
+.preloader__word,
+.marquee__item,
+.hero-stat__number,
+.countdown__number {
+  font-weight: 400;
+  letter-spacing: -.035em;
+  text-transform: uppercase;
+}
+.hero__title { line-height: .9; }
+.section-title { line-height: .92; }
+.stack-card h3 { line-height: .98; }
+
+/* Bungee has no lowercase personality worth showing in running text. */
+.hero__tagline {
+  font-family: var(--font-meta);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: -.015em;
+}
+.lead, .stack-card p, .form-step__intro { text-transform: none; }
+
+/* Baloo 2 sits lower on the line than the previous stack, so the tight
+   uppercase labels need a touch more room to stay legible. */
+.meta, .btn, .card-tag, .stack-card__num, .eyebrow, .site-nav a {
+  font-weight: 700;
+}
+.btn { line-height: 1.1; }
+
+/* Playful eyebrow: tilted tag instead of a flat line of caps. */
+.eyebrow {
+  padding: 5px 12px 5px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--navy-950);
+  font-size: clamp(11px, 1.4svh, 13px);
+  letter-spacing: .14em;
+  transform: rotate(-1.4deg);
+}
+.eyebrow::before { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); }
+.story .eyebrow,
+.schedule .eyebrow,
+.contact .eyebrow,
+.attendance .eyebrow,
+.prizes .eyebrow { background: var(--yellow); color: var(--navy-950); }
+
+/* Coloured highlight under key headlines. */
+.section-title--medium > span,
+.hero__tagline { position: relative; }
+
+/* ============================================================
+   2. Sections: full-bleed, no peeking corners.
+   ============================================================
+   62px rounded corners meant the section underneath showed through on both
+   sides at every boundary. Square edges make the stack read as one surface. */
+:root { --section-card-radius: 0px; }
+#main > section.section-card,
+#main > section.section-card--hero {
+  border-radius: 0;
+  box-shadow: 0 -18px 44px rgba(7, 26, 61, .22);
+}
+.site-footer { border-radius: 0; }
+
+/* A thin coloured seam marks each boundary instead of a rounded corner. */
+#main > section.section-card:not(.section-card--hero)::before {
+  content: '';
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--confetti-1) 0 22px,
+    var(--confetti-2) 22px 44px,
+    var(--confetti-3) 44px 66px,
+    var(--confetti-4) 66px 88px
+  );
+  pointer-events: none;
+}
+
+/* Snap targets are declared in section 16, not here: making every section a
+   target — including the two- and three-screen ones — is what made scrolling feel
+   like it was fighting back. */
+
+/* ============================================================
+   3. Attendance: the background must not move.
+   ============================================================ */
+.attendance::before {
+  animation: none !important;
+  background: repeating-radial-gradient(
+    circle at center,
+    transparent 0 62px,
+    rgba(255, 255, 255, .085) 64px 67px
+  );
+}
+.attendance__press {
+  border-color: rgba(255, 255, 255, .28);
+  box-shadow: 0 18px 0 #a9263b, 0 34px 58px rgba(0, 0, 0, .34);
+}
+
+/* ============================================================
+   4. Stepper: nothing clipped, everything aligned.
+   ============================================================
+   The runner sits on the bar and is 27px tall, so the bar needs at least 14px
+   of clearance from the top of the clipped container. */
+.form-main { padding-top: calc(clamp(28px, 5vw, 68px) + 16px); }
+.form-progress { top: 16px; }
+.form-progress__runner { width: 24px; height: 24px; font-size: 10px; }
+
+/* Measured before this block: the active row sat 9px to the right of the other
+   two, so its circle missed the vertical rail by 9px and its label started 9px
+   further in than the labels above and below. Cause: .is-active carried
+   translateX(9px), which moves layout, not just paint. The emphasis now comes
+   from the circle alone — the row itself never moves, so circles and labels stay
+   on one line. Column width equals circle width so the rail can be centred on it
+   with plain arithmetic instead of a guess. */
+.step-indicator {
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+.step-indicator.is-active { transform: none; }
+.step-indicator.is-active .step-indicator__number { transform: scale(1.1); }
+.step-indicator__number { z-index: 1; }
+.step-indicator__copy strong { letter-spacing: .02em; }
+.step-list::before { left: 18px; width: 3px; border-radius: 3px; }
+
+/* The date button used to be 66px tall next to 56px inputs, so the row it sits
+   in stepped down. Same height, and the icon rides with the label's first line
+   instead of the middle of a two-line block. */
+#signup .date-trigger { min-height: 56px; padding-block: 6px; }
+.date-trigger__icon { align-self: start; margin-top: 1px; width: 32px; height: 32px; }
+.date-trigger__copy { align-self: center; }
+.date-trigger__copy small { font-size: 10px; line-height: 1.2; letter-spacing: .1em; }
+.date-trigger__copy strong { font-size: 15px; line-height: 1.25; }
+.date-trigger__arrow { align-self: start; margin-top: 3px; }
+
+@media (max-width: 760px) {
+  .form-main { padding-top: 34px; }
+  .form-progress { top: 12px; }
+  #signup .step-list::before { top: 17px; }
+  .step-indicator { grid-template-columns: minmax(0, 1fr); }
+  .step-indicator.is-active { transform: translateY(-3px); }
+}
+
+/* ============================================================
+   5. Newsletter opt-in: a real control, not a bare checkbox.
+   ============================================================ */
+.consent-box .checkbox {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  overflow: hidden;
+  padding: 14px 16px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  background: var(--white);
+  transition: border-color .25s ease, background .25s ease, transform .3s var(--ease-out);
+}
+.consent-box .checkbox:hover { transform: translateY(-2px); border-color: var(--blue-500); }
+.consent-box .checkbox input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.consent-box .checkbox::before {
+  content: '';
+  grid-column: 1;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: #c3cee0;
+  transition: background .25s ease;
+}
+.consent-box .checkbox::after {
+  content: '';
+  position: absolute;
+  left: 20px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 2px 5px rgba(7, 26, 61, .3);
+  transition: transform .28s var(--ease-snap);
+}
+.consent-box .checkbox:has(input:checked) { border-color: var(--green); background: #f1fdf7; }
+.consent-box .checkbox:has(input:checked)::before { background: var(--green); }
+.consent-box .checkbox:has(input:checked)::after { transform: translateX(18px); }
+.consent-box .checkbox:has(input:focus-visible) { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.consent-box .checkbox > span { grid-column: 2; font-size: 13.5px; line-height: 1.45; }
+
+/* The reminder modal reuses .checkbox but needs the tick semantics, not a switch. */
+.modal .consent-box .checkbox { grid-template-columns: 26px minmax(0, 1fr); }
+.modal .consent-box .checkbox::before {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--line);
+  border-radius: 9px;
+  background: var(--white);
+}
+.modal .consent-box .checkbox::after {
+  left: 21px;
+  width: 14px;
+  height: 8px;
+  border: 0;
+  border-left: 3px solid var(--white);
+  border-bottom: 3px solid var(--white);
+  border-radius: 1px;
+  background: none;
+  box-shadow: none;
+  opacity: 0;
+  transform: rotate(-45deg);
+}
+.modal .consent-box .checkbox:has(input:checked)::before { border-color: var(--green); background: var(--green); }
+.modal .consent-box .checkbox:has(input:checked)::after { opacity: 1; transform: rotate(-45deg); }
+
+/* ============================================================
+   6. More colour, fewer flat greys.
+   ============================================================ */
+.route__fact { border-left: 5px solid var(--confetti-3); }
+.route__fact:nth-child(2) { border-left-color: var(--confetti-1); }
+.route__fact--obstacles { border-left-color: var(--confetti-2); }
+.schedule-row:nth-child(odd) time { color: var(--yellow); }
+.schedule-row:nth-child(even) time { color: var(--white); }
+.card-tag { border-width: 2px; font-weight: 700; }
+.hero__kicker { transform: rotate(-1deg); }
+
+/* ============================================================
+   7. Things that react when you touch them.
+   ============================================================
+   Every effect below is transform, opacity or box-shadow only. No blur, no
+   filter, no background-position animation — those force a repaint of the whole
+   painted area on every frame, which is what made the earlier passes stutter. */
+
+/* Ticket-booth buttons: a hard offset shadow that collapses on press, so the
+   button physically goes down instead of just changing colour. */
+.btn {
+  font-weight: 700;
+  letter-spacing: .05em;
+  box-shadow: 0 4px 0 rgba(7, 26, 61, .38);
+  transition: transform .16s var(--ease-snap), box-shadow .16s var(--ease-snap),
+    background .25s ease, color .25s ease;
+}
+.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(7, 26, 61, .38); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(7, 26, 61, .38); }
+.btn--yellow, .btn--blue { box-shadow: 0 4px 0 rgba(7, 26, 61, .45); }
+
+/* Category cards. The transform on .stack-card itself belongs to the scroll
+   handler in app.js — writing one here would be overwritten on the next frame,
+   so the hover life goes on the artwork instead. */
+.stack-card__visual svg { transition: transform .6s var(--ease-snap); }
+.stack-card:hover .stack-card__visual svg { transform: rotate(-5deg) scale(1.08); }
+
+/* Tags fill in on hover instead of sitting there as outlines. */
+.card-tag { transition: background .22s ease, color .22s ease, transform .22s var(--ease-snap); }
+.card-tag:hover { background: currentColor; transform: translateY(-2px) rotate(-1.5deg); }
+.stack-card--classic .card-tag:hover { color: var(--navy-950); background: var(--white); }
+
+/* Hero tiles and route facts lift as a group so the grid reads as physical objects.
+   ---------------------------------------------------------------------------
+   `.prize-card` USED TO BE IN THIS LIST. It was the reason hovering the prize deck
+   made the card jump.
+
+   Every prize card is positioned by script: translate(-50%, -50%) plus the stack
+   offsets plus whatever the drag is doing. This rule set `transform` to a plain
+   translateY, which replaced all of that at once — so the moment the cursor
+   crossed the card it leapt to a completely different place, and left again as
+   soon as the cursor moved off. Section 31 spotted the same class of problem and
+   warned against writing `transform: none` on hover, but the write that was
+   already doing the damage lived here.
+
+   There are no prize cards outside the deck, so the fix is simply not to match
+   them. The deck gets its own hover in section 35, on properties script does not
+   own. */
+.hero-stat,
+.route__fact,
+.faq-item {
+  transition: transform .35s var(--ease-out), box-shadow .35s ease;
+}
+.hero-stat:hover,
+.route__fact:hover { transform: translateY(-4px) rotate(-.4deg); }
+
+/* Countdown digits get a ticket-stub frame so the number reads as a score board. */
+.countdown__unit {
+  border-radius: 16px;
+  transition: background .3s ease, transform .3s var(--ease-snap);
+}
+.countdown__unit:nth-child(1) { background: rgba(255, 201, 40, .14); }
+.countdown__unit:nth-child(2) { background: rgba(246, 73, 79, .16); }
+.countdown__unit:nth-child(3) { background: rgba(63, 130, 247, .18); }
+.countdown__unit:nth-child(4) { background: rgba(31, 191, 120, .16); }
+
+/* Schedule rows light up one at a time as the pointer runs down the list. */
+.schedule-row { transition: background .25s ease, transform .25s var(--ease-out); }
+.schedule-row:hover { background: rgba(255, 201, 40, .1); transform: translateX(6px); }
+
+/* Nav underline becomes a full chip: easier to hit and reads as a fairground sign. */
+.site-nav a::after { height: 3px; border-radius: 3px; }
+
+/* Confetti thrown by the attendance button. The pieces are created once per
+   press and removed on animationend, so nothing accumulates in the DOM. */
+.confetti-piece {
+  position: fixed;
+  z-index: 90;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  pointer-events: none;
+  animation: confetti-fall var(--confetti-life, 1400ms) cubic-bezier(.2, .6, .4, 1) forwards;
+}
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg); }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--confetti-dx, 0), var(--confetti-dy, 240px), 0)
+      rotate(var(--confetti-spin, 540deg));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eyebrow, .hero__kicker { transform: none; }
+  .consent-box .checkbox,
+  .btn,
+  .card-tag,
+  .schedule-row,
+  .hero-stat,
+  .prize-card,
+  .route__fact { transition: none; }
+  .confetti-piece { display: none; }
+}
+
+@media print {
+  #main > section.section-card::before { display: none; }
+  .confetti-piece { display: none; }
+}
+
+/* ============================================================
+   8. Two buttons that have to feel like buttons.
+   ============================================================ */
+
+/* "Ci sarò" / "Będę tam". It used to squash for 450 ms and spring back, and the
+   markup then set [disabled], which reads as broken rather than done. Now the
+   press stays down and goes deep red, and the button remains focusable so
+   clicking it again reopens the reminder dialog. */
+.attendance__press.is-done,
+.attendance__press.is-done:hover {
+  background: #8e1a2c;
+  color: #ffd9df;
+  filter: none;
+  cursor: pointer;
+  transform: translateY(14px) scale(.985);
+  box-shadow: 0 5px 0 #5f0f1d, 0 12px 26px rgba(0, 0, 0, .34), inset 0 5px 14px rgba(0, 0, 0, .35);
+}
+.attendance__press.is-done:active { transform: translateY(16px) scale(.98); }
+.attendance__press.is-done::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  color: var(--yellow);
+  font-size: 18px;
+  line-height: 1;
+}
+/* The old [disabled] rule desaturated the whole thing; nothing is disabled now. */
+.attendance__press[disabled] { filter: none; }
+
+/* Regulations gate. Pressing it opens a dialog, and a dialog steals focus in the
+   same frame, so the button never rendered its :active state — the pop-up looked
+   like it came from nowhere. The class is added on click and the dialog waits
+   170 ms behind it. */
+.consent-gate.is-pressing {
+  border-color: var(--blue-500);
+  background: #eaf2ff;
+  transform: translateY(3px) scale(.99);
+  box-shadow: 0 2px 0 rgba(36, 105, 216, .45), inset 0 3px 10px rgba(7, 26, 61, .12);
+}
+.consent-gate.is-pressing .consent-gate__mark { transform: scale(.92) rotate(-8deg); }
+.consent-gate:active {
+  transform: translateY(3px) scale(.99);
+  box-shadow: 0 2px 0 rgba(36, 105, 216, .45);
+}
+
+/* ============================================================
+   9. Header opens on hover, not only on click.
+   ============================================================
+   After 120 px of scroll the bar collapses to a 292 px pill. Reaching the menu
+   then took a click. On a mouse, hovering the pill expands it straight back to
+   the full bar; touch devices keep the click, because there is no hover there and
+   a hover-only affordance would be unreachable. */
+/* The first attempt expanded the pill to the full 1120 px bar, which looked
+   broken: the "current section" chip un-clipped from zero width and its spinning
+   dot appeared as a lone yellow circle floating in the middle of the bar while
+   its label was still being revealed.
+
+   So the hover no longer restores the whole bar. It grows the pill just enough to
+   bring back the two controls that matter — language and "Ci sarò" — and leaves
+   the current-section chip collapsed, because that information is already in the
+   scroll progress line at the top of the screen. Nothing un-clips, nothing floats,
+   and the pill stays a pill. */
+@media (hover: hover) and (pointer: fine) {
+  .site-header.is-compact:hover,
+  .site-header.is-compact:focus-within {
+    width: min(560px, calc(100vw - 28px));
+  }
+  .site-header.is-compact:hover .nav-shell,
+  .site-header.is-compact:focus-within .nav-shell {
+    gap: 10px;
+    padding-right: 8px;
+  }
+  .site-header.is-compact:hover .nav-actions,
+  .site-header.is-compact:focus-within .nav-actions { gap: 8px; }
+  .site-header.is-compact:hover .nav-attend,
+  .site-header.is-compact:hover .language-picker,
+  .site-header.is-compact:focus-within .nav-attend,
+  .site-header.is-compact:focus-within .language-picker {
+    max-width: 200px;
+    overflow: visible;
+    opacity: 1;
+    transform: none;
+  }
+  /* Stays collapsed on purpose — see the note above. */
+  .site-header.is-compact:hover .nav-current,
+  .site-header.is-compact:focus-within .nav-current {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+  .site-header.is-compact:hover .menu-toggle,
+  .site-header.is-compact:focus-within .menu-toggle {
+    width: 50px;
+    min-width: 50px;
+    border-radius: 50%;
+  }
+  .site-header.is-compact:hover .menu-toggle__label,
+  .site-header.is-compact:focus-within .menu-toggle__label { display: none; }
+}
+
+/* ============================================================
+   14. Pop-ups on a phone.
+   ============================================================
+   The reminder dialog and the success panel were centred with `place-items` on a
+   container that was itself taller than the visual viewport once the on-screen
+   keyboard appeared, so the card sat off-centre and its top was unreachable. They
+   are now anchored to the top with a scrollable body, which is the only layout
+   that survives a keyboard opening. */
+@media (max-width: 760px) {
+  .modal {
+    align-items: flex-start;
+    justify-items: stretch;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .modal__dialog {
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    margin: 0 auto;
+    padding: 20px 18px 22px;
+    border-radius: 26px;
+  }
+  .modal__icon { width: 44px; height: 44px; margin-bottom: 12px; font-size: 20px; }
+  .modal h2 { font-size: clamp(20px, 6.2vw, 26px); line-height: 1.08; }
+  .modal__lead { font-size: 13.5px; line-height: 1.5; }
+  .modal__close { top: 10px; right: 10px; }
+  /* Three time chips wrapped to two lines and left a ragged edge. */
+  .reminder-times {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .reminder-times span {
+    padding: 7px 4px;
+    font-size: 10.5px;
+    letter-spacing: .02em;
+    text-align: center;
+  }
+  .modal .form-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .modal .consent-box { padding: 12px 12px; }
+  .modal .consent-box .checkbox > span { font-size: 12.5px; }
+
+  /* The consent reader is a full-height sheet on a phone, not a floating card.
+     `height: 100%` inside a <dialog> whose own height is auto resolved to auto,
+     so the sheet grew to 7166 px — the length of both legal documents — and the
+     Accept button sat 7 screens below the fold, permanently out of reach. A
+     viewport unit plus an internal scroll area is the only thing that holds. */
+  .consent-dialog { padding: 0; }
+  .consent-dialog__surface {
+    display: flex;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    flex-direction: column;
+    border-radius: 0;
+  }
+  /* Header, progress bar and footer stay put; only the documents scroll. */
+  .consent-dialog__header,
+  .consent-dialog__footer,
+  .consent-progress { flex: none; }
+  .consent-dialog__header { padding: 16px 16px 12px; }
+  .consent-dialog__footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  [data-consent-scroll] {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ============================================================
+   10. Route: marching dashes, one upright cart, two end markers.
+   ============================================================ */
+
+/* One thin travelling line instead of a wide painted road.
+   The tapered yellow dash polygons stay, but quiet: at full strength they were
+   the loudest thing in the section and buried the photo underneath. The white
+   marching centre line now carries the direction of travel on its own.
+   stroke-dashoffset animates on the compositor and repaints only the stroke, so
+   this costs nothing per frame. The keyframes live in experience.css. */
+.route__ribbon--fill { fill-opacity: .72; filter: none; }
+.route__ribbon--casing { fill-opacity: .34; }
+.route__frame.is-route-drawn .route__line--dash {
+  opacity: 1;
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-dasharray: 9 13;
+  animation-duration: .9s;
+  filter: drop-shadow(0 0 2px rgba(7, 26, 61, .9));
+}
+
+/* Start and finish only, and small. Both were 89x34 badges with a 30px dot
+   beside them — four objects fighting for two corners of a photograph. One
+   compact chip per end, and the dot shrinks to a bead that just marks the spot. */
+.route__node {
+  width: 16px;
+  height: 16px;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .9), 0 4px 10px rgba(7, 26, 61, .45);
+}
+.route__node::after { display: none; }
+.route__frame .route__pin {
+  gap: 5px;
+  padding: 4px 10px;
+  border: 2px solid var(--navy-950);
+  border-radius: 999px;
+  font-family: var(--font-meta);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 0 rgba(7, 26, 61, .35);
+}
+.route__frame .route__pin::before { width: 5px; height: 5px; }
+.route__frame .route__pin--start { background: var(--yellow); color: var(--navy-950); }
+.route__frame .route__pin--end { background: var(--coral); color: var(--white); }
+/* Pull the labels clear of their dots so neither sits on the line. */
+.route__frame .route__pin--start { transform: translate(-50%, calc(-100% - 14px)); }
+.route__frame .route__pin--end { transform: translate(-50%, 16px); }
+
+/* The finish pin was hidden below 760 px, so a phone showed a start marker and
+   nothing at the bottom. Both ends matter more than either label being roomy. */
+@media (max-width: 760px) {
+  .route__frame .route__pin--end { display: flex; }
+  .route__frame .route__pin { padding: 5px 9px; font-size: 9px; letter-spacing: .1em; border-width: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route__frame.is-route-drawn .route__line--dash { animation: none; }
+  .attendance__press.is-done,
+  .consent-gate.is-pressing { transition: none; }
+}
+
+/* ============================================================
+   11. Prize deck: shuffles cleanly, both ways.
+   ============================================================
+   Measured causes of the juddering, in order of how much they cost:
+     - filter: saturate() on seven stacked 440x540 cards, re-evaluated on every
+       frame of the floating artwork. Removed in app.js.
+     - perspective: 1400px on the deck with no 3D rotation anywhere in it. It
+       bought nothing and put the whole stack on its own composited layer.
+     - touch-action: pan-y, which let a sideways drag scroll the page at the same
+       time, so the card and the page moved together. */
+.prize-deck {
+  perspective: none;
+  touch-action: manipulation;
+}
+.prize-deck.is-dragging { cursor: grabbing; touch-action: none; }
+.prize-deck.is-dragging .prize-card__art svg { animation-play-state: paused; }
+
+/* Shorter, snappier throw. .7s felt like waiting for the card to decide. */
+.prize-card { transition: transform .38s var(--ease-out), opacity .3s ease; }
+.prize-card.is-gone {
+  opacity: 0;
+  transform: translate(-50%, -50%) translateX(-125%) rotate(-16deg);
+}
+/* Going back sends the card off the other side, so the direction of the flick
+   and the direction the card leaves always agree. */
+.prize-card.is-gone-back {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) translateX(125%) rotate(16deg);
+}
+.prize-card:active { cursor: grabbing; }
+
+@media (prefers-reduced-motion: reduce) {
+  .prize-card { transition: none; }
+  .prize-card__art svg { animation: none !important; }
+}
+
+/* ============================================================
+   12. Language switch: letters flip over one by one.
+   ============================================================
+   Applied only to short, on-screen strings — see setTranslatedText in app.js for
+   why. Each letter is its own inline-block so it can rotate on its own axis;
+   transform and opacity only, so the browser can composite the whole word. */
+/* A word is one unbreakable box, so a line can only break between words. Without
+   this each letter was its own inline-level box and Polish labels came apart
+   mid-word inside narrow buttons. */
+.flip-word { display: inline-block; white-space: nowrap; }
+.flip-letter {
+  display: inline-block;
+  white-space: pre;
+  animation: letter-flip .42s cubic-bezier(.2, 1.4, .3, 1) both;
+  transform-origin: 50% 60%;
+  will-change: transform, opacity;
+}
+@keyframes letter-flip {
+  0% { opacity: 0; transform: rotateX(-92deg) translateY(-.22em) scale(.86); }
+  55% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+/* experience.css blurs and fades #main, the footer and the menu for the duration
+   of a language switch. That curtain existed to hide an instant text swap; now
+   there is something to watch instead, and a blurred half-transparent parent would
+   hide it. The wrapper stays crisp and only the letters move. */
+body.is-language-transitioning #main,
+body.is-language-transitioning .site-footer,
+body.is-language-transitioning .mobile-nav .menu-panel__inner,
+body.is-language-transitioning .nav-current__copy {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-letter { animation: none; }
+}
+
+/* ============================================================
+   13. Footer: room to scroll, and a rainbow rising off the floor.
+   ============================================================
+   Two separate problems were tangled together here.
+
+   Scrolling stopped short because `html { scroll-snap-type: y proximity }` plus
+   `.site-footer { scroll-snap-align: end }` made the footer a snap target. On a
+   phone, where the footer is taller than the viewport, the browser kept pulling
+   back to that single target and the last part of the footer was unreachable.
+   The footer is no longer a snap target; it is the end of the document and needs
+   no help being found. */
+.site-footer { scroll-snap-align: none; scroll-snap-stop: normal; }
+
+/* A plain containing block. A transform or filter here would capture the
+   position:fixed band and pin it to the footer instead of the viewport. */
+.site-footer {
+  isolation: auto;
+  /* Room under the content for the glow to land in. Doubles as the scroll
+     distance the reveal takes. */
+  padding-bottom: var(--footer-glow-h, 34vh);
+  overflow: clip visible;
+}
+
+.footer-glow {
+  position: fixed;
+  z-index: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--footer-glow-h, 34vh);
+  pointer-events: none;
+  /* Starts as a thin strip of colour along the very bottom edge and grows to full
+     height as the last screen scrolls past. app.js writes only this variable. */
+  transform: scaleY(var(--footer-glow-progress, .05));
+  transform-origin: bottom;
+  will-change: transform;
+}
+.footer-glow svg { display: block; width: 100%; height: 100%; }
+
+/* Each column breathes on its own period, so the band never looks like a static
+   bar chart. Prime-ish durations keep the nine from ever lining up again, and the
+   transform origin is the floor so they grow upward out of the edge. */
+.footer-glow__col {
+  transform-origin: 50% 100%;
+  animation: glow-breathe calc(5.3s + var(--i) * 0.47s) ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -0.83s);
+}
+@keyframes glow-breathe {
+  from { transform: scaleY(.82) scaleX(.97); }
+  to { transform: scaleY(1.06) scaleX(1.03); }
+}
+
+/* Smooths out the scroll-driven rise so a fast flick does not make it jump. The
+   per-frame value written by app.js is already clamped, this just eases between
+   the frames the browser actually delivers. */
+.footer-glow { transition: transform .25s linear; }
+
+@media (prefers-reduced-motion: reduce) {
+  .footer-glow__col { animation: none; }
+}
+
+/* The footer's own content has to read over the glow. */
+.site-footer > .container { position: relative; z-index: 1; }
+
+@media (max-width: 760px) {
+  .site-footer { --footer-glow-h: 26vh; }
+}
+
+/* No JavaScript: show the strip at a fixed, modest height rather than nothing. */
+html.no-js .footer-glow { transform: scaleY(.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  .footer-glow { transition: none; transform: scaleY(.5); }
+}
+
+@media print {
+  .footer-glow { display: none; }
+}
+
+/* ============================================================
+   15. Nothing may scroll sideways.
+   ============================================================
+   Measured at 390 px: document.scrollWidth was 444 while clientWidth was 390, so
+   the whole page could be dragged 54 px to the left. That is why the header and
+   the bottom dock looked crooked — they are fixed to the viewport while the
+   content underneath them was shifted.
+
+   The 54 px came from the prize deck: the stacked cards are offset with
+   `translateX(calc(var(--deck-i) * 12px))`, up to +84 px for the seventh card, and
+   the throw animation moves a card 125% off-screen. Transforms count towards
+   scrollable overflow, and neither the deck nor the section clipped it.
+
+   `overflow-x: clip` rather than `hidden`: hidden would turn the root into a
+   scroll container and every `position: sticky` panel on the page would stop
+   sticking. `clip` only clips, and it is allowed next to `overflow-y: visible`. */
+html { overflow-x: clip; }
+body { overflow-x: clip; }
+#prizes, .prize-deck { overflow-x: clip; }
+/* The marquee is rotated and scaled past the viewport edge by design. */
+.marquee, .hero__marquee { overflow: clip; }
+
+/* ============================================================
+   16. Snapping that feels like a phone, not a trap.
+   ============================================================
+   Section 2 of this file made *every* section a snap target, including the tall
+   ones — categories, prizes and signup are two to three screens each, so
+   scrolling through them kept getting yanked back to their start. Only the
+   one-screen panels are targets now, and `scroll-snap-stop: always` means one
+   flick moves exactly one panel instead of skipping two.
+
+   Strictness stays `proximity`: with `mandatory` the middle of a tall section is
+   unreachable, because the nearest target would always be a section boundary. */
+@media (prefers-reduced-motion: no-preference) and (min-height: 600px) {
+  html { scroll-snap-type: y proximity; }
+  #main > section.section-card { scroll-snap-align: none; }
+  #main > section.section-card[data-panel='pinned'] {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+}
+
+/* ============================================================
+   17. Custom scroll bar.
+   ============================================================
+   Firefox gets the two-colour form; Chrome and Safari get the full thing. The
+   thumb carries the same confetti stripe as the section seams, and it drifts
+   slowly — a background-position animation on a 10 px wide strip is a trivial
+   repaint, unlike the same trick on a full-width element. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--coral) rgba(7, 26, 61, .1);
+}
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track {
+  background: rgba(7, 26, 61, .07);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 99px;
+  background-clip: content-box;
+  background-color: var(--coral);
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--yellow) 0 10px,
+    var(--coral) 10px 20px,
+    var(--blue-500) 20px 30px,
+    var(--green) 30px 40px
+  );
+  background-size: 100% 40px;
+  animation: scrollbar-drift 2.4s linear infinite;
+}
+::-webkit-scrollbar-thumb:hover { border-width: 2px; }
+@keyframes scrollbar-drift {
+  to { background-position: 0 40px; }
+}
+::-webkit-scrollbar-corner { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  ::-webkit-scrollbar-thumb { animation: none; }
+}
+
+/* ============================================================
+   18. Bottom dock: two icons while reading, full size on tap.
+   ============================================================ */
+.quick-actions {
+  transition: width .32s var(--ease-out), padding .32s var(--ease-out),
+    transform .32s var(--ease-out), box-shadow .3s ease;
+}
+.quick-action {
+  overflow: hidden;
+  transition: width .32s var(--ease-out), padding .3s var(--ease-out),
+    transform .2s var(--ease-snap), background .25s ease;
+}
+.quick-action__icon { flex: none; }
+
+/* Shrunken state. Width is driven from the dock so both pills collapse together
+   and the group stays centred — animating each label's width instead made the
+   two buttons arrive at different times and the dock visibly wobbled. */
+.quick-actions.is-mini {
+  width: auto;
+  padding: 7px;
+  gap: 7px;
+}
+.quick-actions.is-mini .quick-action {
+  width: 50px;
+  min-width: 50px;
+  padding: 0;
+  border-radius: 50%;
+  justify-content: center;
+}
+.quick-actions.is-mini .quick-action > span:not(.quick-action__icon) {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+/* One clear hint that a tap opens it rather than acting. */
+.quick-actions.is-mini::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 26px;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--yellow);
+  opacity: .9;
+  transform: translateX(-50%);
+}
+.quick-actions.is-mini .quick-action:active { transform: scale(.94); }
+
+/* Centred on a phone whatever state it is in, and clear of the home bar. */
+@media (max-width: 760px) {
+  .quick-actions {
+    right: auto;
+    left: 50%;
+    width: max-content;
+    max-width: calc(100vw - 20px);
+    transform: translateX(-50%);
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+  .quick-actions.is-keyboard-hidden { transform: translateX(-50%) translateY(140%); }
+  .quick-action { min-height: 54px; }
+}
+
+/* ============================================================
+   19. Header: one tap on a phone opens it fully.
+   ============================================================
+   There is no hover on a touchscreen, so the compact pill needed a tap. The class
+   is toggled in app.js; this is what it looks like. */
+.site-header.is-peeked {
+  width: min(1120px, calc(100vw - 20px)) !important;
+}
+.site-header.is-peeked .nav-shell { gap: 10px; }
+.site-header.is-peeked .nav-attend,
+.site-header.is-peeked .language-picker {
+  max-width: 220px;
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+}
+.site-header.is-peeked .brand { min-width: 132px; }
+
+@media (max-width: 760px) {
+  /* The compact pill was 254 px wide and centred, but the page itself could be
+     dragged 54 px sideways, so it read as off-centre. With that fixed it only
+     needs the transform kept consistent between states. */
+  .site-header,
+  .site-header.is-compact,
+  .site-header.is-menu-open { left: 50%; transform: translateX(-50%); }
+  .site-header.is-hidden { transform: translateX(-50%); }
+}
+
+/* ============================================================
+   20. Section jump: a colourful cover, not a grey fade.
+   ============================================================
+   Five stripes sweep in from the bottom on staggered delays, a wheel spins in the
+   middle, then they sweep off upward. The scroll itself happens while the cover is
+   closed, so the new section is already in place when it opens. */
+/* experience.css gives .page-wipe a clip-path animation, an opacity fade and a
+   `visibility 0s linear .38s` delay. All three are from the old single-panel wipe
+   and they fight the five bars: the delayed visibility left the overlay reported as
+   visible for 380 ms after it was finished with, and the clip-path clipped the bars
+   halfway through their own travel. Reset here, and let the bars be the animation. */
+.page-wipe {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 1;
+  clip-path: none;
+  background: none;
+  transition: visibility 0s linear .05s;
+}
+.page-wipe.is-covering,
+.page-wipe.is-covering.is-clearing {
+  visibility: visible;
+  opacity: 1;
+  clip-path: none;
+  pointer-events: auto;
+  transition: visibility 0s linear 0s;
+}
+
+.page-wipe__bars {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+/* 4 x 35 ms stagger + 260 ms travel = 400 ms to cover. app.js waits 420 ms before
+   it scrolls and another 420 ms before it removes the classes. If you change these
+   numbers, change COVER_MS and CLEAR_MS in setupSectionTransition to match —
+   pulling the classes mid-transition is what made this jam halfway. */
+.page-wipe__bars i {
+  transform: translateY(101%);
+  transition: transform .26s cubic-bezier(.7, 0, .2, 1);
+}
+.page-wipe__bars i:nth-child(1) { background: var(--navy-950); transition-delay: 0ms; }
+.page-wipe__bars i:nth-child(2) { background: var(--blue-600); transition-delay: 35ms; }
+.page-wipe__bars i:nth-child(3) { background: var(--coral); transition-delay: 70ms; }
+.page-wipe__bars i:nth-child(4) { background: var(--yellow); transition-delay: 105ms; }
+.page-wipe__bars i:nth-child(5) { background: var(--green); transition-delay: 140ms; }
+.page-wipe.is-covering .page-wipe__bars i { transform: translateY(0); }
+/* Clearing sweeps upward and out, reversing the stagger so the last bar in is the
+   first one out. */
+.page-wipe.is-clearing .page-wipe__bars i { transform: translateY(-101%); }
+.page-wipe.is-clearing .page-wipe__bars i:nth-child(1) { transition-delay: 140ms; }
+.page-wipe.is-clearing .page-wipe__bars i:nth-child(2) { transition-delay: 105ms; }
+.page-wipe.is-clearing .page-wipe__bars i:nth-child(3) { transition-delay: 70ms; }
+.page-wipe.is-clearing .page-wipe__bars i:nth-child(4) { transition-delay: 35ms; }
+.page-wipe.is-clearing .page-wipe__bars i:nth-child(5) { transition-delay: 0ms; }
+
+.page-wipe__mark {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 9px;
+  opacity: 0;
+  transform: scale(.7);
+  transition: opacity .22s ease .16s, transform .34s var(--ease-snap) .16s;
+}
+.page-wipe.is-covering .page-wipe__mark { opacity: 1; transform: none; }
+.page-wipe.is-clearing .page-wipe__mark { opacity: 0; transition-delay: 0ms; }
+.page-wipe__mark i {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--white);
+  animation: wipe-bounce .62s ease-in-out infinite alternate;
+}
+.page-wipe__mark i:nth-child(1) { background: var(--yellow); animation-delay: 0ms; }
+.page-wipe__mark i:nth-child(2) { background: var(--white); animation-delay: 110ms; }
+.page-wipe__mark i:nth-child(3) { background: var(--coral); animation-delay: 220ms; }
+@keyframes wipe-bounce {
+  from { transform: translateY(-7px) scale(.85); }
+  to { transform: translateY(7px) scale(1.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-wipe { display: none; }
+}
+
+/* ============================================================
+   21. Public wall.
+   ============================================================
+   Two columns on a desk, one on a phone: form first, then the notes, because on a
+   phone the point of arriving here is to write something. */
+/* Fairground, not stationery.
+   The section used to be a white card with a form on it. It is the one place on the
+   page where strangers leave something behind, so it now looks like a noticeboard at
+   a village fete: confetti tape top and bottom, spotted paper, tilted notes. All of
+   it is background and border work, so nothing here costs a repaint while scrolling. */
+.wall {
+  position: relative;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 201, 40, .28) 0 12px, transparent 13px),
+    radial-gradient(circle at 84% 12%, rgba(246, 73, 79, .22) 0 9px, transparent 10px),
+    radial-gradient(circle at 68% 82%, rgba(23, 78, 166, .18) 0 14px, transparent 15px),
+    radial-gradient(circle at 26% 88%, rgba(255, 201, 40, .22) 0 10px, transparent 11px),
+    var(--paper);
+  color: var(--navy-950);
+}
+/* Confetti tape. Two bands of the same repeating gradient, one at each edge. */
+.wall::before,
+.wall::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 9px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--yellow) 0 16px,
+    var(--coral) 16px 32px,
+    var(--blue-600) 32px 48px,
+    #2fbf71 48px 64px
+  );
+  content: '';
+}
+.wall::before { top: 0; }
+.wall::after { bottom: 0; }
+
+/* One column, capped width.
+   It was two columns, form left and notes right. With no messages yet the right
+   half was a tall empty strip with one line of status text stranded at the top of
+   it, which on a wide screen landed under the floating header and read like the
+   header had leaked data. One column removes the empty half entirely, and the cap
+   keeps the reading width sane on a 24" monitor. */
+.wall__grid {
+  display: grid;
+  max-width: 780px;
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 34px);
+  align-items: start;
+}
+
+.wall-form { margin-top: clamp(20px, 3svh, 34px); }
+.wall-form__foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+.wall-form__count {
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+.wall-form__count b { color: var(--navy-950); }
+
+/* Shorter than it was. 62svh of scroller under a form that is itself a screen tall
+   made the section the longest on the page for content that is three lines per
+   message. The list scrolls, so height costs nothing but page length. */
+.wall-board {
+  max-height: min(340px, 42svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+.wall-board:not(:has(.wall-note)) { max-height: none; overflow: visible; }
+.wall-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  list-style: none;
+}
+
+/* Each note is a scrap of paper pinned to a board, tilted by a per-item variable
+   set in JS so no two sit at the same angle. */
+.wall-note {
+  position: relative;
+  display: grid;
+  padding: 16px 16px 12px;
+  gap: 10px;
+  border: 2px solid var(--navy-950);
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 4px 5px 0 rgba(7, 26, 61, .16);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform .28s var(--ease-snap), box-shadow .28s ease;
+}
+.wall-note:hover {
+  transform: rotate(0deg) translateY(-3px);
+  box-shadow: 6px 8px 0 rgba(7, 26, 61, .2);
+}
+.wall-note:nth-child(4n+2) { background: #fff3c4; }
+.wall-note:nth-child(4n+3) { background: #e3edff; }
+.wall-note:nth-child(4n+4) { background: #ffe3e3; }
+
+/* The pin. A dot pressed through the top of the note, in a colour that rotates with
+   the paper so a wall of ten notes never shows the same pair twice in a row. */
+.wall-note::before {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--navy-950);
+  border-radius: 50%;
+  margin-left: -7px;
+  background: var(--coral);
+  box-shadow: 0 2px 0 rgba(7, 26, 61, .25);
+  content: '';
+}
+.wall-note:nth-child(4n+2)::before { background: var(--blue-600); }
+.wall-note:nth-child(4n+3)::before { background: var(--yellow); }
+.wall-note:nth-child(4n+4)::before { background: #2fbf71; }
+/* Room for the pin, which sits outside the box. */
+.wall-note { margin-top: 8px; }
+.wall-note__text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.wall-note__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.wall-note__meta strong { color: var(--navy-950); font-weight: 800; }
+.wall-note__meta time { margin-left: auto; }
+
+/* A card, not a stray sentence. Empty and error are the states a visitor is most
+   likely to meet before the event, so they get a shape of their own instead of one
+   grey line floating in whitespace. */
+.wall-empty {
+  display: grid;
+  margin: 0;
+  padding: 18px 20px;
+  place-items: center;
+  border: 1px dashed rgba(7, 26, 61, .2);
+  border-radius: 18px;
+  background: rgba(7, 26, 61, .03);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.wall-more { margin-top: 14px; }
+
+/* Closing line: the wall is for public notes, a question is not a public note. */
+.wall-ask {
+  display: flex;
+  max-width: 780px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  margin: clamp(18px, 2.6vw, 30px) auto 0;
+  padding-top: clamp(16px, 2.4vw, 26px);
+  border-top: 1px dashed rgba(7, 26, 61, .18);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+.wall-ask .btn { flex: none; }
+
+/* Phone. The notes go to one column, the confetti tape thins out so it does not eat
+   a tenth of a small screen, and the spots shrink with it. */
+@media (max-width: 700px) {
+  .wall::before,
+  .wall::after { height: 6px; }
+  .wall__grid { gap: 18px; }
+  .wall-list { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .wall-note { --tilt: 0deg; }
+  .wall-note:hover { transform: translateY(-2px); }
+  .wall-ask { gap: 12px; }
+  .wall-ask .btn { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 900px) {
+  .wall-board { max-height: 38svh; }
+  .wall-list { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The gallery call-to-action repeated the two buttons that are already fixed to
+   the bottom of every screen. Kept in the markup for the no-JS build, hidden
+   whenever the dock is there to do the job. */
+/* `#gallery .gallery-cta` in gallery-3d.css is an id selector and outranks a plain
+   class-plus-attribute one, so this has to match its weight to win. */
+#gallery .gallery-cta[data-duplicate-cta] { display: none; }
+html.no-js #gallery .gallery-cta[data-duplicate-cta] { display: flex; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-note { transform: none; transition: none; }
+}
+
+/* ============================================================
+   22. Dock: elastic under the thumb.
+   ============================================================
+   The nudge is written by app.js as two custom properties and damped to a third of
+   the finger's travel, capped at 16 px. While held there is no transition, so it
+   tracks the thumb; on release the transition comes back and it springs home. The
+   translate has to be composed with the -50% that centres it, or letting go would
+   throw the dock to the left edge. */
+.quick-actions {
+  --dock-nudge-x: 0px;
+  --dock-nudge-y: 0px;
+}
+.quick-actions.is-held {
+  transition: none;
+  cursor: grabbing;
+}
+@media (max-width: 760px) {
+  .quick-actions {
+    transform: translateX(-50%) translate(var(--dock-nudge-x), var(--dock-nudge-y));
+    transition: width .32s var(--ease-out), padding .32s var(--ease-out),
+      transform .42s var(--ease-snap);
+  }
+  .quick-actions.is-keyboard-hidden {
+    transform: translateX(-50%) translateY(140%);
+  }
+}
+@media (min-width: 761px) {
+  .quick-actions {
+    transform: translate(var(--dock-nudge-x), var(--dock-nudge-y));
+    transition: width .32s var(--ease-out), padding .32s var(--ease-out),
+      transform .42s var(--ease-snap);
+  }
+}
+
+/* ============================================================
+   23. No accidental zoom, no text-size surprises.
+   ============================================================
+   A double tap on a phone was zooming the page, which on a layout made of
+   full-height panels leaves you stranded mid-section. `manipulation` keeps
+   scrolling and pinch-zoom (the deliberate kind) and drops the double-tap
+   shortcut. Pinch still works, so nothing is taken away from anyone who needs it. */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+
+/* ============================================================
+   24. Language: one big flag in a circle.
+   ============================================================ */
+.language-picker__trigger {
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
+  gap: 0;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.language-picker__flag {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .75);
+}
+.language-picker__flag svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* The code and the chevron are what made it a pill. The flag says everything a
+   flag needs to say, and the menu underneath still lists the names. */
+.language-picker__code,
+.language-picker__trigger > svg { display: none; }
+
+.language-picker__menu button > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .5);
+}
+.language-picker__menu button > span:first-child svg { width: 100%; height: 100%; object-fit: cover; }
+
+@media (max-width: 760px) {
+  .language-picker__trigger { width: 46px; min-width: 46px; height: 46px; }
+  .language-picker__flag { width: 30px; height: 30px; }
+}
+
+/* ============================================================
+   25. Pop-ups stay clear of the header.
+   ============================================================
+   The reminder dialog opened over the top of the fixed header pill, so the way out
+   of the page was underneath the way out of the dialog. Its own close button is in
+   the top right, which is exactly where the header's menu button sits. */
+.modal { padding-top: calc(18px + 76px + 12px); }
+@media (max-width: 760px) {
+  .modal { padding-top: calc(10px + 66px + 10px); }
+}
+/* The dialog is above everything, so the header must not compete with it. */
+body.is-modal-open .site-header { opacity: 0; pointer-events: none; }
+.site-header { transition: opacity .2s ease, width .42s var(--ease-out), transform .4s var(--ease-out); }
+
+/* ============================================================
+   26. Prize deck on a phone: smaller, and it moves with the finger.
+   ============================================================
+   Measured on a 390 px screen the card was 350 x 470 with the two round controls
+   sitting on top of its bottom edge, and a sideways drag scrolled the page instead
+   of moving the card. */
+@media (max-width: 760px) {
+  .prize-deck {
+    min-height: 430px;
+    /* Any horizontal gesture belongs to the deck; vertical still scrolls the page
+       until a drag actually starts, at which point app.js takes both. */
+    touch-action: pan-y;
+  }
+  .prize-card {
+    width: min(84vw, 330px);
+    min-height: 380px;
+    padding: 18px 16px;
+    border-radius: 24px;
+  }
+  .prize-card__art { min-height: 132px; margin: -6px -12px -8px; }
+  .prize-card__art svg { max-height: 168px; }
+  .prize-card__number { font-size: 40px; }
+  .prize-card h3 { font-size: clamp(18px, 6vw, 24px); }
+  .prize-card__drag { font-size: 13px; }
+  /* Controls below the deck, never on it. */
+  .deck-controls { margin-top: 14px; }
+  #prizes .prize-layout { row-gap: 22px; }
+}
+
+/* ============================================================
+   27. Signup form: one screen on a phone.
+   ============================================================
+   Measured at 390x844 before this block: step 1 ended at 957 px and step 2 at
+   988 px, against a viewport of 844 — so the last two fields and the Continue
+   button were below the fold on both. The section itself was 1034 px, 190 over.
+
+   The 190 px comes back from three places, none of which is content anyone needs
+   while filling in a form:
+     the intro paragraph above the shell   93 px
+     field height and row gaps            ~70 px
+     the step strip                        26 px */
+@media (max-width: 760px) {
+  #signup .signup__head {
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  /* The heading says "three steps and you are racing"; the paragraph under it
+     repeated that in longer words. The stepper is right below and shows the same
+     thing as a picture. */
+  #signup .signup__head > *:not(:first-child) { display: none; }
+  #signup .signup__head .eyebrow { margin-bottom: 6px; }
+  #signup .section-title { font-size: clamp(23px, 7.4vw, 30px); line-height: .98; }
+
+  #signup .form-sidebar { padding: 10px 12px 12px; }
+  #signup .step-list { gap: 3px; }
+  #signup .step-indicator__number { width: 30px; height: 30px; }
+  #signup .step-indicator__digit { font-size: 12px; }
+  #signup .step-list::before { top: 15px; }
+  #signup .step-indicator__copy strong { font-size: 9.5px; }
+
+  #signup .form-main { padding: 16px 14px 18px; }
+  #signup .form-step h3 { margin-bottom: 6px; font-size: clamp(19px, 5.6vw, 24px); }
+  #signup .form-step__intro { margin-bottom: 14px; font-size: 12.5px; line-height: 1.45; }
+
+  #signup .form-grid { gap: 9px; }
+  #signup .field input,
+  #signup .field select { min-height: 50px; }
+  #signup .field textarea { min-height: 78px; }
+  #signup .field label { font-size: 13px; }
+  #signup .date-trigger { min-height: 50px; }
+  /* Step 2 was the last one still 2 px over: it carries the two category cards on
+     top of its three fields. The cards lose a little padding rather than the form
+     losing its Continue button below the fold. */
+  #signup .choice-grid { gap: 8px; }
+  #signup .choice__label,
+  #signup .choice > label,
+  #signup .choice-card { padding: 11px 12px; }
+  #signup .choice strong { font-size: 14px; }
+  #signup .choice small { font-size: 11px; line-height: 1.35; }
+  #signup .consent-box { margin-top: 10px; padding: 11px 12px; }
+  #signup .form-actions { margin-top: 12px; }
+}
+
+/* Parks like the one-screen panels do, without being one. The section stays in
+   normal flow — it is not `position: sticky` and it does not clip — so if a
+   translation ever makes a step taller than the screen the overflow is still
+   reachable. Snap alignment is independent of that, and it is what makes the
+   section come to a stop under the thumb. */
+@media (prefers-reduced-motion: no-preference) and (min-height: 600px) {
+  #main > section.section-card#signup {
+    scroll-snap-align: start;
+    scroll-snap-stop: normal;
+  }
+}
+
+/* ============================================================
+   28. Avatar row: real initials, and a remainder that can hide.
+   ============================================================ */
+.avatar-stack .avatar[hidden] { display: none; }
+.avatar-stack .avatar:last-child {
+  padding-inline: 10px;
+  width: auto;
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+@media (max-width: 760px) {
+  .avatar-stack .avatar:last-child { min-width: 40px; font-size: 11px; }
+}
+
+/* ============================================================
+   29. Nothing gets hyphenated, nothing gets cut.
+   ============================================================
+   Measured at 1440 px: thirteen headings contained a single word wider than the box
+   it had to fit in, and every one of them had `hyphens: auto`. So the browser did
+   the only thing left to it and broke the word in half — "CARRULED-DHI",
+   "Najzabawniej-szy". A display face split mid-word looks like a rendering fault,
+   and browser hyphenation for Polish and Italian is frequently wrong anyway.
+
+   Turning hyphenation off alone is not enough: the word is still too wide, so it
+   would simply overflow. The type has to be sized against the box it lives in, not
+   against the viewport — which is what container queries are for. The multipliers
+   below come from the measurement: longest word width divided by font size gives
+   how many em the word occupies, and 100/that is the largest safe cqw.
+
+     CARRULEDDHI     7.52 em  ->  13.3cqw max, set to 12.4
+     Najzabawniejszy 9.87 em  ->  10.1cqw max, set to 9.4
+     zwycięstwo.     6.94 em  ->  14.4cqw max, set to 13.2
+
+   Sized this way the headline can never hyphenate at any window width, in any of
+   the six languages, without anyone having to pick a breakpoint. */
+.hero__title,
+.hero__tagline,
+.section-title,
+.stack-card h3,
+.prize-card h3,
+.form-step h3,
+.modal h2,
+.g3d__heading,
+.footer__brand,
+.attendance__title,
+.eyebrow,
+.wall-note__text {
+  hyphens: none;
+  -webkit-hyphens: none;
+  /* Words stay whole. Anything genuinely unbreakable is handled by the sizes below,
+     so nothing is left to overflow. */
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Balanced line breaks: with three lines of heading, this evens them out instead of
+   leaving one word alone on the last line. */
+.hero__title,
+.section-title,
+.stack-card h3,
+.prize-card h3 { text-wrap: balance; }
+
+/* The size itself is settled by fitHeadings() in app.js, which measures each heading
+   against its own box and shrinks it until the longest word fits. Container queries
+   were the first attempt and got most of the way, but the multiplier has to be
+   derived from the heading's *own* box, and several of these headings sit in grid
+   cells much narrower than the element I could name as a container — the prize card
+   is 500 px wide while its h3 gets about 250 of them. Thirteen headings times six
+   languages times every window width is not something to tune by hand.
+
+   THERE MUST BE NO TRANSITION ON font-size HERE.
+   There was one, for a fraction of a second of smoothing, and it made the whole
+   routine fail silently: the bisection sets a size and immediately reads
+   scrollWidth, but with a transition in flight the computed size is still the old
+   one, so every probe reported "does not fit" and the search drove itself to its
+   floor. Measured trace, at eight successive candidate sizes from 55 px down to
+   34 px: scrollWidth stayed at 563 px every single time. You cannot animate the
+   property you are measuring. */
+.hero__title,
+.section-title,
+.stack-card h3,
+.prize-card h3,
+.form-step h3,
+.modal h2,
+.g3d__heading,
+.attendance__title,
+.footer__brand,
+.wall-note__text {
+  transition-property: none;
+}
+
+/* THE ACTUAL CAUSE OF "CARRULED-DHI".
+   main.css had `.hero__title { max-width: 8.4ch }` and experience.css `9ch`. Those
+   were there to force a two-line headline in Italian. But `ch` scales with the font,
+   so the ratio never changes: an 8.4ch box can never hold an eleven-character word
+   at any size, which is why shrinking the type did nothing at all. The browser was
+   left with hyphenating it.
+
+   The markup already carries an explicit <br> after CARRULEDDHI, so the line break
+   was never the max-width's job in the first place. Removing it lets the word be as
+   wide as it needs to be, and fitHeadings() keeps it inside the column.
+
+   Same reasoning for the other fitted headings: a hard cap measured in characters
+   fights a routine whose job is to make the text fit. */
+.hero__title,
+.section-title,
+.stack-card h3,
+.prize-card h3,
+.form-step h3,
+.modal h2,
+.attendance__title { max-width: none; }
+
+/* Eyebrow pills: the label is short, but the cell it sits in can be narrower than
+   the words. Wrapping inside the pill is fine; sticking out of it is not. */
+.eyebrow {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  text-align: left;
+}
+
+/* ============================================================
+   30. Preloader: centred, and a great deal louder.
+   ============================================================
+   Centring is done by the grid on .preloader and `justify-items: center` inside,
+   rather than by a fixed width and `text-align`, which is what left the wordmark
+   sitting off to one side once Bungee replaced the fallback font and every line
+   changed width. */
+.preloader {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #123675 0%, #071a3d 55%, #04102a 100%);
+}
+.preloader__inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(560px, 86vw);
+  justify-items: center;
+  gap: clamp(10px, 2vh, 20px);
+  text-align: center;
+  /* Makes this box the unit the wordmark is measured against. See the note on
+     .preloader__word: the font size has to come from the width it must fit into,
+     not from the viewport, or the two numbers drift apart. */
+  container-type: inline-size;
+}
+
+/* A vignette over the turning bands.
+   Without it the bands meet the centre of the screen at full strength and the
+   wordmark competes with a hard colour edge running straight through it — which is
+   what made the background read as a rendering fault rather than as decoration. */
+.preloader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 46% at 50% 50%, rgba(4, 16, 42, .92) 0%, rgba(4, 16, 42, .55) 45%, transparent 78%),
+    radial-gradient(120% 100% at 50% 120%, rgba(4, 16, 42, .8), transparent 60%);
+}
+
+/* Four wide bands of colour turning slowly behind everything. Rotation only, so the
+   whole thing is one composited layer no matter how big it is.
+   The blur is what turns four hard-edged wedges into moving light. It is applied to
+   the wrapper, not to each band, so the browser blurs one surface instead of four. */
+.preloader__confetti {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  opacity: .42;
+  filter: blur(18px) saturate(1.15);
+}
+.preloader__confetti i {
+  position: absolute;
+  inset: 0;
+  border-radius: 44%;
+  background: conic-gradient(
+    from calc(var(--i) * 90deg),
+    transparent 0 22%,
+    var(--yellow) 22% 30%,
+    transparent 30% 52%,
+    var(--coral) 52% 60%,
+    transparent 60% 78%,
+    var(--blue-500) 78% 86%,
+    transparent 86% 100%
+  );
+  animation: preloader-spin calc(9s + var(--i) * 2.5s) linear infinite;
+  animation-direction: var(--dir, normal);
+}
+.preloader__confetti i:nth-child(even) { --dir: reverse; }
+@keyframes preloader-spin { to { transform: rotate(360deg); } }
+
+.preloader__eyebrow {
+  color: var(--yellow);
+  font-family: var(--font-meta);
+  font-size: clamp(10px, 1.6vh, 13px);
+  font-weight: 800;
+  letter-spacing: .34em;
+  text-transform: uppercase;
+}
+
+/* One span per letter so each can bounce on its own beat.
+   ---------------------------------------------------------------------------
+   WHY THE SIZE COMES FROM THE CONTAINER, NOT THE VIEWPORT.
+
+   This wrapped. Measured, not guessed: the eleven glyphs of Bungee are 7.690em
+   wide, the container is capped at 560 px, so the font can never exceed
+   560 / 7.69 = 72.8 px — and the old rule allowed 76 px. Every viewport tall
+   enough for `min(9vw, 9vh)` to reach the cap (height >= 845 px, i.e. any normal
+   desktop) asked for 584 px of word inside a 560 px box, and the "I" dropped to a
+   second line. 1280x800 came out at 554 px and squeaked through, which is why it
+   looked fine on some screens and broken on others.
+
+   Two hand-tuned numbers that had to agree, and did not. `cqw` removes the
+   agreement: 12.4cqw of the container is 95% of it whatever the container becomes,
+   so the fit holds without anyone remembering to update a second constant.
+
+   `nowrap` on top of that. The name of the event is one word; if a fallback font
+   ever measures wider than Bungee, letting it stick out slightly is a far smaller
+   problem than breaking the name in half. */
+.preloader__word {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  white-space: nowrap;
+  margin: 0;
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: clamp(26px, min(12.4cqw, 9vh), 72px);
+  line-height: .92;
+  letter-spacing: -.02em;
+  /* Lifts the wordmark off the turning bands behind it without a solid panel. */
+  text-shadow: 0 6px 26px rgba(4, 16, 42, .75);
+}
+.preloader__word span {
+  display: inline-block;
+  animation: preloader-letter 1.15s cubic-bezier(.4, 0, .3, 1) infinite alternate;
+}
+.preloader__word span:nth-child(3n+1) { color: var(--yellow); }
+.preloader__word span:nth-child(3n+2) { color: var(--white); }
+.preloader__word span:nth-child(3n+3) { color: var(--coral); }
+.preloader__word span:nth-child(1)  { animation-delay: 0ms; }
+.preloader__word span:nth-child(2)  { animation-delay: 60ms; }
+.preloader__word span:nth-child(3)  { animation-delay: 120ms; }
+.preloader__word span:nth-child(4)  { animation-delay: 180ms; }
+.preloader__word span:nth-child(5)  { animation-delay: 240ms; }
+.preloader__word span:nth-child(6)  { animation-delay: 300ms; }
+.preloader__word span:nth-child(7)  { animation-delay: 360ms; }
+.preloader__word span:nth-child(8)  { animation-delay: 420ms; }
+.preloader__word span:nth-child(9)  { animation-delay: 480ms; }
+.preloader__word span:nth-child(10) { animation-delay: 540ms; }
+.preloader__word span:nth-child(11) { animation-delay: 600ms; }
+@keyframes preloader-letter {
+  from { transform: translateY(.14em) rotate(-3deg) scale(.94); }
+  to { transform: translateY(-.14em) rotate(3deg) scale(1.04); }
+}
+
+/* Three wheels rolling under the wordmark. */
+.preloader__wheels { display: flex; gap: 14px; }
+.preloader__wheels i {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--white);
+  border-radius: 50%;
+  border-top-color: var(--yellow);
+  animation: preloader-roll .9s linear infinite;
+}
+.preloader__wheels i:nth-child(2) { border-top-color: var(--coral); animation-delay: .15s; }
+.preloader__wheels i:nth-child(3) { border-top-color: var(--green); animation-delay: .3s; }
+@keyframes preloader-roll { to { transform: rotate(360deg); } }
+
+.preloader__track {
+  width: min(320px, 70vw);
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .16);
+  overflow: hidden;
+}
+.preloader__bar {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--yellow) 0 14px,
+    var(--coral) 14px 28px,
+    var(--blue-500) 28px 42px,
+    var(--green) 42px 56px
+  );
+  background-size: 56px 100%;
+  animation: preloader-stripe .7s linear infinite;
+}
+@keyframes preloader-stripe { to { background-position: 56px 0; } }
+
+.preloader__number {
+  margin: 0;
+  color: var(--blue-200);
+  font-family: var(--font-meta);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .3em;
+}
+
+/* The eyebrow and the counter fade in after the wordmark has landed, so the screen
+   arrives in an order instead of all at once. */
+.preloader__eyebrow,
+.preloader__number { animation: preloader-fade .7s ease both; }
+.preloader__number { animation-delay: .25s; }
+
+@keyframes preloader-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader__confetti i,
+  .preloader__word span,
+  .preloader__wheels i,
+  .preloader__eyebrow,
+  .preloader__number,
+  .preloader__bar { animation: none; }
+  .preloader__confetti { opacity: .3; filter: blur(18px); }
+  .preloader__eyebrow,
+  .preloader__number { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   31. Prize deck: hovering does nothing at all.
+   ============================================================
+   The shake on hover was the artwork's own idle animation: prize-float runs
+   continuously on the front card, and with the cursor over the card it reads as the
+   card itself trembling. It bought nothing — the deck already invites a drag through
+   its shadow and its "drag the card" label — and it repainted a 440x540 illustration
+   forever, on every page, whether or not anyone was looking at it.
+
+   Grab it and it moves; let go and it snaps. Nothing happens on hover. */
+.prize-card__art svg { animation: none !important; }
+/* Deliberately no `transform` here. The card's position comes from
+   translate(-50%,-50%) plus the stack offsets, so writing `transform: none` on hover
+   would throw it into the corner — which is a worse shake than the one being fixed. */
+.prize-deck:not(.is-dragging) .prize-card { cursor: grab; }
+
+/* ============================================================
+   32. Thank-you screen.
+   ============================================================
+   Three dated lines rather than a paragraph: what arrives, and when. A promise with
+   a date on it is worth more than one without. */
+.success-plan {
+  display: grid;
+  width: min(420px, 100%);
+  margin: clamp(16px, 3vh, 26px) auto clamp(14px, 2.4vh, 22px);
+  padding: 0;
+  gap: 8px;
+  list-style: none;
+  text-align: left;
+}
+.success-plan li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--white);
+}
+.success-plan li:nth-child(1) { border-color: var(--yellow); }
+.success-plan li:nth-child(2) { border-color: var(--blue-500); }
+.success-plan li:nth-child(3) { border-color: var(--coral); }
+.success-plan b {
+  font-family: var(--font-meta);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.success-plan span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+.success-back {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 11.5px;
+  letter-spacing: .08em;
+  min-height: 1.2em;
+}
+
+@media (max-width: 760px) {
+  .success-plan { gap: 6px; margin-block: 14px 12px; }
+  .success-plan li { padding: 8px 11px; gap: 9px; }
+  .success-plan b { font-size: 10px; }
+  .success-plan span { font-size: 12px; }
+}
+
+/* ============================================================
+   33. Wall: stars, photos, translation, lightbox.
+   ============================================================
+   The star picker is a radio group, so all of the state below comes from :checked
+   and the sibling combinator. No script decides what a star looks like — which
+   means the control still works if the script has not run yet, and there is no
+   moment where the markup and the paint disagree.
+
+   The trick worth knowing: `direction: rtl` on the row. With it, "every star up to
+   the one under the cursor" becomes a plain `~` selector, because in a right-to-left
+   flow the earlier stars are the ones after it in the DOM. Doing it left-to-right
+   needs either five hand-written rules or a wrapper per star. */
+.wall-stars {
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+.wall-stars legend {
+  padding: 0;
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 11.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.wall-stars__row {
+  display: flex;
+  direction: rtl;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 8px;
+}
+.wall-stars__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.wall-stars__star {
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  /* One glyph, drawn as a mask, so the colour is a background and can be animated
+     without swapping characters or loading an icon font. */
+  background: #d8dceb;
+  -webkit-mask: var(--star-mask) center / 100% 100% no-repeat;
+  mask: var(--star-mask) center / 100% 100% no-repeat;
+  transition: background-color .16s ease, transform .18s var(--ease-snap);
+}
+.wall-stars {
+  --star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z'/%3E%3C/svg%3E");
+}
+/* A committed score. `~` from the checked input reaches its own label and every
+   lower one, which in this right-to-left row are the stars to its left. */
+.wall-stars__input:checked ~ .wall-stars__star { background: var(--yellow); }
+
+/* Hover previews a different score, so the committed one has to be wiped first —
+   otherwise hovering two stars while five are already selected leaves all five lit.
+   The wipe matches the same specificity as the :checked rule and is written after it,
+   so source order decides; the two lit rules carry one class more and beat both.
+
+   NOT `:has(.wall-stars__star:hover)`, which was the first attempt. Chrome applied
+   that rule with nothing hovered at all — measured: `matches()` on the row returned
+   false, no element matched `.wall-stars__star:hover`, and deleting this one rule at
+   runtime turned the selected stars yellow. A plain `:hover` on the row behaves, and
+   the reason `:has` was wanted in the first place — the "clear" link inside the row
+   counting as a hover — is solved by moving that button out of the row instead. */
+.wall-stars__row:hover .wall-stars__star { background: #d8dceb; }
+.wall-stars__row:hover .wall-stars__star:hover,
+.wall-stars__row:hover .wall-stars__star:hover ~ .wall-stars__star { background: var(--yellow); }
+.wall-stars__input:focus-visible + .wall-stars__star {
+  outline: 3px solid var(--navy-950);
+  outline-offset: 3px;
+}
+.wall-stars__star:active { transform: scale(.88); }
+.wall-stars__clear {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-meta);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-decoration: underline;
+  text-transform: uppercase;
+}
+
+/* ---------- photo picker ----------
+   The native file input cannot be styled, so it is moved out of sight while staying
+   in the tab order, and the label becomes the button. Clicking a label bound to a
+   file input opens the picker in every browser, so no click handler is involved. */
+.wall-photo { margin-top: 16px; }
+.wall-photo__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.wall-photo__pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 15px;
+  border: 2px dashed var(--navy-950);
+  border-radius: 999px;
+  background: var(--white);
+  cursor: pointer;
+  font-family: var(--font-meta);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  transition: background-color .18s ease, transform .18s var(--ease-snap);
+}
+.wall-photo__pick:hover { background: var(--yellow); transform: translateY(-2px); }
+.wall-photo__input:focus-visible + .wall-photo__pick {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+.wall-photo__icon { font-size: 16px; line-height: 1; }
+.wall-photo[data-state="ready"] .wall-photo__pick { border-style: solid; }
+.wall-photo__preview {
+  position: relative;
+  display: inline-block;
+  margin-top: 12px;
+}
+.wall-photo__preview img {
+  display: block;
+  width: 108px;
+  height: 108px;
+  border: 2px solid var(--navy-950);
+  border-radius: 14px;
+  object-fit: cover;
+}
+.wall-photo__drop {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--navy-950);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--navy-950);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  place-items: center;
+}
+.wall-photo__drop:hover { background: var(--coral, #ff6b6b); color: var(--white); }
+.wall-photo__hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 11.5px;
+  letter-spacing: .04em;
+  min-height: 1.3em;
+}
+
+/* ---------- the average ----------
+   Hidden until somebody has voted. "0.0 out of 5, 0 votes" reads like a bad review
+   of an event that has not happened. */
+.wall-score {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 2px solid var(--navy-950);
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 3px 4px 0 rgba(7, 26, 61, .14);
+}
+.wall-score b {
+  font-family: var(--font-display, inherit);
+  font-size: 22px;
+  line-height: 1;
+}
+.wall-score__stars { display: inline-flex; gap: 2px; }
+.wall-score__star {
+  width: 16px;
+  height: 16px;
+  background: #d8dceb;
+  -webkit-mask: var(--star-mask) center / 100% 100% no-repeat;
+  mask: var(--star-mask) center / 100% 100% no-repeat;
+}
+.wall-score {
+  --star-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z'/%3E%3C/svg%3E");
+}
+.wall-score__star[data-fill="full"] { background: var(--yellow); }
+/* A half star is one gradient, not two elements stacked. */
+.wall-score__star[data-fill="half"] {
+  background: linear-gradient(90deg, var(--yellow) 0 50%, #d8dceb 50% 100%);
+}
+.wall-score__votes {
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* ---------- stars and photos inside a note ---------- */
+.wall-note__stars { display: inline-flex; gap: 2px; }
+.wall-note__stars i {
+  width: 14px;
+  height: 14px;
+  background: #d8dceb;
+  -webkit-mask: var(--note-star) center / 100% 100% no-repeat;
+  mask: var(--note-star) center / 100% 100% no-repeat;
+}
+.wall-note {
+  --note-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z'/%3E%3C/svg%3E");
+}
+.wall-note__stars i[data-fill="full"] { background: var(--yellow); }
+
+.wall-note__photo {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid var(--navy-950);
+  border-radius: 12px;
+  background: none;
+  cursor: zoom-in;
+  line-height: 0;
+}
+.wall-note__photo img {
+  display: block;
+  width: 100%;
+  /* A fixed ratio, so a portrait and a landscape photo occupy the same slot and the
+     masonry of notes does not lurch when the images finish loading. */
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  transition: transform .3s ease;
+}
+.wall-note__photo:hover img { transform: scale(1.05); }
+
+/* Translation swaps the text in place; the tint is the only clue that what is on
+   screen is not what was typed, which is exactly as much emphasis as it deserves. */
+.wall-note[data-translated="true"] { outline: 2px solid rgba(255, 199, 44, .8); }
+.wall-note__translate {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--navy-950);
+  cursor: pointer;
+  font-family: var(--font-meta);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-decoration: underline;
+  text-transform: uppercase;
+  flex-basis: 100%;
+  text-align: left;
+}
+.wall-note__translate:disabled { color: var(--muted); cursor: progress; }
+
+/* ---------- lightbox ----------
+   A <dialog>, so the backdrop, the focus trap and Escape are the browser's job. */
+.wall-lightbox {
+  width: min(92vw, 1020px);
+  max-width: none;
+  max-height: 90svh;
+  padding: 0;
+  border: 3px solid var(--navy-950);
+  border-radius: 20px;
+  background: var(--white);
+  overflow: visible;
+}
+.wall-lightbox::backdrop {
+  background: rgba(7, 26, 61, .78);
+  backdrop-filter: blur(3px);
+}
+.wall-lightbox__figure {
+  margin: 0;
+  padding: 0;
+}
+.wall-lightbox__figure img {
+  display: block;
+  width: 100%;
+  max-height: calc(90svh - 52px);
+  border-radius: 17px 17px 0 0;
+  object-fit: contain;
+  background: #0d1a33;
+}
+.wall-lightbox__figure figcaption {
+  padding: 12px 18px;
+  color: var(--navy-950);
+  font-family: var(--font-meta);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+/* Outside the frame, top right, in a circle — where a close button belongs and
+   where it cannot be mistaken for part of the photo. */
+.wall-lightbox__close {
+  position: absolute;
+  top: -18px;
+  right: -18px;
+  z-index: 2;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  border: 3px solid var(--navy-950);
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--navy-950);
+  cursor: pointer;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  place-items: center;
+  box-shadow: 3px 4px 0 rgba(7, 26, 61, .3);
+  transition: transform .18s var(--ease-snap), background-color .18s ease;
+}
+.wall-lightbox__close:hover { background: var(--white); transform: rotate(90deg); }
+
+@media (max-width: 760px) {
+  .wall-lightbox { width: 94vw; border-radius: 16px; }
+  /* Off-corner buttons get clipped by the viewport on a phone, so it comes inside. */
+  .wall-lightbox__close {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+  }
+  .wall-stars__star { width: 40px; height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-stars__star,
+  .wall-photo__pick,
+  .wall-note__photo img,
+  .wall-lightbox__close { transition: none; }
+  .wall-note__photo:hover img { transform: none; }
+  .wall-lightbox__close:hover { transform: none; }
+}
+
+/* ============================================================
+   34. Riders under 18: the guardian block.
+   ============================================================
+   A <select> always has a value, and it has no `:placeholder-shown`, so the
+   floating-label rule written for inputs never fires for it and the label sits
+   right on top of the chosen option. Selects therefore start floated and stay
+   floated — there is no empty state to return to. */
+.field select + label {
+  transform: translateY(-12px);
+  color: var(--blue-700);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+#signup .field select + label { transform: translateY(-11px); font-size: 10.5px; }
+
+/* The block is a fieldset, not a div: the legend gives the group a real name, so a
+   screen reader announces "Iscrizione di un minore" before each field inside it
+   instead of reading seven unrelated labels. */
+.minor-box {
+  margin: 16px 0 0;
+  padding: 16px 17px 15px;
+  border: 2px solid var(--blue-500);
+  border-radius: 18px;
+  background: linear-gradient(160deg, #eef4ff, #fff);
+  /* Animating `height` would need a measured pixel value; the block is revealed by
+     the `hidden` attribute, and this only softens the arrival. */
+  animation: minor-appear .34s var(--ease-snap) both;
+}
+@keyframes minor-appear {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+.minor-box[hidden] { display: none; }
+
+.minor-box legend {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 6px;
+  font-family: var(--font-meta);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.minor-box__badge {
+  display: grid;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--blue-600, #2469d8);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: .04em;
+  place-items: center;
+}
+.minor-box__intro {
+  margin: 4px 0 14px;
+  color: var(--navy-800, #103063);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.minor-box__note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.minor-box__consent { margin-top: 12px; }
+.minor-box [data-minor-consent-error] { display: none; margin: 6px 0 0; }
+
+/* The same warning in step 3, next to the accept button, so nobody meets the rule
+   for the first time in their inbox. */
+.consent-minor {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  border-left: 4px solid var(--blue-500);
+  border-radius: 0 12px 12px 0;
+  background: #eef4ff;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.consent-minor strong {
+  font-family: var(--font-meta);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.consent-minor[hidden] { display: none; }
+
+@media (max-width: 760px) {
+  .minor-box { padding: 13px 13px 12px; border-radius: 15px; }
+  .minor-box__intro { margin-bottom: 11px; font-size: 12.5px; }
+  .minor-box legend { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minor-box { animation: none; }
+}
+
+/* ============================================================
+   35. Prize deck: a hover that cannot fight the drag.
+   ============================================================
+   The rule that used to lift the card on hover is gone from section 7, because
+   script owns `transform` on these cards and any CSS write to it throws the card
+   across the deck.
+
+   So the hover happens on everything except transform of the card itself: the
+   border, the shadow, and a scale on the inner artwork — which has its own
+   transform nobody else touches. Same feeling, no fight. */
+.prize-deck .prize-card {
+  /* Deliberately NOT `transform` in this list. A transition on a property that
+     script rewrites every frame during a drag means the browser is interpolating
+     towards a target that has already moved, and the card lags behind the finger. */
+  transition: box-shadow .32s ease, border-color .32s ease;
+}
+
+.prize-deck:not(.is-dragging) .prize-card:hover {
+  border-color: var(--coral);
+  box-shadow:
+    14px 16px 0 var(--yellow),
+    0 30px 60px rgba(7, 26, 61, .3);
+}
+
+/* The artwork is the part that moves. It sits inside the card, so scaling it is
+   invisible to the positioning script and cannot displace anything. */
+.prize-card__art {
+  overflow: hidden;
+  transition: transform .42s var(--ease-snap);
+}
+.prize-deck:not(.is-dragging) .prize-card:hover .prize-card__art {
+  transform: scale(1.06) rotate(-1.2deg);
+}
+
+/* The rank plate and the title follow, a beat later, so the card feels like it
+   wakes up rather than snapping. */
+.prize-card__rank,
+.prize-card__number {
+  transition: transform .34s var(--ease-snap) .04s, background-color .34s ease;
+}
+.prize-deck:not(.is-dragging) .prize-card:hover .prize-card__rank { transform: translateX(3px); }
+.prize-deck:not(.is-dragging) .prize-card:hover .prize-card__number { transform: scale(1.08); }
+
+/* The three dots that say "you can drag this" start moving when you are about to. */
+.prize-card__drag { transition: opacity .3s ease, letter-spacing .3s ease; }
+.prize-deck:not(.is-dragging) .prize-card:hover .prize-card__drag {
+  opacity: 1;
+  letter-spacing: .22em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prize-deck .prize-card,
+  .prize-card__art,
+  .prize-card__rank,
+  .prize-card__number,
+  .prize-card__drag { transition: none; }
+  .prize-deck:not(.is-dragging) .prize-card:hover .prize-card__art { transform: none; }
+  .prize-deck:not(.is-dragging) .prize-card:hover .prize-card__rank,
+  .prize-deck:not(.is-dragging) .prize-card:hover .prize-card__number { transform: none; }
+}
+
+/* Touch devices have no hover, but Safari and Chrome both fire :hover once after a
+   tap and leave it stuck until the next tap elsewhere. On a deck you drag with your
+   finger that means the artwork stays scaled after every swipe. */
+@media (hover: none) {
+  .prize-deck:not(.is-dragging) .prize-card:hover .prize-card__art,
+  .prize-deck:not(.is-dragging) .prize-card:hover .prize-card__rank,
+  .prize-deck:not(.is-dragging) .prize-card:hover .prize-card__number { transform: none; }
+  .prize-deck:not(.is-dragging) .prize-card:hover {
+    border-color: var(--navy-950);
+    box-shadow: 10px 12px 0 var(--yellow), 0 26px 54px rgba(7, 26, 61, .26);
+  }
+}
+
+/* ============================================================
+   36. Segmented pickers and the guardian consent switch.
+   ============================================================
+   These replaced two native <select> dropdowns. With three options each, a
+   dropdown hides two of them behind a tap and gives back a control that cannot be
+   styled, needs its own label-overlap workaround, and on a phone opens the system
+   picker over the form.
+
+   Underneath they are radio groups, so keyboard arrows, tab order and screen-reader
+   grouping come from the browser and not from script. Everything visible is a label
+   reacting to :checked on its own input. */
+.pick {
+  margin: 0 0 2px;
+  padding: 0;
+  border: 0;
+}
+.pick legend {
+  padding: 0 0 7px;
+  color: var(--muted);
+  font-family: var(--font-meta);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.pick__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 8px;
+}
+.pick__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.pick__opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 62px;
+  padding: 9px 8px;
+  border: 2px solid var(--navy-950);
+  border-radius: 14px;
+  background: var(--white);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  /* No transition on transform here: these sit in a form tuned to one screen and a
+     lift would be clipped by the fieldset. Colour and shadow carry the state. */
+  transition: background-color .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.pick__glyph { font-size: 19px; line-height: 1; }
+.pick__opt:hover { background: #eef4ff; }
+.pick__input:checked + .pick__opt {
+  border-color: var(--blue-600, #2469d8);
+  background: var(--yellow);
+  box-shadow: 3px 4px 0 var(--navy-950);
+}
+.pick__input:focus-visible + .pick__opt {
+  outline: 3px solid var(--blue-500);
+  outline-offset: 3px;
+}
+
+/* The guardian authorisation. A real checkbox, hidden, with the box drawn by the
+   label — the native control cannot carry the tick animation and stays a grey
+   square that looks like an afterthought next to everything around it. */
+.minor-box__consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 2px solid var(--navy-950);
+  border-radius: 14px;
+  background: var(--white);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+  transition: background-color .22s ease, box-shadow .22s ease;
+}
+.minor-box__consent:hover { background: #fffaeb; }
+.minor-box__consent input {
+  /* Kept in the layout and in the tab order; only its own painting is suppressed,
+     so the label below can draw the box in its place. */
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 2px solid var(--navy-950);
+  border-radius: 7px;
+  background: var(--white);
+  cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease;
+}
+.minor-box__consent input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  width: 7px;
+  height: 12px;
+  border: solid var(--navy-950);
+  border-width: 0 3px 3px 0;
+  opacity: 0;
+  transform: rotate(45deg) scale(.5);
+  transform-origin: center;
+  transition: opacity .16s ease, transform .24s var(--ease-snap);
+}
+.minor-box__consent input:checked {
+  border-color: var(--blue-600, #2469d8);
+  background: var(--yellow);
+}
+.minor-box__consent input:checked::after { opacity: 1; transform: rotate(45deg) scale(1); }
+.minor-box__consent input:focus-visible { outline: 3px solid var(--blue-500); outline-offset: 3px; }
+.minor-box__consent:has(input:checked) {
+  background: #fffaeb;
+  box-shadow: 3px 4px 0 rgba(7, 26, 61, .14);
+}
+
+@media (max-width: 760px) {
+  .pick__row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .pick__opt { min-height: 56px; padding: 7px 4px; font-size: 11px; }
+  .pick__glyph { font-size: 17px; }
+  .minor-box__consent { font-size: 12.5px; padding: 10px 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pick__opt,
+  .minor-box__consent,
+  .minor-box__consent input,
+  .minor-box__consent input::after { transition: none; }
+}
+
+/* ============================================================
+   37. The consent gate inside the reminder pop-up.
+   ============================================================
+   Same control as on the signup form, in a smaller box: the reminder pop-up is
+   short and the full-size gate would push the send button off a phone screen.
+   Only the sizing differs — the state classes, the tick and the fill animation are
+   inherited from the signup gate so the two behave identically. */
+.consent-gate--compact {
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  text-align: left;
+}
+.consent-gate--compact .consent-gate__copy strong { font-size: 13px; }
+.consent-gate--compact .consent-gate__copy small {
+  font-size: 11.5px;
+  line-height: 1.35;
+  opacity: .85;
+}
+.consent-gate--compact .consent-gate__mark { width: 24px; height: 24px; }
+.consent-gate--compact .consent-gate__arrow { font-size: 14px; }
+
+/* The reminder dialog sits at z-index above the page; the consent dialog has to sit
+   above the reminder, or the documents open behind the pop-up that asked for them.
+   A native <dialog> in the top layer is already above everything, but the backdrop
+   is not, so it is raised explicitly. */
+.consent-dialog::backdrop { background: rgba(4, 16, 42, .82); }
+
+@media (max-width: 760px) {
+  .consent-gate--compact { padding: 10px 11px; }
+  .consent-gate--compact .consent-gate__copy strong { font-size: 12.5px; }
+  .consent-gate--compact .consent-gate__copy small { font-size: 11px; }
+}

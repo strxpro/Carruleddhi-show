@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "make": {
+      "command": "npx",
+      "args": ["-y", "@makehq/mcp-server"],
+      "env": {
+        "MAKE_API_KEY": "<make-api-key-with-scenarios:read-and-scenarios:run>",
+        "MAKE_ZONE": "<eu1.make.com | eu2.make.com | us1.make.com>",
+        "MAKE_TEAM": "<team-id-from-the-team-page-url>"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

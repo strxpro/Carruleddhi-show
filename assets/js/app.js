@@ -1,0 +1,3485 @@
+import { DEFAULT_SITE_CONFIG, getPublicSiteConfig } from './site-config.js';
+import { ROUTE_VIEWBOX, buildDashPathData, buildRoutePathData } from './route-path.js';
+import { flagSvg } from './flags.js';
+
+(() => {
+  'use strict';
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const finePointer = window.matchMedia('(pointer: fine)').matches;
+  const config = getPublicSiteConfig();
+  window.CARRULEDDHI_ACTIVE_CONFIG = config;
+
+  const storage = {
+    get(key, fallback = null) {
+      try {
+        const value = localStorage.getItem(key);
+        return value === null ? fallback : value;
+      } catch (_) {
+        return fallback;
+      }
+    },
+    set(key, value) {
+      try {
+        localStorage.setItem(key, value);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    },
+    remove(key) {
+      try { localStorage.removeItem(key); } catch (_) { /* Storage may be blocked. */ }
+    }
+  };
+
+  const state = {
+    lang: 'it',
+    formStep: 1,
+    deckIndex: 0,
+    deckLocked: false,
+    attended: storage.get('carruleddhi.attended') === '1',
+    registrations: Number.parseInt(storage.get('carruleddhi.registrations', '0'), 10) || 0,
+    remoteAttendees: null,
+    // Two-letter initials of the first riders, for the avatar row. Empty until the
+    // counts endpoint answers; the markup carries placeholders until then.
+    riderInitials: [],
+    remotePilots: null,
+    lastRegistration: null,
+    lastFocused: null
+  };
+
+  function dictionary() {
+    const all = window.CARRULEDDHI_I18N || {};
+    return all[state.lang] || all.it || {};
+  }
+
+  function text(key) {
+    const dict = dictionary();
+    return dict[key] || (window.CARRULEDDHI_I18N?.it || {})[key] || key;
+  }
+
+  function formatHeaderDate(value) {
+    const parts = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return parts ? `${parts[3]} · ${parts[2]} · ${parts[1]}` : config.dateLabel;
+  }
+
+  function applyPublicConfig() {
+    $$('[data-config-event-name]').forEach((element) => { element.textContent = config.eventName; });
+    $$('[data-header-date]').forEach((element) => { element.textContent = formatHeaderDate(config.eventDate); });
+    const configurableText = [
+      ['[data-config-date-label]', config.dateLabel, DEFAULT_SITE_CONFIG.dateLabel],
+      ['[data-config-tagline]', config.tagline, DEFAULT_SITE_CONFIG.tagline],
+      ['[data-config-route-distance]', config.route.distance, DEFAULT_SITE_CONFIG.route.distance],
+      ['[data-config-route-road]', config.route.road, DEFAULT_SITE_CONFIG.route.road]
+    ];
+    configurableText.forEach(([selector, value, defaultValue]) => {
+      if (value === defaultValue) return;
+      $$(selector).forEach((element) => { element.textContent = value; });
+    });
+    if (config.eventName !== DEFAULT_SITE_CONFIG.eventName) document.title = config.eventName;
+
+    $$('[data-contact-email]').forEach((link) => {
+      link.textContent = config.contact.email;
+      link.href = `mailto:${config.contact.email}`;
+    });
+    $$('[data-contact-phone]').forEach((link) => {
+      link.textContent = config.contact.phone;
+      link.href = `tel:${config.contact.phone.replace(/[^+\d]/g, '')}`;
+    });
+    $$('[data-route-map-link]').forEach((link) => { link.href = config.route.mapUrl; });
+
+    const routeImage = $('[data-route-image]');
+    if (routeImage) routeImage.src = config.media.routeImage;
+    $$('[data-gallery-image]').forEach((image) => {
+      const index = Number.parseInt(image.dataset.galleryImage, 10);
+      if (config.media.galleryImages[index]) image.src = config.media.galleryImages[index];
+    });
+
+    Object.entries(config.features).forEach(([feature, enabled]) => {
+      $$(`[data-feature="${feature}"]`).forEach((element) => { element.hidden = !enabled; });
+      $$(`[data-feature-link="${feature}"]`).forEach((element) => { element.hidden = !enabled; });
+    });
+
+    if (config.preview && !$('[data-config-preview-banner]')) {
+      const banner = document.createElement('div');
+      banner.className = 'config-preview-banner';
+      banner.dataset.configPreviewBanner = '';
+      banner.setAttribute('role', 'status');
+      banner.innerHTML = `<strong>${text('preview.title')}</strong><span>${text('preview.text')}</span><a href="admin.html">${text('preview.back')}</a>`;
+      document.body.appendChild(banner);
+      document.body.classList.add('is-config-preview');
+    }
+  }
+
+  function showToast(message, duration = 4200) {
+    const toast = $('[data-toast]');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('is-visible');
+    window.clearTimeout(showToast.timer);
+    showToast.timer = window.setTimeout(() => toast.classList.remove('is-visible'), duration);
+  }
+
+  async function postJSON(endpoint, payload) {
+    if (!endpoint) return { ok: true, demo: true };
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      mode: 'cors',
+      credentials: 'omit'
+    });
+    const raw = await response.text();
+    if (!response.ok) {
+      let parsed = null;
+      try { parsed = JSON.parse(raw); } catch (_) { /* not JSON — see below */ }
+
+      /**
+       * No backend at all, as opposed to a backend saying no.
+       *
+       * On `npm run dev` there is no Worker, so /api/carruleddhi/* falls through to
+       * Vite, which answers 404 with the SPA's HTML. Every form then threw and
+       * showed the contact form's "check the fields" toast — with the fields
+       * perfectly valid, on a page where filling the form in is the only thing
+       * there is to test. So the form looked broken while nothing was wrong with it.
+       *
+       * A 404 whose body is not JSON means nothing is listening on that path: the
+       * real Worker answers JSON for every outcome, including its own errors, and
+       * in production it claims /api/carruleddhi/* before static assets can
+       * (run_worker_first in wrangler.toml), so it cannot produce this shape.
+       * Treated as demo mode, exactly like an unconfigured endpoint, and logged so
+       * it is never silent.
+       */
+      if (response.status === 404 && !parsed) {
+        console.warn(`No API at ${endpoint} — running in demo mode. Deploy the Worker to store data for real.`);
+        return { ok: true, demo: true };
+      }
+
+      // Still a throw, because every existing caller treats a throw as failure and
+      // a returned object as success. But the body is carried along on the error, so
+      // callers that want to tell "rate limited" from "broken" can, and the ones
+      // that do not keep behaving exactly as before.
+      const error = new Error(`Webhook returned ${response.status}`);
+      error.status = response.status;
+      error.payload = parsed;
+      throw error;
+    }
+    if (!raw) return { ok: true };
+    try { return JSON.parse(raw); } catch (_) { return { ok: true, response: raw }; }
+  }
+
+  function eventPayload(type, data = {}) {
+    return {
+      type,
+      event: config.eventName,
+      eventDate: config.eventDate,
+      locale: state.lang,
+      source: config.preview ? 'website-preview' : 'website',
+      submittedAt: new Date().toISOString(),
+      ...data
+    };
+  }
+
+  const languageMeta = Object.freeze({
+    it: { code: 'IT', name: 'Italiano' },
+    pl: { code: 'PL', name: 'Polski' },
+    en: { code: 'EN', name: 'English' },
+    de: { code: 'DE', name: 'Deutsch' },
+    es: { code: 'ES', name: 'Español' },
+    fr: { code: 'FR', name: 'Français' }
+  });
+
+  /** Swaps every emoji flag for an inline SVG: Windows has no colour flag glyphs. */
+  function paintFlags() {
+    const trigger = $('[data-language-flag]');
+    if (trigger && !trigger.dataset.svgFlag) trigger.dataset.svgFlag = '1';
+    $$('[data-language-option]').forEach((option) => {
+      const locale = option.dataset.languageOption;
+      const slot = option.firstElementChild;
+      if (!slot || slot.dataset.svgFlag === locale) return;
+      slot.innerHTML = flagSvg(locale, { size: 26 });
+      slot.dataset.svgFlag = locale;
+    });
+  }
+
+  /**
+   * Writes a translation into an element, letter by letter, like a fairground sign
+   * flipping over.
+   *
+   * Only worth doing where it can be seen and afforded, so three gates:
+   *   - the element must be on screen, or nothing is animated at all;
+   *   - the text must be short (headlines, labels, buttons), because splitting a
+   *     paragraph into 300 spans and animating each one costs a layout per letter;
+   *   - reduced motion switches the whole thing off.
+   * Everything else gets a plain textContent write, which is what used to happen
+   * everywhere. The surrounding fade in experience.css still covers those.
+   *
+   * The letters are plain spans with a staggered CSS animation and are replaced by
+   * a flat string once it finishes, so the DOM does not slowly fill with wrappers
+   * after a few language switches.
+   */
+  const LETTER_LIMIT = 46;
+
+  /**
+   * Only display copy is animated. Buttons, chips and dock labels are deliberately
+   * excluded: they are narrow boxes, and a run of inline-block letters can break
+   * across lines at any letter, so "ZAPISZ SIĘ" inside a 174 px button came apart
+   * into stray characters. Restricting the effect to headings and intro copy
+   * removes that whole class of bug instead of patching each control.
+   */
+  const FLIP_SELECTOR = [
+    '.hero__title', '.hero__tagline', '.section-title', '.eyebrow',
+    '.stack-card h3', '.prize-card h3', '.form-step h3', '.modal h2',
+    '.attendance__title', '.attendance__label', '.footer__brand',
+    '.g3d__caption', '.story-number span', '.schedule-row strong'
+  ].join(',');
+
+  function setTranslatedText(element, value) {
+    if (element.textContent === value) return;
+
+    if (reducedMotion || value.length > LETTER_LIMIT || !element.isConnected
+      || !element.matches(FLIP_SELECTOR)) {
+      element.textContent = value;
+      return;
+    }
+    const box = element.getBoundingClientRect();
+    const onScreen = box.bottom > 0 && box.top < window.innerHeight && box.width > 0;
+    if (!onScreen) {
+      element.textContent = value;
+      return;
+    }
+
+    /**
+     * Two levels of wrapper. The outer one holds a whole word and is the only
+     * thing a line break is allowed to happen between; the inner ones are the
+     * letters. Without the word wrapper every letter is its own inline-level box
+     * and the browser will happily break a word in half.
+     */
+    const fragment = document.createDocumentFragment();
+    let index = 0;
+    const words = value.split(' ');
+
+    words.forEach((word, wordIndex) => {
+      if (wordIndex > 0) fragment.appendChild(document.createTextNode(' '));
+      if (!word) return;
+      const wrapper = document.createElement('span');
+      wrapper.className = 'flip-word';
+      for (const character of word) {
+        const span = document.createElement('span');
+        span.className = 'flip-letter';
+        span.textContent = character;
+        // Capped so even the longest allowed string finishes inside half a second.
+        span.style.animationDelay = `${Math.min(index * 22, 420)}ms`;
+        wrapper.appendChild(span);
+        index += 1;
+      }
+      fragment.appendChild(wrapper);
+    });
+
+    element.replaceChildren(fragment);
+    window.clearTimeout(element._flipTimer);
+    element._flipTimer = window.setTimeout(() => {
+      // Flatten back to a plain string so repeated switches cannot leave the DOM
+      // full of wrappers. Skipped if something else has rewritten the element.
+      if (element.textContent === value) element.textContent = value;
+    }, Math.min(index * 22, 420) + 460);
+  }
+
+  /** Holds the last scroll position the header peek logic reacted to. */
+  function updateHeaderPeek() {}
+
+  /**
+   * Shrinks any heading whose text does not fit its own box until it does.
+   *
+   * Why this is done by measurement rather than by CSS. At 1440 px, thirteen
+   * headings held a single word wider than the box it had to live in — CARRULEDDHI
+   * needed 812 px of a 707 px column, "Najzabawniejszy" 355 px of about 250. With
+   * `hyphens: auto` the browser broke them mid-word, which is what produced
+   * "CARRULED-DHI". Turning hyphenation off alone just converts a broken word into
+   * an overflowing one.
+   *
+   * A CSS answer needs one multiplier per heading per container, and the container
+   * is often a grid cell far narrower than any element that can be named. Six
+   * languages and a fluid layout multiply that out into something nobody will keep
+   * correct. Measuring is exact and self-maintaining: read the base size once, then
+   * bisect downwards until scrollWidth fits clientWidth.
+   *
+   * Cost is a forced layout per probe, so it runs on load, on resize and on language
+   * change — never on scroll.
+   */
+  const FIT_SELECTOR = [
+    '.hero__title', '.hero__tagline', '.section-title',
+    '.stack-card h3', '.prize-card h3', '.form-step h3', '.modal h2',
+    '.g3d__heading', '.attendance__title', '.footer__brand', '.wall-note__text'
+  ].join(',');
+
+  /**
+   * Fits one heading. Always measures — no shortcuts.
+   *
+   * An earlier version skipped when the element's width had not changed since the
+   * last run, which looked like a sensible optimisation and was a bug: the *content*
+   * width also changes without the box moving. When the webfont landed, Bungee's
+   * wider glyphs pushed "Carruleddhi Classic" 139 px past its box, but the box was
+   * still 424 px, so the guard skipped it and the heading stayed too big. The guard
+   * belongs in the ResizeObserver, where the loop it was protecting against
+   * actually lives.
+   */
+  function fitOne(element) {
+    // Remember the size the stylesheet wants, so repeated runs never ratchet down.
+    if (!element.dataset.fitBase) {
+      element.style.removeProperty('font-size');
+      element.dataset.fitBase = String(parseFloat(getComputedStyle(element).fontSize) || 0);
+    }
+    const base = Number(element.dataset.fitBase);
+    if (!base) return;
+    if (element.clientWidth < 8) return;
+
+    element.style.fontSize = `${base}px`;
+    if (element.scrollWidth <= element.clientWidth + 1) return;
+
+    // Bisect between 45% and 100% of the intended size. Eight rounds lands within a
+    // fraction of a pixel, and stopping at 45% means a pathological string makes the
+    // heading small rather than making it silently unreadable.
+    let low = base * 0.45;
+    let high = base;
+    for (let round = 0; round < 8; round += 1) {
+      const middle = (low + high) / 2;
+      element.style.fontSize = `${middle}px`;
+      if (element.scrollWidth <= element.clientWidth + 1) low = middle;
+      else high = middle;
+    }
+    element.style.fontSize = `${low.toFixed(2)}px`;
+  }
+
+  function fitHeadings() {
+    for (const element of $$(FIT_SELECTOR)) fitOne(element);
+  }
+
+  function setupHeadingFit() {
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fitHeadings);
+    };
+
+    /**
+     * A ResizeObserver on each heading rather than only window resize.
+     *
+     * Several of these live inside things that change size after the page has
+     * settled — the card stack measures itself, the prize deck lays itself out, the
+     * gallery pins. Fitting once on load left those headings at full size and
+     * overflowing by up to 263 px, because at the moment they were measured their
+     * boxes were still the wrong width.
+     */
+    if ('ResizeObserver' in window) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          // Setting font-size changes the element's height, which fires this
+          // observer again. Acting only when the inline size actually moved is what
+          // stops that becoming an endless loop.
+          const width = Math.round(entry.contentRect.width);
+          if (entry.target.dataset.fitWidth === String(width)) continue;
+          entry.target.dataset.fitWidth = String(width);
+          fitOne(entry.target);
+        }
+      });
+      $$(FIT_SELECTOR).forEach((element) => observer.observe(element));
+    }
+
+    /**
+     * And once more when the heading actually comes into view.
+     *
+     * Everything above measures headings that may be several screens away, inside
+     * sections that have not been laid out the way they will be when you get there —
+     * the card stack scales its cards, the prize deck stacks them, the gallery pins.
+     * Measured early, "Carruleddhi Classic" reported as fitting and was left at its
+     * full 76 px; by the time it was on screen it was 139 px too wide. Intersection
+     * is the one moment the box is guaranteed to be real.
+     */
+    if ('IntersectionObserver' in window) {
+      const seen = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          fitOne(entry.target);
+        }
+      }, { rootMargin: '200px 0px' });
+      $$(FIT_SELECTOR).forEach((element) => seen.observe(element));
+    }
+
+    schedule();
+    // The webfont changes every measurement, so this has to run again once it lands.
+    document.fonts?.ready?.then(schedule).catch(() => {});
+    window.addEventListener('resize', schedule, { passive: true });
+    window.addEventListener('orientationchange', schedule, { passive: true });
+    // New text, new widths: everything has to be measured again.
+    window.addEventListener('carruleddhi:language', schedule);
+  }
+
+  function applyLanguage(language, persist = true) {
+    const available = Object.keys(window.CARRULEDDHI_I18N || {});
+    const lang = available.includes(language) ? language : 'it';
+    state.lang = lang;
+    const dict = dictionary();
+
+    $$('[data-i18n]').forEach((element) => {
+      const key = element.dataset.i18n;
+      if (typeof dict[key] === 'string') setTranslatedText(element, dict[key]);
+    });
+    const translatedAttributes = [
+      ['data-i18n-placeholder', 'placeholder'],
+      ['data-i18n-alt', 'alt'],
+      ['data-i18n-aria-label', 'aria-label'],
+      ['data-i18n-title', 'title']
+    ];
+    translatedAttributes.forEach(([dataAttribute, attribute]) => {
+      $$(`[${dataAttribute}]`).forEach((element) => {
+        const key = element.getAttribute(dataAttribute);
+        if (typeof dict[key] === 'string') element.setAttribute(attribute, dict[key]);
+      });
+    });
+
+    document.documentElement.lang = lang;
+    document.title = dict['meta.title'] || config.eventName;
+    const description = $('meta[name="description"]');
+    if (description && dict['meta.description']) description.content = dict['meta.description'];
+
+    const metadata = languageMeta[lang] || languageMeta.it;
+    const languageTrigger = $('[data-language-trigger]');
+    const languageFlag = $('[data-language-flag]');
+    const languageCode = $('[data-language-code]');
+    if (languageFlag) languageFlag.innerHTML = flagSvg(lang, { size: 26 });
+    if (languageCode) languageCode.textContent = metadata.code;
+    paintFlags();
+    if (languageTrigger) languageTrigger.setAttribute('aria-label', `Lingua / Language: ${metadata.name}`);
+    $$('[data-language-option]').forEach((option) => {
+      const selected = option.dataset.languageOption === lang;
+      option.setAttribute('aria-selected', String(selected));
+      option.tabIndex = selected ? 0 : -1;
+    });
+
+    const menuToggle = $('[data-menu-toggle]');
+    if (menuToggle) menuToggle.setAttribute('aria-label', dict['a11y.menu'] || 'Menu');
+
+    $$('a[href^="privacy.html"], a[href^="cookies.html"], a[href^="regolamento.html"]').forEach((link) => {
+      const base = link.getAttribute('href').split('?')[0];
+      link.setAttribute('href', `${base}?lang=${lang}`);
+    });
+
+    if (persist) storage.set('carruleddhi.lang', lang);
+    refreshAttendanceLabels();
+    applyPublicConfig();
+    window.dispatchEvent(new CustomEvent('carruleddhi:language', { detail: { lang } }));
+  }
+
+  function setupLanguage() {
+    const picker = $('[data-language-picker]');
+    const trigger = $('[data-language-trigger]');
+    const menu = $('[data-language-menu]');
+    const options = $$('[data-language-option]', menu || document);
+    const browserLanguage = (navigator.language || 'it').slice(0, 2).toLowerCase();
+    const saved = storage.get('carruleddhi.lang');
+    let transitionTimer = 0;
+
+    applyLanguage(saved || browserLanguage, false);
+    if (!picker || !trigger || !menu || !options.length) return;
+    menu.inert = true;
+
+    function setPickerOpen(open, moveFocus = false) {
+      picker.classList.toggle('is-open', open);
+      menu.classList.toggle('is-open', open);
+      trigger.setAttribute('aria-expanded', String(open));
+      menu.setAttribute('aria-hidden', String(!open));
+      menu.inert = !open;
+      if (open && moveFocus) {
+        const selected = $('[aria-selected="true"]', menu) || options[0];
+        requestAnimationFrame(() => selected?.focus({ preventScroll: true }));
+      } else if (!open && moveFocus) {
+        trigger.focus({ preventScroll: true });
+      }
+    }
+
+    function focusOption(index) {
+      const target = options[(index + options.length) % options.length];
+      options.forEach((option) => { option.tabIndex = option === target ? 0 : -1; });
+      target?.focus({ preventScroll: true });
+    }
+
+    /**
+     * Applied immediately, on purpose.
+     *
+     * This used to blur and fade the whole page out for 180 ms, swap the text, then
+     * fade back. That reads as a loading state, and it hid the thing worth
+     * watching: setTranslatedText now flips every short string letter by letter,
+     * and a blurred, half-transparent parent makes that invisible. The letters are
+     * the transition, so the curtain in front of them is gone.
+     *
+     * `is-language-transitioning` stays on the body for one frame because the
+     * mobile menu and the section chip hang their own timing off it.
+     */
+    function changeLanguage(lang) {
+      if (!languageMeta[lang] || lang === state.lang) return;
+      window.clearTimeout(transitionTimer);
+      document.body.classList.add('is-language-transitioning');
+      document.body.setAttribute('aria-busy', 'true');
+      applyLanguage(lang);
+      transitionTimer = window.setTimeout(() => {
+        document.body.classList.remove('is-language-transitioning');
+        document.body.removeAttribute('aria-busy');
+      }, reducedMotion ? 0 : 620);
+    }
+
+    /**
+     * A touchscreen has no hover, so the collapsed header needed a way in. Tapping
+     * the brand opens the pill out to the full bar for a few seconds. Only the
+     * brand: the menu button and the language picker keep their own jobs.
+     */
+    const header = $('.site-header');
+    const brand = $('.site-header .brand');
+    if (header && brand) {
+      let peekTimer = 0;
+      brand.addEventListener('click', (event) => {
+        if (!header.classList.contains('is-compact')) return;
+        // The brand is a link to the top of the page; the first tap opens the bar
+        // instead, which is the less destructive of the two meanings.
+        event.preventDefault();
+        header.classList.add('is-peeked');
+        window.clearTimeout(peekTimer);
+        peekTimer = window.setTimeout(() => header.classList.remove('is-peeked'), 4200);
+      });
+      window.addEventListener('scroll', () => {
+        if (header.classList.contains('is-peeked')) {
+          window.clearTimeout(peekTimer);
+          peekTimer = window.setTimeout(() => header.classList.remove('is-peeked'), 900);
+        }
+      }, { passive: true });
+    }
+
+    trigger.addEventListener('click', () => {
+      const open = !picker.classList.contains('is-open');
+      setPickerOpen(open, open);
+    });
+    trigger.addEventListener('keydown', (event) => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      setPickerOpen(true);
+      const selectedIndex = Math.max(0, options.findIndex((option) => option.getAttribute('aria-selected') === 'true'));
+      const targetIndex = event.key === 'ArrowUp' || event.key === 'End'
+        ? options.length - 1
+        : event.key === 'Home' ? 0 : selectedIndex;
+      window.setTimeout(() => focusOption(targetIndex), 0);
+    });
+    menu.addEventListener('click', (event) => {
+      const option = event.target.closest('[data-language-option]');
+      if (!option) return;
+      changeLanguage(option.dataset.languageOption);
+      setPickerOpen(false, true);
+    });
+    menu.addEventListener('keydown', (event) => {
+      const current = Math.max(0, options.indexOf(document.activeElement));
+      if (event.key === 'ArrowDown') { event.preventDefault(); focusOption(current + 1); }
+      if (event.key === 'ArrowUp') { event.preventDefault(); focusOption(current - 1); }
+      if (event.key === 'Home') { event.preventDefault(); focusOption(0); }
+      if (event.key === 'End') { event.preventDefault(); focusOption(options.length - 1); }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setPickerOpen(false, true);
+      }
+      if (event.key === 'Tab') setPickerOpen(false);
+    });
+    document.addEventListener('pointerdown', (event) => {
+      if (!picker.contains(event.target)) setPickerOpen(false);
+    });
+    window.addEventListener('blur', () => setPickerOpen(false));
+  }
+
+  /**
+   * Intro overlay.
+   *
+   * It must never be able to trap the page. Three independent safeguards:
+   *  1. the fill bar is a CSS animation, so a throttled or stalled
+   *     requestAnimationFrame cannot freeze the progress;
+   *  2. a watchdog timer dismisses the overlay even if this function is
+   *     interrupted halfway through;
+   *  3. `assets/css/experience.css` hides the overlay with a pure CSS animation,
+   *     so the page stays usable even when JavaScript never runs at all
+   *     (opening the file over file:// blocks ES modules, for example).
+   */
+  function setupPreloader() {
+    const preloader = $('[data-preloader]');
+    if (!preloader) return;
+    const skipIntro = new URLSearchParams(window.location.search).has('skipIntro');
+
+    let dismissed = false;
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      preloader.classList.add('is-done');
+      document.body.classList.remove('is-locked');
+      // Take it out of the layout for good: relying on a delayed visibility
+      // transition left the overlay hit-testable on slow paints.
+      window.setTimeout(() => { preloader.hidden = true; }, reducedMotion ? 0 : 900);
+    };
+
+    if (reducedMotion || skipIntro) {
+      preloader.hidden = true;
+      document.body.classList.remove('is-locked');
+      return;
+    }
+
+    const duration = 1250;
+    document.body.classList.add('is-locked');
+    preloader.classList.add('is-running');
+
+    // Hard stop: whatever happens, the overlay is gone by this point.
+    const watchdog = window.setTimeout(dismiss, duration + 1400);
+
+    const number = $('[data-preloader-number]', preloader);
+    if (number) {
+      const started = Date.now();
+      const tick = window.setInterval(() => {
+        const linear = clamp((Date.now() - started) / duration, 0, 1);
+        number.textContent = String(Math.round((1 - Math.pow(1 - linear, 3)) * 100)).padStart(2, '0');
+        if (linear >= 1) window.clearInterval(tick);
+      }, 40);
+      window.setTimeout(() => window.clearInterval(tick), duration + 400);
+    }
+
+    window.setTimeout(() => {
+      window.clearTimeout(watchdog);
+      dismiss();
+    }, duration + 180);
+  }
+
+  function setupReveal() {
+    const elements = $$('.reveal');
+    if (reducedMotion || !('IntersectionObserver' in window)) {
+      elements.forEach((element) => element.classList.add('is-visible'));
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -7% 0px' });
+    elements.forEach((element) => observer.observe(element));
+  }
+
+  function setupNavigation() {
+    const header = $('[data-header]');
+    const menuToggle = $('[data-menu-toggle]');
+    const menu = $('[data-mobile-menu]');
+    const backdrop = $('[data-menu-backdrop]');
+    const currentLabel = $('[data-current-section]');
+    const currentProgress = $('[data-nav-progress]');
+    const sections = $$('main section[id]').filter((section) => !section.hidden);
+    const labelKeys = {
+      story: 'nav.race',
+      categories: 'nav.categories',
+      route: 'nav.route',
+      schedule: 'nav.program',
+      gallery: 'nav.gallery',
+      prizes: 'nav.prizes',
+      attendance: 'nav.attend',
+      signup: 'nav.signup',
+      faq: 'nav.faq',
+      contact: 'nav.contact'
+    };
+    let currentSectionId = 'hero';
+    let ticking = false;
+    let menuFocusTimer = 0;
+
+    function sectionName(id) {
+      return id === 'hero' ? 'Carruleddhi' : text(labelKeys[id] || 'nav.race');
+    }
+
+    function setCurrentSection(id) {
+      if (!id) return;
+      currentSectionId = id;
+      if (currentLabel) currentLabel.textContent = sectionName(id);
+      $$('[data-section-link]', menu || document).forEach((link) => {
+        const active = link.dataset.sectionLink === id;
+        link.classList.toggle('is-active', active);
+        if (active) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+      });
+    }
+
+    function updateActiveSection() {
+      const focusLine = window.innerHeight * 0.38;
+      let active = sections[0]?.id || 'hero';
+      sections.forEach((section) => {
+        if (section.getBoundingClientRect().top <= focusLine) active = section.id;
+      });
+      if (active !== currentSectionId) setCurrentSection(active);
+    }
+
+    function menuBackgroundElements() {
+      return $$('body > *').filter((element) => ![header, menu, backdrop].includes(element) && element.tagName !== 'SCRIPT');
+    }
+
+    function setMenuBackgroundInert(open) {
+      menuBackgroundElements().forEach((element) => {
+        if (open) {
+          element.dataset.menuWasInert = String(element.inert);
+          element.inert = true;
+        } else if ('menuWasInert' in element.dataset) {
+          element.inert = element.dataset.menuWasInert === 'true';
+          delete element.dataset.menuWasInert;
+        }
+      });
+    }
+
+    function menuFocusable() {
+      const selector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      return [header, menu]
+        .filter(Boolean)
+        .flatMap((root) => $$(selector, root))
+        .filter((element) => !element.closest('[aria-hidden="true"]') && !element.closest('[inert]') && element.getClientRects().length > 0);
+    }
+
+    function setMenu(open, restoreFocus = true) {
+      if (!menu || !menuToggle) return;
+      window.clearTimeout(menuFocusTimer);
+      menu.classList.toggle('is-open', open);
+      menu.inert = !open;
+      backdrop?.classList.toggle('is-open', open);
+      header?.classList.toggle('is-menu-open', open);
+      header?.classList.toggle('is-compact', !open && window.scrollY > 120);
+      menuToggle.classList.toggle('is-open', open);
+      menuToggle.setAttribute('aria-expanded', String(open));
+      menuToggle.setAttribute('aria-label', text(open ? 'a11y.close' : 'a11y.menu'));
+      menu.setAttribute('aria-hidden', String(!open));
+      document.body.classList.toggle('is-menu-open', open);
+      document.body.classList.toggle('is-locked', open || Boolean($('.modal.is-open')));
+      setMenuBackgroundInert(open);
+
+      if (open) {
+        const active = $(`[data-section-link="${currentSectionId}"]`, menu) || $('a', menu);
+        menuFocusTimer = window.setTimeout(() => active?.focus({ preventScroll: true }), reducedMotion ? 0 : 240);
+      } else if (restoreFocus || menu.contains(document.activeElement)) {
+        menuToggle.focus({ preventScroll: true });
+      }
+    }
+
+    function updateScroll() {
+      const y = window.scrollY;
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const ratio = clamp(y / max, 0, 1);
+      const progress = $('[data-scroll-progress]');
+      if (progress) progress.style.width = `${ratio * 100}%`;
+      if (currentProgress) currentProgress.textContent = `${String(Math.round(ratio * 100)).padStart(2, '0')}%`;
+
+      /**
+       * Scrolling back up opens the header out again, the way it looks over the
+       * hero, language picker included. There is no hover on a phone, so upward
+       * movement is the gesture that means "I want the controls back". Removed as
+       * soon as you head down again so it never covers what you are reading.
+       */
+      if (header) {
+        // lastY has to be seeded on the very first call. Leaving it undefined made
+        // `goingUp` compare y against y, which is never true, so the reference was
+        // never written and the whole thing deadlocked at "not moving".
+        if (updateHeaderPeek.lastY === undefined) updateHeaderPeek.lastY = y;
+        const goingUp = y < updateHeaderPeek.lastY - 3;
+        const goingDown = y > updateHeaderPeek.lastY + 3;
+        if (goingUp) header.classList.add('is-peeked');
+        else if (goingDown || y < 120) header.classList.remove('is-peeked');
+        if (goingUp || goingDown) updateHeaderPeek.lastY = y;
+      }
+      header?.classList.toggle('is-compact', y > 120 && !menu?.classList.contains('is-open'));
+      updateActiveSection();
+      updateCardStack();
+      ticking = false;
+    }
+
+    window.addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(updateScroll);
+    }, { passive: true });
+
+    menuToggle?.addEventListener('click', () => setMenu(!menu.classList.contains('is-open')));
+    backdrop?.addEventListener('click', () => setMenu(false));
+    $$('a[href^="#"]', menu || document).forEach((link) => link.addEventListener('click', () => setMenu(false, false)));
+    $$('[data-open-reminder]', menu || document).forEach((button) => button.addEventListener('click', () => setMenu(false, false)));
+    document.addEventListener('keydown', (event) => {
+      if (!menu?.classList.contains('is-open')) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenu(false);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = menuFocusable();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !focusable.includes(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !focusable.includes(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+    window.addEventListener('carruleddhi:language', () => {
+      if (currentLabel) currentLabel.textContent = sectionName(currentSectionId);
+      menuToggle?.setAttribute('aria-label', text(menu?.classList.contains('is-open') ? 'a11y.close' : 'a11y.menu'));
+    });
+
+    if (menu) menu.inert = true;
+    setCurrentSection('hero');
+    updateScroll();
+  }
+
+  /**
+   * Card stack metrics.
+   *
+   * getComputedStyle forces a style recalculation, so it must never run inside the
+   * scroll loop. These values only change on resize, so they are cached here and
+   * refreshed from setupCardStack().
+   */
+  const stackMetrics = { top: 96, gap: 16, sticky: false, influence: 420 };
+
+  function measureCardStack() {
+    const cards = $$('.stack-card');
+    if (!cards.length) return;
+    const first = getComputedStyle(cards[0]);
+    stackMetrics.sticky = first.position === 'sticky';
+    stackMetrics.top = Number.parseFloat(first.top) || 96;
+    const secondTop = cards[1] ? Number.parseFloat(getComputedStyle(cards[1]).top) : NaN;
+    stackMetrics.gap = Number.isFinite(secondTop) ? Math.max(4, secondTop - stackMetrics.top) : 16;
+    stackMetrics.influence = Math.max(240, Math.min(window.innerHeight * 0.62, 560));
+  }
+
+  function updateCardStack() {
+    const stack = $('[data-card-stack]');
+    const cards = $$('.stack-card', stack || document);
+    if (!stack || !cards.length) return;
+
+    if (reducedMotion || !stackMetrics.sticky) {
+      cards.forEach((card) => {
+        card.style.removeProperty('transform');
+        card.style.removeProperty('filter');
+        card.classList.remove('is-covered', 'is-active-stack-card');
+      });
+      return;
+    }
+
+    const { top: stickyTop, gap: stickyGap, influence } = stackMetrics;
+    // Read every rect first, write afterwards: interleaving reads and writes
+    // forces a layout on each card and is what made the stack stutter.
+    const tops = cards.map((card) => card.getBoundingClientRect().top);
+    let activeIndex = 0;
+
+    cards.forEach((card, index) => {
+      const cardTop = stickyTop + index * stickyGap;
+      if (tops[index] <= cardTop + stickyGap) activeIndex = index;
+      if (index === cards.length - 1) {
+        card.style.transform = 'translate3d(0,0,0) scale(1)';
+        card.style.removeProperty('filter');
+        card.classList.remove('is-covered');
+        return;
+      }
+      const progress = clamp((cardTop + influence - tops[index + 1]) / influence, 0, 1);
+      const eased = progress * progress * (3 - 2 * progress);
+      // Only transform and brightness: an animated blur on a card this large
+      // repaints the whole layer every frame and drops the framerate.
+      card.style.transform = `translate3d(0,${(-eased * 12).toFixed(2)}px,0) scale(${(1 - eased * 0.085).toFixed(4)})`;
+      card.style.filter = `brightness(${(1 - eased * 0.26).toFixed(3)})`;
+      card.classList.toggle('is-covered', progress > 0.15);
+    });
+
+    cards.forEach((card, index) => {
+      card.classList.toggle('is-active-stack-card', index === activeIndex);
+      card.setAttribute('aria-current', index === activeIndex ? 'step' : 'false');
+    });
+    stack.style.setProperty('--stack-active', String(activeIndex));
+  }
+
+  function setupCardStack() {
+    const stack = $('[data-card-stack]');
+    if (!stack) return;
+    stack.style.setProperty('--stack-count', String($$('.stack-card', stack).length));
+    let frame = 0;
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        measureCardStack();
+        updateCardStack();
+      });
+    };
+    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    window.addEventListener('orientationchange', scheduleUpdate, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(scheduleUpdate).observe(stack);
+    scheduleUpdate();
+  }
+
+  function setupPrizeDeck() {
+    const deck = $('[data-prize-deck]');
+    const cards = $$('[data-prize-card]', deck || document);
+    if (!deck || !cards.length) return;
+    deck.tabIndex = 0;
+    deck.setAttribute('aria-label', 'Interactive prize cards');
+
+    function layout() {
+      const total = cards.length;
+      cards.forEach((card, index) => {
+        const relative = (index - state.deckIndex + total) % total;
+        card.style.setProperty('--deck-i', String(Math.min(relative, 7)));
+        card.style.zIndex = String(total - relative);
+        card.style.opacity = relative > 7 ? '0' : String(Math.max(0.55, 1 - relative * 0.055));
+        // `filter: saturate()` used to be set here on seven stacked cards. Every
+        // frame of the floating artwork then forced each of them to re-filter a
+        // 440x540 surface, and that is what made the deck judder. Opacity and
+        // transform composite; filter does not.
+        card.style.pointerEvents = relative === 0 ? 'auto' : 'none';
+        card.setAttribute('aria-hidden', relative === 0 ? 'false' : 'true');
+      });
+      const current = $('[data-deck-current]');
+      if (current) current.textContent = String(state.deckIndex + 1).padStart(2, '0');
+    }
+
+    /**
+     * @param {number} direction  1 sends the top card away to the left and brings
+     *                            the next one up, -1 goes back.
+     */
+    function advance(direction = 1) {
+      if (state.deckLocked) return;
+      state.deckLocked = true;
+      const outgoing = cards[state.deckIndex];
+      outgoing.style.removeProperty('transform');
+      outgoing.style.removeProperty('transition');
+      void outgoing.offsetWidth;
+      outgoing.classList.add(direction < 0 ? 'is-gone-back' : 'is-gone');
+      window.setTimeout(() => {
+        state.deckIndex = (state.deckIndex + direction + cards.length) % cards.length;
+        outgoing.classList.remove('is-gone', 'is-gone-back');
+        layout();
+        window.setTimeout(() => { state.deckLocked = false; }, 90);
+      }, reducedMotion ? 10 : 300);
+    }
+
+    /**
+     * Drag handling.
+     *
+     * Two things were wrong. The transform was written straight from pointermove,
+     * which on a 1000 Hz mouse is a thousand style writes a second and reads as
+     * shaking. And the release always called advance(1), so a card thrown to the
+     * right still went forward — the deck could never be shuffled back.
+     *
+     * The write is now batched into one requestAnimationFrame, and the throw
+     * direction decides which way the deck moves. The threshold is low (52 px) so
+     * a quick flick is enough.
+     */
+    let drag = null;
+    let dragFrame = 0;
+
+    const paint = () => {
+      dragFrame = 0;
+      if (!drag) return;
+      const { dx, dy } = drag;
+      drag.card.style.transform =
+        `translate(-50%, -50%) translate(${dx.toFixed(1)}px, ${(dy * 0.22).toFixed(1)}px)`
+        + ` rotate(${(dx * 0.03).toFixed(2)}deg)`;
+    };
+
+    deck.addEventListener('pointerdown', (event) => {
+      const card = event.target.closest('[data-prize-card]');
+      if (!card || card !== cards[state.deckIndex] || state.deckLocked) return;
+      drag = { card, startX: event.clientX, startY: event.clientY, dx: 0, dy: 0, moved: false };
+      card.setPointerCapture?.(event.pointerId);
+      card.style.transition = 'none';
+      // Stops the page from scrolling under a sideways drag on a touchscreen, and
+      // freezes the floating artwork so the card feels like a solid object.
+      deck.classList.add('is-dragging');
+    });
+
+    deck.addEventListener('pointermove', (event) => {
+      if (!drag) return;
+      drag.dx = event.clientX - drag.startX;
+      drag.dy = event.clientY - drag.startY;
+      drag.moved ||= Math.abs(drag.dx) > 4 || Math.abs(drag.dy) > 4;
+      if (!dragFrame) dragFrame = requestAnimationFrame(paint);
+    });
+
+    const release = () => {
+      if (!drag) return;
+      const { card, dx, moved } = drag;
+      drag = null;
+      cancelAnimationFrame(dragFrame);
+      dragFrame = 0;
+      deck.classList.remove('is-dragging');
+      card.style.removeProperty('transition');
+      card.style.removeProperty('transform');
+      if (!moved) { advance(1); return; }
+      if (dx <= -52) advance(1);
+      else if (dx >= 52) advance(-1);
+    };
+
+    deck.addEventListener('pointerup', release);
+    deck.addEventListener('pointercancel', release);
+    deck.addEventListener('lostpointercapture', release);
+    deck.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); advance(1); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); advance(-1); }
+    });
+    $('[data-deck-next]')?.addEventListener('click', () => advance(1));
+    $('[data-deck-prev]')?.addEventListener('click', () => advance(-1));
+    layout();
+  }
+
+  function setupCountdown() {
+    const target = new Date(config.eventDate).getTime();
+    const units = {
+      days: $('[data-days]'), hours: $('[data-hours]'),
+      minutes: $('[data-minutes]'), seconds: $('[data-seconds]')
+    };
+    function update() {
+      const difference = Math.max(0, target - Date.now());
+      const days = Math.floor(difference / 86400000);
+      const hours = Math.floor((difference % 86400000) / 3600000);
+      const minutes = Math.floor((difference % 3600000) / 60000);
+      const seconds = Math.floor((difference % 60000) / 1000);
+      if (units.days) units.days.textContent = String(days).padStart(2, '0');
+      if (units.hours) units.hours.textContent = String(hours).padStart(2, '0');
+      if (units.minutes) units.minutes.textContent = String(minutes).padStart(2, '0');
+      if (units.seconds) units.seconds.textContent = String(seconds).padStart(2, '0');
+    }
+    update();
+    window.setInterval(update, 1000);
+  }
+
+  function formatNumber(number) {
+    try { return new Intl.NumberFormat(state.lang).format(number); } catch (_) { return String(number); }
+  }
+
+  function animateNumber(element, from, to, duration = 950) {
+    if (!element) return;
+    if (reducedMotion || from === to) {
+      element.textContent = formatNumber(to);
+      return;
+    }
+    const start = performance.now();
+    function tick(now) {
+      const progress = clamp((now - start) / duration, 0, 1);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      element.textContent = formatNumber(Math.round(from + (to - from) * eased));
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function attendeeTotal() {
+    return Number.isFinite(state.remoteAttendees)
+      ? state.remoteAttendees
+      : Number(config.attendeesBase) + (state.attended ? 1 : 0);
+  }
+
+  function pilotTotal() {
+    return Number.isFinite(state.remotePilots)
+      ? state.remotePilots
+      : Number(config.pilotsBase) + state.registrations;
+  }
+
+  /**
+   * Paints the avatar row from the initials the server sent.
+   *
+   * Two letters per rider, in the order they signed up, and the last circle is
+   * always the remainder. The markup ships with AM / LG / SR / FC / MB as
+   * placeholders so the row is never empty on first paint; the moment real initials
+   * arrive they replace them. Only initials ever leave the database — see the
+   * public_counts view in 0002_event_data.sql for why that matters.
+   */
+  function paintAvatars() {
+    const stack = $('.avatar-stack');
+    if (!stack) return;
+    const circles = $$('.avatar', stack);
+    if (!circles.length) return;
+
+    const initials = Array.isArray(state.riderInitials) ? state.riderInitials : [];
+    const slots = circles.length - 1;
+
+    circles.slice(0, slots).forEach((circle, index) => {
+      const value = initials[index];
+      // No real value for this slot yet: leave whatever is there rather than
+      // blanking a circle, which would read as a loading glitch.
+      if (value) circle.textContent = value;
+      circle.hidden = initials.length > 0 && index >= initials.length;
+    });
+
+    const shown = initials.length ? Math.min(initials.length, slots) : slots;
+    const rest = Math.max(0, attendeeTotal() - shown);
+    const last = circles[circles.length - 1];
+    last.textContent = `+${formatNumber(rest)}`;
+    last.hidden = rest <= 0;
+  }
+
+  function paintCounters(animate = false, previousAttendance = attendeeTotal()) {
+    $$('[data-attendee-count]').forEach((element) => {
+      if (animate) animateNumber(element, previousAttendance, attendeeTotal());
+      else element.textContent = formatNumber(attendeeTotal());
+    });
+    $$('[data-pilots-count]').forEach((element) => {
+      element.textContent = formatNumber(pilotTotal());
+    });
+    paintAvatars();
+  }
+
+  function refreshAttendanceLabels() {
+    const button = $('[data-attendance-button]');
+    const label = button ? $('span', button) : null;
+    if (label) label.textContent = text(state.attended ? 'attendance.done' : 'attendance.press');
+    if (button) {
+      // Deliberately not disabled. A disabled button cannot be focused, reads as
+      // broken rather than finished, and would swallow the click that reopens the
+      // reminder dialog. The sunken red `is-done` state carries the meaning, and
+      // it is restored here so a reload does not make the press look undone.
+      button.classList.toggle('is-done', state.attended);
+      button.setAttribute('aria-pressed', String(state.attended));
+    }
+    $$('[data-quick-attend]').forEach((quickButton) => {
+      const quickLabel = $('[data-attendance-quick-label]', quickButton);
+      if (quickLabel) quickLabel.textContent = text(state.attended ? 'quick.attended' : 'quick.attend');
+      quickButton.classList.toggle('is-complete', state.attended);
+      quickButton.setAttribute('aria-pressed', String(state.attended));
+    });
+  }
+
+  function createBurst(origin) {
+    if (reducedMotion || !origin) return;
+    const rect = origin.getBoundingClientRect();
+    const colors = ['#ffc928', '#f6494f', '#ffffff', '#3f82f7', '#28b67a'];
+    for (let index = 0; index < 52; index += 1) {
+      const piece = document.createElement('span');
+      piece.className = 'burst-piece';
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 110 + Math.random() * 300;
+      piece.style.left = `${rect.left + rect.width / 2}px`;
+      piece.style.top = `${rect.top + rect.height / 2}px`;
+      piece.style.background = colors[index % colors.length];
+      piece.style.borderRadius = index % 3 === 0 ? '50%' : '2px';
+      piece.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+      piece.style.setProperty('--dy', `${Math.sin(angle) * distance + 150}px`);
+      piece.style.setProperty('--rot', `${Math.random() * 720 - 360}deg`);
+      piece.style.animationDelay = `${Math.random() * 0.12}s`;
+      document.body.appendChild(piece);
+      window.setTimeout(() => piece.remove(), 1600);
+    }
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple';
+    ripple.style.left = `${rect.left + rect.width / 2 - 10}px`;
+    ripple.style.top = `${rect.top + rect.height / 2 - 10}px`;
+    document.body.appendChild(ripple);
+    window.setTimeout(() => ripple.remove(), 1000);
+  }
+
+  /**
+   * Takes the press back.
+   *
+   * Local only: the counter, the label and localStorage. The server is not told,
+   * because the attendance endpoint has no "remove" operation and inventing one
+   * would let anyone decrement the public counter by replaying a request. The
+   * optimistic local number is corrected the next time loadGlobalCounts() runs.
+   */
+  function undoAttendance() {
+    const button = $('[data-attendance-button]');
+    const previous = attendeeTotal();
+    state.attended = false;
+    if (Number.isFinite(state.remoteAttendees)) state.remoteAttendees = Math.max(0, state.remoteAttendees - 1);
+    storage.remove('carruleddhi.attended');
+    paintCounters(true, previous);
+    refreshAttendanceLabels();
+    button?.classList.remove('is-done');
+    button?.classList.add('is-releasing');
+    window.setTimeout(() => button?.classList.remove('is-releasing'), 420);
+    showToast(text('attendance.undone'));
+  }
+
+  async function registerAttendance(openReminderAfter = false, origin = null) {
+    const button = $('[data-attendance-button]');
+    // Second press on an already-pressed button lets it back up. The reminder
+    // dialog is reachable from the quick-action bar and from the footer link, so
+    // nothing becomes unreachable by giving this click the un-press meaning.
+    if (state.attended) {
+      undoAttendance();
+      return;
+    }
+    const previous = attendeeTotal();
+    state.attended = true;
+    if (Number.isFinite(state.remoteAttendees)) state.remoteAttendees += 1;
+    storage.set('carruleddhi.attended', '1');
+    paintCounters(true, previous);
+    refreshAttendanceLabels();
+    button?.classList.add('is-pressed');
+    createBurst(origin || button);
+    if (!navigator.userActivation || navigator.userActivation.isActive) navigator.vibrate?.(35);
+    // `is-pressed` is the 450 ms squash. `is-done` stays for good: the button sinks
+    // into the page and turns deep red, so the answer to "did my press count?" is
+    // visible for the rest of the visit and after a reload.
+    window.setTimeout(() => button?.classList.remove('is-pressed'), 450);
+    button?.classList.add('is-done');
+
+    postJSON(config.endpoints.attendance, eventPayload('attendance', {
+      attendeeId: storage.get('carruleddhi.visitorId') || createVisitorId()
+    })).then((result) => {
+      if (result.attendees !== null && result.attendees !== undefined && Number.isFinite(Number(result.attendees))) {
+        const optimistic = attendeeTotal();
+        state.remoteAttendees = Number(result.attendees);
+        // The attendance answer carries the fresh totals and initials too, so the
+        // row of faces updates on the press rather than on the next page load.
+        if (Array.isArray(result.initials)) {
+          state.riderInitials = result.initials
+            .filter((value) => typeof value === 'string')
+            .map((value) => value.trim().toUpperCase().slice(0, 2))
+            .filter(Boolean);
+        }
+        paintCounters(true, optimistic);
+      }
+    }).catch((error) => {
+      // Silent on purpose. The count was already updated optimistically and the
+      // press is recorded locally, so there is nothing for the visitor to do about
+      // a background sync failing. It used to raise "check the fields and try
+      // again", which is both wrong (there are no fields) and it overwrote the
+      // confirmation toast that had just appeared.
+      console.warn('Attendance sync failed, keeping the local count:', error);
+    });
+
+    showToast(text('attendance.seeYou'));
+
+    // Straight after the press, not a second later. The old 1050 ms delay felt
+    // like the click had been ignored; 260 ms is just long enough for the button
+    // to visibly sink before the dialog takes over.
+    if (openReminderAfter && storage.get('carruleddhi.reminder') !== '1') {
+      window.setTimeout(openReminder, reducedMotion ? 0 : 260);
+    }
+  }
+
+  function createVisitorId() {
+    const value = globalThis.crypto?.randomUUID?.() || `visitor-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    storage.set('carruleddhi.visitorId', value);
+    return value;
+  }
+
+  async function loadGlobalCounts() {
+    if (!config.endpoints.counts) return;
+    try {
+      const result = await postJSON(config.endpoints.counts, eventPayload('counts'));
+      const attendees = Number(result.attendees);
+      const pilots = Number(result.pilots);
+      if (result.attendees !== null && result.attendees !== undefined && Number.isFinite(attendees)) state.remoteAttendees = attendees;
+      if (result.pilots !== null && result.pilots !== undefined && Number.isFinite(pilots)) state.remotePilots = pilots;
+      // Two-letter initials for the avatar row. Filtered rather than trusted: this
+      // is rendered with textContent, but keeping the shape tight means a change at
+      // the other end cannot quietly turn a circle into a paragraph.
+      if (Array.isArray(result.initials)) {
+        state.riderInitials = result.initials
+          .filter((value) => typeof value === 'string')
+          .map((value) => value.trim().toUpperCase().slice(0, 2))
+          .filter(Boolean);
+      }
+      paintCounters(true);
+    } catch (error) {
+      console.warn('Global counters are temporarily unavailable:', error);
+    }
+  }
+
+  /**
+   * Live counters.
+   *
+   * Polling only runs while a counter is actually on screen and the tab is in
+   * the foreground. That keeps the numbers current without hammering the
+   * backend: every poll costs Make credits, so an always-on 5 second timer
+   * would drain a free plan in a day.
+   */
+  function setupLiveCounts() {
+    if (!config.endpoints.counts) return;
+    const targets = $$('[data-attendee-count], [data-pilots-count]');
+    if (!targets.length) return;
+
+    const intervalMs = 45000;
+    let timer = 0;
+    let visibleCount = 0;
+    let lastFetch = 0;
+
+    const refresh = () => {
+      const now = Date.now();
+      if (now - lastFetch < 5000) return;
+      lastFetch = now;
+      loadGlobalCounts();
+    };
+
+    function start() {
+      if (timer) return;
+      refresh();
+      timer = window.setInterval(() => {
+        if (document.hidden) return;
+        refresh();
+      }, intervalMs);
+    }
+
+    function stop() {
+      window.clearInterval(timer);
+      timer = 0;
+    }
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          visibleCount += entry.isIntersecting ? 1 : -1;
+        });
+        visibleCount = Math.max(0, visibleCount);
+        if (visibleCount > 0) start();
+        else stop();
+      }, { threshold: 0.1 });
+      targets.forEach((target) => observer.observe(target));
+    } else {
+      start();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && visibleCount > 0) refresh();
+    });
+    window.addEventListener('pagehide', stop);
+  }
+
+  /**
+   * Throws a short burst of paper from a point on screen.
+   *
+   * Pieces are position:fixed, animated by CSS only, and each one removes itself
+   * on animationend. A safety timer removes it anyway in case the tab is hidden
+   * mid-animation and animationend never arrives, otherwise a background tab
+   * would slowly fill up with orphan nodes.
+   */
+  function burstConfetti(origin, count = 26) {
+    if (reducedMotion || !origin) return;
+    const box = origin.getBoundingClientRect();
+    const cx = box.left + box.width / 2;
+    const cy = box.top + box.height / 2;
+    const colours = ['#ffc928', '#f6494f', '#3f82f7', '#1fbf78', '#ffffff'];
+
+    for (let i = 0; i < count; i += 1) {
+      const piece = document.createElement('i');
+      piece.className = 'confetti-piece';
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const distance = 110 + Math.random() * 190;
+      const life = 1000 + Math.random() * 900;
+      piece.style.left = `${cx}px`;
+      piece.style.top = `${cy}px`;
+      piece.style.background = colours[i % colours.length];
+      piece.style.setProperty('--confetti-dx', `${Math.cos(angle) * distance}px`);
+      piece.style.setProperty('--confetti-dy', `${Math.sin(angle) * distance + 200}px`);
+      piece.style.setProperty('--confetti-spin', `${Math.round(Math.random() * 900 - 450)}deg`);
+      piece.style.setProperty('--confetti-life', `${Math.round(life)}ms`);
+
+      const remove = () => piece.remove();
+      piece.addEventListener('animationend', remove, { once: true });
+      window.setTimeout(remove, life + 400);
+      document.body.appendChild(piece);
+    }
+  }
+
+  /**
+   * Drives the rainbow band at the bottom of the page.
+   *
+   * The band measures how much scroll is left before the end of the document. Once
+   * that is within its own height it starts rising, and it is at full height
+   * exactly when the page bottoms out. One custom property is written per frame and
+   * only `transform: scaleY()` reads it, so this never triggers layout.
+   *
+   * offsetHeight is used rather than getBoundingClientRect because the element is
+   * already scaled — the rect would report the squashed height and the maths would
+   * feed on its own output.
+   */
+  function setupFooterGlow() {
+    const band = $('[data-footer-glow]');
+    if (!band) return;
+    const minimum = 0.05;
+    let frame = 0;
+
+    const measure = () => {
+      frame = 0;
+      const height = band.offsetHeight || 1;
+      const left = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      const progress = clamp((height - left) / height, 0, 1);
+      band.style.setProperty(
+        '--footer-glow-progress',
+        (minimum + (1 - minimum) * progress).toFixed(4)
+      );
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(schedule).observe(document.body);
+  }
+
+  /**
+   * Public wall.
+   *
+   * Reads through the Worker, never straight from the database: the browser has no
+   * key and should not have one. If the endpoint is not configured the whole
+   * section removes itself rather than showing an empty box with a dead form —
+   * a visible feature that cannot work is worse than one that is not there.
+   */
+  function setupWall() {
+    const section = $('#wall');
+    if (!section) return;
+    const form = $('[data-wall-form]', section);
+    const list = $('[data-wall-list]', section);
+    const empty = $('[data-wall-empty]', section);
+    const more = $('[data-wall-more]', section);
+    const status = $('[data-wall-status]', section);
+    const counter = $('[data-wall-count]', section);
+    const messageField = form?.elements.namedItem('message');
+    const endpoint = config.endpoints.wall || '';
+
+    if (!endpoint) {
+      section.hidden = true;
+      section.dataset.wallState = 'no-endpoint';
+      return;
+    }
+
+    const starsBox = $('[data-wall-stars]', section);
+    const starsClear = $('[data-wall-stars-clear]', section);
+    const fileInput = $('#wall-file', section);
+    const photoBox = $('[data-wall-photo]', section);
+    const photoPreview = $('[data-wall-photo-preview]', section);
+    const photoImage = $('[data-wall-photo-image]', section);
+    const photoClear = $('[data-wall-photo-clear]', section);
+    const photoHint = $('[data-wall-photo-hint]', section);
+    const score = $('[data-wall-score]', section);
+    const scoreValue = $('[data-wall-score-value]', section);
+    const scoreStars = $('[data-wall-score-stars]', section);
+    const scoreVotes = $('[data-wall-score-votes]', section);
+    const lightbox = $('[data-wall-lightbox]', section);
+    const lightboxImage = $('[data-wall-lightbox-image]', section);
+    const lightboxCaption = $('[data-wall-lightbox-caption]', section);
+    const lightboxClose = $('[data-wall-lightbox-close]', section);
+
+    /**
+     * postJSON, but a rejected request comes back as its body instead of throwing.
+     *
+     * The wall needs to tell "you posted a minute ago" from "the wall is broken", and
+     * both arrive as a non-2xx status. Everything here goes through this wrapper so
+     * that distinction survives.
+     */
+    const ask = (payload) => postJSON(endpoint, payload)
+      .catch((error) => error?.payload || null);
+
+    let oldest = '';
+    let loading = false;
+    /** The downscaled data URL waiting to be sent, and its size after downscaling. */
+    let pendingPhoto = null;
+    /**
+     * Translations already fetched, keyed by comment id and target language.
+     *
+     * Kept for the life of the page so pressing translate, then the original, then
+     * translate again costs one request rather than three. It is deliberately not
+     * persisted: a cache in storage would outlive a corrected message.
+     */
+    const translations = new Map();
+
+    /* --- photo, downscaled in the browser ---------------------------------------
+       A phone photo is 3–5 MB and 4000 px wide. Sending it as-is would mean a slow
+       upload on the mobile connection these are taken on, a bucket full of images
+       nobody will ever view at full size, and a request most likely rejected for
+       being too large. Resizing here costs a few milliseconds of canvas work.
+
+       `imageOrientation: 'from-image'` matters more than it looks: without it every
+       photo taken in portrait on a phone arrives rotated, because the sensor writes
+       it landscape and leaves the rotation in the EXIF header that canvas ignores. */
+    const PHOTO_MAX_EDGE = 1600;
+    const PHOTO_QUALITY = 0.82;
+
+    async function loadBitmap(file) {
+      if ('createImageBitmap' in window) {
+        try {
+          return await createImageBitmap(file, { imageOrientation: 'from-image' });
+        } catch (_) { /* Safari below 15 lacks the option; fall through. */ }
+        try {
+          return await createImageBitmap(file);
+        } catch (_) { /* fall through to the <img> path */ }
+      }
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+        image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+        image.src = url;
+      });
+    }
+
+    async function shrinkPhoto(file) {
+      const source = await loadBitmap(file);
+      const sourceWidth = source.width || source.naturalWidth;
+      const sourceHeight = source.height || source.naturalHeight;
+      if (!sourceWidth || !sourceHeight) throw new Error('empty image');
+
+      const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(sourceWidth, sourceHeight));
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.drawImage(source, 0, 0, width, height);
+      if (source.close) source.close();
+
+      // Always JPEG on the way out, whatever came in. A 12 MP PNG re-encodes to
+      // several megabytes; the same picture as JPEG is a few hundred kilobytes and
+      // indistinguishable at the size it is shown.
+      const dataUrl = canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+      return { dataUrl, width, height, bytes: Math.round((dataUrl.length - 23) * 0.75) };
+    }
+
+    function dropPhoto() {
+      pendingPhoto = null;
+      if (fileInput) fileInput.value = '';
+      if (photoImage) photoImage.removeAttribute('src');
+      if (photoPreview) photoPreview.hidden = true;
+      if (photoBox) photoBox.dataset.state = 'empty';
+      if (photoHint) photoHint.textContent = text('wall.photoHint');
+    }
+
+    fileInput?.addEventListener('change', async () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return dropPhoto();
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+        if (photoHint) photoHint.textContent = text('wall.photoType');
+        fileInput.value = '';
+        return;
+      }
+      if (photoBox) photoBox.dataset.state = 'working';
+      if (photoHint) photoHint.textContent = text('wall.photoWorking');
+      try {
+        pendingPhoto = await shrinkPhoto(file);
+        if (photoImage) photoImage.src = pendingPhoto.dataUrl;
+        if (photoPreview) photoPreview.hidden = false;
+        if (photoBox) photoBox.dataset.state = 'ready';
+        if (photoHint) {
+          photoHint.textContent = text('wall.photoReady')
+            .replace('%KB%', String(Math.max(1, Math.round(pendingPhoto.bytes / 1024))));
+        }
+      } catch (_) {
+        dropPhoto();
+        if (photoHint) photoHint.textContent = text('wall.photoFailed');
+      }
+    });
+
+    photoClear?.addEventListener('click', dropPhoto);
+
+    /* --- stars ---------------------------------------------------------------- */
+    function currentRating() {
+      const picked = form ? form.querySelector('.wall-stars__input:checked') : null;
+      return picked ? Number(picked.value) : 0;
+    }
+    function paintStarState() {
+      const value = currentRating();
+      if (starsBox) starsBox.dataset.value = String(value);
+      if (starsClear) starsClear.hidden = value === 0;
+    }
+    starsBox?.addEventListener('change', paintStarState);
+    starsClear?.addEventListener('click', () => {
+      $$('.wall-stars__input', section).forEach((input) => { input.checked = false; });
+      paintStarState();
+    });
+    paintStarState();
+
+    /* --- the average, shown only once somebody has voted ---------------------- */
+    function paintScore(summary) {
+      if (!score) return;
+      const votes = Number(summary?.votes) || 0;
+      const average = Number(summary?.average) || 0;
+      if (!votes) { score.hidden = true; return; }
+      score.hidden = false;
+      if (scoreValue) scoreValue.textContent = average.toLocaleString(state.lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      // Rounded to halves, so 4.3 reads as four and a half rather than as five.
+      if (scoreStars) {
+        const filled = Math.round(average * 2) / 2;
+        scoreStars.replaceChildren();
+        for (let index = 1; index <= 5; index += 1) {
+          const star = document.createElement('i');
+          star.className = 'wall-score__star';
+          star.dataset.fill = filled >= index ? 'full' : (filled >= index - 0.5 ? 'half' : 'none');
+          scoreStars.appendChild(star);
+        }
+      }
+      if (scoreVotes) scoreVotes.textContent = text('wall.votes').replace('%N%', String(votes));
+    }
+
+    const relative = (iso) => {
+      const then = new Date(iso).getTime();
+      if (!Number.isFinite(then)) return '';
+      const minutes = Math.round((Date.now() - then) / 60000);
+      if (minutes < 1) return text('wall.justNow');
+      if (minutes < 60) return `${minutes} min`;
+      const hours = Math.round(minutes / 60);
+      if (hours < 24) return `${hours} h`;
+      return new Date(iso).toLocaleDateString(state.lang, { day: 'numeric', month: 'short' });
+    };
+
+    /* --- lightbox -------------------------------------------------------------
+       Opened with showModal(), so the browser supplies the focus trap, the backdrop
+       and Escape. The only thing left to do by hand is the click on the backdrop,
+       which lands on the dialog element itself rather than on its contents. */
+    function openLightbox(src, caption) {
+      if (!lightbox || !lightboxImage) return;
+      lightboxImage.src = src;
+      if (lightboxCaption) lightboxCaption.textContent = caption || '';
+      if (typeof lightbox.showModal === 'function') lightbox.showModal();
+      else lightbox.setAttribute('open', '');
+    }
+    function closeLightbox() {
+      if (!lightbox) return;
+      if (typeof lightbox.close === 'function') lightbox.close();
+      else lightbox.removeAttribute('open');
+      // Dropped on the way out so a large image is not held in memory, and so the
+      // next open never shows the previous photo for a frame.
+      if (lightboxImage) lightboxImage.removeAttribute('src');
+    }
+    lightboxClose?.addEventListener('click', closeLightbox);
+    lightbox?.addEventListener('click', (event) => {
+      if (event.target === lightbox) closeLightbox();
+    });
+    lightbox?.addEventListener('close', () => {
+      if (lightboxImage) lightboxImage.removeAttribute('src');
+    });
+
+    /** Five static stars for one comment's score. */
+    function starRow(value) {
+      const row = document.createElement('span');
+      row.className = 'wall-note__stars';
+      row.setAttribute('role', 'img');
+      row.setAttribute('aria-label', text('wall.ratedAs').replace('%N%', String(value)));
+      for (let index = 1; index <= 5; index += 1) {
+        const star = document.createElement('i');
+        star.dataset.fill = index <= value ? 'full' : 'none';
+        row.appendChild(star);
+      }
+      return row;
+    }
+
+    /**
+     * Translation is a button, not something done on load.
+     *
+     * Translating every message automatically would mean one API call per message per
+     * visitor against a free, rate-limited service, and would replace what somebody
+     * actually wrote with a machine's guess at it. Pressing it again puts the original
+     * back, and the original is what stays in the DOM until then.
+     */
+    function attachTranslate(item, comment, body) {
+      if (!comment.message || comment.message.length < 3) return null;
+      const target = state.lang;
+      const from = (comment.locale || 'it').slice(0, 2);
+      if (from === target) return null;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'wall-note__translate';
+      button.textContent = text('wall.translate');
+
+      let showing = 'original';
+      button.addEventListener('click', async () => {
+        if (showing === 'translated') {
+          body.textContent = comment.message;
+          item.dataset.translated = 'false';
+          button.textContent = text('wall.translate');
+          showing = 'original';
+          return;
+        }
+
+        const key = `${comment.id}:${target}`;
+        if (translations.has(key)) {
+          body.textContent = translations.get(key);
+          item.dataset.translated = 'true';
+          button.textContent = text('wall.showOriginal');
+          showing = 'translated';
+          return;
+        }
+
+        button.disabled = true;
+        button.textContent = text('wall.translating');
+        const result = await ask({
+          type: 'wall-translate',
+          text: comment.message,
+          from,
+          to: target
+        });
+        button.disabled = false;
+
+        if (result?.ok && result.text) {
+          translations.set(key, result.text);
+          body.textContent = result.text;
+          item.dataset.translated = 'true';
+          button.textContent = text('wall.showOriginal');
+          showing = 'translated';
+        } else {
+          button.textContent = text('wall.translateFailed');
+          // Back to the offer after a moment, so a single failure is not permanent.
+          window.setTimeout(() => { button.textContent = text('wall.translate'); }, 2600);
+        }
+      });
+      return button;
+    }
+
+    /** textContent everywhere: these strings come from strangers. */
+    function render(comments, append) {
+      if (!append) list.replaceChildren();
+      for (const comment of comments) {
+        const item = document.createElement('li');
+        item.className = 'wall-note';
+        item.style.setProperty('--tilt', `${(Math.random() * 2.4 - 1.2).toFixed(2)}deg`);
+
+        if (comment.rating) item.appendChild(starRow(comment.rating));
+
+        const body = document.createElement('p');
+        body.className = 'wall-note__text';
+        body.textContent = comment.message;
+        item.appendChild(body);
+
+        if (comment.photo) {
+          const figure = document.createElement('button');
+          figure.type = 'button';
+          figure.className = 'wall-note__photo';
+          figure.setAttribute('aria-label', text('wall.openPhoto'));
+          const thumb = document.createElement('img');
+          thumb.src = comment.photo;
+          thumb.alt = '';
+          thumb.loading = 'lazy';
+          thumb.decoding = 'async';
+          // Known up front, so the note does not jump when the image arrives.
+          if (comment.photoWidth && comment.photoHeight) {
+            thumb.width = comment.photoWidth;
+            thumb.height = comment.photoHeight;
+          }
+          figure.appendChild(thumb);
+          figure.addEventListener('click', () => {
+            openLightbox(comment.photo, `${comment.name}${comment.place ? ` — ${comment.place}` : ''}`);
+          });
+          item.appendChild(figure);
+        }
+
+        const meta = document.createElement('div');
+        meta.className = 'wall-note__meta';
+        const who = document.createElement('strong');
+        who.textContent = comment.name;
+        meta.appendChild(who);
+        if (comment.place) {
+          const where = document.createElement('span');
+          where.textContent = comment.place;
+          meta.appendChild(where);
+        }
+        const when = document.createElement('time');
+        when.dateTime = comment.createdAt;
+        when.textContent = relative(comment.createdAt);
+        meta.appendChild(when);
+
+        const translate = attachTranslate(item, comment, body);
+        if (translate) meta.appendChild(translate);
+
+        item.appendChild(meta);
+        list.appendChild(item);
+      }
+      const total = list.children.length;
+      if (empty) empty.hidden = total > 0;
+      list.setAttribute('aria-busy', 'false');
+    }
+
+    async function load(append = false) {
+      if (loading) return;
+      loading = true;
+      const result = await ask({
+        type: 'wall',
+        limit: 12,
+        ...(append && oldest ? { before: oldest } : {})
+      });
+      loading = false;
+
+      if (!result?.ok || !Array.isArray(result.comments)) {
+        list.setAttribute('aria-busy', 'false');
+        if (empty) {
+          empty.hidden = false;
+          empty.textContent = text('wall.error');
+        }
+        return;
+      }
+      render(result.comments, append);
+      paintScore(result.rating);
+      if (result.comments.length) oldest = result.comments[result.comments.length - 1].createdAt;
+      if (more) more.hidden = !result.hasMore;
+    }
+
+    messageField?.addEventListener('input', () => {
+      if (counter) counter.textContent = String(messageField.value.length);
+    });
+
+    more?.addEventListener('click', () => load(true));
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const name = String(form.elements.namedItem('name').value || '').trim();
+      const message = String(messageField.value || '').trim();
+      if (name.length < 1 || message.length < 2) {
+        if (status) status.textContent = text('validation.required');
+        return;
+      }
+      const submit = $('button[type="submit"]', form);
+      if (submit) submit.disabled = true;
+      if (status) status.textContent = text('wall.sending');
+
+      const rating = currentRating();
+      const result = await ask({
+        type: 'wall-post',
+        name,
+        place: String(form.elements.namedItem('place').value || '').trim(),
+        message,
+        ...(rating ? { rating } : {}),
+        ...(pendingPhoto
+          ? {
+            photo: pendingPhoto.dataUrl,
+            photoWidth: pendingPhoto.width,
+            photoHeight: pendingPhoto.height
+          }
+          : {})
+      });
+
+      if (submit) submit.disabled = false;
+      if (result?.ok) {
+        form.reset();
+        dropPhoto();
+        paintStarState();
+        if (counter) counter.textContent = '0';
+        // Says "waiting for approval", not "published". It is not on the wall yet.
+        if (status) status.textContent = text('wall.pending');
+        burstConfetti(submit, 18);
+      } else if (result?.code === 'WALL_RATE_LIMITED') {
+        if (status) status.textContent = text('wall.tooMany');
+      } else if (result?.code === 'WALL_PHOTO_TOO_LARGE' || result?.code === 'PAYLOAD_TOO_LARGE') {
+        if (status) status.textContent = text('wall.photoTooBig');
+      } else if (result?.code === 'WALL_PHOTO_FORMAT' || result?.code === 'WALL_PHOTO_FAILED') {
+        if (status) status.textContent = text('wall.photoFailed');
+      } else {
+        if (status) status.textContent = text('wall.error');
+      }
+    });
+
+    // Loaded when the section gets close, not at startup: nobody needs a database
+    // round trip to read the hero.
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        load(false);
+      }, { rootMargin: '600px 0px' });
+      observer.observe(section);
+    } else {
+      load(false);
+    }
+  }
+
+  function setupAttendance() {
+    paintCounters(false);
+    refreshAttendanceLabels();
+    loadGlobalCounts();
+    const press = $('[data-attendance-button]');
+    press?.addEventListener('click', () => {
+      burstConfetti(press, 34);
+      registerAttendance(true);
+    });
+    $$('[data-quick-attend]').forEach((button) => {
+      button.addEventListener('click', () => {
+        burstConfetti(button, 16);
+        registerAttendance(false, button);
+      });
+    });
+  }
+
+  function setupQuickActions() {
+    const dock = $('[data-quick-actions]');
+    if (!dock) return;
+    const formSections = ['#signup', '#contact'].map((selector) => $(selector)).filter(Boolean);
+    const visibleSections = new Set();
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) visibleSections.add(entry.target);
+          else visibleSections.delete(entry.target);
+        });
+        dock.classList.toggle('is-over-form', visibleSections.size > 0);
+      }, { threshold: 0.08 });
+      formSections.forEach((section) => observer.observe(section));
+    }
+
+    const formControlSelector = 'input, textarea, select, [contenteditable="true"]';
+    document.addEventListener('focusin', (event) => {
+      if (event.target.matches?.(formControlSelector)) dock.classList.add('is-keyboard-hidden');
+    });
+    document.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!document.activeElement?.matches?.(formControlSelector)) dock.classList.remove('is-keyboard-hidden');
+      }, 80);
+    });
+
+    const viewport = window.visualViewport;
+    viewport?.addEventListener('resize', () => {
+      dock.classList.toggle('is-keyboard-hidden', viewport.height < window.innerHeight * 0.72);
+    }, { passive: true });
+
+    /**
+     * The dock shrinks to two icons while you are reading, and one tap brings the
+     * labels back.
+     *
+     * The first tap on a shrunken dock must not also press the button underneath
+     * it. Icon-only targets are ambiguous — you cannot tell "I'll be there" from
+     * "sign up" at a glance — and firing an action from a guess is worse than
+     * asking for a second tap. The listener runs in the capture phase so it can
+     * swallow that first tap before either control sees it.
+     *
+     * It re-shrinks after eight seconds of no interaction, and immediately when
+     * you scroll again, so it never sits there covering content.
+     */
+    const MINI_AFTER = 180;
+    const EXPANDED_FOR = 8000;
+    let expandTimer = 0;
+    let lastY = window.scrollY;
+    let pinnedOpen = false;
+
+    const shrink = () => {
+      pinnedOpen = false;
+      window.clearTimeout(expandTimer);
+      dock.classList.add('is-mini');
+    };
+    const expand = (sticky) => {
+      dock.classList.remove('is-mini');
+      window.clearTimeout(expandTimer);
+      if (!sticky) return;
+      pinnedOpen = true;
+      expandTimer = window.setTimeout(shrink, EXPANDED_FOR);
+    };
+
+    dock.addEventListener('click', (event) => {
+      if (!dock.classList.contains('is-mini')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      expand(true);
+    }, true);
+
+    // Keyboard users never get a mini dock they cannot read.
+    dock.addEventListener('focusin', () => expand(true));
+
+    /**
+     * Shrinks only after you have been scrolling down for a while, not on the first
+     * pixel. Snapping shut the instant a finger moves is what made it feel twitchy;
+     * 420 ms of continuous downward scrolling is long enough to mean "I am reading",
+     * short enough not to feel laggy.
+     */
+    let scrollFrame = 0;
+    let downSince = 0;
+    const SHRINK_DELAY = 420;
+
+    const onScroll = () => {
+      scrollFrame = 0;
+      const y = window.scrollY;
+      const goingDown = y > lastY + 2;
+      const goingUp = y < lastY - 2;
+      lastY = y;
+      if (pinnedOpen) return;
+
+      if (y < MINI_AFTER || goingUp) {
+        downSince = 0;
+        dock.classList.remove('is-mini');
+        return;
+      }
+      if (!goingDown) return;
+      if (!downSince) { downSince = performance.now(); return; }
+      if (performance.now() - downSince > SHRINK_DELAY) dock.classList.add('is-mini');
+    };
+    window.addEventListener('scroll', () => {
+      if (!scrollFrame) scrollFrame = requestAnimationFrame(onScroll);
+    }, { passive: true });
+    onScroll();
+
+    /**
+     * Hold and it gives a little, release and it springs home.
+     *
+     * The movement is damped to a third of the finger's travel and capped, so it
+     * reads as elastic resistance rather than a draggable panel — it is not meant
+     * to be repositioned, just to feel alive under the thumb. A drag beyond 6 px
+     * cancels the click, otherwise nudging the dock would fire whichever button was
+     * underneath.
+     */
+    let hold = null;
+    let holdFrame = 0;
+
+    const paintHold = () => {
+      holdFrame = 0;
+      if (!hold) return;
+      const damp = 0.34;
+      const limit = 16;
+      const dx = clamp(hold.dx * damp, -limit, limit);
+      const dy = clamp(hold.dy * damp, -limit, limit);
+      dock.style.setProperty('--dock-nudge-x', `${dx.toFixed(1)}px`);
+      dock.style.setProperty('--dock-nudge-y', `${dy.toFixed(1)}px`);
+    };
+
+    dock.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      hold = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, dy: 0, moved: false };
+      dock.classList.add('is-held');
+    });
+
+    dock.addEventListener('pointermove', (event) => {
+      if (!hold || event.pointerId !== hold.id) return;
+      hold.dx = event.clientX - hold.x;
+      hold.dy = event.clientY - hold.y;
+      if (Math.abs(hold.dx) > 6 || Math.abs(hold.dy) > 6) hold.moved = true;
+      if (!holdFrame) holdFrame = requestAnimationFrame(paintHold);
+    });
+
+    const releaseHold = () => {
+      if (!hold) return;
+      const moved = hold.moved;
+      hold = null;
+      cancelAnimationFrame(holdFrame);
+      holdFrame = 0;
+      dock.classList.remove('is-held');
+      // Springs back through the CSS transition, which only applies without .is-held.
+      dock.style.setProperty('--dock-nudge-x', '0px');
+      dock.style.setProperty('--dock-nudge-y', '0px');
+      if (moved) {
+        // Swallow the click that would otherwise follow the drag.
+        const swallow = (event) => { event.preventDefault(); event.stopPropagation(); };
+        dock.addEventListener('click', swallow, { capture: true, once: true });
+        window.setTimeout(() => dock.removeEventListener('click', swallow, { capture: true }), 60);
+      }
+    };
+    dock.addEventListener('pointerup', releaseHold);
+    dock.addEventListener('pointercancel', releaseHold);
+    dock.addEventListener('lostpointercapture', releaseHold);
+  }
+
+  function modalFocusable(modal) {
+    return $$('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]', modal)
+      .filter((element) => element.offsetParent !== null);
+  }
+
+  function modalBackgroundElements(modal) {
+    return $$('body > *').filter((element) => element !== modal && element.tagName !== 'SCRIPT');
+  }
+
+  function openReminder() {
+    const modal = $('[data-reminder-modal]');
+    if (!modal) return;
+    state.lastFocused = document.activeElement;
+    const subscribed = storage.get('carruleddhi.reminder') === '1';
+    $('[data-reminder-form-view]', modal)?.classList.toggle('is-hidden', subscribed);
+    $('[data-reminder-success]', modal)?.classList.toggle('is-visible', subscribed);
+    modalBackgroundElements(modal).forEach((element) => {
+      element.dataset.modalWasInert = String(element.inert);
+      element.inert = true;
+    });
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('is-locked', 'is-modal-open');
+    window.setTimeout(() => modalFocusable(modal)[0]?.focus(), 30);
+  }
+
+  function closeReminder() {
+    const modal = $('[data-reminder-modal]');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    modalBackgroundElements(modal).forEach((element) => {
+      const wasInert = element.dataset.modalWasInert === 'true';
+      element.inert = wasInert;
+      delete element.dataset.modalWasInert;
+    });
+    document.body.classList.toggle('is-locked', Boolean($('[data-mobile-menu].is-open')));
+    document.body.classList.remove('is-modal-open');
+    const focusTarget = state.lastFocused?.closest?.('[data-mobile-menu]')
+      ? $('[data-menu-toggle]')
+      : state.lastFocused;
+    focusTarget?.focus?.();
+  }
+
+  function focusControl(control) {
+    if (!control) return;
+    const picker = control.matches?.('[data-date-input]') ? control.closest('[data-date-picker]') : null;
+    const dateTrigger = picker ? $('[data-date-trigger]', picker) : null;
+    const target = dateTrigger && !dateTrigger.hidden ? dateTrigger : control;
+    target?.focus({ preventScroll: true });
+  }
+
+  function markField(control, valid) {
+    const field = control.closest('[data-field]');
+    field?.classList.toggle('is-invalid', !valid);
+    control.setAttribute('aria-invalid', String(!valid));
+    return valid;
+  }
+
+  function validateControl(control) {
+    if (control.type === 'email') {
+      const valid = !control.required && !control.value ? true : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(control.value.trim());
+      return markField(control, valid);
+    }
+    return markField(control, control.checkValidity());
+  }
+
+  function validateContainer(container) {
+    const controls = $$('input, select, textarea', container).filter((control) => control.required && control.type !== 'checkbox');
+    let valid = true;
+    let firstInvalid = null;
+    controls.forEach((control) => {
+      const current = validateControl(control);
+      if (!current && !firstInvalid) firstInvalid = control;
+      valid = current && valid;
+    });
+    focusControl(firstInvalid);
+    return valid;
+  }
+
+  function setupReminderModal() {
+    const modal = $('[data-reminder-modal]');
+    const form = $('[data-reminder-form]');
+    if (!modal || !form) return;
+    $$('[data-open-reminder]').forEach((button) => button.addEventListener('click', openReminder));
+    $$('[data-close-reminder]', modal).forEach((button) => button.addEventListener('click', closeReminder));
+    modal.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeReminder();
+      if (event.key !== 'Tab') return;
+      const focusable = modalFocusable(modal);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+    $$('input', form).forEach((control) => control.addEventListener('input', () => validateControl(control)));
+
+    /* The privacy consent here opens the same scroll-to-the-end dialog as the signup
+       form, rather than linking to another page. The checkbox is still the thing the
+       submit checks; the dialog just ticks it once the text has been read. */
+    const consentGate = $('[data-reminder-consent-gate]', form);
+    const consentInput = $('[data-reminder-consent-input]', form);
+    const consentLabel = $('[data-reminder-consent-label]', form);
+
+    function paintReminderConsent() {
+      const done = Boolean(consentInput?.checked);
+      consentGate?.classList.toggle('is-accepted', done);
+      consentGate?.setAttribute('aria-pressed', String(done));
+      if (consentLabel) consentLabel.textContent = text(done ? 'consent.gateDone' : 'consent.gateAction');
+    }
+
+    consentGate?.addEventListener('click', () => {
+      // The gate presses first and the dialog opens a moment later, for the same
+      // reason as the signup one: opening a modal in the same frame as the click
+      // steals focus and repaints before the button can show it was pressed.
+      consentGate.classList.add('is-pressing');
+      window.setTimeout(() => consentGate.classList.remove('is-pressing'), 380);
+      const run = () => {
+        if (!openConsentDocuments) {
+          // No dialog wired: rather than dead-end the visitor, fall back to ticking
+          // the box directly. Better a working form than a button that does nothing.
+          if (consentInput) consentInput.checked = true;
+          paintReminderConsent();
+          return;
+        }
+        openConsentDocuments(() => {
+          if (consentInput) consentInput.checked = true;
+          paintReminderConsent();
+          $('[data-reminder-consent-error]', form)?.style.setProperty('display', 'none');
+          consentGate.focus({ preventScroll: true });
+        });
+      };
+      if (reducedMotion) run();
+      else window.setTimeout(run, 170);
+    });
+
+    window.addEventListener('carruleddhi:language', paintReminderConsent);
+    paintReminderConsent();
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const consent = consentInput || $('[name="consent"]', form);
+      const consentError = $('[data-reminder-consent-error]', form);
+      const fieldsValid = validateContainer(form);
+      const consentValid = Boolean(consent?.checked);
+      consentError?.style.setProperty('display', consentValid ? 'none' : 'block');
+      if (!consentValid) {
+        consentGate?.classList.add('is-nudged');
+        window.setTimeout(() => consentGate?.classList.remove('is-nudged'), 600);
+      }
+      if (!fieldsValid || !consentValid) return;
+
+      const submit = $('button[type="submit"]', form);
+      submit.disabled = true;
+      const original = submit.textContent;
+      submit.textContent = text('form.sending');
+      const values = Object.fromEntries(new FormData(form).entries());
+      try {
+        const result = await postJSON(config.endpoints.reminder, eventPayload('reminder', {
+          name: String(values.name || '').trim(),
+          email: String(values.email || '').trim().toLowerCase(),
+          consent: true,
+          reminderSchedule: ['P7D', 'P1D', 'PT3H']
+        }));
+        storage.set('carruleddhi.reminder', '1');
+        $('[data-reminder-form-view]', modal)?.classList.add('is-hidden');
+        $('[data-reminder-success]', modal)?.classList.add('is-visible');
+        if (!state.attended) registerAttendance(false);
+        if (result.demo) showToast(text('common.webhookDemo'));
+      } catch (error) {
+        console.error('Reminder webhook failed:', error);
+        showToast(text('contact.error'));
+      } finally {
+        submit.disabled = false;
+        submit.textContent = original;
+      }
+    });
+  }
+
+  function interpolate(key, values = {}) {
+    return Object.entries(values).reduce(
+      (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)),
+      text(key)
+    );
+  }
+
+  /**
+   * Progress bar driven by how much of the form is actually filled in, not by
+   * which step is open. Jumping 33% at a time felt disconnected from the work;
+   * this moves on every field the visitor completes.
+   */
+  function paintFormFill() {
+    const form = $('[data-registration-form]');
+    const shell = $('[data-form-shell]');
+    if (!form || !shell) return;
+
+    const controls = $$('input, select, textarea', form)
+      .filter((control) => control.required && control.type !== 'checkbox' && control.type !== 'hidden');
+    const consents = $$('[data-consent-input]');
+    const total = controls.length + (consents.length ? 1 : 0);
+    if (!total) return;
+
+    const filled = controls.filter((control) => {
+      const value = String(control.value || '').trim();
+      if (!value) return false;
+      // A wrong e-mail should not count as progress.
+      if (control.type === 'email') return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+      return true;
+    }).length + (consents.length && consents.every((input) => input.checked) ? 1 : 0);
+
+    // Never fully empty: a bar at 0 looks broken rather than "not started".
+    const ratio = Math.max(0.06, filled / total);
+    shell.style.setProperty('--form-fill', `${(ratio * 100).toFixed(1)}%`);
+    shell.dataset.formFilled = String(filled);
+    shell.dataset.formTotal = String(total);
+  }
+
+  function setFormStep(step, { focus = true, announce = true } = {}) {
+    const form = $('[data-registration-form]');
+    const shell = $('[data-form-shell]');
+    const sections = $$('[data-form-step]', form || document);
+    const indicators = $$('[data-step-indicator]', shell || document);
+    const total = Math.max(1, sections.length);
+    state.formStep = clamp(step, 1, total);
+
+    sections.forEach((section) => {
+      const active = Number(section.dataset.formStep) === state.formStep;
+      section.hidden = !active;
+      section.classList.toggle('is-active', active);
+      section.setAttribute('aria-hidden', String(!active));
+    });
+    indicators.forEach((indicator) => {
+      const number = Number(indicator.dataset.stepIndicator);
+      const active = number === state.formStep;
+      indicator.classList.toggle('is-active', active);
+      indicator.classList.toggle('is-complete', number < state.formStep);
+      if (active) indicator.setAttribute('aria-current', 'step');
+      else indicator.removeAttribute('aria-current');
+    });
+
+    const activeSection = $(`[data-form-step="${state.formStep}"]`, form || document);
+    const activeTitle = $('h3', activeSection || document)?.textContent?.trim() || '';
+    const statusText = interpolate('stepper.status', {
+      current: state.formStep,
+      total,
+      title: activeTitle
+    });
+    const progress = $('[data-form-progress]', shell || document);
+    const percentage = (state.formStep / total) * 100;
+    if (progress) {
+      progress.setAttribute('aria-valuenow', String(state.formStep));
+      progress.setAttribute('aria-valuemax', String(total));
+      progress.setAttribute('aria-valuetext', statusText);
+    }
+    if (shell) {
+      shell.dataset.formActive = String(state.formStep);
+      shell.style.setProperty('--form-step-progress', `${percentage}%`);
+    }
+    paintFormFill();
+    const liveStatus = $('[data-form-step-status]', shell || document);
+    if (liveStatus && announce) liveStatus.textContent = statusText;
+    if (focus) $('h3', activeSection || document)?.focus({ preventScroll: true });
+
+    // Keep the whole step in view when moving between steps: a step that starts
+    // half off-screen is the main reason people miss fields further down.
+    if (focus && shell) {
+      const box = shell.getBoundingClientRect();
+      const off = box.top < 8 || box.bottom > window.innerHeight - 8;
+      if (off) shell.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'center' });
+    }
+  }
+
+  /* ==========================================================================
+     Riders under 18
+     ==========================================================================
+     Age is measured AT THE EVENT, never today. Somebody who turns 18 the week
+     before the race is an adult on the start line, and checking against today
+     would demand a guardian from an adult. The reverse case matters more: a
+     seventeen-year-old signing up eleven months early is still seventeen on the
+     day, and a "today" check would let them through as an adult and produce a
+     liberatoria nobody can legally sign.
+  */
+
+  /** Whole years completed on `onDate`. Returns null when the date is unusable. */
+  function ageOn(birthISO, onDate) {
+    if (!/^\d{4}-\d{2}-\d{2}/.test(String(birthISO || ''))) return null;
+    const birth = new Date(`${String(birthISO).slice(0, 10)}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) return null;
+    let years = onDate.getFullYear() - birth.getFullYear();
+    // Not yet had this year's birthday on the event date.
+    const beforeBirthday =
+      onDate.getMonth() < birth.getMonth() ||
+      (onDate.getMonth() === birth.getMonth() && onDate.getDate() < birth.getDate());
+    if (beforeBirthday) years -= 1;
+    return years;
+  }
+
+  const ADULT_AGE = 18;
+
+  function eventDay() {
+    const day = new Date(config.eventDate);
+    return Number.isNaN(day.getTime()) ? new Date() : day;
+  }
+
+  /**
+   * How old the rider will be at the start, and whether that makes them a minor.
+   *
+   * An unparseable or empty date returns `isMinor: false`. Guessing "probably a
+   * minor" from a blank field would spring seven required inputs on somebody who
+   * has simply not filled the date in yet.
+   */
+  function riderAge(form) {
+    const value = form?.elements?.namedItem('birthDate')?.value || '';
+    const years = ageOn(value, eventDay());
+    return { years, isMinor: years !== null && years >= 0 && years < ADULT_AGE };
+  }
+
+  function registrationData(form) {
+    const raw = Object.fromEntries(new FormData(form).entries());
+    const { years, isMinor } = riderAge(form);
+    const base = {
+      firstName: String(raw.firstName || '').trim(),
+      lastName: String(raw.lastName || '').trim(),
+      birthDate: String(raw.birthDate || ''),
+      // Was `taxCode` here long after the field became a postal code, so the
+      // payload carried an empty tax code and no postal code at all — and the
+      // Worker requires postalCode, which made every submit fail with 422.
+      postalCode: String(raw.postalCode || '').trim().toUpperCase(),
+      email: String(raw.email || '').trim().toLowerCase(),
+      phone: String(raw.phone || '').trim(),
+      address: String(raw.address || '').trim(),
+      cartName: String(raw.cartName || '').trim(),
+      category: raw.category || 'classic',
+      teamName: String(raw.teamName || '').trim(),
+      cartNotes: String(raw.cartNotes || '').trim(),
+      rulesConsent: raw.rulesConsent === 'on',
+      privacyConsent: raw.privacyConsent === 'on',
+      newsConsent: raw.newsConsent === 'on',
+      // Always sent, both ways. Make branches on it, and a field that only appears
+      // for minors would leave the adult branch guessing from an absence.
+      isMinor,
+      riderAge: years === null ? '' : String(years)
+    };
+
+    if (!isMinor) return base;
+
+    return {
+      ...base,
+      childKind: String(raw.childKind || 'child'),
+      guardianRelation: String(raw.guardianRelation || 'guardian'),
+      guardianName: String(raw.guardianName || '').trim(),
+      guardianEmail: String(raw.guardianEmail || '').trim().toLowerCase(),
+      guardianPhone: String(raw.guardianPhone || '').trim(),
+      motherName: String(raw.motherName || '').trim(),
+      fatherName: String(raw.fatherName || '').trim(),
+      guardianConsent: raw.guardianConsent === 'on'
+    };
+  }
+
+  /**
+   * Shows or hides the guardian block and moves `required` with it.
+   *
+   * Returning the state lets the caller avoid recomputing it. Called on every
+   * change to the birth date, on language change (the age sentence is translated)
+   * and after a reset.
+   */
+  function paintMinorState(form) {
+    const box = $('[data-minor-box]', form);
+    const clause = $('[data-minor-clause]');
+    const { years, isMinor } = riderAge(form);
+    if (!box) return { years, isMinor };
+
+    box.hidden = !isMinor;
+    if (clause) clause.hidden = !isMinor;
+
+    $$('[data-minor-field]', box).forEach((control) => {
+      if (isMinor) control.setAttribute('required', '');
+      else {
+        control.removeAttribute('required');
+        // Leaving a red outline on a field that has just been hidden means it is
+        // still red the next time the block opens.
+        control.closest('[data-field]')?.classList.remove('is-invalid');
+        control.removeAttribute('aria-invalid');
+      }
+    });
+
+    if (!isMinor) {
+      const consent = $('[data-minor-consent]', box);
+      if (consent) consent.checked = false;
+      const error = $('[data-minor-consent-error]', box);
+      if (error) error.style.display = 'none';
+    }
+
+    const note = $('[data-minor-age]', box);
+    if (note && isMinor) {
+      note.textContent = text('minor.intro').replace('%AGE%', String(years));
+    }
+    return { years, isMinor };
+  }
+
+  /**
+   * Opens the shared consent dialog from somewhere other than the signup form.
+   *
+   * Assigned by setupConsentGate once the dialog is wired. Anything that needs the
+   * documents — the reminder pop-up, for one — calls this instead of linking to
+   * regolamento.html in a new tab. A link away from the page loses the half-filled
+   * form behind it and gives back a document with no way to accept it, so the
+   * visitor reads it, comes back, and still has to find the checkbox.
+   *
+   * `onAccept` runs only after the reader has actually reached the end of the text.
+   */
+  let openConsentDocuments = null;
+
+  /**
+   * Single consent gate.
+   *
+   * The two mandatory checkboxes are replaced by one button that opens the real
+   * documents. Accepting requires reaching the end of the text, so the consent is
+   * informed rather than a reflex click. The checkboxes still exist in the form,
+   * so the submitted payload is unchanged.
+   */
+  function setupConsentGate() {
+    const gate = $('[data-consent-gate]');
+    const dialog = $('[data-consent-dialog]');
+    if (!gate || !dialog) return;
+
+    /** Set while the dialog was opened by something other than the signup gate. */
+    let externalAccept = null;
+
+    const scroller = $('[data-consent-scroll]', dialog);
+    const content = $('[data-consent-content]', dialog);
+    const loading = $('[data-consent-loading]', dialog);
+    const accept = $('[data-consent-accept]', dialog);
+    const status = $('[data-consent-status]', dialog);
+    const progress = $('[data-consent-progress]', dialog);
+    const progressFill = $('[data-consent-progress-fill]', dialog);
+    const inputs = $$('[data-consent-input]');
+    const label = $('[data-consent-gate-label]');
+    const hint = $('[data-consent-gate-hint]');
+    let loaded = false;
+    let unlocked = false;
+
+    function accepted() {
+      return inputs.every((input) => input.checked);
+    }
+
+    function paintGate() {
+      const done = accepted();
+      gate.classList.toggle('is-accepted', done);
+      gate.setAttribute('aria-pressed', String(done));
+      if (label) label.textContent = text(done ? 'consent.gateDone' : 'consent.gateAction');
+      if (hint) hint.textContent = text(done ? 'consent.gateDoneHint' : 'consent.gateHint');
+    }
+
+    function setUnlocked(value) {
+      unlocked = value;
+      accept.disabled = !value;
+      if (status) status.textContent = text(value ? 'consent.readyToAccept' : 'consent.scrollMore');
+      status?.classList.toggle('is-ready', value);
+    }
+
+    function trackScroll() {
+      if (!scroller) return;
+      const max = scroller.scrollHeight - scroller.clientHeight;
+      // A document shorter than the viewport is already fully read.
+      const ratio = max <= 8 ? 1 : clamp(scroller.scrollTop / max, 0, 1);
+      const percent = Math.round(ratio * 100);
+      if (progressFill) progressFill.style.width = `${percent}%`;
+      progress?.setAttribute('aria-valuenow', String(percent));
+      if (ratio >= 0.985 && !unlocked) setUnlocked(true);
+    }
+
+    async function loadDocuments() {
+      if (loaded) return;
+      loaded = true;
+      const sources = [
+        ['consent.rulesHeading', 'regolamento.html'],
+        ['consent.privacyHeading', 'privacy.html']
+      ];
+      const parts = [];
+      for (const [headingKey, url] of sources) {
+        try {
+          const response = await fetch(url, { credentials: 'omit' });
+          if (!response.ok) throw new Error(String(response.status));
+          const markup = await response.text();
+          const parsed = new DOMParser().parseFromString(markup, 'text/html');
+          const article = parsed.querySelector('.legal-content');
+          if (!article) throw new Error('no .legal-content');
+          article.querySelectorAll('script, style, iframe, form, object, embed').forEach((node) => node.remove());
+          article.querySelectorAll('a[href]').forEach((link) => {
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener noreferrer');
+          });
+          const block = document.createElement('section');
+          block.className = 'consent-doc';
+          const heading = document.createElement('h3');
+          heading.textContent = text(headingKey);
+          block.append(heading, article);
+          parts.push(block);
+        } catch (error) {
+          console.warn(`Consent document ${url} could not be inlined:`, error);
+          const fallback = document.createElement('p');
+          fallback.className = 'consent-doc__fallback';
+          fallback.innerHTML = `${text('consent.error')} <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+          parts.push(fallback);
+        }
+      }
+      if (loading) loading.remove();
+      if (content) {
+        content.hidden = false;
+        content.append(...parts);
+      }
+      requestAnimationFrame(trackScroll);
+    }
+
+    function open() {
+      state.lastFocused = document.activeElement;
+      // An external caller starts locked even if the signup form was already
+      // accepted: the reader has to reach the end of the text for their own consent,
+      // not inherit somebody else's.
+      setUnlocked(externalAccept ? false : accepted());
+      dialog.showModal();
+      document.body.classList.add('is-locked');
+      loadDocuments();
+      requestAnimationFrame(() => scroller?.focus({ preventScroll: true }));
+    }
+
+    openConsentDocuments = (onAccept) => {
+      externalAccept = typeof onAccept === 'function' ? onAccept : null;
+      open();
+    };
+
+    function close() {
+      if (dialog.open) dialog.close();
+    }
+
+    /**
+     * Press first, dialog second. Opening a <dialog> synchronously on click steals
+     * focus and repaints the whole overlay in the same frame, so the button never
+     * got to render its active state — the press felt like nothing happened and
+     * the pop-up appeared out of nowhere. 170 ms is one visible squash.
+     */
+    gate.addEventListener('click', () => {
+      gate.classList.add('is-pressing');
+      window.setTimeout(() => gate.classList.remove('is-pressing'), 380);
+      if (reducedMotion) open();
+      else window.setTimeout(open, 170);
+    });
+    scroller?.addEventListener('scroll', trackScroll, { passive: true });
+    $('[data-consent-close]', dialog)?.addEventListener('click', close);
+
+    accept.addEventListener('click', () => {
+      if (!unlocked) return;
+      const external = externalAccept;
+      // Only the signup form's own checkboxes are ticked here. An external caller
+      // gets its callback and decides what accepting means for it.
+      if (!external) {
+        inputs.forEach((input) => { input.checked = true; });
+        paintGate();
+        paintFormFill();
+        $('[data-consent-error]')?.style.setProperty('display', 'none');
+      }
+      accept.classList.add('is-filling');
+      window.setTimeout(() => {
+        accept.classList.remove('is-filling');
+        close();
+        if (external) external();
+        else gate.focus({ preventScroll: true });
+        showToast(text('consent.savedToast'));
+      }, reducedMotion ? 0 : 520);
+    });
+
+    dialog.addEventListener('close', () => {
+      externalAccept = null;
+      // The reminder pop-up is a `.modal`, and it is still open underneath, so the
+      // lock has to stay on when the dialog closes back onto it.
+      document.body.classList.toggle('is-locked', Boolean($('.modal.is-open')));
+    });
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      close();
+    });
+
+    window.addEventListener('carruleddhi:language', () => {
+      paintGate();
+      setUnlocked(unlocked);
+    });
+    paintGate();
+  }
+
+  function setupRegistrationForm() {
+    /** Interval id for the thank-you screen countdown. 0 when nothing is pending. */
+    let successTimer = 0;
+    const form = $('[data-registration-form]');
+    if (!form) return;
+
+    const focusRegistrationControl = (control) => {
+      const dateTrigger = control?.matches?.('[data-date-input]')
+        ? $('[data-date-trigger]', control.closest('[data-date-picker]'))
+        : null;
+      (dateTrigger && !dateTrigger.hidden ? dateTrigger : control)?.focus({ preventScroll: true });
+    };
+
+    $$('input, select, textarea', form).forEach((control) => {
+      const eventName = control.tagName === 'SELECT' || control.type === 'checkbox' ? 'change' : 'input';
+      control.addEventListener(eventName, () => {
+        if (control.required && control.type !== 'checkbox') validateControl(control);
+        if (control.type === 'checkbox') $('[data-consent-error]', form)?.style.setProperty('display', 'none');
+        paintFormFill();
+      });
+    });
+
+    /**
+     * The guardian block follows the birth date.
+     *
+     * Bound with `change` as well as `input` because the custom calendar writes the
+     * value straight into the hidden native input and dispatches `change` — an
+     * `input`-only listener would miss every date picked from the dialog, which is
+     * how most people on a phone will pick it.
+     */
+    const birthControl = form.elements.namedItem('birthDate');
+    const repaintMinor = () => {
+      paintMinorState(form);
+      paintFormFill();
+    };
+    birthControl?.addEventListener('input', repaintMinor);
+    birthControl?.addEventListener('change', repaintMinor);
+    $('[data-minor-consent]', form)?.addEventListener('change', () => {
+      const error = $('[data-minor-consent-error]', form);
+      if (error) error.style.display = 'none';
+    });
+    // The age sentence carries a translated string, so it is repainted on switch.
+    window.addEventListener('carruleddhi:language', () => paintMinorState(form));
+    paintMinorState(form);
+    $$('[data-form-next]', form).forEach((button) => button.addEventListener('click', () => {
+      const current = $(`[data-form-step="${state.formStep}"]`, form);
+      if (validateContainer(current)) setFormStep(state.formStep + 1);
+    }));
+    $$('[data-form-back]', form).forEach((button) => button.addEventListener('click', () => setFormStep(state.formStep - 1)));
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const requiredControls = $$('input, select, textarea', form)
+        .filter((control) => control.required && control.type !== 'checkbox');
+      let firstInvalid = null;
+      requiredControls.forEach((control) => {
+        if (!validateControl(control) && !firstInvalid) firstInvalid = control;
+      });
+      if (firstInvalid) {
+        const invalidStep = Number(firstInvalid.closest('[data-form-step]')?.dataset.formStep) || 1;
+        setFormStep(invalidStep, { focus: false });
+        requestAnimationFrame(() => focusRegistrationControl(firstInvalid));
+        return;
+      }
+
+      const data = registrationData(form);
+
+      // The guardian authorisation is checked before the two document consents,
+      // because it lives in step 1: sending somebody back to step 3 first and then
+      // to step 1 would make them cross the whole form twice.
+      if (data.isMinor && !data.guardianConsent) {
+        const error = $('[data-minor-consent-error]', form);
+        if (error) error.style.display = 'block';
+        setFormStep(1, { focus: false });
+        const consent = $('[data-minor-consent]', form);
+        requestAnimationFrame(() => consent?.focus({ preventScroll: true }));
+        return;
+      }
+
+      const consentValid = data.rulesConsent && data.privacyConsent;
+      const consentError = $('[data-consent-error]', form);
+      if (consentError) consentError.style.display = consentValid ? 'none' : 'block';
+      if (!consentValid) {
+        setFormStep(3, { focus: false });
+        const gate = $('[data-consent-gate]');
+        gate?.classList.add('is-nudged');
+        window.setTimeout(() => gate?.classList.remove('is-nudged'), 600);
+        gate?.focus({ preventScroll: true });
+        return;
+      }
+
+      const submit = $('button[type="submit"]', form);
+      const original = submit.innerHTML;
+      submit.disabled = true;
+      submit.textContent = text('form.sending');
+      try {
+        const result = await postJSON(config.endpoints.registration, eventPayload('registration', data));
+        const proposed = Number(config.pilotsBase) + state.registrations + 1;
+        const raceNumber = String(result.raceNumber || proposed).padStart(3, '0');
+        state.registrations += 1;
+        if (Number.isFinite(state.remotePilots)) state.remotePilots += 1;
+        state.lastRegistration = { ...data, raceNumber, submittedAt: new Date().toISOString() };
+        storage.set('carruleddhi.registrations', String(state.registrations));
+        const number = $('[data-race-number]');
+        if (number) number.textContent = raceNumber;
+        form.hidden = true;
+        $('[data-form-success]')?.classList.add('is-active');
+        paintCounters(false);
+        createBurst($('[data-race-number]')?.closest('.race-number'));
+        if (result.demo) showToast(text('common.webhookDemo'));
+        startSuccessReturn();
+      } catch (error) {
+        console.error('Registration webhook failed:', error);
+        // Its own message. This used to borrow contact.error — "check the fields and
+        // try again" — which is a lie here: the fields were already validated three
+        // times above, and the only way to reach this line is the request failing.
+        showToast(text(error.status === 429 ? 'form.tooMany' : 'form.sendError'), 6000);
+      } finally {
+        submit.disabled = false;
+        submit.innerHTML = original;
+      }
+    });
+
+    /**
+     * Puts the empty form back.
+     *
+     * Used by the "new entry" button and by the timer that runs after the thank-you
+     * screen, so both paths leave the form in exactly the same state — a reset that
+     * exists in two places drifts apart.
+     */
+    function resetRegistrationForm() {
+      window.clearInterval(successTimer);
+      successTimer = 0;
+      const note = $('[data-success-countdown]');
+      if (note) note.textContent = '';
+      form.reset();
+      form.hidden = false;
+      $('[data-form-success]')?.classList.remove('is-active');
+      $$('[data-field]', form).forEach((field) => field.classList.remove('is-invalid'));
+      $$('[aria-invalid]', form).forEach((control) => control.removeAttribute('aria-invalid'));
+      // `form.reset()` empties the birth date but does not fire an event, so the
+      // guardian block would stay open with seven required fields for the next
+      // person, who has not typed a date at all.
+      paintMinorState(form);
+      setFormStep(1);
+    }
+
+    /**
+     * Counts the thank-you screen down and then hands the form back.
+     *
+     * Twelve seconds: long enough to read the race number and the three reminder
+     * dates, short enough that the next person in a queue at a stand is not left
+     * looking for a button. The remaining seconds are shown rather than the form
+     * vanishing without warning, and any click or key press cancels it — being
+     * interrupted while reading your own race number would be worse than waiting.
+     */
+    function startSuccessReturn() {
+      const note = $('[data-success-countdown]');
+      let left = 12;
+      window.clearInterval(successTimer);
+
+      const tick = () => {
+        if (note) note.textContent = text('success.backIn').replace('%S%', String(left));
+        if (left <= 0) {
+          resetRegistrationForm();
+          return;
+        }
+        left -= 1;
+      };
+      tick();
+      successTimer = window.setInterval(tick, 1000);
+
+      const cancel = () => {
+        window.clearInterval(successTimer);
+        successTimer = 0;
+        if (note) note.textContent = '';
+      };
+      const success = $('[data-form-success]');
+      success?.addEventListener('pointerdown', cancel, { once: true });
+      success?.addEventListener('keydown', cancel, { once: true });
+    }
+
+    $('[data-new-registration]')?.addEventListener('click', resetRegistrationForm);
+
+    $('[data-download-summary]')?.addEventListener('click', () => {
+      const data = state.lastRegistration;
+      if (!data) return;
+      const lines = [
+        'CARRULEDDHI SHOW 2026',
+        '17 ottobre 2026 · Santa Teresa Gallura',
+        '',
+        `${text('success.number')}: ${data.raceNumber}`,
+        `${text('form.firstName').replace(' *', '')}: ${data.firstName}`,
+        `${text('form.lastName').replace(' *', '')}: ${data.lastName}`,
+        `${text('form.email').replace(' *', '')}: ${data.email}`,
+        `${text('form.cartName').replace(' *', '')}: ${data.cartName}`,
+        `${text('nav.categories')}: ${data.category.toUpperCase()}`,
+        '',
+        'Documento riepilogativo — il modulo ufficiale firmabile sarà generato dal flusso Make.com.'
+      ];
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `carruleddhi-${data.raceNumber}.txt`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+
+    window.addEventListener('carruleddhi:language', () => {
+      setFormStep(state.formStep, { focus: false, announce: false });
+    });
+    setFormStep(1, { focus: false, announce: false });
+  }
+
+  function setupContactForm() {
+    const form = $('[data-contact-form]');
+    if (!form) return;
+    $$('input, textarea', form).forEach((control) => control.addEventListener('input', () => validateControl(control)));
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const status = $('[data-contact-status]', form);
+      if (!validateContainer(form)) {
+        if (status) status.textContent = text('contact.error');
+        return;
+      }
+      const submit = $('button[type="submit"]', form);
+      const original = submit.textContent;
+      submit.disabled = true;
+      submit.textContent = text('form.sending');
+      const values = Object.fromEntries(new FormData(form).entries());
+      try {
+        const result = await postJSON(config.endpoints.contact, eventPayload('contact', {
+          name: String(values.name || '').trim(),
+          email: String(values.email || '').trim().toLowerCase(),
+          message: String(values.message || '').trim()
+        }));
+        if (status) status.textContent = text('contact.success');
+        form.reset();
+        if (result.demo) showToast(text('common.webhookDemo'));
+      } catch (error) {
+        console.error('Contact webhook failed:', error);
+        if (status) status.textContent = text('contact.error');
+      } finally {
+        submit.disabled = false;
+        submit.textContent = original;
+      }
+    });
+  }
+
+  function setupAccordion() {
+    $$('[data-accordion] .accordion__button').forEach((button) => {
+      button.addEventListener('click', () => {
+        const currentlyOpen = button.getAttribute('aria-expanded') === 'true';
+        $$('[data-accordion] .accordion__button').forEach((item) => item.setAttribute('aria-expanded', 'false'));
+        button.setAttribute('aria-expanded', String(!currentlyOpen));
+      });
+    });
+  }
+
+  function setupCookieConsent() {
+    const banner = $('[data-cookie-banner]');
+    const panel = $('[data-cookie-panel]');
+    const analytics = $('[data-cookie-analytics]');
+    const save = $('[data-cookie-save]');
+    if (!banner) return;
+    let saved = null;
+    try { saved = JSON.parse(storage.get('carruleddhi.cookies', 'null')); } catch (_) { saved = null; }
+
+    function applyConsent(consent) {
+      storage.set('carruleddhi.cookies', JSON.stringify({ version: 1, necessary: true, analytics: Boolean(consent.analytics), savedAt: new Date().toISOString() }));
+      banner.classList.remove('is-visible');
+      banner.setAttribute('aria-hidden', 'true');
+      window.dispatchEvent(new CustomEvent('carruleddhi:consent', { detail: consent }));
+    }
+    function openSettings() {
+      let current = null;
+      try { current = JSON.parse(storage.get('carruleddhi.cookies', 'null')); } catch (_) { current = null; }
+      if (analytics) analytics.checked = Boolean(current?.analytics);
+      banner.classList.add('is-visible');
+      banner.setAttribute('aria-hidden', 'false');
+      panel?.classList.add('is-open');
+      if (save) save.hidden = false;
+    }
+
+    $('[data-cookie-accept]')?.addEventListener('click', () => applyConsent({ analytics: true }));
+    $('[data-cookie-reject]')?.addEventListener('click', () => applyConsent({ analytics: false }));
+    $('[data-cookie-customize]')?.addEventListener('click', () => {
+      panel?.classList.toggle('is-open');
+      if (save) save.hidden = !panel?.classList.contains('is-open');
+    });
+    save?.addEventListener('click', () => applyConsent({ analytics: Boolean(analytics?.checked) }));
+    $$('[data-cookie-settings]').forEach((button) => button.addEventListener('click', openSettings));
+
+    if (!saved || saved.version !== 1) {
+      window.setTimeout(() => {
+        banner.classList.add('is-visible');
+        banner.setAttribute('aria-hidden', 'false');
+      }, reducedMotion ? 50 : 1700);
+    }
+  }
+
+  function setupCursor() {
+    if (!finePointer || reducedMotion) return;
+    const dot = $('[data-cursor-dot]');
+    const ring = $('[data-cursor-ring]');
+    if (!dot || !ring) return;
+    let pointerX = -100;
+    let pointerY = -100;
+    let ringX = -100;
+    let ringY = -100;
+
+    window.addEventListener('pointermove', (event) => {
+      pointerX = event.clientX;
+      pointerY = event.clientY;
+      dot.style.left = `${pointerX}px`;
+      dot.style.top = `${pointerY}px`;
+      dot.style.opacity = '1';
+      ring.style.opacity = '1';
+    }, { passive: true });
+    document.addEventListener('pointerover', (event) => {
+      ring.classList.toggle('is-hover', Boolean(event.target.closest('a, button, input, textarea, select, [data-prize-card]')));
+    });
+    function animate() {
+      ringX += (pointerX - ringX) * 0.16;
+      ringY += (pointerY - ringY) * 0.16;
+      ring.style.left = `${ringX}px`;
+      ring.style.top = `${ringY}px`;
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+  }
+
+  function setupMagneticButtons() {
+    if (!finePointer || reducedMotion) return;
+    $$('.magnetic').forEach((button) => {
+      button.addEventListener('pointermove', (event) => {
+        const rect = button.getBoundingClientRect();
+        const x = (event.clientX - rect.left - rect.width / 2) * 0.14;
+        const y = (event.clientY - rect.top - rect.height / 2) * 0.18;
+        button.style.transform = `translate(${x}px, ${y}px)`;
+      });
+      button.addEventListener('pointerleave', () => button.style.removeProperty('transform'));
+    });
+  }
+
+  function setupHeroMotion() {
+    if (!finePointer || reducedMotion) return;
+    const hero = $('.hero');
+    const content = $('.hero__content');
+    if (!hero || !content) return;
+    hero.addEventListener('pointermove', (event) => {
+      const x = (event.clientX / window.innerWidth - 0.5) * 12;
+      const y = (event.clientY / window.innerHeight - 0.5) * 8;
+      content.style.transform = `translate(${x}px, ${y}px)`;
+    });
+    hero.addEventListener('pointerleave', () => { content.style.transform = 'translate(0, 0)'; });
+  }
+
+  function setupRouteDraw() {
+    const frame = $('[data-route-frame]');
+    const svg = $('[data-route-svg]');
+    const core = $('[data-route-core]');
+    const mask = $('[data-route-mask]');
+    const ribbonCasing = $('[data-route-ribbon-casing]');
+    const ribbonFill = $('[data-route-ribbon-fill]');
+    const dash = $('[data-route-dash]');
+    const startNode = $('[data-route-node="start"]');
+    const finishNode = $('[data-route-node="finish"]');
+    if (!frame || !svg || !core || !mask || !ribbonCasing || !ribbonFill || !dash) return;
+
+    if (!config.route.path.length) {
+      frame.classList.add('is-route-hidden');
+      return;
+    }
+
+    const startPin = $('.route__pin--start', frame);
+    const finishPin = $('.route__pin--end', frame);
+    let viewHeight = ROUTE_VIEWBOX;
+    let total = 0;
+
+    /**
+     * The viewBox height tracks the frame's real aspect ratio. With a matching
+     * aspect and preserveAspectRatio="none", one user unit is the same length on
+     * both axes, so the ribbon normals are not skewed.
+     */
+    function layout() {
+      const box = frame.getBoundingClientRect();
+      if (!box.width || !box.height) return false;
+      viewHeight = Math.round((box.height / box.width) * ROUTE_VIEWBOX);
+      svg.setAttribute('viewBox', `0 0 ${ROUTE_VIEWBOX} ${viewHeight}`);
+
+      const data = buildRoutePathData(config.route.path, ROUTE_VIEWBOX, viewHeight);
+      if (!data) return false;
+      core.setAttribute('d', data);
+      mask.setAttribute('d', data);
+      dash.setAttribute('d', data);
+      total = core.getTotalLength();
+
+      const near = clamp(Number(config.route.width?.near) || 26, 4, 80);
+      const far = clamp(Number(config.route.width?.far) || 5, 1, 40);
+      mask.setAttribute('stroke-width', String(Math.max(24, near * 3.2)));
+      // Road markings: an outlined dash run instead of one solid ribbon.
+      // Both passes share the dash rhythm; only the outline is padded outwards.
+      const dashOptions = { near, far, height: viewHeight };
+      ribbonCasing.setAttribute('d', buildDashPathData(core, { ...dashOptions, widthScale: 1, widthPad: 2.6 }));
+      ribbonFill.setAttribute('d', buildDashPathData(core, dashOptions));
+      return true;
+    }
+
+    const place = (element, length, insetPercent = 0) => {
+      if (!element || !total) return null;
+      const point = core.getPointAtLength(clamp(length, 0, total));
+      const x = (point.x / ROUTE_VIEWBOX) * 100;
+      const y = (point.y / viewHeight) * 100;
+      element.style.left = `${clamp(x, insetPercent, 100 - insetPercent)}%`;
+      element.style.top = `${clamp(y, insetPercent, 100 - insetPercent)}%`;
+      return point;
+    };
+
+    function placeMarkers() {
+      place(startNode, 0);
+      place(finishNode, total);
+      place(startPin, 0, 22);
+      place(finishPin, total, 22);
+    }
+
+    if (!layout()) {
+      frame.classList.add('is-route-hidden');
+      return;
+    }
+    placeMarkers();
+
+    // Static state first: if motion is reduced the finished line is what matters.
+    mask.style.strokeDasharray = `${total}`;
+    mask.style.strokeDashoffset = reducedMotion ? '0' : `${total}`;
+
+    let relayoutFrame = 0;
+    const relayout = () => {
+      cancelAnimationFrame(relayoutFrame);
+      relayoutFrame = requestAnimationFrame(() => {
+        const drawn = frame.classList.contains('is-route-drawn');
+        if (!layout()) return;
+        mask.style.strokeDasharray = `${total}`;
+        mask.style.strokeDashoffset = drawn || reducedMotion ? '0' : `${total}`;
+        placeMarkers();
+      });
+    };
+    window.addEventListener('resize', relayout, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(relayout).observe(frame);
+
+    if (reducedMotion) {
+      frame.classList.add('is-route-drawn');
+      return;
+    }
+
+    /**
+     * The travelling cart used to be animated here on its own rAF loop. It has
+     * been removed: it landed on top of the finish badge in the bottom-left
+     * corner, and a 40x30 illustration on a photographed street read as clutter
+     * rather than information. The marching dashes already carry the direction
+     * of travel, and they cost nothing because the browser animates
+     * stroke-dashoffset on the compositor.
+     */
+    function draw() {
+      mask.style.transition = 'stroke-dashoffset 2.5s cubic-bezier(.16,1,.3,1)';
+      mask.style.strokeDashoffset = '0';
+      frame.classList.add('is-route-drawn');
+    }
+
+    if (!('IntersectionObserver' in window)) {
+      draw();
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) return;
+      observer.disconnect();
+      draw();
+    }, { threshold: 0.28 });
+    observer.observe(frame);
+  }
+
+  /**
+   * Sticky panels only work when the content fits the viewport. Anything taller
+   * is demoted to a flow section so its lower half stays reachable.
+   */
+  function setupPanels() {
+    const panels = $$('#main > section.section-card');
+    if (!panels.length) return;
+    // Sections whose own sticky children need more than one screen of scroll.
+    const alwaysFlow = new Set(['categories', 'prizes', 'signup']);
+
+    // The gallery is the one section with a hard `height: 100svh` and
+    // `overflow: hidden` in CSS, so it can never need more than one screen no
+    // matter what the copy does. Measuring it is not just unnecessary, it is
+    // unreliable: the probe runs before the webfont settles and once read the
+    // section too tall, which parked it as a flow section for the rest of the
+    // visit. It is declared instead.
+    const alwaysPinned = new Set(['gallery']);
+
+    function measure() {
+      const viewport = window.innerHeight;
+      panels.forEach((panel) => {
+        if (alwaysFlow.has(panel.id)) {
+          panel.dataset.panel = 'flow';
+          return;
+        }
+        if (alwaysPinned.has(panel.id)) {
+          panel.dataset.panel = 'pinned';
+          return;
+        }
+        // Measure without the sticky/clip constraints, then restore.
+        const previous = panel.dataset.panel;
+        panel.dataset.panel = 'measure';
+        const needed = panel.scrollHeight;
+        panel.dataset.panel = needed > viewport + 4 ? 'flow' : 'pinned';
+        if (previous === panel.dataset.panel) return;
+      });
+      updateCardStack();
+    }
+
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('resize', schedule, { passive: true });
+    window.addEventListener('orientationchange', schedule, { passive: true });
+    window.addEventListener('carruleddhi:language', schedule);
+    if (document.fonts?.ready) document.fonts.ready.then(schedule).catch(() => {});
+  }
+
+  /** Keeps the decorative ring pattern centred on the attendance button. */
+  function setupAttendanceRings() {
+    const section = $('.attendance');
+    const button = $('[data-attendance-button]');
+    if (!section || !button) return;
+    function place() {
+      const sectionBox = section.getBoundingClientRect();
+      const buttonBox = button.getBoundingClientRect();
+      if (!sectionBox.height || !buttonBox.height) return;
+      const x = ((buttonBox.left + buttonBox.width / 2) - sectionBox.left) / sectionBox.width;
+      const y = ((buttonBox.top + buttonBox.height / 2) - sectionBox.top) / sectionBox.height;
+      section.style.setProperty('--press-x', `${(x * 100).toFixed(2)}%`);
+      section.style.setProperty('--press-y', `${(y * 100).toFixed(2)}%`);
+    }
+    place();
+    window.addEventListener('resize', place, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(place).observe(section);
+  }
+
+  /**
+   * In-page jumps get a short wipe so landing on a pinned panel does not look
+   * like a hard cut. Desktop and mobile share the same behaviour.
+   */
+  function setupSectionTransition() {
+    const wipe = document.createElement('div');
+    wipe.className = 'page-wipe';
+    wipe.dataset.pageWipe = '';
+    wipe.setAttribute('aria-hidden', 'true');
+    // Five confetti stripes plus a spinning wheel. The jump happens behind the
+    // cover, so by the time it clears you are already at the section.
+    wipe.innerHTML = '<span class="page-wipe__bars">'
+      + '<i></i><i></i><i></i><i></i><i></i>'
+      + '</span><span class="page-wipe__mark"><i></i><i></i><i></i></span>';
+    document.body.appendChild(wipe);
+    let busy = false;
+
+    function jump(target) {
+      const scrollTo = () => {
+        // `instant`, not `auto`. `auto` means "whatever scroll-behavior says", so a
+        // single CSS declaration elsewhere could turn this back into an animation
+        // happening behind a wipe that is already lifting.
+        target.scrollIntoView({ behavior: 'instant', block: 'start' });
+        history.replaceState(null, '', `#${target.id}`);
+      };
+      if (reducedMotion) {
+        scrollTo();
+        return;
+      }
+      if (busy) return;
+      busy = true;
+
+      /**
+       * The timings here must match the CSS, or the loader looks broken.
+       *
+       * It did: the bars take 4 x 35 ms of stagger plus 260 ms to travel, so the
+       * screen is not covered until 400 ms. The old code scrolled at 380 ms and
+       * started clearing immediately, so the last bars were still arriving while
+       * the first were already leaving, and then both classes were pulled at
+       * 520 ms — mid-transition — which snapped everything back. That is the
+       * "gets to half and jams".
+       *
+       * COVER_MS and CLEAR_MS below are the real durations. Keep them in step with
+       * .page-wipe in carnival.css.
+       */
+      const COVER_MS = 420;
+      const CLEAR_MS = 420;
+
+      window.setTimeout(() => {
+        // Fully covered: safe to jump without the visitor seeing it.
+        scrollTo();
+        wipe.classList.add('is-clearing');
+        window.setTimeout(() => {
+          wipe.classList.remove('is-covering', 'is-clearing');
+          busy = false;
+          const focusable = $('h1, h2, [tabindex="-1"]', target);
+          focusable?.setAttribute?.('tabindex', '-1');
+          focusable?.focus?.({ preventScroll: true });
+        }, CLEAR_MS);
+      }, COVER_MS);
+
+      wipe.classList.add('is-covering');
+    }
+
+    document.addEventListener('click', (event) => {
+      const link = event.target.closest('a[href^="#"]');
+      if (!link) return;
+      const id = link.getAttribute('href').slice(1);
+      if (!id || id === 'main') return;
+      const target = document.getElementById(id);
+      if (!target || target.hidden) return;
+      event.preventDefault();
+      jump(target);
+    });
+  }
+
+  /**
+   * Sponsor logo strip.
+   *
+   * The track is duplicated so the CSS translateX(-50%) loop is seamless, and the
+   * animation duration scales with the number of logos to keep a constant speed.
+   * The hero's bottom padding is grown by the real strip height, so the band can
+   * never sit on top of the headline.
+   */
+  function setupSponsors() {
+    const band = $('[data-sponsor-band]');
+    const track = $('[data-sponsor-track]');
+    const hero = $('.section-card--hero');
+    if (!band || !track) return;
+
+    const sponsors = Array.isArray(config.sponsors) ? config.sponsors : [];
+    track.replaceChildren();
+
+    if (!sponsors.length) {
+      band.hidden = true;
+      hero?.style.removeProperty('--hero-bottom-strips');
+      return;
+    }
+
+    const build = (sponsor, duplicate) => {
+      const linked = Boolean(sponsor.url);
+      const item = document.createElement(linked ? 'a' : 'span');
+      item.className = 'sponsor-logo';
+      if (linked) {
+        item.href = sponsor.url;
+        item.target = '_blank';
+        item.rel = 'noopener noreferrer sponsored';
+      }
+      // The duplicated half is decoration only: never announced, never focusable.
+      if (duplicate) {
+        item.setAttribute('aria-hidden', 'true');
+        if (linked) item.tabIndex = -1;
+      }
+      const image = document.createElement('img');
+      image.src = sponsor.image;
+      image.alt = duplicate ? '' : (sponsor.name || 'Sponsor');
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      item.appendChild(image);
+      return item;
+    };
+
+    sponsors.forEach((sponsor) => track.appendChild(build(sponsor, false)));
+    sponsors.forEach((sponsor) => track.appendChild(build(sponsor, true)));
+
+    band.hidden = false;
+    band.style.setProperty('--sponsor-speed', `${Math.max(18, sponsors.length * 6)}s`);
+
+    const syncHeight = () => {
+      const height = band.getBoundingClientRect().height;
+      if (!height) return;
+      hero?.style.setProperty('--hero-bottom-strips', `${Math.round(height)}px`);
+      $('.hero__marquee')?.style.setProperty('--sponsor-band-h', `${Math.round(height)}px`);
+    };
+    syncHeight();
+    window.addEventListener('resize', syncHeight, { passive: true });
+    if ('ResizeObserver' in window) new ResizeObserver(syncHeight).observe(band);
+  }
+
+  /**
+   * Hands the gallery images and captions to the 3D carousel module.
+   * Loaded lazily so a GSAP failure cannot take the rest of the page down, and so
+   * the ~60 kB of GSAP is only fetched when the gallery is actually enabled.
+   */
+  function setupGalleryCarousel() {
+    const section = $('[data-gallery3d]');
+    if (!section) return;
+    // Lifecycle marker: makes it obvious in DevTools whether this step ran,
+    // whether the lazy chunk was requested, and whether it initialised.
+    section.dataset.g3dState = 'init';
+    if (!config.features.gallery) {
+      section.hidden = true;
+      section.dataset.g3dState = 'feature-off';
+      return;
+    }
+
+    const captions = [1, 2, 3, 4, 5].map((number) => text(`gallery.caption${number}`));
+    const start = () => {
+      section.dataset.g3dState = 'loading';
+      import('./gallery-3d.js')
+        .then(({ setupGallery3D }) => {
+          section.dataset.g3dState = 'module-ready';
+          const instance = setupGallery3D({
+            images: config.media.galleryImages,
+            captions,
+            reducedMotion
+          });
+          if (instance) {
+            document.querySelector('[data-gallery-fallback]')?.setAttribute('hidden', '');
+            section.dataset.ready = '1';
+            section.dataset.g3dState = 'ready';
+          } else {
+            section.dataset.g3dState = 'declined';
+          }
+        })
+        .catch((error) => {
+          console.warn('3D gallery unavailable, keeping the grid:', error);
+          section.dataset.g3dState = `failed: ${error?.message || error}`;
+          section.hidden = true;
+        });
+    };
+
+    /**
+     * Deliberately three independent triggers. IntersectionObserver is the
+     * cheapest, but it can be starved in embedded and automated browsers, and a
+     * gallery that silently never loads is worse than 118 kB fetched early.
+     * Whichever fires first wins; the rest are torn down.
+     */
+    let started = false;
+    let observer = null;
+    let fallbackTimer = 0;
+
+    const kickOff = () => {
+      if (started) return;
+      started = true;
+      observer?.disconnect();
+      window.removeEventListener('scroll', onFirstScroll);
+      window.clearTimeout(fallbackTimer);
+      start();
+    };
+
+    function onFirstScroll() {
+      const box = section.getBoundingClientRect();
+      if (box.top < window.innerHeight * 2.2) kickOff();
+    }
+
+    if ('IntersectionObserver' in window) {
+      observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) kickOff();
+      }, { rootMargin: '700px 0px' });
+      observer.observe(section);
+    }
+    window.addEventListener('scroll', onFirstScroll, { passive: true });
+    fallbackTimer = window.setTimeout(kickOff, 2600);
+    onFirstScroll();
+  }
+
+  function setupFooterYear() {
+    $$('[data-current-year]').forEach((element) => { element.textContent = String(new Date().getFullYear()); });
+  }
+
+  function initialize() {
+    // The intro overlay goes first and is released independently, so a failure
+    // further down can never leave the page hidden behind it.
+    const steps = [
+      ['language', setupLanguage],
+      ['preloader', setupPreloader],
+      ['reveal', setupReveal],
+      ['navigation', setupNavigation],
+      ['panels', setupPanels],
+      ['sectionTransition', setupSectionTransition],
+      ['cardStack', setupCardStack],
+      ['prizeDeck', setupPrizeDeck],
+      ['countdown', setupCountdown],
+      ['footerGlow', setupFooterGlow],
+      ['headingFit', setupHeadingFit],
+      ['wall', setupWall],
+      ['attendance', setupAttendance],
+      ['liveCounts', setupLiveCounts],
+      ['attendanceRings', setupAttendanceRings],
+      ['quickActions', setupQuickActions],
+      ['reminderModal', setupReminderModal],
+      ['consentGate', setupConsentGate],
+      ['registrationForm', setupRegistrationForm],
+      ['contactForm', setupContactForm],
+      ['accordion', setupAccordion],
+      ['cookieConsent', setupCookieConsent],
+      ['cursor', setupCursor],
+      ['magneticButtons', setupMagneticButtons],
+      ['heroMotion', setupHeroMotion],
+      ['routeDraw', setupRouteDraw],
+      ['sponsors', setupSponsors],
+      ['gallery3d', setupGalleryCarousel],
+      ['footerYear', setupFooterYear]
+    ];
+
+    // One broken feature must not take the whole page down with it.
+    steps.forEach(([name, step]) => {
+      try {
+        step();
+      } catch (error) {
+        console.error(`Carruleddhi: "${name}" failed to initialise.`, error);
+      }
+    });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
+  else initialize();
+})();

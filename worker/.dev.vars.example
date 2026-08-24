@@ -1,0 +1,7 @@
+# Copy to worker/.dev.vars for `wrangler dev`. That file is gitignored.
+# Zone is eu1 for this account. The live hook id is deliberately not committed —
+# a webhook URL is all anyone needs to push rows into the scenario. Take it from
+# make/JAK-WGRAC.md and keep it in .dev.vars / wrangler secret only.
+MAKE_WEBHOOK_URL="https://hook.eu1.make.com/PUT_YOUR_WEBHOOK_ID_HERE"
+INTAKE_SHARED_KEY=""
+TURNSTILE_SECRET=""

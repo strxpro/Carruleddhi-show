@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "exportedAt": "2026-08-22T13:28:50.383Z",
+  "config": {
+    "eventName": "Carruleddhi Show 2026",
+    "eventDate": "2026-10-17T14:30:00+02:00",
+    "dateLabel": "17 ottobre 2026 · Santa Teresa Gallura",
+    "tagline": "Nessun motore. Solo la discesa.",
+    "pilotsBase": 38,
+    "attendeesBase": 412,
+    "route": {
+      "distance": "circa 650 m",
+      "road": "Via Giuseppe Verdi",
+      "mapUrl": "https://maps.app.goo.gl/MZLJyzTH3tC93Pm86",
+      "path": [
+        {
+          "x": 1,
+          "y": 0.5892
+        },
+        {
+          "x": 0.7176,
+          "y": 0.8178
+        },
+        {
+          "x": 0.5044,
+          "y": 0.9532
+        },
+        {
+          "x": 0.4308,
+          "y": 0.7809
+        },
+        {
+          "x": 0.4099,
+          "y": 0.5998
+        }
+      ],
+      "width": {
+        "near": 8,
+        "far": 1
+      }
+    },
+    "contact": {
+      "email": "info@carruleddhishow.com",
+      "phone": "+39 328 498 1574"
+    },
+    "media": {
+      "routeImage": "/assets/images/zjazd.png",
+      "galleryImages": [
+        "/assets/images/gallery-start.svg",
+        "/assets/images/gallery-race.svg",
+        "/assets/images/gallery-craft.svg",
+        "/assets/images/gallery-crowd.svg",
+        "/assets/images/gallery-finish.svg"
+      ]
+    },
+    "sponsors": [],
+    "features": {
+      "gallery": true,
+      "attendance": true,
+      "registration": true
+    },
+    "endpoints": {
+      "registration": "",
+      "reminder": "",
+      "attendance": "",
+      "counts": "",
+      "contact": ""
+    }
+  }
+}

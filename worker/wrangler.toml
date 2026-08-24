@@ -1,0 +1,29 @@
+name = "carruleddhi-intake"
+main = "index.js"
+compatibility_date = "2026-08-01"
+
+# Serve the built site and let the Worker answer only /api/carruleddhi/*.
+[assets]
+directory = "../dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/carruleddhi/*"]
+
+[vars]
+# Comma separated. Leave empty during local development.
+ALLOWED_ORIGINS = ""
+
+# Optional throttling store. Create it once, then paste the id here:
+#   npx wrangler kv namespace create RATE_LIMIT
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "<kv-namespace-id>"
+
+# Secrets are never written here. Set them with:
+#   npx wrangler secret put MAKE_WEBHOOK_URL       # required for the forms
+#   npx wrangler secret put ROSTER_KEY             # admin participant list
+#   npx wrangler secret put SUPABASE_URL           # public wall
+#   npx wrangler secret put SUPABASE_SERVICE_KEY   # public wall
+#   npx wrangler secret put WALL_SALT              # public wall, any long random string
+#   npx wrangler secret put INTAKE_SHARED_KEY      # optional
+#   npx wrangler secret put TURNSTILE_SECRET       # optional

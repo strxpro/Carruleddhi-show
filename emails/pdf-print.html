@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Carruleddhi Show 2026 — modulo di iscrizione</title>
+<!--
+  Print-ready registration form, two pages:
+    page 1 — ITALIAN, the copy the rider prints and signs
+    page 2 — TRANSLATED, courtesy copy, never handed in
+
+  Values wrapped in double curly braces are placeholders, e.g. RACE_NUMBER.
+  Written out in words rather than shown literally, because make-pdf.ps1 refuses to
+  produce a PDF that still contains an unreplaced placeholder, and an example of one
+  inside this comment counted as exactly that. Two ways to use this file:
+    A) open it in Chrome, Ctrl+P, "Save as PDF" — gives you a sample to look at
+    B) paste the layout into Google Docs and let Make fill the placeholders
+       (see emails/pdf-template.md for the full placeholder list)
+-->
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    color: #071a3d;
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+  .sheet { page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+
+  .warn {
+    margin: 0 0 7mm;
+    padding: 3.5mm 5mm;
+    border: 1.6pt solid #f6494f;
+    border-radius: 2.5mm;
+    background: #fff4f4;
+    color: #8a2026;
+    font-size: 9pt;
+    font-weight: 700;
+  }
+
+  .head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8mm;
+    padding-bottom: 4mm;
+    border-bottom: 1.4pt solid #071a3d;
+  }
+  .head__event { font-size: 7.5pt; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+  .head__title { margin: 1mm 0 0; font-size: 19pt; font-weight: 900; letter-spacing: -.4pt; line-height: 1.05; }
+  .head__meta { margin: 1mm 0 0; font-size: 9pt; color: #45577a; }
+  .num { flex: none; padding: 2.5mm 5mm; border: 1.6pt solid #071a3d; border-radius: 2.5mm; text-align: center; }
+  .num small { display: block; font-size: 6.5pt; font-weight: 800; letter-spacing: .16em; }
+  .num b { display: block; font-size: 24pt; line-height: 1; }
+
+  h2 {
+    margin: 6mm 0 2.5mm;
+    padding-bottom: 1mm;
+    border-bottom: .6pt solid #9fb0cc;
+    font-size: 8pt;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #45577a;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm 8mm; }
+  .grid > div { min-width: 0; }
+  .grid.one { grid-template-columns: 1fr; }
+  dt { font-size: 7pt; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #6b7c9c; }
+  dd { margin: .5mm 0 0; font-size: 11pt; font-weight: 600; }
+
+  .decl { margin: 0; font-size: 9pt; text-align: justify; }
+  .minor { margin: 3mm 0 0; padding: 2.5mm 4mm; border-left: 2pt solid #ffc928; background: #fffaeb; font-size: 8.5pt; }
+
+  .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin-top: 10mm; }
+  .sign__line { margin-top: 12mm; border-top: .8pt solid #071a3d; padding-top: 1.5mm; font-size: 8pt; color: #45577a; }
+  .place { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8mm; margin-top: 7mm; }
+  .place__line { border-bottom: .8pt solid #071a3d; height: 6mm; }
+  .place span { font-size: 8pt; color: #45577a; }
+
+  .foot { margin-top: 8mm; padding-top: 2.5mm; border-top: .6pt dashed #9fb0cc; font-size: 7.5pt; color: #6b7c9c; }
+  .check { margin: 4mm 0 0; padding: 0; list-style: none; font-size: 9pt; }
+  .check li { margin-bottom: 1.5mm; }
+  .check li::before { content: '\25A1'; margin-right: 2.5mm; font-size: 11pt; }
+</style>
+</head>
+<body>
+
+<!-- =============== PAGE 1 — ITALIAN, THE ONE TO SIGN =============== -->
+<section class="sheet">
+  <div class="head">
+    <div>
+      <span class="head__event">Carruleddhi Show 2026</span>
+      <h1 class="head__title">Modulo di iscrizione</h1>
+      <p class="head__meta">17 ottobre 2026 · Discesa Rena Bianca, Via Giuseppe Verdi, Santa Teresa Gallura (SS)</p>
+    </div>
+    <div class="num"><small>N.</small><b>{{RACE_NUMBER}}</b></div>
+  </div>
+
+  <h2>Dati del pilota</h2>
+  <dl class="grid">
+    <div><dt>Nome e cognome</dt><dd>{{FULL_NAME}}</dd></div>
+    <div><dt>Data di nascita</dt><dd>{{BIRTH_DATE}}</dd></div>
+    <div><dt>CAP</dt><dd>{{POSTAL_CODE}}</dd></div>
+    <div><dt>Telefono</dt><dd>{{PHONE}}</dd></div>
+    <div><dt>E-mail</dt><dd>{{EMAIL}}</dd></div>
+    <div><dt>Indirizzo</dt><dd>{{ADDRESS}}</dd></div>
+  </dl>
+
+  <h2>Dati del mezzo</h2>
+  <dl class="grid">
+    <div><dt>Nome del carruleddhu</dt><dd>{{CART_NAME}}</dd></div>
+    <div><dt>Categoria</dt><dd>{{CATEGORY}}</dd></div>
+    <div><dt>Team</dt><dd>{{TEAM}}</dd></div>
+    <div><dt>Note sul mezzo</dt><dd>{{CART_NOTES}}</dd></div>
+  </dl>
+
+  <h2>Dichiarazione e liberatoria</h2>
+  <p class="decl">
+    Il sottoscritto dichiara di aver letto e di accettare integralmente il regolamento
+    dell'evento, di partecipare volontariamente e sotto la propria responsabilità, di
+    utilizzare un casco omologato per tutta la durata della discesa e di sottoporre il
+    mezzo al controllo tecnico prima della partenza. Dichiara inoltre di essere in
+    condizioni psicofisiche idonee e di acconsentire al trattamento dei dati personali
+    per la gestione dell'iscrizione, secondo l'informativa privacy pubblicata sul sito.
+  </p>
+  <p class="minor">
+    I minori partecipano esclusivamente con liberatoria firmata da un genitore o tutore legale.
+  </p>
+
+  <h2>Da portare il giorno della gara</h2>
+  <ul class="check">
+    <li>Questo modulo, stampato e firmato</li>
+    <li>Un documento d'identità valido</li>
+    <li>Casco omologato — senza casco non si parte</li>
+  </ul>
+
+  <div class="place">
+    <div><span>Luogo</span><div class="place__line"></div></div>
+    <div><span>Data</span><div class="place__line"></div></div>
+  </div>
+
+  <div class="sign">
+    <div><div class="sign__line">Firma del pilota</div></div>
+    <div><div class="sign__line">Firma del genitore o tutore (se minorenne)</div></div>
+  </div>
+
+  <p class="foot">
+    Documento generato automaticamente il {{GENERATED_AT}} — Carruleddhi Show 2026,
+    Shardana Nuragici e Comitato FIDALI 82 · info@carruleddhishow.com
+  </p>
+</section>
+
+<!-- =============== PAGE 2 — TRANSLATED COURTESY COPY =============== -->
+<section class="sheet" lang="pl">
+  <p class="warn">
+    KOPIA INFORMACYJNA — NIE PODPISUJ I NIE ODDAWAJ.
+    Do podpisu i oddania służy wyłącznie wersja włoska ze strony 1.
+  </p>
+
+  <div class="head">
+    <div>
+      <span class="head__event">Carruleddhi Show 2026</span>
+      <h1 class="head__title">Formularz zgłoszeniowy</h1>
+      <p class="head__meta">17 października 2026 · Zjazd Rena Bianca, Via Giuseppe Verdi, Santa Teresa Gallura (SS)</p>
+    </div>
+    <div class="num"><small>NR</small><b>{{RACE_NUMBER}}</b></div>
+  </div>
+
+  <h2>Dane zawodnika</h2>
+  <dl class="grid">
+    <div><dt>Imię i nazwisko</dt><dd>{{FULL_NAME}}</dd></div>
+    <div><dt>Data urodzenia</dt><dd>{{BIRTH_DATE}}</dd></div>
+    <div><dt>CAP</dt><dd>{{POSTAL_CODE}}</dd></div>
+    <div><dt>Telefon</dt><dd>{{PHONE}}</dd></div>
+    <div><dt>E-mail</dt><dd>{{EMAIL}}</dd></div>
+    <div><dt>Adres</dt><dd>{{ADDRESS}}</dd></div>
+  </dl>
+
+  <h2>Dane pojazdu</h2>
+  <dl class="grid">
+    <div><dt>Nazwa carruleddhu</dt><dd>{{CART_NAME}}</dd></div>
+    <div><dt>Kategoria</dt><dd>{{CATEGORY}}</dd></div>
+    <div><dt>Zespół</dt><dd>{{TEAM}}</dd></div>
+    <div><dt>Uwagi o pojeździe</dt><dd>{{CART_NOTES}}</dd></div>
+  </dl>
+
+  <h2>Oświadczenie i zgoda</h2>
+  <p class="decl">
+    Niżej podpisany oświadcza, że przeczytał i w całości akceptuje regulamin wydarzenia,
+    bierze udział dobrowolnie i na własną odpowiedzialność, będzie używał atestowanego
+    kasku przez cały czas zjazdu oraz przedstawi pojazd do kontroli technicznej przed
+    startem. Oświadcza również, że jego stan psychofizyczny pozwala na udział oraz
+    wyraża zgodę na przetwarzanie danych osobowych w celu obsługi zgłoszenia, zgodnie
+    z informacją o prywatności opublikowaną na stronie.
+  </p>
+  <p class="minor">
+    Osoby niepełnoletnie startują wyłącznie za pisemną zgodą rodzica lub opiekuna prawnego.
+  </p>
+
+  <h2>Co zabrać w dniu wyścigu</h2>
+  <ul class="check">
+    <li>Wydrukowany i podpisany formularz w wersji WŁOSKIEJ (strona 1)</li>
+    <li>Ważny dokument tożsamości</li>
+    <li>Atestowany kask — bez kasku nie ma startu</li>
+  </ul>
+
+  <p class="foot">
+    Tłumaczenie ma charakter wyłącznie informacyjny. W razie różnic obowiązuje wersja włoska.
+    Dokument wygenerowany automatycznie {{GENERATED_AT}} · info@carruleddhishow.com
+  </p>
+</section>
+
+</body>
+</html>

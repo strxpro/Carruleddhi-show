@@ -1,0 +1,1234 @@
+<!doctype html>
+<html lang="it" class="no-js">
+<head>
+  <meta charset="utf-8">
+  <!-- Classic script on purpose: it runs during parsing, before first paint, and
+       before any module. Without it the intro overlay would cover the whole page
+       for visitors whose JavaScript never runs. -->
+  <script>document.documentElement.classList.replace('no-js', 'js');</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Carruleddhi Show 2026 — Santa Teresa Gallura</title>
+  <meta name="description" content="La corsa di carretti artigianali più spettacolare della Sardegna. 17 ottobre 2026, Santa Teresa Gallura.">
+  <meta name="theme-color" content="#071a3d">
+  <meta name="color-scheme" content="light">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Carruleddhi Show 2026">
+  <meta property="og:description" content="Nessun motore. Solo la discesa. 17 ottobre 2026 — Santa Teresa Gallura.">
+  <meta property="og:locale" content="it_IT">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23071a3d'/%3E%3Ccircle cx='20' cy='44' r='8' fill='%23ffc928'/%3E%3Ccircle cx='46' cy='44' r='8' fill='%23ffc928'/%3E%3Cpath d='M13 38h40L44 22H25z' fill='%23f6494f'/%3E%3C/svg%3E">
+  <!-- The two faces used above the fold. Preloading them removes the swap flash
+       on the hero headline; the latin-ext files are left to load on demand
+       because only Polish and a few accented names need them. Self-hosted, so
+       there is no third-party connection to warm up. -->
+  <link rel="preload" href="/assets/fonts/bungee-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/baloo2-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/site.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SportsEvent",
+    "name": "Carruleddhi Show 2026",
+    "description": "Corsa di carretti artigianali senza motore a Santa Teresa Gallura.",
+    "startDate": "2026-10-17T12:00:00+02:00",
+    "endDate": "2026-10-17T22:00:00+02:00",
+    "eventStatus": "https://schema.org/EventScheduled",
+    "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+    "location": {
+      "@type": "Place",
+      "name": "Discesa Rena Bianca",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Via Giuseppe Verdi",
+        "addressLocality": "Santa Teresa Gallura",
+        "addressRegion": "SS",
+        "addressCountry": "IT"
+      }
+    },
+    "organizer": { "@type": "Organization", "name": "Shardana Nuragici e Comitato FIDALI 82" },
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR", "availability": "https://schema.org/InStock" }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
+  <div class="cursor-dot" data-cursor-dot aria-hidden="true"></div>
+  <div class="cursor-ring" data-cursor-ring aria-hidden="true"></div>
+
+  <noscript>
+    <p class="no-js-note">JavaScript è disattivato: countdown, iscrizione e mappa del percorso non funzionano. Il resto della pagina è leggibile.</p>
+  </noscript>
+
+  <!-- Everything is centred by the grid, not by nudged margins, and the confetti
+       behind it is four spinning bands of colour. The bar is a pure CSS animation
+       with a JS watchdog on top, so a dead module can never leave this on screen —
+       see setupPreloader in app.js. -->
+  <div class="preloader" data-preloader aria-hidden="true">
+    <div class="preloader__confetti" aria-hidden="true">
+      <i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i>
+    </div>
+    <div class="preloader__inner">
+      <span class="preloader__eyebrow">Santa Teresa Gallura</span>
+      <div class="preloader__word">
+        <span>C</span><span>A</span><span>R</span><span>R</span><span>U</span><span>L</span><span>E</span><span>D</span><span>D</span><span>H</span><span>I</span>
+      </div>
+      <div class="preloader__wheels" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="preloader__track"><div class="preloader__bar" data-preloader-bar></div></div>
+      <span class="preloader__number" data-preloader-number>00</span>
+    </div>
+  </div>
+
+  <header class="site-header" data-header>
+    <div class="nav-shell">
+      <a class="brand" href="#hero" aria-label="Carruleddhi Show — home">
+        <span class="brand__name">Carruleddhi</span>
+        <span class="brand__date" data-header-date>17 · 10 · 2026</span>
+      </a>
+
+      <div class="nav-current" data-nav-current aria-live="polite">
+        <span class="nav-current__pulse" aria-hidden="true"></span>
+        <span class="nav-current__copy">
+          <small class="nav-current__progress" data-nav-progress>00%</small>
+          <strong data-current-section>Carruleddhi</strong>
+        </span>
+      </div>
+
+      <div class="nav-actions">
+        <div class="language-picker" data-language-picker>
+          <button class="language-picker__trigger" type="button" data-language-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="language-options" aria-label="Lingua / Language">
+            <span class="language-picker__flag" data-language-flag aria-hidden="true">🇮🇹</span>
+            <span class="language-picker__code" data-language-code>IT</span>
+            <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <div class="language-picker__menu" id="language-options" data-language-menu role="listbox" aria-label="Wybierz język" aria-hidden="true">
+            <button type="button" role="option" data-language-option="it" aria-selected="true"><span aria-hidden="true">🇮🇹</span><strong>Italiano</strong><small>IT</small></button>
+            <button type="button" role="option" data-language-option="pl" aria-selected="false"><span aria-hidden="true">🇵🇱</span><strong>Polski</strong><small>PL</small></button>
+            <button type="button" role="option" data-language-option="en" aria-selected="false"><span aria-hidden="true">🇬🇧</span><strong>English</strong><small>EN</small></button>
+            <button type="button" role="option" data-language-option="de" aria-selected="false"><span aria-hidden="true">🇩🇪</span><strong>Deutsch</strong><small>DE</small></button>
+            <button type="button" role="option" data-language-option="es" aria-selected="false"><span aria-hidden="true">🇪🇸</span><strong>Español</strong><small>ES</small></button>
+            <button type="button" role="option" data-language-option="fr" aria-selected="false"><span aria-hidden="true">🇫🇷</span><strong>Français</strong><small>FR</small></button>
+          </div>
+        </div>
+        <button class="btn btn--small nav-attend" type="button" data-open-reminder data-i18n="nav.attend">Ci sarò</button>
+        <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Apri il menu">
+          <span class="menu-toggle__label">Menu</span>
+          <span class="menu-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <button class="menu-backdrop" type="button" data-menu-backdrop tabindex="-1" aria-label="Chiudi il menu"></button>
+  <nav class="mobile-nav" id="site-menu" data-mobile-menu aria-label="Main navigation" aria-hidden="true">
+    <div class="menu-panel__inner">
+      <div class="menu-panel__heading">
+        <span class="menu-panel__eyebrow" data-config-event-name>Carruleddhi Show 2026</span>
+        <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
+      </div>
+
+      <div class="menu-panel__grid">
+        <div class="menu-panel__links">
+          <a href="#hero" data-section-link="hero"><span class="menu-link__index">01</span><span>Carruleddhi</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#story" data-section-link="story"><span class="menu-link__index">02</span><span data-i18n="nav.race">La gara</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#categories" data-section-link="categories"><span class="menu-link__index">03</span><span data-i18n="nav.categories">Categorie</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#route" data-section-link="route"><span class="menu-link__index">04</span><span data-i18n="nav.route">Percorso</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#schedule" data-section-link="schedule"><span class="menu-link__index">05</span><span data-i18n="nav.program">Programma</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#gallery" data-section-link="gallery" data-feature-link="gallery"><span class="menu-link__index">06</span><span data-i18n="nav.gallery">Galleria</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#prizes" data-section-link="prizes"><span class="menu-link__index">07</span><span data-i18n="nav.prizes">Premi</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#attendance" data-section-link="attendance" data-feature-link="attendance"><span class="menu-link__index">08</span><span data-i18n="nav.attend">Ci sarò</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#signup" data-section-link="signup" data-feature-link="registration"><span class="menu-link__index">09</span><span data-i18n="nav.signup">Iscriviti</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#faq" data-section-link="faq"><span class="menu-link__index">10</span><span data-i18n="nav.faq">FAQ</span><span class="menu-link__arrow">↗</span></a>
+          <a href="#contact" data-section-link="contact"><span class="menu-link__index">11</span><span data-i18n="nav.contact">Contatti</span><span class="menu-link__arrow">↗</span></a>
+        </div>
+
+        <aside class="menu-panel__event">
+          <span class="menu-event__kicker" data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
+          <strong data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</strong>
+          <div class="menu-event__stats">
+            <span><b data-pilots-count>38</b><small data-i18n="hero.pilots">piloti iscritti</small></span>
+            <span><b data-attendee-count>412</b><small data-i18n="hero.people">persone ci saranno</small></span>
+          </div>
+          <a class="btn" href="#signup" data-feature-link="registration"><span data-i18n="nav.signup">Iscriviti</span><span aria-hidden="true">↘</span></a>
+          <button class="btn btn--outline" type="button" data-open-reminder data-i18n="nav.attend">Ci sarò</button>
+        </aside>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <section class="hero section-card section-card--hero" id="hero" aria-labelledby="hero-title">
+      <div class="container hero__grid">
+        <div class="hero__content">
+          <div class="hero__kicker reveal">
+            <span class="hero__kicker-dot" aria-hidden="true"></span>
+            <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
+          </div>
+          <h1 class="hero__title reveal" id="hero-title" data-delay="1">
+            CARRULEDDHI<br><span class="accent">SHOW</span> <span class="hero__year">2026</span>
+          </h1>
+          <p class="hero__tagline reveal" data-delay="2" data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</p>
+          <div class="hero__actions reveal" data-delay="3">
+            <a class="btn magnetic" href="#signup" data-feature-link="registration"><span data-i18n="hero.signup">Iscriviti alla gara</span><span class="btn__icon" aria-hidden="true">↘</span></a>
+            <button class="btn btn--outline magnetic" type="button" data-open-reminder><span data-i18n="hero.attend">Ci sarò</span><span class="btn__icon" aria-hidden="true">＋</span></button>
+          </div>
+        </div>
+        <aside class="hero__aside reveal" data-delay="2" aria-label="Event statistics">
+          <div class="countdown" data-countdown aria-label="Countdown to event">
+            <div class="countdown__unit"><strong class="countdown__number" data-days>00</strong><span class="countdown__label" data-i18n="count.days">giorni</span></div>
+            <div class="countdown__unit"><strong class="countdown__number" data-hours>00</strong><span class="countdown__label" data-i18n="count.hours">ore</span></div>
+            <div class="countdown__unit"><strong class="countdown__number" data-minutes>00</strong><span class="countdown__label" data-i18n="count.minutes">minuti</span></div>
+            <div class="countdown__unit"><strong class="countdown__number" data-seconds>00</strong><span class="countdown__label" data-i18n="count.seconds">secondi</span></div>
+          </div>
+          <div class="hero-stat">
+            <strong class="hero-stat__number" data-pilots-count>38</strong>
+            <span class="hero-stat__label" data-i18n="hero.pilots">piloti iscritti</span>
+          </div>
+          <div class="hero-stat">
+            <strong class="hero-stat__number" data-attendee-count>412</strong>
+            <span class="hero-stat__label" data-i18n="hero.people">persone ci saranno</span>
+          </div>
+        </aside>
+      </div>
+      <div class="marquee hero__marquee" aria-hidden="true">
+        <div class="marquee__track">
+          <span class="marquee__item" data-i18n="marquee">Costruisci · Sali · Scendi · Frena · Sorridi</span>
+          <span class="marquee__item" data-i18n="marquee">Costruisci · Sali · Scendi · Frena · Sorridi</span>
+          <span class="marquee__item" data-i18n="marquee">Costruisci · Sali · Scendi · Frena · Sorridi</span>
+          <span class="marquee__item" data-i18n="marquee">Costruisci · Sali · Scendi · Frena · Sorridi</span>
+        </div>
+      </div>
+
+      <!-- Logos only, no headings: filled from the config by app.js. -->
+      <aside class="sponsor-band" data-sponsor-band data-i18n-aria-label="sponsors.label" aria-label="Sponsor" hidden>
+        <div class="sponsor-band__track" data-sponsor-track></div>
+      </aside>
+    </section>
+
+    <section class="section section-card story" id="story" aria-labelledby="story-title">
+      <div class="container story__grid">
+        <div class="story__copy reveal">
+          <span class="eyebrow" data-i18n="story.kicker">Una tradizione che corre</span>
+          <h2 class="section-title" id="story-title" data-i18n="story.title">Un paese intero in discesa.</h2>
+          <p class="lead" data-i18n="story.p1">I Carruleddhi sono carretti costruiti a mano: legno, cuscinetti e molta fantasia. Nessun motore, nessuna propulsione — solo gravità, coraggio e il rumore delle ruote sulla strada.</p>
+          <p class="lead" data-i18n="story.p2">Alcuni corrono per il tempo, altri per lo spettacolo. Qui vince la velocità, ma anche l’idea più folle.</p>
+        </div>
+        <div class="story__numbers">
+          <div class="story-number reveal"><strong>0</strong><span data-i18n="story.stat1">motori</span></div>
+          <div class="story-number reveal" data-delay="1"><strong>2</strong><span data-i18n="story.stat2">categorie</span></div>
+          <div class="story-number reveal" data-delay="2"><strong>12</strong><span data-i18n="story.stat3">premi</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-card stack-section" id="categories" aria-labelledby="categories-title">
+      <div class="container">
+        <div class="stack-intro reveal">
+          <div>
+            <span class="eyebrow" data-i18n="category.kicker">Mezzi ammessi</span>
+            <h2 class="section-title section-title--medium" id="categories-title" data-i18n="category.title">Le carte si sovrappongono. La sfida sale.</h2>
+          </div>
+          <p class="lead" data-i18n="category.intro">Scorri: ogni carta mostra ciò che serve per prendere parte alla discesa.</p>
+        </div>
+
+        <div class="card-stack" data-card-stack>
+          <article class="stack-card stack-card--classic" style="--stack-index:0">
+            <div class="stack-card__inner">
+              <div class="stack-card__copy">
+                <div>
+                  <span class="stack-card__num" data-i18n="category.classic.kicker">Categoria A · Tradizione</span>
+                  <h3 data-i18n="category.classic.title">Carruleddhi Classic</h3>
+                  <p data-i18n="category.classic.body">Telaio artigianale in legno, quattro ruote piene o con cuscinetti a sfera. Guida con i piedi o con la corda; freno a piede o a leva.</p>
+                </div>
+                <div class="card-tags"><span class="card-tag" data-i18n="category.classic.tag1">4 ruote</span><span class="card-tag" data-i18n="category.classic.tag2">Telaio in legno</span><span class="card-tag" data-i18n="category.classic.tag3">Senza motore</span></div>
+              </div>
+              <div class="stack-card__visual" aria-hidden="true">
+                <svg viewBox="0 0 600 440" role="img">
+                  <path d="M138 305h330l-55-128-201-25z" fill="#fff6e7" stroke="#071a3d" stroke-width="14" stroke-linejoin="round"/>
+                  <path d="M207 153l61-81h62l40 97" fill="none" stroke="#071a3d" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M280 73l-18 80" stroke="#f6494f" stroke-width="15" stroke-linecap="round"/>
+                  <circle cx="180" cy="326" r="66" fill="#174ea6" stroke="#071a3d" stroke-width="14"/>
+                  <circle cx="180" cy="326" r="19" fill="#ffc928"/>
+                  <circle cx="432" cy="326" r="66" fill="#174ea6" stroke="#071a3d" stroke-width="14"/>
+                  <circle cx="432" cy="326" r="19" fill="#ffc928"/>
+                  <path d="M154 220h250" stroke="#f6494f" stroke-width="18" stroke-linecap="round"/>
+                  <circle cx="320" cy="130" r="35" fill="#ffc928" stroke="#071a3d" stroke-width="12"/>
+                </svg>
+              </div>
+            </div>
+          </article>
+
+          <article class="stack-card stack-card--art" style="--stack-index:1">
+            <div class="stack-card__inner">
+              <div class="stack-card__copy">
+                <div>
+                  <span class="stack-card__num" data-i18n="category.art.kicker">Categoria B · Creatività</span>
+                  <h3 data-i18n="category.art.title">Carruleddhi ART</h3>
+                  <p data-i18n="category.art.body">Qualsiasi materiale, da quattro a dieci ruote e freni di ogni tipo. Una sola regola creativa: deve essere costruito artigianalmente.</p>
+                </div>
+                <div class="card-tags"><span class="card-tag" data-i18n="category.art.tag1">4–10 ruote</span><span class="card-tag" data-i18n="category.art.tag2">Materiali liberi</span><span class="card-tag" data-i18n="category.art.tag3">Effetto wow</span></div>
+              </div>
+              <div class="stack-card__visual" aria-hidden="true">
+                <svg viewBox="0 0 600 440" role="img">
+                  <path d="M98 282c68-131 143-182 257-155 77 18 126 79 158 168z" fill="#ffc928" stroke="#071a3d" stroke-width="14" stroke-linejoin="round"/>
+                  <path d="M216 177c14-68 53-108 116-121l42 81" fill="#fff" stroke="#071a3d" stroke-width="14" stroke-linecap="round"/>
+                  <path d="M373 80l81-43-28 101" fill="#f6494f" stroke="#071a3d" stroke-width="12" stroke-linejoin="round"/>
+                  <circle cx="149" cy="318" r="51" fill="#fff" stroke="#071a3d" stroke-width="14"/><circle cx="149" cy="318" r="13" fill="#2469d8"/>
+                  <circle cx="286" cy="318" r="51" fill="#fff" stroke="#071a3d" stroke-width="14"/><circle cx="286" cy="318" r="13" fill="#2469d8"/>
+                  <circle cx="449" cy="318" r="51" fill="#fff" stroke="#071a3d" stroke-width="14"/><circle cx="449" cy="318" r="13" fill="#2469d8"/>
+                  <path d="M152 245c84-38 195-46 313 4" fill="none" stroke="#f6494f" stroke-width="16" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          </article>
+
+          <article class="stack-card stack-card--safety" style="--stack-index:2">
+            <div class="stack-card__inner">
+              <div class="stack-card__copy">
+                <div>
+                  <span class="stack-card__num" data-i18n="category.safety.kicker">Prima di partire</span>
+                  <h3 data-i18n="category.safety.title">Sicurezza, sempre.</h3>
+                  <p data-i18n="category.safety.body">Casco omologato obbligatorio. Il mezzo viene controllato prima della partenza. I minori partecipano solo con liberatoria firmata da un genitore o tutore.</p>
+                </div>
+                <div class="card-tags"><span class="card-tag" data-i18n="category.safety.tag1">Casco</span><span class="card-tag" data-i18n="category.safety.tag2">Controllo tecnico</span><span class="card-tag" data-i18n="category.safety.tag3">Liberatoria</span></div>
+              </div>
+              <div class="stack-card__visual" aria-hidden="true">
+                <svg viewBox="0 0 600 440" role="img">
+                  <path d="M133 266c8-124 87-206 200-206 114 0 195 82 202 207l-128 2c-16-47-49-74-99-74-48 0-83 25-104 72z" fill="#ffc928" stroke="#071a3d" stroke-width="16" stroke-linejoin="round"/>
+                  <path d="M205 267c21-62 62-98 118-98 60 0 101 33 124 99" fill="none" stroke="#f6494f" stroke-width="18" stroke-linecap="round"/>
+                  <path d="M149 267h383c0 55-33 91-89 91H240c-58 0-91-34-91-91z" fill="#fff" stroke="#071a3d" stroke-width="16"/>
+                  <path d="M257 98c56-21 111-10 153 28" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-card route" id="route" aria-labelledby="route-title">
+      <div class="container route__grid">
+        <div class="route__copy reveal">
+          <span class="eyebrow" data-i18n="route.kicker">Il percorso</span>
+          <h2 class="section-title section-title--medium" id="route-title" data-i18n="route.title">Giù verso il mare.</h2>
+          <p class="lead" data-i18n="route.body">Partenza dalla discesa della Rena Bianca, lungo via Giuseppe Verdi. Presentazione in piazza, salita a piedi e poi tutti giù — con il blu del mare davanti.</p>
+          <div class="route__facts">
+            <div class="route__fact"><strong data-i18n="route.distance" data-config-route-distance>circa 250 m</strong><span data-i18n="route.distanceLabel">di discesa</span></div>
+            <div class="route__fact"><strong data-i18n="route.road" data-config-route-road>Via Giuseppe Verdi</strong><span data-i18n="route.roadLabel">Santa Teresa Gallura</span></div>
+            <div class="route__fact route__fact--obstacles"><strong data-i18n="route.obstacles">Ostacoli</strong><span data-i18n="route.obstaclesLabel">disposti in modo diverso ogni anno</span></div>
+          </div>
+          <div class="route__actions">
+            <a class="btn btn--blue magnetic" data-route-map-link href="https://maps.app.goo.gl/MZLJyzTH3tC93Pm86" target="_blank" rel="noopener noreferrer"><span data-i18n="route.map">Apri in Google Maps</span><span class="btn__icon" aria-hidden="true">↗</span></a>
+            <a class="btn btn--outline" href="#signup" data-feature-link="registration"><span data-i18n="route.cta">Iscriviti e affronta la discesa</span><span class="btn__icon" aria-hidden="true">↘</span></a>
+          </div>
+        </div>
+        <figure class="route__map reveal" data-delay="1">
+          <div class="route__frame" data-route-frame>
+            <img data-route-image src="/assets/images/zjazd.png" alt="La discesa di via Giuseppe Verdi verso la Rena Bianca" data-i18n-alt="route.imageAlt" width="1672" height="940" decoding="async">
+            <svg class="route__overlay" data-route-svg viewBox="0 0 1000 562" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+              <defs>
+                <!-- The reveal mask is a thick stroke drawn with dashoffset, so a filled
+                     ribbon can still animate progressively along the route. -->
+                <mask id="route-reveal" maskUnits="userSpaceOnUse">
+                  <path data-route-mask fill="none" stroke="#fff" stroke-width="90" stroke-linecap="round" stroke-linejoin="round"/>
+                </mask>
+              </defs>
+              <!-- Geometry source: never painted, only measured. -->
+              <path data-route-core fill="none" stroke="none"/>
+              <g mask="url(#route-reveal)">
+                <path class="route__ribbon route__ribbon--casing" data-route-ribbon-casing fill="#071a3d" fill-opacity=".62"/>
+                <path class="route__ribbon route__ribbon--fill" data-route-ribbon-fill fill="#ffda3d"/>
+                <path class="route__line route__line--dash" data-route-dash fill="none" stroke="#071a3d" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 13" vector-effect="non-scaling-stroke"/>
+              </g>
+            </svg>
+            <!-- Two markers, nothing else. The little cart that used to drive
+                 down the line is gone: it competed with the finish badge for the
+                 same corner and read as clutter on a photo this busy. -->
+            <span class="route__node route__node--start" data-route-node="start" aria-hidden="true"></span>
+            <span class="route__node route__node--finish" data-route-node="finish" aria-hidden="true"></span>
+            <span class="route__pin route__pin--start" data-i18n="route.startShort">Partenza</span>
+            <span class="route__pin route__pin--end" data-i18n="route.finishShort">Arrivo</span>
+
+            <!-- Side note: obstacle layout changes from one edition to the next. -->
+            <p class="route__aside" data-i18n="route.obstaclesNote">Ostacoli lungo la discesa. Ogni anno sono disposti in modo diverso.</p>
+          </div>
+          <figcaption data-i18n="route.figureNote">Fotografia della discesa. La linea del percorso è indicativa e si regola dal pannello admin.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section section-card schedule" id="schedule" aria-labelledby="schedule-title">
+      <div class="container">
+        <span class="eyebrow reveal" data-i18n="schedule.kicker">17 ottobre 2026</span>
+        <h2 class="section-title reveal" id="schedule-title" data-i18n="schedule.title">Un giorno. Tutto da ricordare.</h2>
+        <div class="schedule-list">
+          <div class="schedule-row reveal"><time datetime="2026-10-17T12:00">12.00</time><span data-i18n="schedule.item1">Presentazione dei carruleddhi in piazza</span></div>
+          <div class="schedule-row reveal"><time datetime="2026-10-17T14:30">14.30</time><span data-i18n="schedule.item2">Partenza ufficiale della gara</span></div>
+          <div class="schedule-row reveal"><time data-i18n="schedule.item3time">Sera</time><span data-i18n="schedule.item3">Premiazione e festa finale</span></div>
+        </div>
+        <p class="lead reveal" data-i18n="schedule.note">Panino e bevanda offerti a ogni partecipante.</p>
+      </div>
+    </section>
+
+    <section class="section section-card gallery" id="gallery" aria-labelledby="gallery-title" data-feature="gallery">
+      <div class="container">
+        <div class="gallery__head reveal">
+          <div>
+            <span class="eyebrow" data-i18n="gallery.kicker">Dentro la giornata</span>
+            <h2 class="section-title section-title--medium" id="gallery-title" data-i18n="gallery.title">Costruita a mano. Vissuta insieme.</h2>
+          </div>
+          <div>
+            <p class="lead" data-i18n="gallery.intro">Cinque scene raccontano l’energia della partenza, della discesa e della festa. Le immagini sono illustrazioni locali pronte per essere sostituite con foto autentiche.</p>
+            <p class="gallery__disclaimer" data-i18n="gallery.note">Anteprime illustrative — nessuna immagine viene presentata come fotografia dell’evento.</p>
+          </div>
+        </div>
+
+        <!-- 3D carousel. Cards are generated from the same config images as the
+             fallback grid below, so the admin panel still controls the photos.
+             The grid stays in the markup as the no-JS / no-GSAP fallback. -->
+        <!-- Three grid rows: title, stage, controls. Nothing is absolutely
+             positioned over anything else, so the whole carousel is visible the
+             moment the section arrives and no element can land under the fixed
+             header. The frame no longer grows to 100vw on scroll — that was what
+             made the photos look enormous and made them drift sideways. -->
+        <div class="g3d" data-gallery3d>
+          <h3 class="g3d__heading" data-gallery3d-heading><span data-i18n="gallery.heading">Galleria</span></h3>
+          <div class="g3d__frame" data-gallery3d-frame>
+            <button class="g3d__nav g3d__nav--prev" type="button" data-gallery3d-prev aria-label="←"><span aria-hidden="true">←</span></button>
+            <div class="g3d__stage" data-gallery3d-stage tabindex="0" role="group" data-i18n-aria-label="gallery.carouselLabel" aria-label="Carosello fotografico">
+              <div class="g3d__ring" data-gallery3d-ring></div>
+            </div>
+            <button class="g3d__nav g3d__nav--next" type="button" data-gallery3d-next aria-label="→"><span aria-hidden="true">→</span></button>
+          </div>
+          <div class="g3d__footer">
+            <p class="g3d__caption" data-gallery3d-caption aria-live="polite"></p>
+            <div class="g3d__dots" data-gallery3d-dots role="tablist" aria-label="1-5"></div>
+          </div>
+        </div>
+
+        <div class="gallery__grid" data-gallery-fallback>
+          <figure class="gallery-card gallery-card--hero reveal">
+            <div class="gallery-card__media"><img data-gallery-image="0" src="/assets/images/gallery-start.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione dei carruleddhi sulla linea di partenza" data-i18n-alt="gallery.alt1"></div>
+            <figcaption><span>01</span><strong data-i18n="gallery.caption1">La tensione prima del via</strong></figcaption>
+          </figure>
+          <figure class="gallery-card gallery-card--portrait reveal" data-delay="1">
+            <div class="gallery-card__media"><img data-gallery-image="1" src="/assets/images/gallery-race.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione di un carruleddhu lanciato in discesa" data-i18n-alt="gallery.alt2"></div>
+            <figcaption><span>02</span><strong data-i18n="gallery.caption2">Gravità, curve e mare</strong></figcaption>
+          </figure>
+          <figure class="gallery-card reveal">
+            <div class="gallery-card__media"><img data-gallery-image="2" src="/assets/images/gallery-craft.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione della costruzione artigianale di un carruleddhu" data-i18n-alt="gallery.alt3"></div>
+            <figcaption><span>03</span><strong data-i18n="gallery.caption3">Ogni mezzo nasce in officina</strong></figcaption>
+          </figure>
+          <figure class="gallery-card reveal" data-delay="1">
+            <div class="gallery-card__media"><img data-gallery-image="3" src="/assets/images/gallery-crowd.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione del pubblico che tifa lungo il percorso" data-i18n-alt="gallery.alt4"></div>
+            <figcaption><span>04</span><strong data-i18n="gallery.caption4">Un paese intero fa il tifo</strong></figcaption>
+          </figure>
+          <figure class="gallery-card gallery-card--wide reveal">
+            <div class="gallery-card__media"><img data-gallery-image="4" src="/assets/images/gallery-finish.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione della festa sul traguardo" data-i18n-alt="gallery.alt5"></div>
+            <figcaption><span>05</span><strong data-i18n="gallery.caption5">Il traguardo diventa festa</strong></figcaption>
+          </figure>
+        </div>
+
+        <!-- Hidden, not deleted: it repeated the two buttons that already sit in
+             the fixed dock at the bottom of every screen. The markup stays so the
+             no-JS build still offers a way into both sections. -->
+        <aside class="gallery-cta reveal" data-duplicate-cta>
+          <div><span class="gallery-cta__index" aria-hidden="true">06</span><h3 data-i18n="gallery.ctaTitle">La prossima scena può essere la tua.</h3><p data-i18n="gallery.ctaBody">Segna la tua presenza oppure iscrivi il carruleddhu alla gara.</p></div>
+          <div class="gallery-cta__actions">
+            <a class="btn btn--yellow" href="#attendance" data-feature-link="attendance"><span data-i18n="quick.attend">Ci sarò</span><span aria-hidden="true">＋</span></a>
+            <a class="btn btn--outline" href="#signup" data-feature-link="registration"><span data-i18n="quick.signup">Iscriviti</span><span aria-hidden="true">↘</span></a>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section section-card prizes" id="prizes" aria-labelledby="prizes-title">
+      <div class="container prize-layout">
+        <div class="prize-copy reveal">
+          <span class="eyebrow" data-i18n="prizes.kicker">Categorie e premi</span>
+          <h2 class="section-title section-title--medium" id="prizes-title" data-i18n="prizes.title">Dodici modi per vincere.</h2>
+          <p class="lead" data-i18n="prizes.body">Trascina o clicca il mazzo. Perché non serve essere il più veloce per diventare leggenda.</p>
+          <div class="deck-controls">
+            <button class="icon-btn" type="button" data-deck-prev data-i18n-aria-label="prizes.prev" aria-label="Premio precedente">←</button>
+            <button class="icon-btn" type="button" data-deck-next data-i18n-aria-label="prizes.next" aria-label="Premio successivo">→</button>
+            <span class="deck-progress"><span data-deck-current>01</span> / 12 · <span data-i18n="prizes.drag">Trascina la carta</span></span>
+          </div>
+        </div>
+        <div class="prize-deck reveal" data-prize-deck aria-live="polite">
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 01</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-01"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">01</div><h3 data-i18n="prize.1">Più veloce Classic</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 02</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-02"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">02</div><h3 data-i18n="prize.2">Più veloce ART</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 03</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-03"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">03</div><h3 data-i18n="prize.3">Carruleddhi Show 2026</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 04</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-04"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">04</div><h3 data-i18n="prize.4">Carruleddhu più grande</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 05</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-05"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">05</div><h3 data-i18n="prize.5">Carruleddhu più simpatico</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 06</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-06"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">06</div><h3 data-i18n="prize.6">Esibizione Show</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 07</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-07"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">07</div><h3 data-i18n="prize.7">Show Classic</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 08</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-08"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">08</div><h3 data-i18n="prize.8">Pilota più giovane</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 09</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-09"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">09</div><h3 data-i18n="prize.9">Pilota più anziano</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 10</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-10"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">10</div><h3 data-i18n="prize.10">Più tecnologico</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 11</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-11"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">11</div><h3 data-i18n="prize.11">Più lento</h3></div>
+          </article>
+          <article class="prize-card" data-prize-card>
+            <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 12</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
+            <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-12"></use></svg></div>
+            <div class="prize-card__bottom"><div class="prize-card__number">12</div><h3 data-i18n="prize.12">Persona più Shardana</h3></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-card attendance" id="attendance" aria-labelledby="attendance-title" data-feature="attendance">
+      <div class="container">
+        <span class="eyebrow reveal" data-i18n="attendance.kicker">La tribuna prende vita</span>
+        <h2 class="section-title section-title--medium attendance__title reveal" id="attendance-title" data-i18n="attendance.title">Premi il grande pulsante. Fai salire il contatore.</h2>
+        <div class="attendance__counter reveal" data-attendee-count aria-live="polite">412</div>
+        <div class="attendance__label" data-i18n="attendance.label">persone hanno detto “ci sarò”</div>
+        <button class="attendance__press reveal" type="button" data-attendance-button><span data-i18n="attendance.press">CI SARÒ!</span></button>
+        <p class="attendance__hint" data-i18n="attendance.hint">Un clic per persona. Salviamo la scelta solo in questo browser finché non colleghi il database.</p>
+        <div class="avatar-stack" aria-hidden="true">
+          <span class="avatar">AM</span><span class="avatar">LG</span><span class="avatar">SR</span><span class="avatar">FC</span><span class="avatar">MB</span><span class="avatar">+407</span>
+        </div>
+        <button class="btn btn--yellow" type="button" data-open-reminder style="margin-top:28px" data-i18n="attendance.reminder">Vuoi anche un promemoria?</button>
+      </div>
+    </section>
+
+    <section class="section section-card signup" id="signup" aria-labelledby="signup-title" data-feature="registration">
+      <div class="container">
+        <div class="signup__head reveal">
+          <div>
+            <span class="eyebrow" data-i18n="signup.kicker">Iscrizione gratuita</span>
+            <h2 class="section-title section-title--medium" id="signup-title" data-i18n="signup.title">Tre passi. Poi sei in gara.</h2>
+          </div>
+          <p class="lead" data-i18n="signup.intro">Un modulo nuovo, semplice e leggibile. Il numero di partenza appare subito dopo l’invio.</p>
+        </div>
+
+        <div class="form-shell reveal" data-form-shell>
+          <nav class="form-sidebar" data-form-stepper aria-labelledby="registration-steps-title">
+            <h3 id="registration-steps-title" data-i18n="signup.sidebar">La tua corsa comincia qui.</h3>
+            <ol class="step-list" data-i18n-aria-label="stepper.label" aria-label="Fasi dell’iscrizione">
+              <li class="step-indicator is-active" data-step-indicator="1" aria-current="step">
+                <span class="step-indicator__number"><span class="step-indicator__digit">01</span><span class="step-indicator__check" aria-hidden="true">✓</span></span>
+                <div class="step-indicator__copy"><strong data-i18n="step.1">I tuoi dati</strong><small data-i18n="step.1sub">Chi guiderà</small></div>
+              </li>
+              <li class="step-indicator" data-step-indicator="2">
+                <span class="step-indicator__number"><span class="step-indicator__digit">02</span><span class="step-indicator__check" aria-hidden="true">✓</span></span>
+                <div class="step-indicator__copy"><strong data-i18n="step.2">Il carruleddhu</strong><small data-i18n="step.2sub">Come correrai</small></div>
+              </li>
+              <li class="step-indicator" data-step-indicator="3">
+                <span class="step-indicator__number"><span class="step-indicator__digit">03</span><span class="step-indicator__check" aria-hidden="true">✓</span></span>
+                <div class="step-indicator__copy"><strong data-i18n="step.3">Conferma</strong><small data-i18n="step.3sub">Regole e invio</small></div>
+              </li>
+            </ol>
+            <div class="stepper-sparks" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          </nav>
+
+          <div class="form-main">
+            <div class="form-progress" data-form-progress role="progressbar" aria-valuemin="1" aria-valuemax="3" aria-valuenow="1" aria-valuetext="Passaggio 1 di 3" data-i18n-aria-label="stepper.label" aria-label="Fasi dell’iscrizione">
+              <span class="form-progress__fill" data-form-progress-bar></span>
+              <span class="form-progress__runner" aria-hidden="true">✦</span>
+            </div>
+            <p class="sr-only" data-form-step-status aria-live="polite" aria-atomic="true"></p>
+            <form id="registration-form" data-registration-form novalidate>
+              <section class="form-step is-active" data-form-step="1" aria-labelledby="form-step-1-title">
+                <h3 id="form-step-1-title" tabindex="-1" data-i18n="form.1title">Prima conosciamoci.</h3>
+                <p class="form-step__intro" data-i18n="form.1intro">I dati servono per l’iscrizione, la liberatoria e le comunicazioni organizzative.</p>
+                <div class="form-grid">
+                  <div class="field" data-field><input id="first-name" name="firstName" type="text" autocomplete="given-name" placeholder=" " required><label for="first-name" data-i18n="form.firstName">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                  <div class="field" data-field><input id="last-name" name="lastName" type="text" autocomplete="family-name" placeholder=" " required><label for="last-name" data-i18n="form.lastName">Cognome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                  <div class="field field--date" data-field data-date-picker>
+                    <input id="birth-date" name="birthDate" type="date" autocomplete="bday" placeholder=" " min="1900-01-01" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" aria-describedby="birth-date-error" data-date-input required>
+                    <label for="birth-date" data-i18n="form.birthDate">Data di nascita *</label>
+                    <button class="date-trigger" type="button" data-date-trigger aria-haspopup="dialog" aria-expanded="false" aria-controls="birth-date-dialog" aria-describedby="birth-date-error" hidden>
+                      <span class="date-trigger__icon" aria-hidden="true"><span></span></span>
+                      <span class="date-trigger__copy"><small data-i18n="date.kicker">Data di nascita</small><strong data-date-value data-i18n="date.placeholder">GG · MM · AAAA</strong></span>
+                      <span class="date-trigger__arrow" aria-hidden="true">↗</span>
+                    </button>
+                    <span class="field__error" id="birth-date-error" data-date-error data-i18n="validation.required">Compila questo campo.</span>
+                  </div>
+                  <div class="field" data-field><input id="postal-code" name="postalCode" type="text" autocomplete="postal-code" inputmode="numeric" placeholder=" " minlength="4" maxlength="12" required><label for="postal-code" data-i18n="form.postalCode">CAP *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                  <div class="field" data-field><input id="reg-email" name="email" type="email" autocomplete="email" placeholder=" " required><label for="reg-email" data-i18n="form.email">E-mail *</label><span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span></div>
+                  <div class="field" data-field><input id="phone" name="phone" type="tel" autocomplete="tel" placeholder=" " required><label for="phone" data-i18n="form.phone">Telefono *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                  <div class="field field--full" data-field><input id="address" name="address" type="text" autocomplete="street-address" placeholder=" " required><label for="address" data-i18n="form.address">Indirizzo completo *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                </div>
+
+                <!-- Appears only when the birth date makes the rider under 18 ON THE DAY
+                     OF THE EVENT, not today. Somebody who turns 18 the week before the
+                     race is an adult at the start line, and a check against today's date
+                     would wrongly demand a guardian from them.
+
+                     `required` is added and removed by script together with the block.
+                     A hidden input that keeps `required` blocks the submit with a
+                     browser message pointing at something nobody can see — the classic
+                     "form does nothing when I press send". -->
+                <fieldset class="minor-box" data-minor-box hidden>
+                  <legend>
+                    <span class="minor-box__badge" aria-hidden="true">18−</span>
+                    <span data-i18n="minor.title">Iscrizione di un minore</span>
+                  </legend>
+                  <p class="minor-box__intro" data-minor-age data-i18n="minor.intro">Al momento della gara il pilota non sarà maggiorenne, quindi la liberatoria deve essere firmata da chi ne ha la responsabilità legale.</p>
+
+                  <div class="form-grid">
+                    <!-- Segmented pickers, not dropdowns.
+                         Three options each, so a dropdown hides two of them behind a
+                         tap for no reason. These are radio groups: the browser gives
+                         arrow-key navigation, tab order and screen-reader grouping for
+                         free, and the decoration is entirely in CSS on the labels.
+                         The submitted field names are unchanged. -->
+                    <div class="field--full">
+                      <fieldset class="pick" data-pick>
+                        <legend data-i18n="minor.kindLabel">Iscrivo *</legend>
+                        <div class="pick__row">
+                          <input class="pick__input" type="radio" name="childKind" id="child-kind-child" value="child" checked data-minor-pick>
+                          <label class="pick__opt" for="child-kind-child">
+                            <span class="pick__glyph" aria-hidden="true">👦👧</span>
+                            <span data-i18n="minor.kindChild">mio figlio o mia figlia</span>
+                          </label>
+                          <input class="pick__input" type="radio" name="childKind" id="child-kind-son" value="son" data-minor-pick>
+                          <label class="pick__opt" for="child-kind-son">
+                            <span class="pick__glyph" aria-hidden="true">👦</span>
+                            <span data-i18n="minor.kindSon">mio figlio</span>
+                          </label>
+                          <input class="pick__input" type="radio" name="childKind" id="child-kind-daughter" value="daughter" data-minor-pick>
+                          <label class="pick__opt" for="child-kind-daughter">
+                            <span class="pick__glyph" aria-hidden="true">👧</span>
+                            <span data-i18n="minor.kindDaughter">mia figlia</span>
+                          </label>
+                        </div>
+                      </fieldset>
+                    </div>
+
+                    <div class="field--full">
+                      <fieldset class="pick" data-pick>
+                        <legend data-i18n="minor.relationLabel">Chi firma *</legend>
+                        <div class="pick__row">
+                          <input class="pick__input" type="radio" name="guardianRelation" id="guardian-rel-mother" value="mother" checked data-minor-pick>
+                          <label class="pick__opt" for="guardian-rel-mother">
+                            <span class="pick__glyph" aria-hidden="true">👩</span>
+                            <span data-i18n="minor.relMother">Madre</span>
+                          </label>
+                          <input class="pick__input" type="radio" name="guardianRelation" id="guardian-rel-father" value="father" data-minor-pick>
+                          <label class="pick__opt" for="guardian-rel-father">
+                            <span class="pick__glyph" aria-hidden="true">👨</span>
+                            <span data-i18n="minor.relFather">Padre</span>
+                          </label>
+                          <input class="pick__input" type="radio" name="guardianRelation" id="guardian-rel-guardian" value="guardian" data-minor-pick>
+                          <label class="pick__opt" for="guardian-rel-guardian">
+                            <span class="pick__glyph" aria-hidden="true">🛡️</span>
+                            <span data-i18n="minor.relGuardian">Tutore legale</span>
+                          </label>
+                        </div>
+                      </fieldset>
+                    </div>
+                    <div class="field" data-field>
+                      <input id="guardian-name" name="guardianName" type="text" autocomplete="name" placeholder=" " data-minor-field>
+                      <label for="guardian-name" data-i18n="minor.guardianName">Nome e cognome di chi firma *</label>
+                      <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+                    </div>
+                    <div class="field" data-field>
+                      <input id="guardian-email" name="guardianEmail" type="email" autocomplete="email" placeholder=" " data-minor-field>
+                      <label for="guardian-email" data-i18n="minor.guardianEmail">E-mail di chi firma *</label>
+                      <span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span>
+                    </div>
+                    <div class="field" data-field>
+                      <input id="guardian-phone" name="guardianPhone" type="tel" autocomplete="tel" placeholder=" " data-minor-field>
+                      <label for="guardian-phone" data-i18n="minor.guardianPhone">Telefono di chi firma *</label>
+                      <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+                    </div>
+
+                    <div class="field" data-field>
+                      <input id="mother-name" name="motherName" type="text" placeholder=" ">
+                      <label for="mother-name" data-i18n="minor.motherName">Nome della madre (facoltativo)</label>
+                    </div>
+                    <div class="field" data-field>
+                      <input id="father-name" name="fatherName" type="text" placeholder=" ">
+                      <label for="father-name" data-i18n="minor.fatherName">Nome del padre (facoltativo)</label>
+                    </div>
+                  </div>
+
+                  <!-- Both parents are optional on purpose. Requiring two names would
+                       turn a single-parent family into an error message they cannot
+                       clear. The person who actually signs is the required one. -->
+                  <p class="minor-box__note" data-i18n="minor.note">Indica almeno chi firma. I nomi dei genitori sono facoltativi e servono solo alla liberatoria.</p>
+
+                  <label class="checkbox minor-box__consent">
+                    <input name="guardianConsent" type="checkbox" data-minor-consent>
+                    <span data-i18n="minor.consent">Dichiaro di essere il genitore o il tutore legale del pilota e autorizzo la sua partecipazione. *</span>
+                  </label>
+                  <p class="field__error" data-minor-consent-error data-i18n="minor.consentError">Serve l’autorizzazione di chi ha la responsabilità legale.</p>
+                </fieldset>
+
+                <div class="form-nav"><span></span><button class="btn btn--blue" type="button" data-form-next><span data-i18n="form.next">Continua</span><span aria-hidden="true">→</span></button></div>
+              </section>
+
+              <section class="form-step" data-form-step="2" aria-labelledby="form-step-2-title" hidden>
+                <h3 id="form-step-2-title" tabindex="-1" data-i18n="form.2title">Raccontaci il tuo mezzo.</h3>
+                <p class="form-step__intro" data-i18n="form.2intro">Scegli la categoria. Il controllo tecnico finale avverrà prima della partenza.</p>
+                <div class="field" data-field><input id="cart-name" name="cartName" type="text" placeholder=" " required><label for="cart-name" data-i18n="form.cartName">Nome del carruleddhu *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                <div class="choice-grid">
+                  <div class="choice">
+                    <input id="category-classic" name="category" type="radio" value="classic" checked>
+                    <label for="category-classic">
+                      <span class="choice__icon" aria-hidden="true">
+                        <svg viewBox="0 0 64 44" role="presentation">
+                          <path d="M11 28h42l-7-14-25-3z" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+                          <path d="M20 11 26 4h9l5 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                          <circle cx="19" cy="34" r="7" fill="none" stroke="currentColor" stroke-width="3"/>
+                          <circle cx="45" cy="34" r="7" fill="none" stroke="currentColor" stroke-width="3"/>
+                          <path d="M15 20h30" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                      </span>
+                      <span class="choice__copy"><strong data-i18n="form.classic">Classic</strong><small data-i18n="form.classicDesc">Legno, 4 ruote, stile tradizionale</small></span>
+                      <span class="choice__check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </label>
+                  </div>
+                  <div class="choice">
+                    <input id="category-art" name="category" type="radio" value="art">
+                    <label for="category-art">
+                      <span class="choice__icon" aria-hidden="true">
+                        <svg viewBox="0 0 64 44" role="presentation">
+                          <path d="M8 26c7-14 16-20 28-17 8 2 13 8 17 18z" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+                          <path d="M23 12c2-7 6-11 13-12l4 8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                          <circle cx="14" cy="33" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+                          <circle cx="32" cy="33" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+                          <circle cx="50" cy="33" r="6" fill="none" stroke="currentColor" stroke-width="3"/>
+                          <path d="M56 6l4 3-4 3-1-3z" fill="currentColor"/>
+                        </svg>
+                      </span>
+                      <span class="choice__copy"><strong data-i18n="form.art">ART</strong><small data-i18n="form.artDesc">Materiali e forma liberi</small></span>
+                      <span class="choice__check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </label>
+                  </div>
+                </div>
+                <div class="form-grid" style="margin-top:20px">
+                  <div class="field" data-field><input id="team-name" name="teamName" type="text" placeholder=" "><label for="team-name" data-i18n="form.team">Nome del team (facoltativo)</label></div>
+                  <div class="field" data-field><textarea id="cart-notes" name="cartNotes" placeholder=" "></textarea><label for="cart-notes" data-i18n="form.notes">Note sul mezzo (facoltative)</label></div>
+                </div>
+                <div class="form-nav"><button class="btn btn--outline" type="button" data-form-back><span aria-hidden="true">←</span><span data-i18n="form.back">Indietro</span></button><button class="btn btn--blue" type="button" data-form-next><span data-i18n="form.next">Continua</span><span aria-hidden="true">→</span></button></div>
+              </section>
+
+              <section class="form-step" data-form-step="3" aria-labelledby="form-step-3-title" hidden>
+                <h3 id="form-step-3-title" tabindex="-1" data-i18n="form.3title">Ultimo controllo.</h3>
+                <p class="form-step__intro" data-i18n="form.3intro">Leggi i documenti e conferma. Il regolamento ufficiale resta disponibile in fondo alla pagina.</p>
+                <div class="consent-box">
+                  <!-- One gate replaces the two mandatory checkboxes. The inputs stay in
+                       the form (same names, same payload) but are driven by the dialog. -->
+                  <input name="rulesConsent" type="checkbox" class="sr-only" tabindex="-1" aria-hidden="true" data-consent-input="rules">
+                  <input name="privacyConsent" type="checkbox" class="sr-only" tabindex="-1" aria-hidden="true" data-consent-input="privacy">
+
+                  <button class="consent-gate" type="button" data-consent-gate aria-haspopup="dialog" aria-controls="consent-dialog">
+                    <span class="consent-gate__fill" aria-hidden="true"></span>
+                    <span class="consent-gate__mark" aria-hidden="true">
+                      <svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    <span class="consent-gate__copy">
+                      <strong data-consent-gate-label data-i18n="consent.gateAction">Leggi e accetta il regolamento</strong>
+                      <small data-consent-gate-hint data-i18n="consent.gateHint">Obbligatorio per inviare l’iscrizione</small>
+                    </span>
+                    <span class="consent-gate__arrow" aria-hidden="true">↗</span>
+                  </button>
+
+                  <!-- Shown together with the guardian block in step 1, driven by the
+                       same check. A rider who is a minor has to be told here, at the
+                       moment of accepting, that the document is signed by someone else
+                       and that a different PDF arrives — not discover it in the inbox. -->
+                  <p class="consent-minor" data-minor-clause hidden>
+                    <strong data-i18n="minor.clauseTitle">Pilota minorenne</strong>
+                    <span data-i18n="minor.clauseBody">La liberatoria va firmata da chi ha la responsabilità legale. Riceverete per e-mail il modulo dedicato ai minori, con lo spazio per la firma del genitore o del tutore.</span>
+                  </p>
+
+                  <label class="checkbox"><input name="newsConsent" type="checkbox"><span data-i18n="form.newsConsent">Desidero ricevere aggiornamenti su future edizioni (facoltativo).</span></label>
+                </div>
+                <p class="field__error" data-consent-error data-i18n="validation.consentGate">Devi accettare il regolamento per inviare l’iscrizione.</p>
+                <div class="form-nav"><button class="btn btn--outline" type="button" data-form-back><span aria-hidden="true">←</span><span data-i18n="form.back">Indietro</span></button><button class="btn" type="submit"><span data-i18n="form.submit">Invia iscrizione</span><span aria-hidden="true">✓</span></button></div>
+              </section>
+            </form>
+
+            <!-- Thank-you screen. Shows the race number, says what will arrive and
+                 when, and then hands the form back on its own so the next person can
+                 sign up without hunting for a button. -->
+            <div class="form-success" data-form-success role="status">
+              <div>
+                <div class="race-number"><div><span data-i18n="success.number">Il tuo numero</span><strong data-race-number>039</strong></div></div>
+                <span class="eyebrow" data-i18n="success.kicker">Iscrizione ricevuta</span>
+                <h3 data-i18n="success.title">Grazie! Ci vediamo in discesa.</h3>
+                <p class="form-step__intro" data-i18n="success.body">Conferma e modulo PDF sono in arrivo per e-mail. Stampa e firma solo la copia in italiano.</p>
+
+                <ul class="success-plan" data-i18n-aria-label="success.planLabel" aria-label="Quando ti scriveremo">
+                  <li><b data-i18n="modal.time1">7 giorni prima</b><span data-i18n="success.plan7">Il promemoria con mappa e orari</span></li>
+                  <li><b data-i18n="modal.time2">1 giorno prima</b><span data-i18n="success.plan1">Ultimi dettagli e meteo</span></li>
+                  <li><b data-i18n="modal.time3">3 ore prima</b><span data-i18n="success.plan3">Ci vediamo alla Rena Bianca</span></li>
+                </ul>
+
+                <div class="hero__actions" style="justify-content:center"><button class="btn btn--blue" type="button" data-download-summary data-i18n="success.download">Scarica riepilogo</button><button class="btn btn--outline" type="button" data-new-registration data-i18n="success.new">Nuova iscrizione</button></div>
+                <p class="success-back" data-success-countdown aria-live="polite"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <dialog class="consent-dialog" id="consent-dialog" data-consent-dialog aria-labelledby="consent-dialog-title">
+          <div class="consent-dialog__surface">
+            <header class="consent-dialog__header">
+              <div>
+                <span class="eyebrow" data-i18n="consent.dialogKicker">Documenti ufficiali</span>
+                <h2 id="consent-dialog-title" data-i18n="consent.dialogTitle">Regolamento e privacy</h2>
+                <p data-i18n="consent.dialogLead">Scorri fino in fondo per sbloccare il pulsante di accettazione.</p>
+              </div>
+              <button class="consent-dialog__close" type="button" data-consent-close data-i18n-aria-label="consent.close" aria-label="Chiudi senza accettare"><span aria-hidden="true"></span></button>
+            </header>
+
+            <div class="consent-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-consent-progress data-i18n-aria-label="consent.progress" aria-label="Lettura">
+              <span class="consent-progress__fill" data-consent-progress-fill></span>
+            </div>
+
+            <div class="consent-dialog__body" data-consent-scroll tabindex="0">
+              <p class="consent-dialog__loading" data-consent-loading data-i18n="consent.loading">Carico i documenti…</p>
+              <div data-consent-content hidden></div>
+            </div>
+
+            <footer class="consent-dialog__footer">
+              <span class="consent-dialog__status" data-consent-status aria-live="polite" data-i18n="consent.scrollMore">Scorri fino in fondo</span>
+              <button class="btn consent-dialog__accept" type="button" data-consent-accept disabled>
+                <span class="consent-dialog__accept-fill" aria-hidden="true"></span>
+                <span data-i18n="consent.accept">Accetto regolamento e privacy</span>
+                <span aria-hidden="true">✓</span>
+              </button>
+            </footer>
+          </div>
+        </dialog>
+
+        <dialog class="date-dialog" id="birth-date-dialog" data-date-dialog aria-labelledby="birth-date-dialog-title">
+          <div class="date-dialog__surface" data-date-surface>
+            <header class="date-dialog__header">
+              <div><span class="eyebrow" data-i18n="date.kicker">Data di nascita</span><h2 id="birth-date-dialog-title" data-i18n="date.title">Scegli la tua data</h2></div>
+              <button class="date-dialog__close" type="button" data-date-close data-i18n-aria-label="date.close" aria-label="Chiudi il calendario"><span aria-hidden="true"></span></button>
+            </header>
+            <div class="date-calendar" data-date-calendar>
+              <div class="date-calendar__toolbar">
+                <button class="date-calendar__nav" type="button" data-date-prev data-i18n-aria-label="date.prevMonth" aria-label="Mese precedente"><span aria-hidden="true">←</span></button>
+                <div class="date-calendar__period">
+                  <strong data-date-month-title aria-live="polite"></strong>
+                  <!-- The native select stays as the accessible control; the year grid
+                       below writes to it, so one source of truth drives the calendar. -->
+                  <label class="sr-only" for="birth-date-year" data-i18n="date.year">Anno</label>
+                  <select class="sr-only" id="birth-date-year" data-date-year data-i18n-aria-label="date.year" aria-label="Anno"></select>
+                  <button class="date-calendar__year" type="button" data-date-year-toggle aria-expanded="false" aria-controls="birth-date-year-panel">
+                    <b data-date-year-label>2026</b>
+                    <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
+                <button class="date-calendar__nav" type="button" data-date-next data-i18n-aria-label="date.nextMonth" aria-label="Mese successivo"><span aria-hidden="true">→</span></button>
+              </div>
+              <div class="date-years" id="birth-date-year-panel" data-date-year-panel hidden>
+                <div class="date-years__head">
+                  <button class="date-calendar__nav" type="button" data-date-decade="-1" aria-label="−12"><span aria-hidden="true">←</span></button>
+                  <strong data-date-decade-label>—</strong>
+                  <button class="date-calendar__nav" type="button" data-date-decade="1" aria-label="+12"><span aria-hidden="true">→</span></button>
+                </div>
+                <div class="date-years__grid" data-date-year-grid></div>
+              </div>
+              <div class="date-calendar__weekdays" role="row" data-date-weekdays></div>
+              <div class="date-calendar__grid" role="grid" data-date-grid aria-labelledby="birth-date-dialog-title"></div>
+            </div>
+            <footer class="date-dialog__footer">
+              <button class="date-dialog__text-action" type="button" data-date-today data-i18n="date.today">Oggi</button>
+              <button class="date-dialog__text-action" type="button" data-date-clear data-i18n="date.clear">Cancella</button>
+              <button class="btn btn--blue" type="button" data-date-done data-i18n="date.done">Fatto</button>
+            </footer>
+          </div>
+        </dialog>
+      </div>
+    </section>
+
+    <section class="section section-card faq" id="faq" aria-labelledby="faq-title">
+      <div class="container faq__grid">
+        <div class="reveal">
+          <span class="eyebrow" data-i18n="faq.kicker">Prima di partire</span>
+          <h2 class="section-title section-title--medium" id="faq-title" data-i18n="faq.title">Domande frequenti.</h2>
+        </div>
+        <div class="accordion reveal" data-accordion>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="true"><span data-i18n="faq.q1">Chi può partecipare?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a1">Chi ha compiuto 18 anni, con modulo, liberatoria e documento. I minori partecipano con liberatoria firmata.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q2">Quanto costa?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a2">Nulla: l’iscrizione è completamente gratuita.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q3">Il carretto può avere un motore?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a3">No. Nessun motore o propulsione: si scende soltanto per gravità.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q4">Serve il casco?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a4">Sì, un casco omologato è obbligatorio.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q5">Come ricevo il numero di gara?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a5">Appare dopo l’iscrizione e arriverà via e-mail con il PDF dopo il collegamento Make.</p></div></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Public wall. Reads and writes through the Worker, which is the only thing
+         holding the Supabase key — a browser that can talk to the database
+         directly can also be told to delete from it. Everything shown here has
+         been approved in the admin panel; nothing appears the moment it is sent. -->
+    <section class="section section-card wall" id="wall" aria-labelledby="wall-title" data-feature="wall">
+      <div class="container wall__grid">
+        <div class="reveal">
+          <span class="eyebrow" data-i18n="wall.kicker">La bacheca</span>
+          <h2 class="section-title section-title--medium" id="wall-title" data-i18n="wall.title">Lasciate un segno.</h2>
+          <p class="lead" data-i18n="wall.body">Un ricordo, un incoraggiamento, il nome del vostro carruleddhu. I messaggi appaiono dopo una lettura veloce da parte nostra.</p>
+
+          <form class="wall-form" data-wall-form novalidate>
+            <div class="form-grid">
+              <div class="field" data-field>
+                <input id="wall-name" name="name" type="text" autocomplete="nickname" maxlength="40" placeholder=" " required>
+                <label for="wall-name" data-i18n="wall.name">Come ti chiami *</label>
+                <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+              </div>
+              <div class="field" data-field>
+                <input id="wall-place" name="place" type="text" autocomplete="address-level2" maxlength="40" placeholder=" ">
+                <label for="wall-place" data-i18n="wall.place">Da dove scrivi</label>
+              </div>
+              <div class="field field--full" data-field>
+                <textarea id="wall-message" name="message" maxlength="280" placeholder=" " required></textarea>
+                <label for="wall-message" data-i18n="wall.message">Il tuo messaggio *</label>
+                <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+              </div>
+            </div>
+
+            <!-- Radios, not buttons. A radio group is what a "pick one of five" control
+                 actually is, so arrow keys, tab order and screen readers all work
+                 without a line of script. The stars are drawn from the labels.
+
+                 FIVE FIRST, ONE LAST, ON PURPOSE. The row is laid out right-to-left in
+                 CSS, which flips this back to 1..5 on screen. That flip is what makes
+                 "light every star up to the one under the cursor" a single sibling
+                 selector instead of five hand-written rules: the lower stars are the
+                 ones that come after in the DOM. Reorder this and the picker inverts. -->
+            <fieldset class="wall-stars" data-wall-stars>
+              <legend data-i18n="wall.rate">Quanto ti piace l’idea?</legend>
+              <div class="wall-stars__row">
+                <input class="wall-stars__input" type="radio" name="rating" id="wall-star-5" value="5">
+                <label class="wall-stars__star" for="wall-star-5"><span class="sr-only" data-i18n="wall.star5">Cinque stelle</span></label>
+                <input class="wall-stars__input" type="radio" name="rating" id="wall-star-4" value="4">
+                <label class="wall-stars__star" for="wall-star-4"><span class="sr-only" data-i18n="wall.star4">Quattro stelle</span></label>
+                <input class="wall-stars__input" type="radio" name="rating" id="wall-star-3" value="3">
+                <label class="wall-stars__star" for="wall-star-3"><span class="sr-only" data-i18n="wall.star3">Tre stelle</span></label>
+                <input class="wall-stars__input" type="radio" name="rating" id="wall-star-2" value="2">
+                <label class="wall-stars__star" for="wall-star-2"><span class="sr-only" data-i18n="wall.star2">Due stelle</span></label>
+                <input class="wall-stars__input" type="radio" name="rating" id="wall-star-1" value="1">
+                <label class="wall-stars__star" for="wall-star-1"><span class="sr-only" data-i18n="wall.star1">Una stella</span></label>
+              </div>
+              <!-- Outside the row on purpose. Inside it, hovering this link would
+                   count as hovering the row and grey out the stars while a score was
+                   still selected. -->
+              <button class="wall-stars__clear" type="button" data-wall-stars-clear hidden data-i18n="wall.rateClear">azzera</button>
+            </fieldset>
+
+            <!-- The real input stays in the DOM and stays reachable by keyboard; only
+                 its box is hidden, because a native file button cannot be restyled. -->
+            <div class="wall-photo" data-wall-photo>
+              <input class="wall-photo__input" id="wall-file" name="photo" type="file" accept="image/jpeg,image/png,image/webp">
+              <label class="wall-photo__pick" for="wall-file">
+                <span class="wall-photo__icon" aria-hidden="true">＋</span>
+                <span data-i18n="wall.photoAdd">Aggiungi una foto</span>
+              </label>
+              <div class="wall-photo__preview" data-wall-photo-preview hidden>
+                <img alt="" data-wall-photo-image>
+                <button class="wall-photo__drop" type="button" data-wall-photo-clear aria-label="Rimuovi la foto">×</button>
+              </div>
+              <p class="wall-photo__hint" data-wall-photo-hint data-i18n="wall.photoHint">JPG, PNG o WEBP. La rimpiccioliamo nel browser prima di inviarla.</p>
+            </div>
+
+            <div class="wall-form__foot">
+              <span class="wall-form__count"><b data-wall-count>0</b>/280</span>
+              <button class="btn btn--yellow" type="submit" data-i18n="wall.send">Pubblica</button>
+            </div>
+            <div class="form-status" data-wall-status aria-live="polite"></div>
+          </form>
+        </div>
+
+        <div class="wall-board reveal" data-delay="1">
+          <div class="wall-score" data-wall-score hidden>
+            <b data-wall-score-value>0,0</b>
+            <span class="wall-score__stars" data-wall-score-stars aria-hidden="true"></span>
+            <span class="wall-score__votes" data-wall-score-votes></span>
+          </div>
+          <ol class="wall-list" data-wall-list aria-live="polite" aria-busy="true"></ol>
+          <p class="wall-empty" data-wall-empty hidden data-i18n="wall.empty">Ancora nessun messaggio. Il primo può essere il tuo.</p>
+          <button class="btn btn--outline wall-more" type="button" data-wall-more hidden data-i18n="wall.more">Mostra altri</button>
+        </div>
+      </div>
+
+      <!-- The wall is public and moderated, so a question posted here waits for
+           approval before anyone reads it. Anyone who actually wants an answer
+           belongs in the contact section, one jump away. -->
+      <div class="container">
+        <p class="wall-ask">
+          <span data-i18n="wall.askLead">Hai una domanda per gli organizzatori? La bacheca non è il posto giusto: le scrivi in pubblico e passano dal controllo.</span>
+          <a class="btn btn--small" href="#contact"><span data-i18n="wall.askCta">Scrivici direttamente</span><span aria-hidden="true">↘</span></a>
+        </p>
+      </div>
+
+      <!-- A native <dialog> rather than a div: showModal() gives the focus trap, the
+           backdrop and Escape for free, and all three are easy to get wrong by hand. -->
+      <dialog class="wall-lightbox" data-wall-lightbox aria-label="Foto">
+        <button class="wall-lightbox__close" type="button" data-wall-lightbox-close aria-label="Chiudi">×</button>
+        <figure class="wall-lightbox__figure">
+          <img alt="" data-wall-lightbox-image>
+          <figcaption data-wall-lightbox-caption></figcaption>
+        </figure>
+      </dialog>
+    </section>
+
+    <section class="section section-card contact" id="contact" aria-labelledby="contact-title">
+      <div class="container contact__grid">
+        <div class="reveal">
+          <span class="eyebrow" data-i18n="contact.kicker">Parliamone</span>
+          <h2 class="section-title section-title--medium" id="contact-title" data-i18n="contact.title">Una domanda? Scrivici.</h2>
+          <p class="lead" data-i18n="contact.body">Per iscrizioni di gruppo, stampa, partnership o qualsiasi dubbio organizzativo.</p>
+          <div class="contact__links"><a data-contact-email href="mailto:info@carruleddhishow.com">info@carruleddhishow.com</a><a data-contact-phone href="tel:+393284981574">+39 328 498 1574</a></div>
+        </div>
+        <div class="contact-card reveal" data-delay="1">
+          <h3 data-i18n="contact.formTitle">Messaggio veloce</h3>
+          <form data-contact-form novalidate>
+            <div class="form-grid">
+              <div class="field" data-field><input id="contact-name" name="name" type="text" autocomplete="name" placeholder=" " required><label for="contact-name" data-i18n="contact.name">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+              <div class="field" data-field><input id="contact-email" name="email" type="email" autocomplete="email" placeholder=" " required><label for="contact-email" data-i18n="contact.email">E-mail *</label><span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span></div>
+              <div class="field field--full" data-field><textarea id="contact-message" name="message" placeholder=" " required></textarea><label for="contact-message" data-i18n="contact.message">Il tuo messaggio *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+            </div>
+            <button class="btn" type="submit" style="margin-top:22px" data-i18n="contact.send">Invia messaggio</button>
+            <div class="form-status" data-contact-status aria-live="polite"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <nav class="quick-actions" data-quick-actions aria-label="Azioni rapide" data-i18n-aria-label="quick.label">
+      <button class="quick-action quick-action--attend" type="button" data-quick-attend data-feature-link="attendance" aria-pressed="false">
+        <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span data-attendance-quick-label data-i18n="quick.attend">Ci sarò</span>
+      </button>
+      <a class="quick-action quick-action--signup" href="#signup" data-feature-link="registration">
+        <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+        <span data-i18n="quick.signup">Iscriviti</span>
+      </a>
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer__top">
+        <div>
+          <div class="footer__brand">CARRULEDDHI<br><span>SHOW 2026</span></div>
+          <p class="footer__copy" data-i18n="footer.copy">Una discesa, un paese, una storia costruita a mano.</p>
+        </div>
+        <div class="footer__group">
+          <h3 data-i18n="footer.explore">Esplora</h3>
+          <div class="footer__links"><a href="#story" data-i18n="nav.race">La gara</a><a href="#categories" data-i18n="nav.categories">Categorie</a><a href="#route" data-i18n="nav.route">Percorso</a><a href="#gallery" data-i18n="nav.gallery" data-feature-link="gallery">Galleria</a><a href="#signup" data-i18n="nav.signup" data-feature-link="registration">Iscriviti</a><a href="#contact" data-i18n="nav.contact">Contatti</a></div>
+        </div>
+        <div class="footer__group">
+          <h3 data-i18n="footer.legal">Informazioni legali</h3>
+          <div class="footer__links"><a href="privacy.html" data-i18n="footer.privacy">Privacy policy</a><a href="cookies.html" data-i18n="footer.cookies">Cookie policy</a><a href="regolamento.html" data-i18n="footer.rules">Regolamento evento</a><button type="button" data-cookie-settings data-i18n="footer.cookieSettings">Impostazioni cookie</button></div>
+        </div>
+      </div>
+      <div class="footer__bottom"><span>© <span data-current-year>2026</span> Carruleddhi Show · Santa Teresa Gallura</span><span data-i18n="footer.credit">Progetto digitale Carruleddhi Show</span></div>
+    </div>
+
+    <!-- Blurred rainbow pinned to the bottom of the viewport. It rises out of the
+         floor over the last stretch of scroll and is at full height exactly when
+         you hit the end of the page. Nine blurred columns in one inline SVG: no
+         canvas, no scroll spacer, and the blur is baked into a static filter so it
+         is rasterised once instead of every frame. app.js only writes scaleY.
+
+         Colours follow the Dia-browser style gradient from the reference: dark
+         ember on the floor through blue, near-white, yellow, red-orange and
+         magenta to transparent pink at the top. -->
+    <div class="footer-glow" data-footer-glow aria-hidden="true">
+      <svg viewBox="0 0 1271 599" preserveAspectRatio="none" focusable="false">
+        <defs>
+          <linearGradient id="footer-glow-grad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#340B05"/>
+            <stop offset="0.1827" stop-color="#0358F7"/>
+            <stop offset="0.2837" stop-color="#5092C7"/>
+            <stop offset="0.4135" stop-color="#E1ECFE"/>
+            <stop offset="0.5866" stop-color="#FFD400"/>
+            <stop offset="0.6827" stop-color="#FA3D1D"/>
+            <stop offset="0.8029" stop-color="#FD02F5"/>
+            <stop offset="1" stop-color="#FFC0FD" stop-opacity="0"/>
+          </linearGradient>
+          <!-- Heavier blur than the reference: at 15 the nine columns still read as
+               separate bars with visible shoulders. At 34 they melt into one band. -->
+          <filter id="footer-glow-blur" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="34"/>
+          </filter>
+        </defs>
+        <!-- One group per column so each can breathe on its own clock. Nine hard
+             rectangles read as a bar chart no matter how much blur is on top, so
+             each column is a rounded-top capsule and rises and falls slowly with a
+             different period. Only transform is animated — the blur filter is
+             rasterised once. -->
+        <g filter="url(#footer-glow-blur)" fill="url(#footer-glow-grad)">
+          <g class="footer-glow__col" style="--i:0"><rect x="-30"  y="269" width="200" height="360" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:1"><rect x="111"  y="185" width="200" height="444" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:2"><rect x="252"  y="120" width="200" height="509" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:3"><rect x="393"  y="74"  width="200" height="555" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:4"><rect x="534"  y="12"  width="200" height="617" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:5"><rect x="675"  y="74"  width="200" height="555" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:6"><rect x="816"  y="120" width="200" height="509" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:7"><rect x="957"  y="185" width="200" height="444" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:8"><rect x="1098" y="269" width="200" height="360" rx="100"/></g>
+        </g>
+      </svg>
+    </div>
+  </footer>
+
+  <div class="modal" data-reminder-modal aria-hidden="true">
+    <button class="modal__backdrop" type="button" data-close-reminder tabindex="-1" aria-label="Close modal"></button>
+    <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reminder-title">
+      <button class="icon-btn modal__close" type="button" data-close-reminder aria-label="Chiudi">×</button>
+      <div class="modal__form" data-reminder-form-view>
+        <div class="modal__icon" aria-hidden="true">✦</div>
+        <h2 id="reminder-title" data-i18n="modal.title">Ci sarai? Ti ricordiamo noi quando partire.</h2>
+        <p class="modal__lead" data-i18n="modal.lead">Lascia nome ed e-mail. Riceverai solo tre promemoria relativi all’evento, niente spam.</p>
+        <div class="reminder-times"><span data-i18n="modal.time1">7 giorni prima</span><span data-i18n="modal.time2">1 giorno prima</span><span data-i18n="modal.time3">3 ore prima</span></div>
+        <form data-reminder-form novalidate>
+          <div class="form-grid">
+            <div class="field" data-field><input id="reminder-name" name="name" type="text" autocomplete="given-name" placeholder=" " required><label for="reminder-name" data-i18n="modal.name">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+            <div class="field" data-field><input id="reminder-email" name="email" type="email" autocomplete="email" placeholder=" " required><label for="reminder-email" data-i18n="modal.email">E-mail *</label><span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span></div>
+          </div>
+          <!-- The consent checkbox is driven by the same scroll-to-the-end dialog the
+               signup form uses, not by a link to another page. A new tab loses the
+               half-filled form behind it and hands back a document with no way to
+               agree to it. The checkbox itself stays in the form, so the payload and
+               the required-field validation are unchanged. -->
+          <div class="consent-box">
+            <input name="consent" type="checkbox" class="sr-only" tabindex="-1" aria-hidden="true" data-reminder-consent-input required>
+            <button class="consent-gate consent-gate--compact" type="button" data-reminder-consent-gate aria-haspopup="dialog" aria-controls="consent-dialog">
+              <span class="consent-gate__fill" aria-hidden="true"></span>
+              <span class="consent-gate__mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <span class="consent-gate__copy">
+                <strong data-reminder-consent-label data-i18n="consent.gateAction">Leggi e accetta il regolamento</strong>
+                <small data-i18n="modal.consent">Accetto l’informativa privacy e l’invio dei tre promemoria. *</small>
+              </span>
+              <span class="consent-gate__arrow" aria-hidden="true">↗</span>
+            </button>
+          </div>
+          <p class="field__error" data-reminder-consent-error data-i18n="validation.consent">Per continuare devi accettare i consensi obbligatori.</p>
+          <button class="btn" type="submit" style="width:100%;margin-top:22px" data-i18n="modal.send">Sì, avvisami</button>
+        </form>
+      </div>
+      <div class="modal__success" data-reminder-success role="status">
+        <div class="success-check" aria-hidden="true">✓</div>
+        <h2 data-i18n="modal.successTitle">Fatto. Sei nella lista!</h2>
+        <p class="modal__lead" data-i18n="modal.successBody">Quando Make.com sarà collegato, i tre promemoria arriveranno automaticamente a questo indirizzo.</p>
+        <button class="btn btn--blue" type="button" data-close-reminder data-i18n="a11y.close">Chiudi</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="cookie-banner" data-cookie-banner aria-labelledby="cookie-title">
+    <h2 id="cookie-title" data-i18n="cookies.title">Cookie, ma solo quelli utili.</h2>
+    <p><span data-i18n="cookies.text">Usiamo cookie tecnici per ricordare lingua, presenza e preferenze. Gli analitici partono solo dopo il tuo consenso.</span> <a href="cookies.html" data-i18n="footer.cookies">Cookie policy</a></p>
+    <div class="cookie-settings" data-cookie-panel>
+      <div class="cookie-option"><div><strong data-i18n="cookies.necessary">Necessari</strong><small data-i18n="cookies.necessaryDesc">Sempre attivi: fanno funzionare il sito.</small></div><label class="switch"><input type="checkbox" checked disabled><span></span></label></div>
+      <div class="cookie-option"><div><strong data-i18n="cookies.analytics">Analitici</strong><small data-i18n="cookies.analyticsDesc">Statistiche anonime sulle visite.</small></div><label class="switch"><input type="checkbox" data-cookie-analytics><span></span></label></div>
+    </div>
+    <div class="cookie-actions">
+      <button class="btn btn--yellow btn--small" type="button" data-cookie-accept data-i18n="cookies.accept">Accetta tutti</button>
+      <button class="btn btn--outline btn--small" type="button" data-cookie-reject data-i18n="cookies.reject">Solo necessari</button>
+      <button class="btn btn--outline btn--small" type="button" data-cookie-customize data-i18n="cookies.settings">Personalizza</button>
+      <button class="btn btn--yellow btn--small" type="button" data-cookie-save hidden data-i18n="cookies.save">Salva preferenze</button>
+    </div>
+  </aside>
+
+  <div class="toast" data-toast role="status" aria-live="polite"></div>
+
+  <script>
+    window.CARRULEDDHI_CONFIG = {
+      eventName: 'Carruleddhi Show 2026',
+      eventDate: '2026-10-17T14:30:00+02:00',
+      dateLabel: '17 ottobre 2026 · Santa Teresa Gallura',
+      tagline: 'Nessun motore. Solo la discesa.',
+      pilotsBase: 0,
+      attendeesBase: 0,
+      route: {
+        distance: 'circa 250 m',
+        road: 'Via Giuseppe Verdi',
+        mapUrl: 'https://maps.app.goo.gl/MZLJyzTH3tC93Pm86',
+        width: { near: 10, far: 2 },
+        path: [
+          { x: 1, y: 0.5892 },
+          { x: 0.7176, y: 0.8178 },
+          { x: 0.5044, y: 0.9532 },
+          { x: 0.4308, y: 0.7809 },
+          { x: 0.4099, y: 0.5998 }
+        ]
+      },
+      contact: { email: 'info@carruleddhishow.com', phone: '+39 328 498 1574' },
+      media: {
+        routeImage: '/assets/images/zjazd.png',
+        galleryImages: [
+          '/assets/images/gallery-start.svg',
+          '/assets/images/gallery-race.svg',
+          '/assets/images/gallery-craft.svg',
+          '/assets/images/gallery-crowd.svg',
+          '/assets/images/gallery-finish.svg'
+        ]
+      },
+      features: { gallery: true, attendance: true, registration: true, wall: true },
+      // Same-origin paths, never a webhook URL. The Worker serves this site and
+      // answers /api/carruleddhi/* itself, so there is no cross-origin request and
+      // no secret in the page. site-config.js rejects anything that is not a path
+      // beginning /api/carruleddhi/ — see section 8 of INSTRUKCJA.md.
+      endpoints: {
+        registration: '/api/carruleddhi/registration',
+        reminder: '/api/carruleddhi/reminder',
+        attendance: '/api/carruleddhi/attendance',
+        counts: '/api/carruleddhi/counts',
+        contact: '/api/carruleddhi/contact',
+        wall: '/api/carruleddhi/wall'
+      }
+    };
+  </script>
+  <script type="module">
+    import './assets/js/i18n.js';
+    import './assets/js/form-experience.js';
+    import './assets/js/app.js';
+  </script>
+</body>
+</html>

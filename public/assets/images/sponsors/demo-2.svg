@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder sponsor mark. Neutral on purpose: swap the file, keep the path. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 72" role="img" aria-label="Esempio sponsor 2">
+  <path d="M8 52 26 18l18 34z" fill="none" stroke="#071a3d" stroke-width="6" stroke-linejoin="round"/>
+  <text x="58" y="47" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="-1" fill="#071a3d">Verdi</text>
+  <rect x="58" y="53" width="70" height="5" rx="2.5" fill="#f6494f"/>
+</svg>

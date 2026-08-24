@@ -1,0 +1,2032 @@
+/* Carruleddhi 2026 experience layer — the final source of truth for page rhythm. */
+:root {
+  --section-card-radius: clamp(30px, 4.4vw, 62px);
+  --section-card-overlap: clamp(30px, 4.6vw, 68px);
+  --section-card-pad: clamp(78px, 9svh, 126px);
+  --header-clearance: 92px;
+}
+
+#main {
+  position: relative;
+  isolation: isolate;
+  background: var(--navy-950);
+}
+
+/* Stacked panels: every section pins at the top and the next one slides over it.
+   #main is the sticky containing block, so panels pile up in z-order.
+   app.js adds data-panel="flow" to any section taller than the viewport; those
+   scroll normally but still travel over the panel underneath. */
+#main > section.section-card {
+  position: sticky;
+  top: 0;
+  display: grid;
+  min-height: 100svh;
+  height: auto;
+  align-content: center;
+  margin-top: 0;
+  padding-block: var(--section-card-pad);
+  overflow: hidden;
+  border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;
+  box-shadow:
+    0 -26px 70px rgba(7, 26, 61, .26),
+    0 4px 0 rgba(255, 255, 255, .16) inset;
+  scroll-margin-top: 0;
+}
+
+#main > section.section-card[data-panel='flow'] {
+  position: relative;
+  top: auto;
+  min-height: 100svh;
+  align-content: start;
+  overflow: visible;
+}
+
+#main > section.section-card--hero {
+  min-height: 100svh;
+  padding-top: clamp(126px, 15svh, 170px);
+  padding-bottom: clamp(118px, 14svh, 152px);
+  border-radius: 0;
+}
+
+#main > section:nth-of-type(1) { z-index: 1; }
+#main > section:nth-of-type(2) { z-index: 2; }
+#main > section:nth-of-type(3) { z-index: 3; }
+#main > section:nth-of-type(4) { z-index: 4; }
+#main > section:nth-of-type(5) { z-index: 5; }
+#main > section:nth-of-type(6) { z-index: 6; }
+#main > section:nth-of-type(7) { z-index: 7; }
+#main > section:nth-of-type(8) { z-index: 8; }
+#main > section:nth-of-type(9) { z-index: 9; }
+#main > section:nth-of-type(10) { z-index: 10; }
+#main > section:nth-of-type(11) { z-index: 11; }
+
+#main > section.section-card > .container {
+  width: var(--page);
+  min-width: 0;
+}
+
+.hero__marquee {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  bottom: 24px;
+  left: 0;
+  margin: 0;
+  transform: rotate(-1deg) scale(1.025);
+}
+
+/* Sections with their own sticky children can never be sticky panels themselves,
+   otherwise the inner scroll gets trapped. They are flow sections by definition. */
+#categories,
+#gallery,
+#prizes,
+#signup {
+  position: relative !important;
+  top: auto !important;
+  align-content: start;
+  overflow: visible;
+}
+#gallery,
+#prizes { overflow: clip; }
+
+/* A later panel always paints over sticky descendants of the previous one. */
+#main > section.section-card { isolation: isolate; }
+
+.site-footer {
+  position: relative;
+  z-index: 20;
+  margin-top: 0;
+  padding-top: 78px;
+  border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;
+  box-shadow: 0 -26px 70px rgba(7, 26, 61, .3);
+}
+
+@media (max-width: 1050px) {
+  :root {
+    --section-card-overlap: clamp(24px, 4vw, 42px);
+    --section-card-pad: clamp(76px, 9svh, 104px);
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --section-card-radius: 30px;
+    --section-card-overlap: 18px;
+    --section-card-pad: clamp(72px, 10svh, 94px);
+    --header-clearance: 74px;
+  }
+
+  #main > section.section-card {
+    min-height: 100svh;
+    margin-top: 0;
+    padding-block: var(--section-card-pad);
+    border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;
+  }
+
+  #main > section.section-card--hero {
+    min-height: 100svh;
+    padding-top: 108px;
+    padding-bottom: 96px;
+    border-radius: 0;
+  }
+
+  .site-footer { padding-top: 66px; }
+}
+
+@media (max-width: 420px) {
+  :root { --section-card-radius: 26px; }
+}
+
+@media print {
+  #main { background: #fff; }
+  #main > section.section-card,
+  #main > section.section-card--hero {
+    position: static !important;
+    display: block;
+    min-height: 0;
+    margin-top: 0;
+    padding: 24px 0;
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .hero__marquee { position: static; }
+  .site-footer { margin-top: 0; border-radius: 0; }
+}
+
+
+/* Adaptive event header — expanded at the top, compact event pill after scroll. */
+.site-header {
+  top: 18px;
+  width: min(1120px, calc(100vw - 28px));
+  transform: translateX(-50%);
+  transition:
+    width .56s var(--ease-out),
+    top .4s var(--ease-out),
+    transform .4s var(--ease-out);
+}
+.site-header.is-hidden { transform: translateX(-50%); }
+.site-header .nav-shell {
+  position: relative;
+  overflow: visible;
+  min-height: 72px;
+  padding: 9px 10px 9px 22px;
+  border-color: rgba(255, 255, 255, .22);
+  background: rgba(7, 26, 61, .9);
+  box-shadow: 0 18px 46px rgba(7, 26, 61, .25);
+  transition:
+    min-height .5s var(--ease-out),
+    padding .5s var(--ease-out),
+    border-radius .5s var(--ease-out),
+    background .35s ease,
+    box-shadow .35s ease;
+}
+.site-header .brand {
+  min-width: 150px;
+  transition: min-width .5s var(--ease-out), transform .5s var(--ease-out);
+}
+.site-header .brand__name,
+.site-header .brand__date { transition: font-size .4s var(--ease-out), opacity .25s ease; }
+.site-header .nav-current,
+.site-header .nav-attend,
+.site-header .language-picker {
+  transition:
+    max-width .42s var(--ease-out),
+    min-width .42s var(--ease-out),
+    opacity .24s ease,
+    transform .42s var(--ease-out),
+    visibility .24s;
+}
+
+.site-header.is-compact { width: min(292px, calc(100vw - 20px)); }
+.site-header.is-compact .nav-shell {
+  min-height: 62px;
+  gap: 7px;
+  padding: 6px 7px 6px 17px;
+  background: rgba(7, 26, 61, .95);
+  box-shadow: 0 15px 38px rgba(7, 26, 61, .3);
+}
+.site-header.is-compact .brand {
+  min-width: 0;
+  flex: 1;
+}
+.site-header.is-compact .nav-current,
+.site-header.is-compact .nav-attend,
+.site-header.is-compact .language-picker {
+  overflow: hidden;
+  max-width: 0;
+  min-width: 0;
+  padding-inline: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-8px) scale(.92);
+}
+.site-header.is-compact .nav-actions { gap: 0; }
+.site-header.is-compact .menu-toggle {
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+  padding: 0;
+  border-radius: 50%;
+}
+.site-header.is-compact .menu-toggle__label { display: none; }
+.site-header.is-menu-open {
+  width: min(1120px, calc(100vw - 28px));
+  transform: translateX(-50%);
+}
+.site-header.is-menu-open .nav-shell {
+  border-color: rgba(255, 255, 255, .28);
+  border-radius: 32px 32px 18px 18px;
+  background: rgba(7, 26, 61, .98);
+  box-shadow: 0 10px 32px rgba(2, 10, 28, .2);
+}
+
+/* Flag language listbox. */
+.language-picker {
+  position: relative;
+  z-index: 4;
+  flex: none;
+}
+.language-picker__trigger {
+  display: inline-flex;
+  min-width: 78px;
+  height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 999px;
+  background: rgba(29, 68, 126, .72);
+  color: var(--white);
+  font-family: var(--font-meta);
+  font-weight: 800;
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: border-color .25s ease, background .25s ease, transform .3s var(--ease-out);
+}
+.language-picker__trigger:hover,
+.language-picker.is-open .language-picker__trigger {
+  border-color: rgba(255, 201, 40, .82);
+  background: rgba(48, 94, 164, .92);
+  transform: translateY(-2px);
+}
+.language-picker__flag { font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif; font-size: 20px; line-height: 1; }
+.language-picker__code { font-size: 11px; }
+.language-picker__trigger svg {
+  width: 10px;
+  flex: none;
+  transition: transform .3s var(--ease-out);
+}
+/* The chevron used to spin 180deg when the list opened. It sits right next to the
+   flag, so the whole control read as "the flag turned over" on every click — which
+   is the one thing a language switch should not look like. Open state is now shown
+   by the ring and the lift on the trigger above, plus the tick in the list. */
+.language-picker.is-open .language-picker__trigger svg { opacity: .55; }
+.language-picker__menu {
+  position: absolute;
+  top: calc(100% + 13px);
+  right: 0;
+  display: grid;
+  width: min(306px, calc(100vw - 32px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 24px;
+  background: rgba(7, 26, 61, .98);
+  color: var(--white);
+  box-shadow: 0 24px 70px rgba(2, 10, 28, .44);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-10px) scale(.94);
+  transform-origin: top right;
+  backdrop-filter: blur(24px) saturate(1.35);
+  transition:
+    opacity .24s ease,
+    transform .38s var(--ease-out),
+    visibility 0s linear .38s;
+}
+.language-picker__menu.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity .24s ease,
+    transform .38s var(--ease-out),
+    visibility 0s linear 0s;
+}
+.language-picker__menu [role="option"] {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 11px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .055);
+  color: rgba(255, 255, 255, .82);
+  text-align: left;
+  cursor: pointer;
+  transition: color .22s ease, background .22s ease, transform .28s var(--ease-out);
+}
+.language-picker__menu [role="option"] > span { font-family: "Segoe UI Emoji", "Apple Color Emoji", sans-serif; font-size: 21px; }
+.language-picker__menu [role="option"] strong {
+  overflow: hidden;
+  font-family: var(--font-meta);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.language-picker__menu [role="option"] small { color: var(--blue-200); font-family: var(--font-meta); font-size: 9px; letter-spacing: .08em; }
+.language-picker__menu [role="option"]:hover,
+.language-picker__menu [role="option"]:focus-visible { background: rgba(255, 255, 255, .13); color: var(--white); transform: translateY(-2px); }
+.language-picker__menu [role="option"][aria-selected="true"] {
+  background: var(--yellow);
+  color: var(--navy-950);
+}
+.language-picker__menu [role="option"][aria-selected="true"] small { color: var(--navy-800); }
+
+/* Three-line menu icon and connected full-screen expansion. */
+.menu-toggle__icon { width: 20px; height: 14px; }
+.menu-toggle__icon span {
+  top: 6px;
+  opacity: 1;
+  transform-origin: center;
+  transition: top .34s var(--ease-out), transform .34s var(--ease-out), opacity .2s ease;
+}
+.menu-toggle__icon span:nth-child(1) { top: 1px; }
+.menu-toggle__icon span:nth-child(2) { top: 6px; }
+.menu-toggle__icon span:nth-child(3) { top: 11px; }
+.menu-toggle.is-open .menu-toggle__icon span:nth-child(1) { top: 6px; transform: rotate(45deg); }
+.menu-toggle.is-open .menu-toggle__icon span:nth-child(2) { opacity: 0; transform: scaleX(.2); }
+.menu-toggle.is-open .menu-toggle__icon span:nth-child(3) { top: 6px; transform: rotate(-45deg); }
+.mobile-nav {
+  inset: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  clip-path: inset(0 0 100% 0 round 0 0 46px 46px);
+  transition: clip-path .72s var(--ease-out), opacity .28s ease, visibility .72s;
+}
+.mobile-nav.is-open { clip-path: inset(0 round 0); }
+
+/* Letter-change atmosphere: old copy dissolves, new copy returns from blur. */
+#main,
+.site-footer,
+.mobile-nav .menu-panel__inner,
+.nav-current__copy {
+  transition: filter .3s var(--ease-out), opacity .25s ease;
+}
+body.is-language-transitioning #main,
+body.is-language-transitioning .site-footer,
+body.is-language-transitioning .mobile-nav .menu-panel__inner,
+body.is-language-transitioning .nav-current__copy {
+  opacity: .48;
+  filter: blur(11px) saturate(.72);
+}
+
+@media (max-width: 760px) {
+  .site-header { top: 10px; width: calc(100vw - 20px); }
+  .site-header .nav-shell { min-height: 64px; gap: 8px; padding: 7px 8px 7px 15px; }
+  .site-header .brand { min-width: 112px; margin-right: auto; }
+  .site-header .brand__name { font-size: 15px; }
+  .site-header .brand__date {
+    display: block !important;
+    margin-top: 3px;
+    font-size: 8px;
+    letter-spacing: .13em;
+  }
+  .site-header .nav-current { display: none; }
+  .site-header .nav-actions { gap: 6px; }
+  .language-picker__trigger { width: 68px; min-width: 68px; height: 50px; gap: 5px; padding-inline: 8px; }
+  .language-picker__flag { font-size: 19px; }
+  .language-picker__trigger svg { width: 8px; }
+  .menu-toggle {
+    width: 50px;
+    min-width: 50px;
+    height: 50px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .menu-toggle__label { display: none; }
+  .site-header.is-compact { width: min(254px, calc(100vw - 20px)); }
+  .site-header.is-compact .nav-shell { min-height: 60px; padding: 5px 6px 5px 15px; }
+  .site-header.is-menu-open { width: calc(100vw - 20px); }
+  .site-header.is-menu-open .nav-shell { border-radius: 25px 25px 14px 14px; }
+  .language-picker__menu {
+    position: fixed;
+    top: 81px;
+    right: 10px;
+    width: min(306px, calc(100vw - 20px));
+  }
+  .mobile-nav { padding: 91px 14px 24px; }
+}
+
+@media (max-width: 380px) {
+  .site-header:not(.is-compact) .brand { min-width: 103px; }
+  .site-header:not(.is-compact) .brand__date { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .language-picker__trigger { width: 63px; min-width: 63px; }
+  .language-picker__code { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.is-language-transitioning #main,
+  body.is-language-transitioning .site-footer,
+  body.is-language-transitioning .mobile-nav .menu-panel__inner,
+  body.is-language-transitioning .nav-current__copy { opacity: 1; filter: none; }
+}
+
+
+/* Registration cockpit: accessible stepper and progressively enhanced birth-date picker. */
+.form-shell {
+  --form-step-progress: 33.333%;
+  position: relative;
+  border: 1px solid rgba(7, 26, 61, .08);
+  box-shadow: 0 38px 110px rgba(7, 26, 61, .2);
+}
+.form-sidebar {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 91%, rgba(255, 201, 40, .3) 0 9%, transparent 9.4%),
+    radial-gradient(circle at 118% -4%, rgba(246, 73, 79, .32) 0 26%, transparent 26.5%),
+    linear-gradient(155deg, var(--navy-950), var(--blue-700));
+}
+.form-sidebar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: .18;
+  background: repeating-linear-gradient(118deg, transparent 0 28px, rgba(255, 255, 255, .18) 29px 30px);
+  pointer-events: none;
+}
+.form-sidebar::after { z-index: -1; }
+.form-sidebar h3 { max-width: 8ch; font-weight: 820; letter-spacing: -.035em; }
+.step-list {
+  isolation: isolate;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step-list::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: 21px;
+  bottom: 21px;
+  left: 20px;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--yellow) 0 var(--form-step-progress), rgba(255, 255, 255, .17) var(--form-step-progress) 100%);
+}
+.step-indicator {
+  position: relative;
+  min-width: 0;
+  opacity: .46;
+  transition: opacity .35s ease, transform .55s var(--ease-out);
+}
+.step-indicator__number {
+  position: relative;
+  overflow: hidden;
+  border-width: 1px;
+  background: rgba(255, 255, 255, .08);
+  box-shadow: 0 0 0 7px rgba(255, 255, 255, .035);
+  transition: color .3s ease, border-color .3s ease, background .3s ease, box-shadow .45s ease, transform .55s var(--ease-snap);
+}
+.step-indicator__digit,
+.step-indicator__check {
+  grid-area: 1 / 1;
+  font-weight: 850;
+  transition: opacity .25s ease, transform .45s var(--ease-snap);
+}
+.step-indicator__digit { font-size: 15px; }
+.step-indicator__check { opacity: 0; transform: translateY(16px) rotate(-28deg) scale(.4); }
+.step-indicator.is-active { transform: translateX(9px); }
+.step-indicator.is-active .step-indicator__number {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--navy-950);
+  box-shadow: 0 0 0 8px rgba(255, 201, 40, .14), 0 12px 26px rgba(0, 0, 0, .2);
+  transform: rotate(-7deg) scale(1.08);
+}
+.step-indicator.is-complete .step-indicator__number {
+  border-color: #67d8a2;
+  background: #1fbf78;
+  color: var(--white);
+}
+.step-indicator.is-complete .step-indicator__digit { opacity: 0; transform: translateY(-15px) rotate(24deg) scale(.5); }
+.step-indicator.is-complete .step-indicator__check { opacity: 1; transform: none; }
+.step-indicator__copy { min-width: 0; }
+.step-indicator__copy strong { line-height: 1.15; }
+.step-indicator__copy small { line-height: 1.35; }
+.stepper-sparks { position: absolute; z-index: -1; inset: 0; pointer-events: none; }
+.stepper-sparks i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 0 5px rgba(255, 201, 40, .09);
+  animation: stepper-drift 5.2s ease-in-out infinite;
+}
+.stepper-sparks i:nth-child(1) { top: 15%; right: 13%; }
+.stepper-sparks i:nth-child(2) { top: 46%; right: 24%; width: 3px; height: 3px; animation-delay: -1.4s; }
+.stepper-sparks i:nth-child(3) { right: 9%; bottom: 19%; animation-delay: -2.7s; }
+.stepper-sparks i:nth-child(4) { right: 35%; bottom: 8%; width: 4px; height: 4px; animation-delay: -3.8s; }
+.form-main { overflow: hidden; }
+.form-progress {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  width: 100%;
+  height: 7px;
+  overflow: visible;
+  background: #e4eaf3;
+  transition: none;
+}
+.form-progress__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  width: 33.333%;
+  border-radius: 0 99px 99px 0;
+  background: linear-gradient(90deg, var(--blue-600), var(--coral) 58%, var(--yellow));
+  box-shadow: 0 3px 14px rgba(246, 73, 79, .26);
+  transition: width .72s var(--ease-out);
+}
+.form-progress__runner {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: clamp(13px, var(--form-step-progress), calc(100% - 13px));
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 3px solid var(--white);
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--navy-950);
+  font-size: 11px;
+  box-shadow: 0 6px 18px rgba(7, 26, 61, .24);
+  transform: translate(-50%, -50%) rotate(0deg);
+  transition: left .72s var(--ease-out), transform .72s var(--ease-snap);
+}
+.form-shell[data-form-active='2'] .form-progress__runner { transform: translate(-50%, -50%) rotate(120deg); }
+.form-shell[data-form-active='3'] .form-progress__runner { transform: translate(-50%, -50%) rotate(240deg); }
+.form-step[hidden] { display: none; }
+.form-step.is-active { display: block; }
+.form-step h3:focus { outline: none; }
+.form-step h3:focus-visible { text-decoration: underline 4px var(--yellow); text-underline-offset: 8px; }
+
+.field--date.is-date-enhanced { min-width: 0; }
+.field--date.is-date-enhanced > input[data-date-input] {
+  position: absolute;
+  top: 50%;
+  left: 18px;
+  width: 1px;
+  height: 1px;
+  min-height: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  opacity: .001;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+.field--date.is-date-enhanced > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.date-trigger {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 76px;
+  grid-template-columns: 42px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 13px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  outline: none;
+  background: #f7faff;
+  color: var(--navy-950);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .22s ease, background .22s ease, box-shadow .22s ease, transform .35s var(--ease-out);
+}
+.date-trigger:hover { background: var(--white); transform: translateY(-2px); }
+.date-trigger:focus-visible { border-color: var(--blue-500); background: var(--white); box-shadow: 0 0 0 5px rgba(63, 130, 247, .14); }
+.field.is-invalid .date-trigger { border-color: var(--coral); box-shadow: 0 0 0 4px rgba(246, 73, 79, .1); }
+.date-trigger__icon {
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 42px;
+  border: 2px solid var(--navy-950);
+  border-radius: 13px;
+  background: var(--yellow);
+  box-shadow: 4px 4px 0 var(--navy-950);
+}
+.date-trigger__icon::before,
+.date-trigger__icon::after { content: ''; position: absolute; top: -5px; width: 3px; height: 10px; border-radius: 3px; background: var(--navy-950); }
+.date-trigger__icon::before { left: 10px; }
+.date-trigger__icon::after { right: 10px; }
+.date-trigger__icon span { position: absolute; top: 13px; right: 6px; left: 6px; height: 2px; background: var(--navy-950); }
+.date-trigger__copy { min-width: 0; }
+.date-trigger__copy small { display: block; margin-bottom: 4px; color: var(--muted); font-family: var(--font-meta); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.date-trigger__copy strong { display: block; overflow: hidden; font-family: var(--font-display); font-size: 17px; font-weight: 780; letter-spacing: -.015em; text-overflow: ellipsis; white-space: nowrap; }
+.date-trigger__arrow { justify-self: end; color: var(--blue-700); font-size: 19px; transition: transform .35s var(--ease-out); }
+.date-trigger:hover .date-trigger__arrow { transform: translate(3px, -3px); }
+
+.date-dialog {
+  width: min(680px, calc(100vw - 28px));
+  max-width: none;
+  max-height: calc(100svh - 30px);
+  margin: auto;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 36px;
+  outline: none;
+  background: transparent;
+  color: var(--navy-950);
+}
+.date-dialog::backdrop { background: rgba(3, 13, 36, .72); backdrop-filter: blur(14px) saturate(.85); animation: date-backdrop-in .3s ease both; }
+.date-dialog__surface {
+  max-height: calc(100svh - 30px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(255, 255, 255, .65);
+  border-radius: inherit;
+  background: var(--paper);
+  box-shadow: 0 42px 130px rgba(2, 12, 34, .58);
+  animation: date-dialog-in .55s var(--ease-out) both;
+}
+.date-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 28px 30px 22px; border-bottom: 1px solid var(--line); }
+.date-dialog__header .eyebrow { margin-bottom: 8px; font-size: 11px; }
+.date-dialog__header h2 { margin: 0; font-family: var(--font-display); font-size: clamp(29px, 5vw, 47px); font-weight: 830; line-height: .95; letter-spacing: -.04em; }
+.date-dialog__close {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--navy-950);
+  color: var(--white);
+  cursor: pointer;
+  transition: transform .35s var(--ease-snap), background .2s ease;
+}
+.date-dialog__close:hover { background: var(--coral); transform: rotate(8deg) scale(1.05); }
+.date-dialog__close::before,
+.date-dialog__close::after { content: ''; position: absolute; top: 22px; left: 13px; width: 20px; height: 2px; border-radius: 4px; background: currentColor; transform: rotate(45deg); }
+.date-dialog__close::after { transform: rotate(-45deg); }
+.date-dialog__close:focus-visible,
+.date-calendar__nav:focus-visible,
+.date-calendar__day:focus-visible,
+.date-dialog__text-action:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+.date-calendar { padding: 22px 30px 14px; }
+.date-calendar__toolbar { display: grid; grid-template-columns: 46px minmax(0, 1fr) 46px; align-items: center; gap: 12px; margin-bottom: 18px; }
+.date-calendar__nav { display: grid; width: 46px; height: 46px; place-items: center; border: 1px solid var(--line); border-radius: 15px; background: var(--white); color: var(--navy-950); font-size: 21px; cursor: pointer; transition: background .2s ease, color .2s ease, transform .3s var(--ease-out); }
+.date-calendar__nav:hover:not(:disabled) { background: var(--yellow); transform: translateY(-2px); }
+.date-calendar__nav:disabled { opacity: .3; cursor: not-allowed; }
+.date-calendar__period { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 10px; }
+.date-calendar__period strong { overflow: hidden; font-family: var(--font-display); font-size: 21px; font-weight: 830; text-overflow: ellipsis; text-transform: capitalize; white-space: nowrap; }
+.date-calendar__period select { min-height: 42px; padding: 0 34px 0 13px; border: 1px solid var(--line); border-radius: 13px; outline: none; background-color: var(--white); color: var(--navy-950); font-family: var(--font-meta); font-weight: 800; cursor: pointer; }
+.date-calendar__period select:focus-visible { border-color: var(--blue-600); box-shadow: 0 0 0 4px rgba(63, 130, 247, .13); }
+.date-calendar__weekdays,
+.date-calendar__row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.date-calendar__weekdays { margin-bottom: 7px; }
+.date-calendar__weekdays span { padding: 6px 0; color: var(--muted); font-family: var(--font-meta); font-size: 10px; font-weight: 850; letter-spacing: .11em; text-align: center; text-transform: uppercase; }
+.date-calendar__grid { display: grid; gap: 6px; }
+.date-calendar__day {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 0;
+  border-radius: 15px;
+  background: var(--white);
+  color: var(--navy-950);
+  font-family: var(--font-meta);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: color .18s ease, background .18s ease, transform .28s var(--ease-snap), box-shadow .18s ease;
+}
+.date-calendar__day:hover:not(:disabled) { z-index: 1; background: var(--blue-100); transform: translateY(-3px) rotate(-2deg); box-shadow: 0 8px 18px rgba(7, 26, 61, .12); }
+.date-calendar__day.is-outside { color: #93a0b5; background: transparent; }
+.date-calendar__day.is-today::after { content: ''; position: absolute; bottom: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--coral); }
+.date-calendar__day.is-selected { background: var(--navy-950); color: var(--white); box-shadow: inset 0 0 0 3px var(--yellow), 0 8px 22px rgba(7, 26, 61, .24); transform: rotate(-3deg) scale(1.04); }
+.date-calendar__day.is-selected::after { background: var(--yellow); }
+.date-calendar__day:disabled { opacity: .2; cursor: not-allowed; }
+.date-dialog__footer { display: flex; align-items: center; gap: 9px; padding: 18px 30px 26px; border-top: 1px solid var(--line); }
+.date-dialog__text-action { min-height: 42px; padding: 7px 12px; border: 0; border-radius: 12px; background: transparent; color: var(--blue-700); font-family: var(--font-meta); font-size: 12px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.date-dialog__text-action:hover { background: var(--blue-100); }
+.date-dialog__footer .btn { min-height: 46px; margin-left: auto; padding-block: 10px; }
+body.is-date-open { overscroll-behavior: none; }
+
+@keyframes stepper-drift { 0%, 100% { transform: translate(0, 0) scale(1); opacity: .38; } 50% { transform: translate(-9px, 13px) scale(1.35); opacity: 1; } }
+@keyframes date-dialog-in { from { opacity: 0; transform: translateY(42px) scale(.94) rotate(-1deg); } }
+@keyframes date-backdrop-in { from { opacity: 0; } }
+
+@media (max-width: 760px) {
+  .form-sidebar { padding: 24px 18px 20px; }
+  .form-sidebar h3 { max-width: none; margin: 0 0 18px; font-size: 25px; text-align: center; }
+  .step-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .step-list::before { top: 20px; right: 15%; bottom: auto; left: 15%; width: auto; height: 2px; background: linear-gradient(to right, var(--yellow) 0 var(--form-step-progress), rgba(255, 255, 255, .17) var(--form-step-progress) 100%); }
+  .step-indicator { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; justify-items: center; text-align: center; }
+  .step-indicator.is-active { transform: translateY(-3px); }
+  .step-indicator__number { width: 40px; height: 40px; }
+  .step-indicator__copy { display: block !important; min-width: 0; }
+  .step-indicator__copy strong { overflow: hidden; font-size: 10px; letter-spacing: .025em; text-overflow: ellipsis; white-space: nowrap; }
+  .step-indicator__copy small { display: none; }
+  .stepper-sparks { display: none; }
+  .form-main { padding: 35px 18px 30px; }
+  .form-progress { height: 6px; }
+  .date-dialog { width: 100%; max-height: calc(100svh - 8px); margin: auto 0 0; border-radius: 30px 30px 0 0; }
+  .date-dialog__surface { max-height: calc(100svh - 8px); border-radius: inherit; animation-name: date-sheet-in; }
+  .date-dialog__header { padding: 21px 18px 16px; }
+  .date-dialog__header h2 { font-size: 30px; }
+  .date-dialog__close { width: 42px; height: 42px; }
+  .date-dialog__close::before,
+  .date-dialog__close::after { top: 20px; left: 12px; width: 18px; }
+  .date-calendar { padding: 16px 12px 10px; }
+  .date-calendar__toolbar { grid-template-columns: 42px minmax(0, 1fr) 42px; gap: 7px; margin-bottom: 11px; }
+  .date-calendar__nav { width: 42px; height: 42px; }
+  .date-calendar__period { gap: 6px; }
+  .date-calendar__period strong { font-size: 17px; }
+  .date-calendar__period select { min-height: 40px; max-width: 94px; padding-inline: 10px; }
+  .date-calendar__weekdays,
+  .date-calendar__row { gap: 3px; }
+  .date-calendar__grid { gap: 3px; }
+  .date-calendar__day { border-radius: 12px; font-size: 13px; }
+  .date-dialog__footer { padding: 13px 14px calc(15px + env(safe-area-inset-bottom)); }
+  .date-dialog__text-action { padding-inline: 8px; font-size: 10px; }
+  .date-dialog__footer .btn { padding-inline: 18px; font-size: 12px; }
+}
+
+@media (max-width: 390px) {
+  .date-trigger { grid-template-columns: 38px minmax(0, 1fr) 20px; gap: 10px; padding-inline: 11px; }
+  .date-trigger__icon { width: 38px; height: 38px; }
+  .date-trigger__copy strong { font-size: 15px; }
+  .date-calendar__day { border-radius: 10px; }
+}
+
+@media (max-width: 760px) and (max-height: 650px) {
+  .date-dialog__header { padding-block: 13px 10px; }
+  .date-dialog__header .eyebrow { display: none; }
+  .date-dialog__header h2 { font-size: 25px; }
+  .date-calendar { padding-top: 10px; }
+  .date-calendar__day { min-height: 32px; aspect-ratio: auto; }
+  .date-dialog__footer { padding-block: 9px; }
+}
+
+@keyframes date-sheet-in { from { opacity: 0; transform: translateY(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper-sparks i,
+  .date-dialog__surface,
+  .date-dialog::backdrop { animation: none !important; }
+  .form-progress__fill,
+  .form-progress__runner,
+  .step-indicator,
+  .step-indicator__number,
+  .date-calendar__day { transition: none !important; }
+}
+
+
+/* ============================================================
+   Fixes layer — loaded last, so these rules are the final word.
+   ============================================================ */
+
+/* 1. Hero marquee sits flush on the panel edge. Panels no longer use negative
+      margins, so nothing crops it, and the hero's padding keeps copy clear of it. */
+.hero__marquee {
+  bottom: 0;
+  z-index: 5;
+}
+.hero__scroll {
+  right: 24px;
+  bottom: 104px;
+}
+
+@media (max-width: 760px) {
+  .hero__scroll { display: none; }
+}
+
+/* 1b. Copy must never escape its box. */
+.hero__title,
+.section-title,
+.stack-card h3,
+.gallery-cta h3,
+.prize-card h3,
+.modal h2,
+.form-step h3,
+.admin-hero h1 {
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+.lead,
+.stack-card p,
+.form-step__intro,
+.attendance__hint,
+.route__pin,
+.card-tag,
+/* .menu-panel__links a used to be here. `overflow-wrap: anywhere` is right for a
+   URL in a footer and wrong for a display headline: it is what let the menu split
+   CARRULEDDHI down the middle. The links now set their own wrapping in main.css. */
+.footer__links a {
+  overflow-wrap: anywhere;
+}
+.hero__grid,
+.story__grid,
+.route__grid,
+.contact__grid,
+.gallery__head,
+.stack-intro,
+.signup__head,
+.prize-layout,
+.stack-card__inner,
+.form-shell { min-width: 0; }
+.hero__grid > *,
+.story__grid > *,
+.route__grid > *,
+.contact__grid > *,
+.gallery__head > *,
+.stack-intro > *,
+.signup__head > *,
+.prize-layout > *,
+.stack-card__inner > *,
+.form-shell > * { min-width: 0; }
+
+/* 1c. The decorative ring pattern is centred on the big button, not the section.
+      app.js measures the button and writes --press-x / --press-y. */
+.attendance::before {
+  inset: auto;
+  left: var(--press-x, 50%);
+  top: var(--press-y, 64%);
+  width: min(230vw, 1600px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle at center, transparent 0 64px, rgba(255, 255, 255, .075) 66px 68px);
+  transform: translate(-50%, -50%);
+  animation: spin 60s linear infinite;
+  pointer-events: none;
+}
+.attendance__press { margin-inline: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .attendance::before { animation: none; }
+}
+
+/* 2. Route photo with an animated descent line. */
+.route__map .route__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.route__frame > img {
+  filter: saturate(1.04) contrast(1.03);
+  transform: scale(1.004);
+}
+.route__frame.is-route-hidden .route__overlay,
+.route__frame.is-route-hidden .route__node,
+.route__frame.is-route-hidden .route__runner { display: none; }
+
+.route__ribbon--fill { filter: drop-shadow(0 4px 12px rgba(7, 26, 61, .5)); }
+.route__line--dash { opacity: 0; transition: opacity .6s ease 1.9s; }
+.route__frame.is-route-drawn .route__line--dash {
+  opacity: .85;
+  animation: route-dash-march 1.1s linear infinite;
+}
+
+.route__node {
+  position: absolute;
+  z-index: 3;
+  width: clamp(22px, 2.4vw, 30px);
+  height: clamp(22px, 2.4vw, 30px);
+  border: 4px solid var(--navy-950);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity .5s ease .35s;
+}
+.route__frame.is-route-drawn .route__node { opacity: 1; }
+.route__node::after {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  animation: route-marker-pulse 2.1s ease-in-out infinite;
+}
+.route__node--start { background: var(--yellow); color: var(--yellow); }
+.route__node--finish {
+  background:
+    conic-gradient(var(--navy-950) 0 25%, var(--white) 0 50%, var(--navy-950) 0 75%, var(--white) 0);
+  color: var(--white);
+}
+
+.route__runner {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  width: clamp(34px, 4vw, 52px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(var(--runner-angle, 0deg));
+  transition: opacity .3s ease;
+  filter: drop-shadow(0 6px 12px rgba(7, 26, 61, .5));
+}
+/* main.css positions every svg inside .route__map absolutely at inset 6%; undo it here. */
+.route__map .route__runner svg {
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: auto;
+}
+
+/* JS drives left/top, so the corner offsets must be cleared to avoid over-constraint. */
+.route__frame .route__pin {
+  right: auto;
+  bottom: auto;
+  width: max-content;
+  opacity: 0;
+  transition: opacity .55s ease .8s;
+}
+.route__frame .route__pin--start { transform: translate(-50%, calc(-100% - 20px)); }
+.route__frame .route__pin--end { transform: translate(-50%, 24px); }
+.route__frame.is-route-drawn .route__pin { opacity: 1; }
+
+@keyframes route-dash-march { to { stroke-dashoffset: -23; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .route__node::after,
+  .route__frame.is-route-drawn .route__line--dash { animation: none; }
+  .route__frame > img { transform: none; }
+}
+
+/* 3. Overlapping category cards — a clearer, deeper stack. */
+.card-stack {
+  --stack-top: clamp(88px, 11svh, 118px);
+  --stack-gap: clamp(12px, 1.5vw, 22px);
+  --stack-card-height: min(640px, calc(100svh - var(--stack-top) - 72px));
+}
+.stack-card {
+  margin-bottom: clamp(150px, 24vh, 260px);
+  transform-origin: 50% 0;
+  transition:
+    transform .18s linear,
+    filter .18s linear,
+    box-shadow .4s var(--ease-out),
+    border-color .4s ease;
+}
+.stack-card::before { content: '0' counter(stack-card) ' / 0' counter(stack-total); }
+.stack-card.is-covered { box-shadow: 0 18px 42px rgba(7, 26, 61, .3); }
+.stack-card.is-active-stack-card {
+  border-color: rgba(255, 255, 255, .95);
+  box-shadow: 0 46px 120px rgba(7, 26, 61, .34), 0 4px 0 rgba(255, 255, 255, .55) inset;
+}
+.card-stack { counter-reset: stack-card stack-total var(--stack-count, 3); }
+
+/* Progress rail so the stack reads as a sequence, not a glitch.
+   It has to be ::before: as the last child it would only pin at the very end. */
+.card-stack::before {
+  content: '';
+  position: sticky;
+  z-index: 20;
+  top: calc(var(--stack-top) - 26px);
+  display: block;
+  width: clamp(64px, 12vw, 132px);
+  height: 4px;
+  margin: 0 auto 22px;
+  border-radius: 99px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    var(--coral) 0 calc((var(--stack-active, 0) + 1) / var(--stack-count, 3) * 100%),
+    rgba(7, 26, 61, .16) 0
+  );
+  transition: background .35s var(--ease-out);
+}
+
+@media (max-width: 760px) {
+  .card-stack {
+    --stack-top: 84px;
+    --stack-gap: 9px;
+    --stack-card-height: min(620px, calc(100svh - 150px));
+  }
+  .stack-card { margin-bottom: clamp(120px, 20vh, 200px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-stack::before { transition: none; }
+}
+
+@media print {
+  .card-stack::before { display: none; }
+}
+
+
+/* 4. Real SVG flags in the language picker. */
+.language-picker__flag,
+.language-picker__menu [role="option"] > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+  line-height: 0;
+}
+.flag {
+  display: block;
+  height: auto;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+}
+.language-picker__trigger { min-width: 72px; gap: 7px; }
+.language-picker__code { font-size: 11px; opacity: .8; }
+
+@media (max-width: 480px) {
+  .language-picker__code { display: none; }
+  .language-picker__trigger { width: 58px; min-width: 58px; }
+}
+
+/* 5. Panel measurement mode: app.js briefly releases the sticky clip to read
+      the real content height, then decides pinned vs flow. */
+#main > section.section-card[data-panel='measure'] {
+  position: static !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  align-content: start;
+}
+
+/* 6. Wipe between in-page jumps. */
+.page-wipe {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  display: grid;
+  place-items: center;
+  background: var(--navy-950);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  clip-path: inset(0 0 100% 0);
+  transition:
+    clip-path .38s var(--ease-out),
+    opacity .2s ease,
+    visibility 0s linear .38s;
+}
+.page-wipe.is-covering {
+  opacity: 1;
+  visibility: visible;
+  clip-path: inset(0);
+  transition:
+    clip-path .38s var(--ease-out),
+    opacity .16s ease,
+    visibility 0s linear 0s;
+}
+.page-wipe.is-covering.is-clearing {
+  clip-path: inset(100% 0 0 0);
+  transition: clip-path .5s var(--ease-out), opacity .3s ease .28s, visibility 0s linear .52s;
+  opacity: 0;
+}
+.page-wipe__mark { display: flex; gap: 9px; }
+.page-wipe__mark i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--yellow);
+  animation: wipe-bounce .72s ease-in-out infinite;
+}
+.page-wipe__mark i:nth-child(2) { animation-delay: .12s; background: var(--coral); }
+.page-wipe__mark i:nth-child(3) { animation-delay: .24s; background: #fff; }
+
+@keyframes wipe-bounce {
+  0%, 100% { transform: translateY(0) scale(1); opacity: .55; }
+  50% { transform: translateY(-11px) scale(1.25); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-wipe { display: none; }
+}
+
+@media print {
+  .page-wipe { display: none !important; }
+}
+
+
+/* 7. Panel density.
+      A pinned panel must fit one viewport, so the type scale is capped by svh
+      as well as vw. Without this, headlines alone blow past 100svh on laptops. */
+:root { --section-card-pad: clamp(52px, 6.4svh, 88px); }
+
+.section-title { font-size: clamp(34px, min(6.6vw, 9svh), 86px); }
+.section-title--medium { font-size: clamp(29px, min(4.9vw, 6.6svh), 62px); }
+.hero__title { font-size: clamp(52px, min(9.6vw, 13svh), 132px); }
+.hero__tagline { font-size: clamp(20px, min(2.6vw, 3.4svh), 34px); }
+.lead { font-size: clamp(15px, min(1.5vw, 2.1svh), 19px); }
+.eyebrow { margin-bottom: clamp(10px, 1.6svh, 18px); font-size: clamp(12px, 1.5svh, 14px); }
+
+.hero__actions { margin-top: clamp(18px, 3svh, 32px); }
+.hero__title { margin: clamp(16px, 3svh, 28px) 0 clamp(12px, 2.2svh, 22px); }
+.countdown__number { font-size: clamp(19px, min(2.6vw, 3.4svh), 33px); }
+.hero-stat { padding: clamp(13px, 2svh, 22px) clamp(16px, 2vw, 24px); }
+.hero-stat__number { font-size: clamp(30px, min(4.2vw, 5.4svh), 58px); }
+
+.story__numbers { gap: clamp(8px, 1.4svh, 12px); }
+.story-number { padding: clamp(12px, 2svh, 20px) clamp(18px, 2vw, 26px); }
+.story-number strong { font-size: clamp(34px, min(5vw, 6.6svh), 66px); }
+.story-number span { font-size: clamp(15px, 2svh, 20px); }
+
+.schedule-list { margin-top: clamp(20px, 3.6svh, 42px); }
+.schedule-row { padding: clamp(14px, 2.4svh, 26px) 8px; }
+.schedule-row time { font-size: clamp(28px, min(4.4vw, 5.8svh), 58px); }
+.schedule-row span { font-size: clamp(16px, min(1.9vw, 2.5svh), 24px); }
+
+.attendance__counter { margin: clamp(16px, 3.4svh, 40px) 0 6px; font-size: clamp(76px, min(17vw, 22svh), 240px); }
+.attendance__label { font-size: clamp(14px, min(1.9vw, 2.4svh), 22px); }
+.attendance__press {
+  width: clamp(140px, min(19vw, 24svh), 240px);
+  margin: clamp(20px, 3.6svh, 38px) auto clamp(14px, 2.4svh, 22px);
+  font-size: clamp(18px, min(2.5vw, 3.2svh), 33px);
+}
+.avatar-stack { margin-top: clamp(14px, 2.6svh, 26px); }
+.avatar { width: clamp(38px, 5.4svh, 48px); height: clamp(38px, 5.4svh, 48px); }
+
+.accordion__button { padding: clamp(14px, 2.4svh, 24px) 0; font-size: clamp(16px, min(2vw, 2.7svh), 24px); }
+.accordion__panel p { padding: 0 clamp(0px, 4vw, 50px) clamp(14px, 2.4svh, 24px) 0; }
+
+.contact__links { margin-top: clamp(16px, 3svh, 30px); }
+.contact__links a { font-size: clamp(18px, min(2.7vw, 3.6svh), 34px); }
+.contact-card { padding: clamp(20px, 3.4svh, 44px); }
+.contact-card h3 { margin-bottom: clamp(14px, 2.6svh, 26px); font-size: clamp(21px, 3svh, 28px); }
+.field input, .field select { min-height: clamp(52px, 7svh, 62px); }
+.field textarea { min-height: clamp(92px, 14svh, 130px); }
+
+.route__facts { margin: clamp(16px, 3svh, 28px) 0; }
+.route__fact { padding: clamp(10px, 1.8svh, 14px) 17px; }
+
+/* Short laptops and landscape phones: let anything oversized flow instead of clipping. */
+@media (max-height: 620px) {
+  :root { --section-card-pad: clamp(44px, 6svh, 64px); }
+}
+
+
+/* 8. Second density pass, driven by measured panel heights.
+      Measured at 1440x749: hero 963, route 835, schedule 947, attendance 1146.
+      Target for all of them is one viewport. */
+#main > section.section-card--hero {
+  padding-top: clamp(94px, 12svh, 128px);
+  padding-bottom: clamp(84px, 10svh, 104px);
+}
+.hero { min-height: 100svh; padding-top: 0; }
+.hero__kicker { padding: 6px 13px 6px 7px; font-size: clamp(12px, 1.7svh, 15px); }
+.hero__kicker-dot { width: clamp(19px, 2.7svh, 27px); height: clamp(19px, 2.7svh, 27px); }
+.hero__title {
+  max-width: 9ch;
+  margin: clamp(12px, 2.4svh, 24px) 0 clamp(10px, 1.8svh, 18px);
+  font-size: clamp(44px, min(8vw, 10.4svh), 116px);
+}
+.hero__tagline { font-size: clamp(18px, min(2.3vw, 2.9svh), 30px); }
+.hero__actions { gap: 10px; margin-top: clamp(14px, 2.4svh, 28px); }
+.hero__grid { gap: clamp(22px, 4vw, 70px); }
+.hero__aside { gap: clamp(8px, 1.4svh, 14px); }
+.countdown { padding: clamp(6px, 1.1svh, 10px); }
+.countdown__unit { padding: clamp(9px, 1.7svh, 15px) 6px; }
+.hero-stat { padding: clamp(11px, 1.7svh, 20px) clamp(15px, 2vw, 24px); }
+.hero-stat__number { font-size: clamp(26px, min(3.6vw, 4.6svh), 52px); }
+.btn { min-height: clamp(46px, 6.2svh, 54px); padding-block: clamp(11px, 1.7svh, 14px); }
+
+.route__frame { aspect-ratio: 16 / 9; border-width: clamp(5px, .6vw, 8px); }
+.route__map figcaption { margin-top: clamp(8px, 1.4svh, 16px); font-size: 12px; }
+.route__grid { gap: clamp(22px, 4vw, 64px); }
+.route__actions { gap: 10px; }
+
+.schedule-list { margin-top: clamp(14px, 2.6svh, 30px); }
+.schedule-row { padding: clamp(10px, 1.9svh, 20px) 8px; }
+.schedule-row time { font-size: clamp(24px, min(3.6vw, 4.6svh), 48px); }
+.schedule-row span { font-size: clamp(15px, min(1.7vw, 2.2svh), 21px); }
+.schedule .lead { margin-top: clamp(12px, 2.2svh, 22px); }
+
+.attendance__title { font-size: clamp(24px, min(3.8vw, 5svh), 50px); }
+.attendance__counter { margin: clamp(10px, 2svh, 24px) 0 4px; font-size: clamp(58px, min(12vw, 15svh), 170px); }
+.attendance__label { font-size: clamp(12px, min(1.6vw, 2svh), 18px); }
+.attendance__press {
+  width: clamp(118px, min(15vw, 18svh), 190px);
+  margin: clamp(14px, 2.6svh, 28px) auto clamp(10px, 1.8svh, 18px);
+  border-width: clamp(7px, .9vw, 12px);
+  font-size: clamp(15px, min(2vw, 2.6svh), 27px);
+}
+.attendance__hint { font-size: clamp(11px, 1.6svh, 14px); }
+.avatar-stack { margin-top: clamp(10px, 1.9svh, 20px); }
+.avatar { width: clamp(32px, 4.4svh, 44px); height: clamp(32px, 4.4svh, 44px); font-size: clamp(11px, 1.6svh, 15px); }
+.attendance .btn[data-open-reminder] { margin-top: clamp(14px, 2.6svh, 28px) !important; }
+
+.faq__grid { gap: clamp(22px, 4vw, 72px); }
+.contact__grid { gap: clamp(22px, 4vw, 72px); }
+
+/* Panels that still overflow keep flowing; the stack effect survives either way. */
+@media (max-height: 700px) {
+  .avatar-stack { display: none; }
+  .attendance__hint { display: none; }
+}
+
+
+/* 9. Calibration pass.
+      With the cascade fixed, the svh caps are the binding constraint, so the
+      type can grow back into the space each panel actually has.
+      Measured slack at 1440x749 before this block: hero 155px, story 294px,
+      route 144px, schedule 244px, attendance 130px, faq 207px, contact 251px. */
+.hero__title { font-size: clamp(46px, min(8.6vw, 12svh), 124px); }
+.hero__tagline { font-size: clamp(19px, min(2.5vw, 3.2svh), 32px); }
+.section-title { font-size: clamp(34px, min(6.6vw, 10svh), 92px); }
+.section-title--medium { font-size: clamp(30px, min(4.9vw, 7.6svh), 66px); }
+.hero-stat__number { font-size: clamp(27px, min(3.8vw, 5.2svh), 56px); }
+.countdown__number { font-size: clamp(19px, min(2.6vw, 3.6svh), 34px); }
+.story-number strong { font-size: clamp(34px, min(5vw, 7.4svh), 70px); }
+.schedule-row time { font-size: clamp(25px, min(3.6vw, 5.4svh), 52px); }
+.schedule-row span { font-size: clamp(15px, min(1.8vw, 2.5svh), 22px); }
+.attendance__title { font-size: clamp(25px, min(3.8vw, 5.6svh), 54px); }
+.attendance__counter { font-size: clamp(62px, min(13vw, 17svh), 190px); }
+.attendance__press { width: clamp(124px, min(16vw, 20svh), 206px); font-size: clamp(16px, min(2.1vw, 2.9svh), 29px); }
+.contact__links a { font-size: clamp(19px, min(2.7vw, 4svh), 38px); }
+.accordion__button { font-size: clamp(16px, min(2vw, 3svh), 25px); }
+.lead { font-size: clamp(15px, min(1.55vw, 2.3svh), 20px); }
+
+/* 10. Phone layout: the hero aside and contact card were the two panels that
+       still overflowed at 390x693. */
+@media (max-width: 760px) {
+  .hero__aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .hero__aside .countdown { grid-column: 1 / -1; }
+  .hero-stat { padding: 11px 13px; text-align: center; }
+  .hero-stat__label { margin-top: 4px; font-size: 10px; letter-spacing: .1em; }
+  .hero__title { max-width: none; }
+  .countdown__unit { padding: 9px 4px; }
+
+  .route__grid { gap: 18px; }
+  .route__facts { gap: 7px; margin: 14px 0; }
+  .route__fact { padding: 9px 13px; }
+  .route__map figcaption { display: none; }
+
+  .contact-card { padding: 18px 15px; }
+  .contact-card h3 { margin-bottom: 14px; font-size: 19px; }
+  .contact__links { gap: 6px; margin-top: 14px; }
+  .contact-card .form-grid { gap: 12px; }
+  .contact-card .field input { min-height: 50px; }
+  .contact-card .field textarea { min-height: 84px; }
+  .contact-card .btn { width: 100%; margin-top: 16px !important; }
+}
+
+
+/* 11. Last 84px on the route panel and 20px on contact, at 390x693. */
+@media (max-width: 760px) {
+  #route .route__actions .btn--outline { display: none; }
+  #route .lead { font-size: 14px; line-height: 1.55; }
+  #route .section-title { font-size: clamp(28px, 8vw, 34px); }
+  #contact .section-title { font-size: clamp(26px, 7.6vw, 32px); }
+  #contact .lead { display: none; }
+}
+
+
+/* ============================================================
+   Consent gate — one button, one dialog, scroll to unlock.
+   ============================================================ */
+.consent-gate {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 44px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 14px;
+  overflow: hidden;
+  padding: 16px 18px;
+  border: 2px solid var(--blue-600);
+  border-radius: 18px;
+  background: var(--white);
+  color: var(--navy-950);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .3s ease, box-shadow .3s ease, transform .35s var(--ease-out);
+}
+.consent-gate:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(36, 105, 216, .18); }
+.consent-gate:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.consent-gate__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(31, 169, 113, .16), rgba(31, 169, 113, .06));
+  transition: width .62s var(--ease-out);
+}
+.consent-gate__mark,
+.consent-gate__copy,
+.consent-gate__arrow { position: relative; }
+.consent-gate__mark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #f3f7ff;
+  color: transparent;
+  transition: background .3s ease, border-color .3s ease, color .3s ease, transform .45s var(--ease-snap);
+}
+.consent-gate__mark svg { width: 24px; }
+.consent-gate__copy { min-width: 0; }
+.consent-gate__copy strong { display: block; font-size: 15px; line-height: 1.3; }
+.consent-gate__copy small { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+.consent-gate__arrow { justify-self: end; color: var(--blue-700); font-size: 18px; transition: transform .35s var(--ease-out); }
+.consent-gate:hover .consent-gate__arrow { transform: translate(3px, -3px); }
+
+.consent-gate.is-accepted { border-color: #1fa971; }
+.consent-gate.is-accepted .consent-gate__fill { width: 100%; }
+.consent-gate.is-accepted .consent-gate__mark {
+  border-color: #1fa971;
+  background: #1fa971;
+  color: var(--white);
+  transform: rotate(-6deg) scale(1.06);
+}
+.consent-gate.is-nudged { animation: consent-nudge .55s var(--ease-out); border-color: var(--coral); }
+
+@keyframes consent-nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  45% { transform: translateX(7px); }
+  70% { transform: translateX(-4px); }
+}
+
+.consent-dialog {
+  width: min(780px, calc(100vw - 24px));
+  max-width: none;
+  max-height: calc(100svh - 28px);
+  margin: auto;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 30px;
+  background: transparent;
+  color: var(--navy-950);
+}
+.consent-dialog::backdrop { background: rgba(3, 13, 36, .74); backdrop-filter: blur(14px) saturate(.85); }
+.consent-dialog__surface {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  max-height: calc(100svh - 28px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: inherit;
+  background: var(--paper);
+  box-shadow: 0 42px 130px rgba(2, 12, 34, .58);
+  animation: consent-in .5s var(--ease-out) both;
+}
+.consent-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 28px 18px;
+}
+.consent-dialog__header .eyebrow { margin-bottom: 6px; font-size: 10px; }
+.consent-dialog__header h2 { margin: 0 0 6px; font-family: var(--font-display); font-size: clamp(24px, 4vw, 36px); font-weight: 830; line-height: 1; letter-spacing: -.035em; }
+.consent-dialog__header p { margin: 0; max-width: 46ch; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.consent-dialog__close {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--navy-950);
+  color: var(--white);
+  cursor: pointer;
+  transition: transform .35s var(--ease-snap), background .2s ease;
+}
+.consent-dialog__close:hover { background: var(--coral); transform: rotate(90deg); }
+.consent-dialog__close::before,
+.consent-dialog__close::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 12px;
+  width: 18px;
+  height: 2px;
+  border-radius: 3px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.consent-dialog__close::after { transform: rotate(-45deg); }
+
+.consent-progress { position: relative; height: 5px; margin: 0 28px; border-radius: 99px; background: #e2e9f6; }
+.consent-progress__fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--blue-600), var(--coral) 62%, var(--yellow));
+  transition: width .18s linear;
+}
+
+.consent-dialog__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 28px 26px;
+  -webkit-overflow-scrolling: touch;
+}
+.consent-dialog__body:focus-visible { outline: 2px solid var(--blue-500); outline-offset: -4px; }
+.consent-dialog__loading { color: var(--muted); font-size: 14px; }
+.consent-doc + .consent-doc { margin-top: 34px; padding-top: 26px; border-top: 2px dashed var(--line); }
+.consent-doc > h3 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 820;
+  letter-spacing: -.02em;
+}
+.consent-doc .legal-content {
+  max-width: none;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.consent-doc .legal-content h2 { margin: 22px 0 8px; font-size: 17px; }
+.consent-doc .legal-content h2:first-child { margin-top: 0; }
+.consent-doc .legal-content p,
+.consent-doc .legal-content li { font-size: 13.5px; line-height: 1.65; }
+.consent-doc__fallback { padding: 14px 16px; border-left: 4px solid var(--coral); background: #fff4f4; font-size: 13px; }
+
+.consent-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 28px calc(20px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--white);
+}
+.consent-dialog__status { color: var(--muted); font-family: var(--font-meta); font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.consent-dialog__status.is-ready { color: #1fa971; }
+.consent-dialog__accept { position: relative; overflow: hidden; }
+.consent-dialog__accept[disabled] { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+.consent-dialog__accept[disabled]:hover::before { transform: none; }
+.consent-dialog__accept-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: #1fa971;
+}
+.consent-dialog__accept.is-filling .consent-dialog__accept-fill { width: 100%; transition: width .5s var(--ease-out); }
+.consent-dialog__accept > span:not(.consent-dialog__accept-fill) { position: relative; }
+
+@keyframes consent-in { from { opacity: 0; transform: translateY(38px) scale(.96); } }
+
+@media (max-width: 620px) {
+  .consent-dialog { width: 100%; max-height: 100svh; margin: auto 0 0; border-radius: 26px 26px 0 0; }
+  .consent-dialog__surface { max-height: 100svh; animation-name: consent-sheet-in; }
+  .consent-dialog__header { padding: 18px 18px 14px; }
+  .consent-progress { margin-inline: 18px; }
+  .consent-dialog__body { padding: 16px 18px 22px; }
+  .consent-dialog__footer { padding: 13px 18px calc(16px + env(safe-area-inset-bottom)); }
+  .consent-dialog__accept { width: 100%; }
+  .consent-dialog__status { order: 2; width: 100%; text-align: center; }
+}
+
+@keyframes consent-sheet-in { from { opacity: 0; transform: translateY(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-dialog__surface { animation: none; }
+  .consent-gate.is-nudged { animation: none; }
+  .consent-gate__fill,
+  .consent-dialog__accept-fill,
+  .consent-progress__fill { transition: none; }
+}
+
+
+/* ============================================================
+   Category choice cards, year grid, compact registration form.
+   ============================================================ */
+
+/* Real icons instead of emoji, and a visible selected state. */
+.choice-grid { margin-top: 18px; gap: 12px; }
+.choice label {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: 52px minmax(0, 1fr) 26px;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 16px;
+  border-radius: 18px;
+}
+.choice__icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 15px;
+  background: #eaf1ff;
+  color: var(--blue-700);
+  font-size: 0;
+  transition: background .25s ease, color .25s ease, transform .4s var(--ease-snap);
+}
+.choice__icon svg { width: 34px; height: auto; }
+.choice__copy { min-width: 0; }
+.choice__copy strong { display: block; font-family: var(--font-display); font-size: 18px; font-weight: 820; letter-spacing: -.02em; }
+.choice__copy small { display: block; margin-top: 2px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.choice__check {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  color: transparent;
+  transition: border-color .25s ease, background .25s ease, color .25s ease;
+}
+.choice__check svg { width: 15px; }
+.choice input:checked + label { border-color: var(--blue-600); background: #f2f7ff; }
+.choice input:checked + label .choice__icon {
+  background: var(--blue-600);
+  color: var(--white);
+  transform: rotate(-5deg) scale(1.04);
+}
+.choice input:checked + label .choice__check { border-color: var(--blue-600); background: var(--blue-600); color: var(--white); }
+.choice input:focus-visible + label { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.choice--art input:checked + label .choice__icon { background: var(--coral); }
+
+/* Year grid replaces the 126-option dropdown. */
+.date-calendar__year {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 6px 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--white);
+  color: var(--navy-950);
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+}
+.date-calendar__year:hover { background: var(--yellow); }
+.date-calendar__year b { font-family: var(--font-meta); font-size: 15px; font-weight: 850; letter-spacing: .04em; }
+.date-calendar__year svg { width: 10px; transition: transform .3s var(--ease-out); }
+.date-calendar__year[aria-expanded='true'] svg { transform: rotate(180deg); }
+
+.date-years { margin: 0 30px 6px; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--white); }
+.date-years__head { display: grid; grid-template-columns: 42px minmax(0, 1fr) 42px; align-items: center; gap: 10px; margin-bottom: 12px; }
+.date-years__head strong { font-family: var(--font-meta); font-size: 14px; font-weight: 850; letter-spacing: .08em; text-align: center; }
+.date-years__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+.date-years__cell {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--navy-950);
+  font-family: var(--font-meta);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, transform .25s var(--ease-snap);
+}
+.date-years__cell:hover { background: var(--blue-100); transform: translateY(-2px); }
+.date-years__cell.is-selected { border-color: var(--navy-950); background: var(--navy-950); color: var(--yellow); }
+
+@media (max-width: 760px) {
+  .date-years { margin-inline: 12px; padding: 11px; }
+  .date-years__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .date-calendar__year { min-height: 40px; padding-inline: 11px; }
+}
+
+/* Compact registration form: a whole step should fit one screen. */
+#signup .form-shell { min-height: 0; }
+#signup .form-grid { gap: 13px; }
+#signup .field input,
+#signup .field select { min-height: 54px; padding: 20px 15px 7px; border-radius: 14px; }
+#signup .field textarea { min-height: 84px; padding: 20px 15px 9px; border-radius: 14px; }
+#signup .field label { top: 18px; left: 15px; font-size: 14px; }
+#signup .field input:focus + label,
+#signup .field input:not(:placeholder-shown) + label,
+#signup .field textarea:focus + label,
+#signup .field textarea:not(:placeholder-shown) + label { transform: translateY(-11px); font-size: 10px; }
+#signup .form-step h3 { font-size: clamp(24px, min(3.4vw, 4.6svh), 40px); }
+#signup .form-step__intro { margin-bottom: clamp(14px, 2.6svh, 26px); font-size: 13.5px; }
+#signup .form-nav { margin-top: clamp(16px, 2.8svh, 30px); }
+#signup .consent-box { margin-top: 16px; padding: 16px; }
+#signup .date-trigger { min-height: 64px; }
+#signup .step-indicator__number { width: 38px; height: 38px; }
+#signup .form-sidebar h3 { margin-bottom: clamp(18px, 3svh, 38px); font-size: clamp(21px, 3svh, 30px); }
+#signup .step-list { gap: clamp(12px, 2.4svh, 24px); }
+
+@media (max-width: 760px) {
+  #signup .field input,
+  #signup .field select { min-height: 50px; padding: 18px 13px 6px; }
+  #signup .field textarea { min-height: 74px; }
+  #signup .form-main { padding: 26px 15px 26px; }
+}
+
+/* Magnetic scrolling: proximity, not mandatory, so long sections never trap you. */
+@media (prefers-reduced-motion: no-preference) and (min-height: 620px) {
+  html { scroll-snap-type: y proximity; }
+  #main > section.section-card[data-panel='pinned'] { scroll-snap-align: start; }
+  .site-footer { scroll-snap-align: end; }
+}
+
+
+/* ============================================================
+   Typography — single swap point.
+   ============================================================
+   The previous stacks resolved to Aptos / Segoe UI Variable / Bahnschrift, all of
+   which ship only with Windows or Microsoft 365. On macOS, iOS, Android and Linux
+   every fallback collapsed to Arial, so the site looked like a different design
+   depending on the device.
+
+   These stacks name a real face for each major platform before falling back.
+   To change the look, edit only these three variables. Ready-made alternatives
+   are listed in INSTRUKCJA.md, section "Czcionki".
+   ============================================================ */
+:root {
+  /* Headlines. Wide, heavy, geometric. */
+  --font-display:
+    'Aptos Display', 'Segoe UI Variable Display',
+    'SF Pro Display', -apple-system, BlinkMacSystemFont,
+    'Roboto', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+
+  /* Labels, buttons, counters, eyebrows.
+     Was a DIN-style condensed face (Aptos Narrow / Bahnschrift), which read as
+     technical and "keyboard-like" on the countdown labels. Swapped for a warmer
+     humanist sans; tracking carries the label look instead of the narrow width. */
+  --font-meta:
+    'Aptos', 'Segoe UI Variable Text', 'Segoe UI',
+    -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
+    'Roboto', 'Noto Sans', system-ui, sans-serif;
+
+  /* Body copy. */
+  --font-body:
+    'Aptos', 'Segoe UI Variable Text', 'Segoe UI',
+    -apple-system, BlinkMacSystemFont, 'Roboto', 'Noto Sans',
+    system-ui, sans-serif;
+
+  --display-weight: 820;
+}
+
+/* Arial Narrow has no real bold, so uppercase meta text needs synthetic weight
+   held back or it smears. Keep tracking instead of leaning on weight. */
+@supports not (font-variation-settings: 'wght' 800) {
+  .btn,
+  .eyebrow,
+  .card-tag,
+  .stack-card__num { letter-spacing: .1em; }
+}
+
+
+/* ============================================================
+   Intro overlay safety net.
+   ============================================================
+   The overlay covers the whole page, so if JavaScript never runs the site is
+   unusable. That happens more often than it sounds: opening the built
+   index.html straight from disk over file:// blocks ES modules, and a stalled
+   requestAnimationFrame used to freeze the progress bar mid-way.
+
+   These rules make the overlay dismiss itself with no JavaScript at all, and
+   drive the fill bar from CSS so it cannot stall.
+   ============================================================ */
+/* No JavaScript at all: the overlay never appears. The `js` class is set by an
+   inline classic script in <head>, so this is decided before the first paint. */
+html.no-js .preloader { display: none !important; }
+
+.preloader {
+  animation: preloader-selfclose .55s var(--ease-out) 2.6s forwards;
+}
+.preloader.is-done {
+  /* JavaScript finished first: cancel the fallback and use the scripted exit. */
+  animation: none;
+}
+.preloader__bar {
+  animation: preloader-fill 1.25s cubic-bezier(.16, 1, .3, 1) forwards;
+}
+
+@keyframes preloader-fill { from { width: 0; } to { width: 100%; } }
+@keyframes preloader-selfclose {
+  to {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+/* Without JS the body never gets .is-locked, so scrolling already works.
+   This only guards against a half-finished run. */
+.preloader.is-done ~ * { pointer-events: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .preloader { display: none !important; animation: none; }
+  .preloader__bar { animation: none; }
+}
+
+/* A visible <noscript> notice beats a blank yellow screen. */
+.no-js-note {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 1250;
+  padding: 14px 18px;
+  background: var(--yellow);
+  color: var(--navy-950);
+  font-family: var(--font-meta);
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+}
+
+
+/* ============================================================
+   Hero bottom: straight marquee + sponsor band, no side label.
+   ============================================================ */
+
+/* The circled arrow hint and the rotated side label were both removed on request. */
+.stack-intro::after { display: none !important; }
+.hero__scroll { display: none !important; }
+
+.stack-intro { grid-template-columns: minmax(0, 1fr) minmax(0, .62fr); }
+
+/* Straight band, no rotation, lifted clear of the sponsor strip. */
+.marquee {
+  padding: 13px 0;
+  transform: none;
+  border-top: 2px solid rgba(7, 26, 61, .12);
+  border-bottom: 2px solid rgba(7, 26, 61, .12);
+}
+.marquee__item { font-size: clamp(17px, min(2.1vw, 2.7svh), 30px); }
+.marquee__item::after { margin-inline: 22px; }
+
+.hero__marquee {
+  bottom: var(--sponsor-band-h, 0px);
+  transform: none;
+}
+
+/* ---------- Sponsor band ---------- */
+.sponsor-band {
+  --sponsor-band-h: clamp(56px, 8svh, 76px);
+  position: absolute;
+  z-index: 6;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--sponsor-band-h);
+  overflow: hidden;
+  background: rgba(255, 255, 255, .82);
+  border-top: 1px solid rgba(7, 26, 61, .1);
+  backdrop-filter: blur(10px) saturate(1.1);
+}
+.sponsor-band[hidden] { display: none !important; }
+.sponsor-band__track {
+  display: flex;
+  width: max-content;
+  height: 100%;
+  align-items: center;
+  gap: clamp(30px, 5vw, 68px);
+  padding-inline: clamp(15px, 3vw, 34px);
+  animation: sponsor-scroll var(--sponsor-speed, 34s) linear infinite;
+}
+.sponsor-band:hover .sponsor-band__track,
+.sponsor-band:focus-within .sponsor-band__track { animation-play-state: paused; }
+
+.sponsor-logo {
+  display: grid;
+  height: 100%;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-decoration: none;
+}
+.sponsor-logo img {
+  width: auto;
+  max-width: clamp(96px, 13vw, 168px);
+  max-height: calc(var(--sponsor-band-h) - clamp(20px, 3svh, 30px));
+  object-fit: contain;
+  /* Logos arrive in every colour and weight; this evens them out and lets the
+     hover state bring the real colours back. */
+  filter: grayscale(1) opacity(.62);
+  transition: filter .3s ease, transform .35s var(--ease-out);
+}
+.sponsor-logo:hover img,
+.sponsor-logo:focus-visible img { filter: none; transform: scale(1.06); }
+.sponsor-logo:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+@keyframes sponsor-scroll { to { transform: translateX(-50%); } }
+
+/* Hero has to leave room for both strips. */
+#main > section.section-card--hero {
+  padding-bottom: calc(clamp(84px, 10svh, 104px) + var(--hero-bottom-strips, 0px));
+}
+
+@media (max-width: 760px) {
+  .sponsor-band { --sponsor-band-h: clamp(48px, 7svh, 60px); }
+  .marquee { padding: 10px 0; }
+  .marquee__item { font-size: clamp(15px, 4.4vw, 20px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-band__track { animation: none; justify-content: center; flex-wrap: wrap; }
+  .sponsor-logo img { filter: none; }
+}
+
+@media print {
+  .sponsor-band { display: none !important; }
+}
+
+
+/* ============================================================
+   Route: dashed markings, short START/FINISH pins, obstacle note.
+   ============================================================ */
+.route__ribbon--casing { fill-opacity: .78; }
+.route__ribbon--fill { filter: drop-shadow(0 2px 6px rgba(7, 26, 61, .45)); }
+
+/* Short pins read better than a full sentence on the photo. */
+.route__frame .route__pin {
+  padding: 7px 13px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+.route__frame .route__pin--end { background: var(--coral); }
+.route__frame .route__pin--end::before { background: var(--white); }
+
+/* Side note, rotated along the right edge of the photo. */
+.route__aside {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  right: 0;
+  width: max-content;
+  max-width: min(46vw, 330px);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 12px 12px 0 0;
+  background: rgba(7, 26, 61, .9);
+  color: var(--white);
+  font-family: var(--font-meta);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+  line-height: 1.45;
+  text-transform: uppercase;
+  transform: translate(50%, -50%) rotate(-90deg);
+  transform-origin: center;
+  backdrop-filter: blur(8px);
+}
+.route__aside::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--yellow);
+  vertical-align: 1px;
+}
+
+.route__fact--obstacles strong { color: var(--coral); }
+.route__fact--obstacles { border-left: 4px solid var(--yellow); }
+
+@media (max-width: 900px) {
+  /* Rotated text is unreadable in a narrow frame; drop to a normal strip. */
+  .route__aside {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+    border-radius: 10px;
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-align: center;
+    transform: none;
+  }
+  .route__frame .route__pin--end { display: none; }
+}
+
+
+/* ============================================================
+   Card stack: real overlap, no gaps, cheap to animate.
+   ============================================================
+   The cards used to sit clamp(150px, 24vh, 260px) apart. That gap exposed the
+   section background between them, so instead of overlapping cards you saw a
+   cream strip and the effect read as broken. Zero margin means the next card
+   slides straight over the pinned one, and the card height alone provides the
+   scroll distance. */
+.card-stack {
+  --stack-top: clamp(84px, 10svh, 112px);
+  --stack-gap: clamp(10px, 1.4vw, 18px);
+  --stack-card-height: min(660px, calc(100svh - var(--stack-top) - 40px));
+  padding-bottom: clamp(40px, 8vh, 90px);
+}
+.stack-card {
+  min-height: max(480px, var(--stack-card-height));
+  margin-bottom: 0;
+  /* Composited transform only; the scroll handler no longer animates blur. */
+  will-change: transform;
+  transition:
+    box-shadow .4s var(--ease-out),
+    border-color .4s ease;
+}
+/* Zero gap is the whole point: the next card must start exactly where the
+   previous one ends, otherwise the section background shows through. The scroll
+   distance comes from the card height, not from a margin. */
+.stack-card + .stack-card { margin-top: 0; }
+.stack-card:last-child { margin-bottom: 0; }
+
+/* A covered card gets a flat shadow so the card above reads as being on top. */
+.stack-card.is-covered { box-shadow: 0 14px 34px rgba(7, 26, 61, .34); }
+
+@media (max-width: 760px) {
+  .card-stack {
+    --stack-top: 78px;
+    --stack-gap: 8px;
+    --stack-card-height: min(600px, calc(100svh - 118px));
+  }
+  .stack-card + .stack-card { margin-top: 0; }
+}
+
+/* ============================================================
+   Registration stepper: progress follows the fields, not the step.
+   ============================================================ */
+.form-progress__fill { width: var(--form-fill, 33.333%); transition: width .5s var(--ease-out); }
+.form-progress__runner { left: clamp(13px, var(--form-fill, 33.333%), calc(100% - 13px)); }
+
+.step-indicator__number::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--yellow);
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+.step-indicator.is-active .step-indicator__number::after { opacity: .55; }
+
+/* Whole shell inside one screen on phones: the sidebar becomes a top strip. */
+@media (max-width: 760px) {
+  #signup .form-shell { grid-template-columns: minmax(0, 1fr); }
+  #signup .form-sidebar { padding: 14px 12px 12px; }
+  #signup .form-sidebar h3 { display: none; }
+  #signup .form-sidebar::after { display: none; }
+  #signup .step-list { gap: 4px; }
+  #signup .step-indicator__number { width: 34px; height: 34px; }
+  #signup .step-indicator__digit { font-size: 13px; }
+  #signup .step-list::before { top: 17px; }
+  #signup .form-main { padding: 22px 14px 22px; }
+  #signup .form-step h3 { font-size: clamp(21px, 6vw, 27px); }
+  #signup .form-step__intro { margin-bottom: 14px; font-size: 12.5px; line-height: 1.5; }
+  #signup .form-grid { gap: 10px; }
+  #signup .field input,
+  #signup .field select { min-height: 48px; padding: 17px 12px 5px; }
+  #signup .field label { top: 15px; left: 12px; font-size: 13px; }
+  #signup .field textarea { min-height: 64px; }
+  #signup .form-nav { margin-top: 16px; gap: 8px; }
+  #signup .form-nav .btn { flex: 1 1 0; min-height: 46px; }
+}
+
+
+/* Phone: the third card carries the most copy and was 730px against a 693px
+   viewport, so the bottom of it was unreachable while pinned. */
+@media (max-width: 760px) {
+  .stack-card__inner { grid-template-rows: auto minmax(0, 1fr); }
+  .stack-card__visual { min-height: 150px; max-height: 34svh; }
+  .stack-card__visual svg { width: min(58%, 240px); }
+  .stack-card__copy { padding: 46px 20px 20px; }
+  .stack-card h3 { max-width: none; margin: 12px 0 8px; font-size: clamp(26px, 8vw, 34px); }
+  .stack-card p { font-size: 13.5px; line-height: 1.5; }
+  .stack-card__num { font-size: 11px; letter-spacing: .16em; }
+  .card-tags { gap: 6px; margin-top: 14px; }
+  .card-tag { padding: 5px 9px; font-size: 10px; letter-spacing: .06em; }
+  .stack-card::before { top: 14px; right: 14px; min-width: 68px; padding: 6px 9px; font-size: 10px; }
+}

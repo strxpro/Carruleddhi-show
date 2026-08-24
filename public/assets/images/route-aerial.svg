@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Illustrated aerial view of the Carruleddhi route</title>
+  <desc id="desc">A stylised top-down view of Santa Teresa Gallura, with streets, houses, vegetation and the sea.</desc>
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#79c9ef"/><stop offset="1" stop-color="#1766a5"/></linearGradient>
+    <linearGradient id="land" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f4e4b8"/><stop offset="1" stop-color="#d7c58f"/></linearGradient>
+    <pattern id="waves" width="66" height="32" patternUnits="userSpaceOnUse"><path d="M0 18c12-10 22-10 34 0s22 10 34 0" fill="none" stroke="#fff" stroke-opacity=".24" stroke-width="3"/></pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#071a3d" flood-opacity=".18"/></filter>
+  </defs>
+  <rect width="1200" height="900" fill="url(#land)"/>
+  <path d="M820 0h380v900H448c53-65 97-105 170-151 84-53 82-133 42-204-43-76-7-154 68-218C795 270 837 188 820 0Z" fill="url(#sea)"/>
+  <path d="M820 0c17 188-25 270-92 327-75 64-111 142-68 218 40 71 42 151-42 204-73 46-117 86-170 151" fill="none" stroke="#fff8dc" stroke-width="32" stroke-linecap="round" opacity=".9"/>
+  <path d="M840 0h360v900H485c40-38 89-77 151-115 118-72 105-182 63-255-33-56-9-117 56-173C831 293 872 185 840 0Z" fill="url(#waves)" opacity=".8"/>
+  <g fill="none" stroke="#fff8e7" stroke-linecap="round" filter="url(#shadow)">
+    <path d="M1064 52C949 106 915 176 876 242c-52 88-157 79-212 155-67 93 19 166-43 238-44 51-109 65-157 139-24 37-38 72-48 107" stroke-width="44"/>
+    <path d="M128 64c158 54 260 149 350 287 39 59 89 88 184 106" stroke-width="31"/>
+    <path d="M83 578c178-81 337-74 527-8" stroke-width="32"/>
+    <path d="M185 821c88-109 168-141 279-153" stroke-width="28"/>
+    <path d="M390 73c-18 121 27 219 127 300" stroke-width="25"/>
+  </g>
+  <g fill="none" stroke="#b9a76f" stroke-width="5" stroke-linecap="round" opacity=".8">
+    <path d="M1064 52C949 106 915 176 876 242c-52 88-157 79-212 155-67 93 19 166-43 238-44 51-109 65-157 139-24 37-38 72-48 107"/>
+    <path d="M128 64c158 54 260 149 350 287 39 59 89 88 184 106M83 578c178-81 337-74 527-8M185 821c88-109 168-141 279-153M390 73c-18 121 27 219 127 300"/>
+  </g>
+  <g fill="#fffaf0" stroke="#8e815d" stroke-width="4" filter="url(#shadow)">
+    <path d="M132 156h112v72H132z"/><path d="M271 203h91v102h-91z"/><path d="M78 329h136v88H78z"/><path d="M252 382h119v69H252z"/>
+    <path d="M438 118h124v93H438z"/><path d="M503 258h118v73H503z"/><path d="M155 493h102v62H155z"/><path d="M324 516h124v91H324z"/>
+    <path d="M107 660h125v82H107z"/><path d="M265 706h99v74h-99z"/><path d="M495 680h87v70h-87z"/>
+  </g>
+  <g fill="#e86a50" opacity=".92"><path d="m122 156 66-38 66 38Z"/><path d="m263 203 54-31 54 31Z"/><path d="m69 329 77-44 77 44Z"/><path d="m244 382 67-38 67 38Z"/><path d="m428 118 72-41 72 41Z"/><path d="m494 258 68-39 68 39Z"/><path d="m98 660 72-41 72 41Z"/><path d="m255 706 59-34 59 34Z"/></g>
+  <g fill="#3e926c" stroke="#23664d" stroke-width="4">
+    <circle cx="97" cy="99" r="35"/><circle cx="310" cy="101" r="28"/><circle cx="578" cy="91" r="34"/><circle cx="679" cy="190" r="30"/>
+    <circle cx="90" cy="488" r="33"/><circle cx="279" cy="590" r="36"/><circle cx="536" cy="466" r="32"/><circle cx="181" cy="787" r="30"/>
+  </g>
+  <!-- "SANTA TERESA GALLURA · ROUTE STUDY" was burnt into the artwork here. It read
+       like a watermark on a draft, it could not be translated, and the caption under
+       the figure already says where this is. Removed. "MARE" stays: it is one word,
+       it is the same word in the language of the place, and it orients the picture. -->
+  <g fill="#071a3d" font-family="Arial, sans-serif" font-weight="700" letter-spacing="3">
+    <text x="964" y="840" font-size="17" fill="#fff">MARE</text>
+  </g>
+  <g transform="translate(1080 112)" fill="none" stroke="#071a3d" stroke-width="5"><circle r="42" fill="#fff" fill-opacity=".82"/><path d="M0-29 9-5 0 0-9-5Z" fill="#f6494f"/><path d="M0 29 9 5 0 0-9 5Z" fill="#174ea6"/></g>
+</svg>

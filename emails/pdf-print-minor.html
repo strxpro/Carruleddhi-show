@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Carruleddhi Show 2026 — modulo per piloti minorenni</title>
+<!--
+  Print-ready form for riders under 18. Two pages:
+    page 1 — ITALIAN, the copy the guardian prints and signs
+    page 2 — TRANSLATED courtesy copy, never handed in
+
+  A SEPARATE FILE FROM pdf-print.html, ON PURPOSE.
+  The adult form is a self-declaration: the person racing accepts the risk on
+  their own behalf. This one is an authorisation given by somebody else for a
+  third person, and it also has to identify who is giving it. That is different
+  legal text, not a different greeting, so sharing one template would mean a
+  thicket of conditionals through the middle of a document that has to be exactly
+  right. The layout and the stylesheet are deliberately kept in step by hand.
+
+  Generate with:
+    powershell -ExecutionPolicy Bypass -File tools\make-pdf.ps1 -Minor
+-->
+<style>
+  @page { size: A4; margin: 12mm 13mm; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    color: #071a3d;
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.42;
+  }
+  .sheet { page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+
+  .warn {
+    margin: 0 0 4mm;
+    padding: 2.5mm 4mm;
+    border: 1.2pt dashed #c2410c;
+    border-radius: 2mm;
+    color: #9a3412;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 6mm;
+    padding-bottom: 3mm;
+    border-bottom: 1.4pt solid #071a3d;
+  }
+  .head__event { font-size: 7.5pt; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+  .head__title { margin: 1mm 0 0; font-size: 18pt; font-weight: 900; letter-spacing: -.4pt; line-height: 1.05; }
+  .head__meta { margin: 1mm 0 0; font-size: 9pt; color: #45577a; }
+  .head__badge {
+    display: inline-block;
+    margin: 1.5mm 0 0;
+    padding: .8mm 3mm;
+    border-radius: 6mm;
+    background: #071a3d;
+    color: #fff;
+    font-size: 7pt;
+    font-weight: 800;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .num { flex: none; padding: 2.5mm 5mm; border: 1.6pt solid #071a3d; border-radius: 2.5mm; text-align: center; }
+  .num small { display: block; font-size: 6.5pt; font-weight: 800; letter-spacing: .16em; }
+  .num b { font-size: 20pt; font-weight: 900; }
+
+  h2 {
+    margin: 6mm 0 2mm;
+    font-size: 8pt;
+    font-weight: 800;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 1.6mm 0; border-bottom: .5pt solid #d8dfea; vertical-align: top; }
+  td.k { width: 42mm; color: #45577a; }
+  td.v { font-weight: 700; }
+  .blank { display: block; min-height: 4.5mm; border-bottom: .8pt solid #071a3d; }
+
+  .decl { margin: 2mm 0 0; font-size: 8.8pt; text-align: justify; }
+  .decl li { margin-bottom: 1.2mm; }
+  .decl ol { margin: 1.5mm 0 0; padding-left: 5mm; }
+
+  .flag {
+    margin: 3mm 0 0;
+    padding: 2.5mm 4mm;
+    border-left: 2pt solid #ffc928;
+    background: #fffaeb;
+    font-size: 8.5pt;
+  }
+
+  ul.check { margin: 1.5mm 0 0; padding-left: 5mm; font-size: 9pt; }
+  ul.check li { margin-bottom: 1mm; }
+
+  .place { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8mm; margin-top: 6mm; }
+  .place__line { border-bottom: .8pt solid #071a3d; height: 6mm; }
+  .place span { font-size: 8pt; color: #45577a; }
+
+  .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin-top: 8mm; }
+  .sign__line { margin-top: 11mm; border-top: .8pt solid #071a3d; padding-top: 1.5mm; font-size: 8pt; color: #45577a; }
+  .sign__req { font-weight: 800; color: #071a3d; }
+
+  .foot { margin-top: 5mm; font-size: 7.5pt; color: #6b7c9c; }
+</style>
+</head>
+<body>
+
+<!-- =============== PAGE 1 — ITALIAN, THE ONE TO SIGN =============== -->
+<section class="sheet">
+  <div class="head">
+    <div>
+      <span class="head__event">Carruleddhi Show 2026</span>
+      <h1 class="head__title">Modulo di iscrizione per minorenni</h1>
+      <p class="head__meta">17 ottobre 2026 · Discesa Rena Bianca, Via Giuseppe Verdi, Santa Teresa Gallura (SS)</p>
+      <span class="head__badge">Autorizzazione del genitore o tutore legale</span>
+    </div>
+    <div class="num"><small>N.</small><b>{{RACE_NUMBER}}</b></div>
+  </div>
+
+  <h2>Dati del pilota minorenne</h2>
+  <table>
+    <tr><td class="k">Nome e cognome</td><td class="v">{{FULL_NAME}}</td></tr>
+    <tr><td class="k">Data di nascita</td><td class="v">{{BIRTH_DATE}}</td></tr>
+    <tr><td class="k">Età il giorno della gara</td><td class="v">{{RIDER_AGE}}</td></tr>
+    <tr><td class="k">CAP</td><td class="v">{{POSTAL_CODE}}</td></tr>
+    <tr><td class="k">Indirizzo</td><td class="v">{{ADDRESS}}</td></tr>
+  </table>
+
+  <h2>Chi esercita la responsabilità genitoriale</h2>
+  <table>
+    <tr><td class="k">Nome e cognome</td><td class="v">{{GUARDIAN_NAME}}</td></tr>
+    <tr><td class="k">In qualità di</td><td class="v">{{GUARDIAN_RELATION}}</td></tr>
+    <tr><td class="k">E-mail</td><td class="v">{{GUARDIAN_EMAIL}}</td></tr>
+    <tr><td class="k">Telefono</td><td class="v">{{GUARDIAN_PHONE}}</td></tr>
+    <tr><td class="k">Madre</td><td class="v">{{MOTHER_NAME}}</td></tr>
+    <tr><td class="k">Padre</td><td class="v">{{FATHER_NAME}}</td></tr>
+    <!-- Left blank on the printed form: an identity document number is checked
+         against the document itself at the start line, so it is written in by hand
+         in front of the organiser rather than mailed around in advance. -->
+    <tr><td class="k">Documento d'identità n.</td><td class="v"><span class="blank"></span></td></tr>
+  </table>
+
+  <h2>Dati del mezzo</h2>
+  <table>
+    <tr><td class="k">Nome del carruleddhu</td><td class="v">{{CART_NAME}}</td></tr>
+    <tr><td class="k">Categoria</td><td class="v">{{CATEGORY}}</td></tr>
+    <tr><td class="k">Team</td><td class="v">{{TEAM}}</td></tr>
+    <tr><td class="k">Note</td><td class="v">{{CART_NOTES}}</td></tr>
+  </table>
+
+  <h2>Dichiarazione e autorizzazione</h2>
+  <div class="decl">
+    Il sottoscritto, indicato sopra come esercente la responsabilità genitoriale o la
+    tutela legale del minore indicato sopra, dichiara:
+    <ol>
+      <li>di aver letto e di accettare integralmente il regolamento della manifestazione;</li>
+      <li>di autorizzare la partecipazione del minore alla discesa, consapevole della
+        natura dell'attività e dei rischi che comporta;</li>
+      <li>di assumersi la responsabilità per la condotta del minore durante la
+        manifestazione e per l'idoneità del mezzo presentato;</li>
+      <li>che il minore utilizzerà un casco omologato per tutta la durata della discesa
+        e presenterà il mezzo al controllo tecnico prima della partenza;</li>
+      <li>di essere presente alla partenza, oppure di delegare per iscritto un adulto
+        indicato nell'apposito spazio, munito di documento d'identità;</li>
+      <li>di acconsentire al trattamento dei dati per le sole finalità organizzative
+        della manifestazione.</li>
+    </ol>
+  </div>
+  <p class="flag">
+    Senza questo modulo firmato da chi esercita la responsabilità genitoriale, il minore
+    non prende il via. La firma del pilota, se in grado di apporla, non sostituisce quella
+    del genitore o del tutore.
+  </p>
+
+  <h2>Da portare il giorno della gara</h2>
+  <ul class="check">
+    <li>Questo modulo, stampato e firmato dal genitore o tutore</li>
+    <li>Documento d'identità valido di chi ha firmato</li>
+    <li>Documento d'identità del minore, se disponibile</li>
+    <li>Casco omologato — senza casco non si parte</li>
+  </ul>
+
+  <div class="place">
+    <div><span>Luogo</span><div class="place__line"></div></div>
+    <div><span>Data</span><div class="place__line"></div></div>
+  </div>
+
+  <div class="sign">
+    <div><div class="sign__line"><span class="sign__req">Firma del genitore o tutore legale (obbligatoria)</span></div></div>
+    <div><div class="sign__line">Firma del pilota (facoltativa)</div></div>
+  </div>
+
+  <p class="foot">
+    Carruleddhi Show 2026 · info@carruleddhishow.com · Documento generato il {{GENERATED_AT}}
+  </p>
+</section>
+
+<!-- =============== PAGE 2 — TRANSLATED COURTESY COPY =============== -->
+<section class="sheet" lang="pl">
+  <p class="warn">
+    Kopia informacyjna — nie podpisuj i nie oddawaj.
+    Do podpisu i oddania służy wyłącznie wersja włoska ze strony 1.
+  </p>
+
+  <div class="head">
+    <div>
+      <span class="head__event">Carruleddhi Show 2026</span>
+      <h1 class="head__title">Formularz dla zawodników niepełnoletnich</h1>
+      <p class="head__meta">17 października 2026 · Zjazd Rena Bianca, Via Giuseppe Verdi, Santa Teresa Gallura (SS)</p>
+      <span class="head__badge">Zgoda rodzica lub opiekuna prawnego</span>
+    </div>
+    <div class="num"><small>NR</small><b>{{RACE_NUMBER}}</b></div>
+  </div>
+
+  <h2>Dane zawodnika niepełnoletniego</h2>
+  <table>
+    <tr><td class="k">Imię i nazwisko</td><td class="v">{{FULL_NAME}}</td></tr>
+    <tr><td class="k">Data urodzenia</td><td class="v">{{BIRTH_DATE}}</td></tr>
+    <tr><td class="k">Wiek w dniu zjazdu</td><td class="v">{{RIDER_AGE}}</td></tr>
+    <tr><td class="k">Kod pocztowy</td><td class="v">{{POSTAL_CODE}}</td></tr>
+    <tr><td class="k">Adres</td><td class="v">{{ADDRESS}}</td></tr>
+  </table>
+
+  <h2>Osoba sprawująca opiekę prawną</h2>
+  <table>
+    <tr><td class="k">Imię i nazwisko</td><td class="v">{{GUARDIAN_NAME}}</td></tr>
+    <tr><td class="k">Jako</td><td class="v">{{GUARDIAN_RELATION_PL}}</td></tr>
+    <tr><td class="k">E-mail</td><td class="v">{{GUARDIAN_EMAIL}}</td></tr>
+    <tr><td class="k">Telefon</td><td class="v">{{GUARDIAN_PHONE}}</td></tr>
+    <tr><td class="k">Matka</td><td class="v">{{MOTHER_NAME}}</td></tr>
+    <tr><td class="k">Ojciec</td><td class="v">{{FATHER_NAME}}</td></tr>
+    <tr><td class="k">Dokument tożsamości nr</td><td class="v"><span class="blank"></span></td></tr>
+  </table>
+
+  <h2>Dane pojazdu</h2>
+  <table>
+    <tr><td class="k">Nazwa carruleddhu</td><td class="v">{{CART_NAME}}</td></tr>
+    <tr><td class="k">Kategoria</td><td class="v">{{CATEGORY}}</td></tr>
+    <tr><td class="k">Zespół</td><td class="v">{{TEAM}}</td></tr>
+    <tr><td class="k">Uwagi</td><td class="v">{{CART_NOTES}}</td></tr>
+  </table>
+
+  <h2>Oświadczenie i zgoda</h2>
+  <div class="decl">
+    Niżej podpisany, wskazany powyżej jako rodzic lub opiekun prawny wskazanego wyżej
+    małoletniego, oświadcza, że:
+    <ol>
+      <li>przeczytał i w całości akceptuje regulamin wydarzenia;</li>
+      <li>zgadza się na udział małoletniego w zjeździe, mając świadomość charakteru
+        aktywności i związanego z nią ryzyka;</li>
+      <li>przyjmuje odpowiedzialność za zachowanie małoletniego w trakcie wydarzenia
+        oraz za stan zgłoszonego pojazdu;</li>
+      <li>małoletni będzie używał atestowanego kasku przez cały czas zjazdu i przedstawi
+        pojazd do kontroli technicznej przed startem;</li>
+      <li>będzie obecny na starcie albo pisemnie upoważni wskazaną osobę dorosłą,
+        posiadającą dokument tożsamości;</li>
+      <li>zgadza się na przetwarzanie danych wyłącznie w celach organizacyjnych
+        wydarzenia.</li>
+    </ol>
+  </div>
+  <p class="flag">
+    Bez tego formularza podpisanego przez osobę sprawującą opiekę prawną małoletni nie
+    wystartuje. Podpis zawodnika nie zastępuje podpisu rodzica ani opiekuna.
+  </p>
+
+  <h2>Co zabrać w dniu zjazdu</h2>
+  <ul class="check">
+    <li>Wydrukowany i podpisany formularz w wersji WŁOSKIEJ (strona 1)</li>
+    <li>Ważny dokument tożsamości osoby, która podpisała</li>
+    <li>Dokument tożsamości małoletniego, jeśli posiada</li>
+    <li>Atestowany kask — bez kasku nie ma startu</li>
+  </ul>
+
+  <p class="foot">
+    Carruleddhi Show 2026 · info@carruleddhishow.com · Dokument wygenerowano {{GENERATED_AT}}
+  </p>
+</section>
+
+</body>
+</html>

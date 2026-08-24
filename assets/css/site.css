@@ -1,0 +1,13 @@
+/**
+ * Single stylesheet entry for index.html.
+ *
+ * Two separate <link> tags are not safe here: when Vite bundles them it emits
+ * the chunks in module-graph order, which inverted main.css and experience.css
+ * in production while dev kept document order. The overrides layer then lost
+ * every conflict in the built site only. One entry with ordered @import rules
+ * is inlined deterministically, so dev and production cascade identically.
+ */
+@import './main.css';
+@import './experience.css';
+@import './gallery-3d.css';
+@import './carnival.css';

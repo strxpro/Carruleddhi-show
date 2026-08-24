@@ -1,0 +1,287 @@
+/**
+ * Gallery — minimal coverflow, laid out as a grid.
+ *
+ * Cards move with translate, scale and opacity only: no blur, no perspective, no
+ * filters. That is the whole reason it feels smooth — an earlier cylinder version
+ * repainted five large blurred layers on every frame.
+ *
+ * Three things were wrong before and are fixed by the layout below.
+ *   1. The frame was scrubbed from min(980px,84vw) to 100vw × 100svh while you
+ *      scrolled, so the photos ballooned and slid sideways mid-animation.
+ *      The frame is now a fixed size and the pin only holds it still.
+ *   2. Heading, arrows, caption and dots were absolutely positioned inside the
+ *      stage, so the title sat underneath the fixed site header and the caption
+ *      overlapped the artwork. They are grid rows now.
+ *   3. .g3d__frame had overflow:hidden, which sliced the top and bottom off every
+ *      card that was taller than the frame. Nothing clips any more; the cards are
+ *      simply small enough to fit.
+ */
+
+.g3d {
+  position: relative;
+  display: grid;
+  width: 100%;
+  /* No min-height and no top padding of its own: the section owns the viewport and
+     its own header clearance, and this block fills whatever row is left. Setting
+     100svh here on top of the section's padding is what pushed the caption and
+     dots below the fold. */
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(10px, 2svh, 24px);
+  /* A shared 3D space for the cards to turn in. Without it rotateY collapses to
+     a flat squash. Kept generous so the turn reads as a lean, not a fisheye. */
+  perspective: 1600px;
+  perspective-origin: 50% 50%;
+}
+.g3d[hidden] { display: none !important; }
+
+/* One viewport for the whole gallery: intro copy on top, carousel below.
+   Previously the section stacked a full-height .g3d underneath a separate heading
+   block, so it ran to two and a half screens and nothing lined up.
+
+   Flexbox rather than percentage heights. The section only carries
+   `min-height: 100svh`, so its used height is `auto` as far as a child is
+   concerned, and `height: 100%` on the container resolved to auto — which
+   collapsed the carousel frame to 52 px. A definite `height` here plus `flex: 1`
+   down the chain gives the frame a real box to fill. */
+/* `#main > section.section-card` sets display:grid and outranks a bare `#gallery`,
+   so the section has to be addressed the same way to win the cascade. */
+#main > section.section-card#gallery {
+  display: flex;
+  height: 100svh;
+  flex-direction: column;
+  overflow: hidden;
+}
+#gallery > .container {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  gap: clamp(8px, 1.6svh, 22px);
+}
+#gallery .g3d { flex: 1 1 auto; min-height: 0; }
+
+/* The call-to-action after the carousel was a 256 px block, which together with
+   the 167 px intro left the photographs 140 px of a 635 px column — that is why
+   the frame had collapsed. It says the same thing as the sticky action bar and the
+   signup section, so here it becomes a single compact line. */
+#gallery .gallery-cta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 18px;
+  border-radius: 999px;
+}
+#gallery .gallery-cta__index,
+#gallery .gallery-cta p { display: none; }
+#gallery .gallery-cta h3 {
+  margin: 0;
+  font-size: clamp(13px, 1.35vw, 17px);
+  line-height: 1.15;
+}
+#gallery .gallery-cta__actions { display: flex; flex: none; gap: 8px; }
+#gallery .gallery-cta .btn { padding: 9px 16px; font-size: 12px; }
+#gallery .gallery__head {
+  margin-bottom: 0;
+  gap: clamp(12px, 2vw, 30px);
+  padding-bottom: 0;
+}
+#gallery .gallery__head::after { display: none; }
+#gallery .gallery__head .lead { font-size: clamp(13px, 1.25vw, 16px); line-height: 1.5; }
+#gallery .gallery__disclaimer { font-size: 11px; }
+/* The carousel already carries a title, so the section title is enough on its own
+   and the duplicate inside the carousel goes away on wide screens. */
+#gallery .g3d__heading { display: none; }
+
+.g3d__heading {
+  grid-row: 1;
+  margin: 0;
+  color: var(--navy-950);
+  font-family: var(--font-display);
+  font-size: clamp(24px, min(4.6vw, 6svh), 54px);
+  font-weight: 400;
+  letter-spacing: -.03em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* Arrows live in the frame row, one on each side of the stage, so they can never
+   sit on top of a photo. */
+.g3d__frame {
+  position: relative;
+  display: grid;
+  grid-row: 2;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: min(1020px, 94vw);
+  /* Fills the middle row but never grows past the cap, so a tall viewport does not
+     leave a field of empty paper above and below the photograph. */
+  height: 100%;
+  max-height: 470px;
+  align-items: center;
+  justify-items: center;
+  gap: clamp(4px, 1.4vw, 22px);
+}
+
+.g3d__stage {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  outline: none;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+}
+.g3d__stage.is-dragging { cursor: grabbing; }
+.g3d__stage:focus-visible { outline: 3px solid var(--coral); outline-offset: 6px; border-radius: 24px; }
+
+/* The ring is only a positioning anchor; every card is absolute inside it.
+   Height is capped against the row so a short viewport shrinks the card instead
+   of cropping it. */
+.g3d__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(320px, 58vw, calc((100% - 40px) * .42));
+  max-height: 100%;
+  aspect-ratio: 4 / 5;
+  transform: translate(-50%, -50%);
+}
+
+.g3d__card {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  will-change: transform, opacity;
+  /* No transition: every position change is tweened by GSAP or set during a drag,
+     so a CSS transition here would fight the tween and add lag. */
+}
+
+.g3d__media {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+  border: 3px solid var(--navy-950);
+  border-radius: clamp(18px, 2.2vw, 28px);
+  background: var(--blue-100);
+  box-shadow: 0 14px 34px rgba(7, 26, 61, .2);
+  transition: box-shadow .35s ease, border-color .35s ease;
+}
+/* Held oversized and pulled back to the left, so the parallax shift written by
+   render() has room to move in either direction without ever bringing the edge of
+   the photo into view. 112% wide offset by -6% keeps it centred at rest.
+   `will-change` because this transform changes on every frame of a drag. */
+.g3d__media img {
+  position: relative;
+  left: -6%;
+  width: 112%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* The centred card gets the fairground treatment: a hard offset shadow in the
+   same language as the buttons, plus a yellow plate peeking out behind it. */
+.g3d__card.is-front .g3d__media {
+  box-shadow: 10px 12px 0 var(--yellow), 0 26px 54px rgba(7, 26, 61, .26);
+}
+.g3d__card:not(.is-front):hover .g3d__media { border-color: var(--coral); }
+
+.g3d__nav {
+  z-index: 3;
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 3px solid var(--navy-950);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--navy-950);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(7, 26, 61, .35);
+  transition: transform .18s var(--ease-snap), box-shadow .18s var(--ease-snap), background .2s ease;
+}
+.g3d__nav--prev { grid-column: 1; }
+.g3d__nav--next { grid-column: 3; }
+.g3d__nav:hover { background: var(--yellow); transform: translateY(-2px); box-shadow: 0 6px 0 rgba(7, 26, 61, .35); }
+.g3d__nav:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(7, 26, 61, .35); }
+.g3d__nav:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+
+.g3d__footer {
+  display: grid;
+  grid-row: 3;
+  justify-items: center;
+  gap: clamp(10px, 1.8svh, 18px);
+}
+
+.g3d__caption {
+  width: min(520px, 86vw);
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--navy-950);
+  font-size: clamp(14px, 1.6vw, 17px);
+  font-weight: 700;
+  line-height: 1.45;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .28s ease, transform .38s var(--ease-out);
+}
+.g3d__caption.is-visible { opacity: 1; transform: none; }
+
+.g3d__dots { display: flex; gap: 10px; }
+.g3d__dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 2px solid var(--navy-950);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background .22s ease, transform .28s var(--ease-snap);
+}
+.g3d__dot:hover { background: var(--coral); }
+.g3d__dot.is-active { background: var(--yellow); transform: scale(1.45); }
+.g3d__dot:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  /* On a phone the intro paragraph and the disclaimer eat about 120 px that the
+     photographs need more. The eyebrow and the title still say what this is. */
+  #gallery .gallery__head > div:last-child { display: none; }
+  #gallery .gallery__head { grid-template-columns: minmax(0, 1fr); }
+
+  #gallery { height: 100svh; }
+  .g3d__frame { width: 96vw; max-height: 345px; gap: 2px; }
+  .g3d__ring { width: min(252px, 64vw); }
+  .g3d__nav { width: 42px; height: 42px; border-width: 2px; font-size: 17px; }
+  .g3d__media { border-width: 2px; }
+  .g3d__card.is-front .g3d__media { box-shadow: 7px 8px 0 var(--yellow), 0 18px 36px rgba(7, 26, 61, .24); }
+  .g3d__caption { font-size: 13.5px; }
+}
+
+/* No GSAP, or motion turned down: a plain tall block, still centred. */
+.g3d.is-static { min-height: 0; padding-block: clamp(30px, 6vh, 60px); }
+.g3d.is-static .g3d__frame { height: min(460px, 58svh); }
+
+@media (prefers-reduced-motion: reduce) {
+  .g3d__caption, .g3d__dot, .g3d__nav, .g3d__media { transition: none; }
+}
+
+@media print {
+  .g3d { display: none !important; }
+  [data-gallery-fallback] { display: grid !important; }
+}

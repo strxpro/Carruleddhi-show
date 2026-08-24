@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-e67e703d-bf5e-4ff9-a213-c8b9e2006e3d/styles.css">
+<script src="_ds/organic-e67e703d-bf5e-4ff9-a213-c8b9e2006e3d/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Bevan:ital@0;1&family=Barlow+Condensed:wght@400;500;600&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="./i18n-show.js"></script>
+<script src="./image-slot.js"></script>
+<style>
+  html, body, #dc-root, .sc-host { scroll-behavior: smooth; }
+  @keyframes crs-dash { to { stroke-dashoffset: -52; } }
+  body { margin: 0; -webkit-font-smoothing: antialiased; background: #17150f; }
+  a { color: inherit; }
+  @keyframes crs-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  @keyframes crs-pop { from { opacity: 0; transform: translateY(20px) scale(.96); } to { opacity: 1; transform: none; } }
+  @keyframes crs-wheel { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes crs-drift { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-16px) rotate(2deg); } }
+</style>
+</helmet>
+
+<div style="--c-cream: #f7ecd8; --c-ink: #17150f; --c-red: #d63a2b; --c-yellow: #f2b520; --c-indigo: #21306e; --c-green: #2f7a45; --f-disp: 'Bevan', Georgia, serif; --f-meta: 'Barlow Condensed', sans-serif; --f-body: 'Archivo', system-ui, sans-serif; position: relative; background: var(--c-ink); font-family: var(--f-body); color: var(--c-ink);">
+
+  <sc-if value="{{ preOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; z-index: 400; pointer-events: none;">
+      <div style="position: absolute; top: 0; left: 0; width: 50.2%; height: 100%; background: var(--c-ink); transition: transform 1s cubic-bezier(.76,0,.24,1); transform: translateX({{ preLeft }});"></div>
+      <div style="position: absolute; top: 0; right: 0; width: 50.2%; height: 100%; background: var(--c-ink); transition: transform 1s cubic-bezier(.76,0,.24,1); transform: translateX({{ preRight }});"></div>
+      <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(16px, 3vw, 32px); padding: 24px; transition: opacity .5s ease; opacity: {{ preFade }};">
+        <div style="font-family: var(--f-meta); font-size: clamp(11px, 1.4vw, 14px); letter-spacing: 0.4em; text-transform: uppercase; color: var(--c-yellow);">Santa Teresa Gallura</div>
+        <div style="overflow: hidden; padding: 0 6px;">
+          <div style="font-family: var(--f-disp); font-size: clamp(30px, 8.5vw, 104px); line-height: 1; letter-spacing: 0.01em; color: var(--c-cream); transition: transform .9s cubic-bezier(.16,1,.3,1); transform: translateY({{ preWord }});">CARRULEDDHI</div>
+        </div>
+        <div style="position: relative; width: min(420px, 70vw); height: 3px; background: rgba(247,236,216,.18);">
+          <div style="position: absolute; inset: 0 auto 0 0; width: {{ prePct }}; background: var(--c-red);"></div>
+          <div style="position: absolute; top: -11px; left: {{ prePct }}; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%; background: var(--c-yellow); display: grid; place-items: center; transform: rotate({{ preRot }});">
+            <div style="width: 2px; height: 14px; background: var(--c-ink);"></div>
+          </div>
+        </div>
+        <div style="font-family: var(--f-meta); font-size: clamp(28px, 5vw, 44px); letter-spacing: 0.1em; color: var(--c-cream);">{{ preNum }}</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div data-progress="" style="position: fixed; top: 0; left: 0; height: 3px; width: 0%; background: var(--c-yellow); z-index: 120;"></div>
+
+  <div data-header="" style="position: fixed; top: clamp(10px, 2vw, 20px); left: 50%; transform: translateX(-50%); z-index: 110; display: flex; align-items: center; gap: clamp(6px, 1.2vw, 14px); padding: 7px; border-radius: 999px; background: {{ hdrBg }}; box-shadow: {{ hdrShadow }}; max-width: calc(100vw - clamp(14px, 4vw, 40px)); transition: background .45s ease, box-shadow .45s ease, gap .45s cubic-bezier(.16,1,.3,1);">
+    <button type="button" data-header-brand="" onClick="{{ toggleHeader }}" style="flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 5px 12px; border: 0; border-radius: 999px; background: transparent; cursor: pointer; text-align: left; color: var(--c-cream); transition: background .35s ease;" style-hover="background: rgba(247,236,216,.1);">
+      <span style="font-family: var(--f-disp); font-size: clamp(13px, 1.6vw, 16px); line-height: 1; letter-spacing: 0.01em;">Carruleddhi</span>
+      <span data-i18n="nav.brandsub" style="font-family: var(--f-meta); font-size: 10px; line-height: 1; letter-spacing: 0.18em; text-transform: uppercase; opacity: .6;">17 ottobre 2026</span>
+    </button>
+    <div data-header-rest="" style="display: flex; align-items: center; gap: clamp(8px, 1.6vw, 18px); overflow: hidden; max-width: {{ hdrMax }}; opacity: {{ hdrOp }}; transition: max-width .55s cubic-bezier(.16,1,.3,1), opacity .35s ease;">
+      <nav style="display: flex; gap: clamp(8px, 1.1vw, 15px); overflow-x: auto; scrollbar-width: none; padding: 2px 0;">
+        <a href="#story" data-nav-link="" data-fit="" data-i18n="nav.story" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">La gara</a>
+        <a href="#categorie" data-nav-link="" data-fit="" data-i18n="nav.categories" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">Categorie</a>
+        <a href="#percorso" data-nav-link="" data-fit="" data-i18n="nav.route" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">Percorso</a>
+        <a href="#programma" data-nav-link="" data-fit="" data-i18n="nav.program" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">Programma</a>
+        <a href="#premi" data-nav-link="" data-fit="" data-i18n="nav.prizes" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">Premi</a>
+        <a href="#galleria" data-nav-link="" data-fit="" data-i18n="nav.gallery" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">Galleria</a>
+        <a href="#contatti" data-nav-link="" data-fit="" data-i18n="nav.contact" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; color: var(--c-cream); text-decoration: none; opacity: .72; transition: opacity .25s, color .25s;" style-hover="opacity: 1; color: var(--c-yellow);">Contatti</a>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 5px; flex: none; padding-left: 2px;">
+        <button type="button" data-lang="it" title="Italiano" onClick="{{ setLangIt }}" style="width: 22px; height: 22px; flex: none; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; overflow: hidden; background: linear-gradient(90deg, #008C45 0 33.33%, #F4F5F0 33.33% 66.66%, #CD212A 66.66% 100%); box-shadow: 0 0 0 1px rgba(247,236,216,.28) inset; transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s;" style-hover="transform: scale(1.14);"></button>
+        <button type="button" data-lang="pl" title="Polski" onClick="{{ setLangPl }}" style="width: 22px; height: 22px; flex: none; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; overflow: hidden; background: linear-gradient(180deg, #F7ECD8 0 50%, #DC143C 50% 100%); box-shadow: 0 0 0 1px rgba(247,236,216,.28) inset; transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s;" style-hover="transform: scale(1.14);"></button>
+        <button type="button" data-lang="de" title="Deutsch" onClick="{{ setLangDe }}" style="width: 22px; height: 22px; flex: none; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; overflow: hidden; background: linear-gradient(180deg, #17150F 0 33.33%, #DD0000 33.33% 66.66%, #FFCE00 66.66% 100%); box-shadow: 0 0 0 1px rgba(247,236,216,.28) inset; transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s;" style-hover="transform: scale(1.14);"></button>
+        <button type="button" data-lang="es" title="Español" onClick="{{ setLangEs }}" style="width: 22px; height: 22px; flex: none; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; overflow: hidden; background: linear-gradient(180deg, #AA151B 0 25%, #F1BF00 25% 75%, #AA151B 75% 100%); box-shadow: 0 0 0 1px rgba(247,236,216,.28) inset; transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s;" style-hover="transform: scale(1.14);"></button>
+        <button type="button" data-lang="fr" title="Français" onClick="{{ setLangFr }}" style="width: 22px; height: 22px; flex: none; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; overflow: hidden; background: linear-gradient(90deg, #002395 0 33.33%, #F7ECD8 33.33% 66.66%, #ED2939 66.66% 100%); box-shadow: 0 0 0 1px rgba(247,236,216,.28) inset; transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s;" style-hover="transform: scale(1.14);"></button>
+        <button type="button" data-lang="en" title="English" onClick="{{ setLangEn }}" style="width: 22px; height: 22px; flex: none; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; overflow: hidden; background: linear-gradient(180deg, transparent 0 38%, #F7ECD8 38% 62%, transparent 62%), linear-gradient(90deg, transparent 0 38%, #F7ECD8 38% 62%, transparent 62%), linear-gradient(180deg, transparent 0 44%, #CD212A 44% 56%, transparent 56%), linear-gradient(90deg, transparent 0 44%, #CD212A 44% 56%, transparent 56%), #012169; box-shadow: 0 0 0 1px rgba(247,236,216,.28) inset; transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .25s;" style-hover="transform: scale(1.14);"></button>
+      </div>
+      <button type="button" data-i18n="nav.signup" onClick="{{ openForm }}" style="flex: none; border: 0; cursor: pointer; font-family: var(--f-disp); font-size: 14px; padding: 10px 20px; border-radius: 999px; background: var(--c-red); color: var(--c-cream); white-space: nowrap; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s;" style-hover="transform: translateY(-2px); box-shadow: 0 10px 22px rgba(214,58,43,.45);">Iscriviti</button>
+    </div>
+  </div>
+
+  <div data-curtain="" style="position: fixed; inset: 0; z-index: 190; background: var(--c-ink); pointer-events: none; opacity: 0; transform: translateY(100%); border-radius: 50% 50% 0 0 / 12% 12% 0 0; transition: transform .55s cubic-bezier(.76,0,.24,1), opacity .25s ease;">
+    <div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-family: var(--f-disp); font-size: clamp(18px, 3vw, 34px); color: var(--c-yellow); letter-spacing: 0.02em;">Carruleddhi</div>
+  </div>
+
+  <section id="hero" data-screen-label="Hero" style="position: relative; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; gap: clamp(30px, 6vh, 64px); padding: clamp(128px, 19vh, 210px) clamp(18px, 4vw, 56px) clamp(120px, 17vh, 170px); background: var(--c-cream); overflow: hidden;">
+    <div style="position: absolute; top: -14%; right: -16%; width: min(64vw, 780px); height: min(64vw, 780px); animation: crs-drift 15s ease-in-out infinite;">
+      <div data-par="0.22" style="width: 100%; height: 100%; border-radius: 50%; background: var(--c-yellow); opacity: .34;"></div>
+    </div>
+    <div style="position: relative; max-width: 1320px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: clamp(22px, 3.6vw, 42px);">
+      <div style="display: inline-flex; align-self: flex-start; align-items: center; gap: 12px; padding: 8px 20px 8px 10px; border-radius: 999px; background: var(--c-ink); color: var(--c-cream);">
+        <span style="width: 22px; height: 22px; border-radius: 50%; background: var(--c-yellow); display: grid; place-items: center; animation: crs-wheel 5s linear infinite;"><span style="width: 2px; height: 13px; background: var(--c-ink); display: block;"></span></span>
+        <span data-i18n="hero.kicker" style="font-family: var(--f-meta); font-size: clamp(13px, 1.5vw, 17px); letter-spacing: 0.18em; text-transform: uppercase;">17 ottobre 2026 · Santa Teresa Gallura</span>
+      </div>
+      <h1 style="font-family: var(--f-disp); font-size: clamp(40px, 9.6vw, 172px); line-height: .88; letter-spacing: -0.02em; margin: 0; color: var(--c-ink);">CARRULEDDHI<br><span style="color: var(--c-red);">SHOW</span> <span style="-webkit-text-stroke: clamp(2px, .4vw, 4px) var(--c-ink); color: transparent;">2026</span></h1>
+      <p data-i18n="hero.tagline" style="font-family: var(--f-disp); font-size: clamp(20px, 3.2vw, 44px); line-height: 1.1; margin: 0; max-width: 24ch; color: var(--c-indigo);">Nessun motore. Solo la discesa.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: clamp(10px, 1.6vw, 16px);">
+        <button type="button" data-i18n="nav.signup" onClick="{{ openForm }}" style="border: 0; cursor: pointer; font-family: var(--f-disp); font-size: clamp(17px, 2.2vw, 26px); padding: clamp(16px, 2vw, 22px) clamp(30px, 3.4vw, 46px); border-radius: 999px; background: var(--c-red); color: var(--c-cream); transition: transform .4s cubic-bezier(.16,1,.3,1), box-shadow .4s;" style-hover="transform: translateY(-5px) scale(1.02); box-shadow: 0 18px 40px rgba(214,58,43,.42);">Iscriviti</button>
+        <button type="button" data-i18n="count.attendCta" onClick="{{ openNotify }}" style="border: 2px solid var(--c-ink); cursor: pointer; font-family: var(--f-disp); font-size: clamp(17px, 2.2vw, 26px); padding: clamp(14px, 1.8vw, 20px) clamp(26px, 3vw, 40px); border-radius: 999px; background: transparent; color: var(--c-ink); transition: transform .4s cubic-bezier(.16,1,.3,1), background .3s, color .3s;" style-hover="transform: translateY(-5px); background: var(--c-ink); color: var(--c-cream);">Sarò all'evento</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <span style="display: inline-flex; align-items: baseline; gap: 10px; padding: 12px 22px; border-radius: 999px; background: var(--c-ink); color: var(--c-cream);">
+          <strong data-count-pilots="" style="font-family: var(--f-disp); font-size: clamp(20px, 2.6vw, 30px); font-weight: 400; color: var(--c-yellow);">0</strong>
+          <span data-i18n="count.pilots" style="font-family: var(--f-meta); font-size: clamp(13px, 1.5vw, 16px); letter-spacing: 0.14em; text-transform: uppercase;">piloti iscritti</span>
+        </span>
+        <span style="display: inline-flex; align-items: baseline; gap: 10px; padding: 12px 22px; border-radius: 999px; border: 2px solid rgba(23,21,15,.22); color: var(--c-ink);">
+          <strong data-count-attend="" style="font-family: var(--f-disp); font-size: clamp(20px, 2.6vw, 30px); font-weight: 400; color: var(--c-red);">0</strong>
+          <span data-i18n="count.attend" style="font-family: var(--f-meta); font-size: clamp(13px, 1.5vw, 16px); letter-spacing: 0.14em; text-transform: uppercase;">dicono che ci saranno</span>
+        </span>
+      </div>
+    </div>
+    <a href="#story" data-nav-link="" style="position: relative; align-self: center; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: rgba(23,21,15,.55); font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase;">
+      <span data-i18n="hero.scroll">Scorri</span>
+      <span style="width: 26px; height: 26px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font-size: 12px;">↓</span>
+    </a>
+  </section>
+
+  <section id="story" data-screen-label="La gara" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(90px, 12vh, 120px); background: var(--c-indigo); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.35);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%; display: flex; flex-wrap: wrap; gap: clamp(28px, 6vw, 90px);">
+      <div style="flex: 1 1 380px;" data-reveal="">
+        <div data-i18n="story.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 16px;">La gara</div>
+        <h2 data-i18n="story.title" style="font-family: var(--f-disp); font-size: clamp(30px, 6vw, 76px); line-height: .98; margin: 0 0 22px;">Un paese in discesa.</h2>
+        <p data-i18n="story.body" style="font-size: clamp(15px, 1.8vw, 20px); line-height: 1.6; margin: 0 0 14px; max-width: 46ch; color: rgba(247,236,216,.88);">I Carruleddhi sono carretti costruiti a mano. Nessun motore, nessuna propulsione: si scende con la forza di gravità e si frena con il piede, con una leva o con una corda.</p>
+        <p data-i18n="story.body2" style="font-size: clamp(15px, 1.8vw, 20px); line-height: 1.6; margin: 0; max-width: 46ch; color: rgba(247,236,216,.7);">Le forme sono spesso bizzarre. Alcuni sono più veloci, altri fanno solo spettacolo — e c'è un premio anche per questo.</p>
+      </div>
+      <div style="flex: 1 1 320px; display: flex; flex-direction: column; gap: clamp(10px, 1.6vw, 18px); align-self: center;">
+        <div data-reveal="" style="display: flex; align-items: baseline; gap: 18px; padding: clamp(14px, 2vw, 22px) clamp(18px, 2.4vw, 28px); border-radius: clamp(18px, 2.4vw, 30px); background: var(--c-yellow); color: var(--c-ink); transition: transform .45s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateX(10px);">
+          <span data-i18n="stat.1v" style="font-family: var(--f-disp); font-size: clamp(34px, 5vw, 62px); line-height: 1;">0</span>
+          <span data-i18n="stat.1l" style="font-family: var(--f-meta); font-size: clamp(15px, 1.8vw, 20px); letter-spacing: 0.16em; text-transform: uppercase;">motori</span>
+        </div>
+        <div data-reveal="" style="display: flex; align-items: baseline; gap: 18px; padding: clamp(14px, 2vw, 22px) clamp(18px, 2.4vw, 28px); border-radius: clamp(18px, 2.4vw, 30px); background: var(--c-red); color: var(--c-cream); transition: transform .45s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateX(10px);">
+          <span data-i18n="stat.2v" style="font-family: var(--f-disp); font-size: clamp(34px, 5vw, 62px); line-height: 1;">2</span>
+          <span data-i18n="stat.2l" style="font-family: var(--f-meta); font-size: clamp(15px, 1.8vw, 20px); letter-spacing: 0.16em; text-transform: uppercase;">categorie</span>
+        </div>
+        <div data-reveal="" style="display: flex; align-items: baseline; gap: 18px; padding: clamp(14px, 2vw, 22px) clamp(18px, 2.4vw, 28px); border-radius: clamp(18px, 2.4vw, 30px); background: var(--c-green); color: var(--c-cream); transition: transform .45s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateX(10px);">
+          <span data-i18n="stat.3v" style="font-family: var(--f-disp); font-size: clamp(34px, 5vw, 62px); line-height: 1;">12</span>
+          <span data-i18n="stat.3l" style="font-family: var(--f-meta); font-size: clamp(15px, 1.8vw, 20px); letter-spacing: 0.16em; text-transform: uppercase;">premi</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="categorie" data-screen-label="Categorie" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(90px, 12vh, 120px); background: var(--c-yellow); color: var(--c-ink); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%;">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: clamp(22px, 3.4vw, 44px);" data-reveal="">
+        <div>
+          <div data-i18n="cat.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-red); margin-bottom: 12px;">Mezzi ammessi</div>
+          <h2 data-i18n="cat.title" style="font-family: var(--f-disp); font-size: clamp(30px, 6vw, 76px); line-height: .98; margin: 0;">Due categorie.</h2>
+        </div>
+        <p data-i18n="cat.note" style="margin: 0; font-size: 14px; line-height: 1.5; max-width: 34ch; color: rgba(23,21,15,.7);">Un mezzo Classic che non rispetta queste regole corre nella categoria ART.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: clamp(14px, 2.2vw, 26px);">
+        <div data-reveal="" style="background: var(--c-cream); border-radius: clamp(20px, 3vw, 36px); padding: clamp(22px, 3vw, 38px); display: flex; flex-direction: column; gap: 14px; transition: transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s;" style-hover="transform: translateY(-10px) rotate(-1deg); box-shadow: 0 24px 50px rgba(23,21,15,.22);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <span style="font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--c-red);">A</span>
+            <span style="width: 34px; height: 34px; border-radius: 50%; background: var(--c-ink); display: grid; place-items: center;"><span style="width: 2px; height: 18px; background: var(--c-yellow); display: block;"></span></span>
+          </div>
+          <h3 data-i18n="cat.classic" style="font-family: var(--f-disp); font-size: clamp(22px, 3.2vw, 38px); line-height: 1.02; margin: 0;">Carruleddhi Classic</h3>
+          <p data-i18n="cat.classicSpec" style="margin: 0; font-size: clamp(14px, 1.5vw, 16px); line-height: 1.6; color: rgba(23,21,15,.78);">Telaio in legno con 4 ruote piene o con cuscinetti a sfera. Guida con i piedi o con la corda, freno con il piede o con la leva. Costruzione artigianale di qualsiasi grandezza.</p>
+        </div>
+        <div data-reveal="" style="background: var(--c-ink); color: var(--c-cream); border-radius: clamp(20px, 3vw, 36px); padding: clamp(22px, 3vw, 38px); display: flex; flex-direction: column; gap: 14px; transition: transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s;" style-hover="transform: translateY(-10px) rotate(1deg); box-shadow: 0 24px 50px rgba(23,21,15,.35);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+            <span style="font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--c-yellow);">B</span>
+            <span style="width: 34px; height: 34px; border-radius: 50%; background: var(--c-red); display: grid; place-items: center;"><span style="width: 2px; height: 18px; background: var(--c-cream); display: block;"></span></span>
+          </div>
+          <h3 data-i18n="cat.art" style="font-family: var(--f-disp); font-size: clamp(22px, 3.2vw, 38px); line-height: 1.02; margin: 0;">Carruleddhi ART</h3>
+          <p data-i18n="cat.artSpec" style="margin: 0; font-size: clamp(14px, 1.5vw, 16px); line-height: 1.6; color: rgba(247,236,216,.8);">Telaio in qualsiasi materiale, purché di costruzione artigianale. Da 4 a 10 ruote di qualsiasi tipo. Freni di qualsiasi tipo: leva diretta in legno, disco, tamburo o V-Brake. Guida e grandezza libere.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="percorso" data-screen-label="Percorso" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(90px, 12vh, 120px); background: var(--c-green); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3); overflow: hidden;">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%; display: flex; flex-wrap: wrap; gap: clamp(24px, 4vw, 60px); align-items: center;">
+      <div style="flex: 1 1 300px;" data-reveal="">
+        <div data-i18n="route.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 14px;">Il percorso</div>
+        <h2 data-i18n="route.title" style="font-family: var(--f-disp); font-size: clamp(30px, 5.6vw, 70px); line-height: .98; margin: 0 0 18px;">Giù verso il mare.</h2>
+        <p data-i18n="route.body" style="font-size: clamp(15px, 1.7vw, 19px); line-height: 1.6; margin: 0 0 12px; max-width: 40ch; color: rgba(247,236,216,.85);">Partenza dalla discesa della Rena Bianca, via Giuseppe Verdi. Presentazione dei carruleddhi in piazza, poi tutti in salita a piedi e giù a rotta di collo.</p>
+        <p data-i18n="route.maphint" style="font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 20px; color: var(--c-yellow);">Clicca la foto per il percorso su Google Maps</p>
+        <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;">
+          <span data-i18n="route.t1" style="font-family: var(--f-meta); font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 16px; border-radius: 999px; background: var(--c-yellow); color: var(--c-ink);">Partenza · Rena Bianca</span>
+          <span data-i18n="route.t2" style="font-family: var(--f-meta); font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 16px; border-radius: 999px; background: rgba(247,236,216,.16); color: var(--c-cream);">Via Giuseppe Verdi</span>
+          <span data-i18n="route.t3" style="font-family: var(--f-meta); font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 16px; border-radius: 999px; background: var(--c-red); color: var(--c-cream);">Arrivo · paese</span>
+        </div>
+      </div>
+      <a href="https://maps.app.goo.gl/MZLJyzTH3tC93Pm86" target="_blank" rel="noopener" style="flex: 1 1 380px; min-width: 0; position: relative; display: block; border-radius: clamp(20px, 3vw, 40px); overflow: hidden; aspect-ratio: 16 / 11; box-shadow: 0 26px 60px rgba(0,0,0,.35); text-decoration: none; transition: transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s;" style-hover="transform: translateY(-6px); box-shadow: 0 34px 70px rgba(0,0,0,.45);" data-reveal="">
+        <img data-parallax="" src="uploads/route_photo-1786905081534-uhs1.png" alt="La discesa verso Rena Bianca" style="width: 100%; height: 118%; object-fit: cover; position: absolute; top: -9%; left: 0; will-change: transform;">
+        <span style="position: absolute; left: 14px; bottom: 14px; padding: 6px 14px; border-radius: 999px; background: rgba(23,21,15,.78); color: var(--c-cream); font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;">Rena Bianca</span>
+        <span style="position: absolute; right: 14px; top: 14px; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; background: var(--c-yellow); color: var(--c-ink); font-family: var(--f-disp); font-size: 14px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--c-red);"></span>
+          <span data-i18n="route.map">Apri la mappa</span>
+        </span>
+      </a>
+    </div>
+  </section>
+
+  <section id="programma" data-screen-label="Programma" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(90px, 12vh, 120px); background: var(--c-red); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%;">
+      <div data-i18n="prog.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 12px;" data-reveal="">17 ottobre 2026</div>
+      <h2 data-i18n="prog.title" style="font-family: var(--f-disp); font-size: clamp(30px, 6vw, 76px); line-height: .98; margin: 0 0 clamp(20px, 3vw, 40px);" data-reveal="">Programma.</h2>
+      <div style="display: flex; flex-direction: column;">
+        <div data-reveal="" style="display: flex; flex-wrap: wrap; align-items: baseline; gap: clamp(12px, 3vw, 44px); padding: clamp(16px, 2.4vw, 26px) 0; border-top: 2px solid rgba(247,236,216,.3); transition: padding-left .4s cubic-bezier(.16,1,.3,1);" style-hover="padding-left: 16px;">
+          <span data-i18n="prog.1t" style="font-family: var(--f-disp); font-size: clamp(28px, 4.6vw, 58px); line-height: 1; min-width: 140px; color: var(--c-yellow);">12.00</span>
+          <span data-i18n="prog.1b" style="font-size: clamp(15px, 1.9vw, 21px);">Presentazione dei carruleddhi in piazza</span>
+        </div>
+        <div data-reveal="" style="display: flex; flex-wrap: wrap; align-items: baseline; gap: clamp(12px, 3vw, 44px); padding: clamp(16px, 2.4vw, 26px) 0; border-top: 2px solid rgba(247,236,216,.3); transition: padding-left .4s cubic-bezier(.16,1,.3,1);" style-hover="padding-left: 16px;">
+          <span data-i18n="prog.2t" style="font-family: var(--f-disp); font-size: clamp(28px, 4.6vw, 58px); line-height: 1; min-width: 140px; color: var(--c-yellow);">14.30</span>
+          <span data-i18n="prog.2b" style="font-size: clamp(15px, 1.9vw, 21px);">Partenza della gara</span>
+        </div>
+        <div data-reveal="" style="display: flex; flex-wrap: wrap; align-items: baseline; gap: clamp(12px, 3vw, 44px); padding: clamp(16px, 2.4vw, 26px) 0; border-top: 2px solid rgba(247,236,216,.3); border-bottom: 2px solid rgba(247,236,216,.3); transition: padding-left .4s cubic-bezier(.16,1,.3,1);" style-hover="padding-left: 16px;">
+          <span data-i18n="prog.3t" style="font-family: var(--f-disp); font-size: clamp(28px, 4.6vw, 58px); line-height: 1; min-width: 140px; color: var(--c-yellow);">Sera</span>
+          <span data-i18n="prog.3b" style="font-size: clamp(15px, 1.9vw, 21px);">Premiazione</span>
+        </div>
+      </div>
+      <div data-reveal="" style="display: inline-flex; align-items: center; gap: 10px; margin-top: clamp(20px, 3vw, 34px); padding: 10px 20px; border-radius: 999px; background: var(--c-cream); color: var(--c-ink);">
+        <span style="width: 9px; height: 9px; border-radius: 50%; background: var(--c-green);"></span>
+        <span data-i18n="prog.note" style="font-family: var(--f-meta); font-size: clamp(14px, 1.7vw, 18px); letter-spacing: 0.08em; text-transform: uppercase;">Panino e bevanda gratis per chi parte.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="premi" data-screen-label="Premi" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(84px, 12vh, 140px); background: var(--c-ink); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3); overflow: hidden;">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%;">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: clamp(30px, 4.4vw, 56px);" data-reveal="">
+        <div>
+          <div data-i18n="prize.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 14px;">Categorie e premi</div>
+          <h2 data-i18n="prize.title" style="font-family: var(--f-disp); font-size: clamp(38px, 8vw, 108px); line-height: .92; margin: 0;">Dodici premi.</h2>
+        </div>
+        <p data-i18n="prize.sub" style="margin: 0; font-family: var(--f-meta); font-size: clamp(15px, 1.9vw, 21px); letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-red); max-width: 24ch;">Vince chi è veloce. E anche chi non lo è.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: clamp(20px, 3vw, 44px); align-items: start;">
+        <div data-reveal="" style="position: relative; border-radius: clamp(26px, 4vw, 46px); padding: clamp(26px, 3.4vw, 46px); background: {{ prizeBg }}; color: {{ prizeFg }}; overflow: hidden; transition: background .6s ease, color .6s ease; min-height: clamp(340px, 44vh, 460px); display: flex; flex-direction: column; justify-content: space-between; gap: 24px;">
+          <svg viewBox="0 0 220 220" aria-hidden="true" data-par="0.1" style="position: absolute; right: -28px; bottom: -34px; width: clamp(180px, 26vw, 300px); opacity: .3;">
+            <circle cx="110" cy="110" r="86" fill="none" stroke="currentColor" stroke-width="5"></circle>
+            <circle cx="110" cy="110" r="16" fill="currentColor"></circle>
+            <g stroke="currentColor" stroke-width="4" style="transform-origin: 110px 110px; animation: crs-wheel 9s linear infinite;">
+              <line x1="110" y1="26" x2="110" y2="194"></line>
+              <line x1="26" y1="110" x2="194" y2="110"></line>
+              <line x1="51" y1="51" x2="169" y2="169"></line>
+              <line x1="169" y1="51" x2="51" y2="169"></line>
+            </g>
+            <path d="M6 24 C 60 24, 96 66, 150 118 S 196 186, 214 200" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="14 12" style="animation: crs-dash 2.4s linear infinite;"></path>
+          </svg>
+          <div style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <span style="font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.26em; text-transform: uppercase; opacity: .72;">{{ prizeRank }}</span>
+            <span data-i18n="prize.tap" style="font-family: var(--f-meta); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; opacity: .6;">Scegli un premio</span>
+          </div>
+          <div style="position: relative;">
+            <div style="font-family: var(--f-disp); font-size: clamp(76px, 15vw, 168px); line-height: .82; letter-spacing: -0.02em;">{{ prizeNum }}</div>
+            <div style="font-family: var(--f-disp); font-size: clamp(24px, 3.6vw, 46px); line-height: 1.04; margin-top: 14px; max-width: 22ch;">{{ prizeName }}</div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px;" data-reveal="">
+        <button type="button" onClick="{{ pick1 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz1Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz1Bg }}; color: {{ pz1Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">01</span>
+          <span data-i18n="prize.1" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick2 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz2Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz2Bg }}; color: {{ pz2Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">02</span>
+          <span data-i18n="prize.2" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick3 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz3Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz3Bg }}; color: {{ pz3Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">03</span>
+          <span data-i18n="prize.3" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick4 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz4Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz4Bg }}; color: {{ pz4Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">04</span>
+          <span data-i18n="prize.4" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick5 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz5Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz5Bg }}; color: {{ pz5Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">05</span>
+          <span data-i18n="prize.5" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick6 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz6Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz6Bg }}; color: {{ pz6Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">06</span>
+          <span data-i18n="prize.6" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick7 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz7Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz7Bg }}; color: {{ pz7Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">07</span>
+          <span data-i18n="prize.7" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick8 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz8Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz8Bg }}; color: {{ pz8Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">08</span>
+          <span data-i18n="prize.8" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick9 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz9Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz9Bg }}; color: {{ pz9Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">09</span>
+          <span data-i18n="prize.9" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick10 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz10Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz10Bg }}; color: {{ pz10Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">10</span>
+          <span data-i18n="prize.10" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick11 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz11Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz11Bg }}; color: {{ pz11Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">11</span>
+          <span data-i18n="prize.11" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        <button type="button" onClick="{{ pick12 }}" style="display: flex; align-items: center; gap: 12px; text-align: left; border: 2px solid {{ pz12Br }}; cursor: pointer; padding: 12px 18px 12px 12px; border-radius: 999px; background: {{ pz12Bg }}; color: {{ pz12Fg }}; transition: transform .4s cubic-bezier(.16,1,.3,1), background .35s, border-color .35s;" style-hover="transform: translateX(8px);">
+          <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.14); display: grid; place-items: center; font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.04em;">12</span>
+          <span data-i18n="prize.12" style="font-family: var(--f-disp); font-size: clamp(14px, 1.6vw, 18px); line-height: 1.15;">—</span>
+        </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="galleria" data-screen-label="Galleria" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(84px, 12vh, 140px); background: var(--c-cream); color: var(--c-ink); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%;">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: clamp(24px, 3.4vw, 44px);" data-reveal="">
+        <div>
+          <div data-i18n="gal.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-red); margin-bottom: 14px;">Galleria</div>
+          <h2 data-i18n="gal.title" style="font-family: var(--f-disp); font-size: clamp(36px, 7.4vw, 100px); line-height: .92; margin: 0;">Come funziona, in foto.</h2>
+        </div>
+        <p data-i18n="gal.note" style="margin: 0; font-size: 14px; line-height: 1.5; color: rgba(23,21,15,.55); max-width: 26ch;">Trascina qui le foto delle edizioni passate.</p>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: clamp(12px, 1.8vw, 20px);">
+        <div data-reveal="" style="min-width: 0; border-radius: clamp(20px, 2.6vw, 34px); overflow: hidden; aspect-ratio: 4 / 3; transition: transform .55s cubic-bezier(.16,1,.3,1), box-shadow .55s;" style-hover="transform: translateY(-8px); box-shadow: 0 26px 54px rgba(23,21,15,.26);">
+          <image-slot id="shw-g1" shape="rect" placeholder="Partenza" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+        <div data-reveal="" style="min-width: 0; border-radius: clamp(20px, 2.6vw, 34px); overflow: hidden; aspect-ratio: 4 / 3; transition: transform .55s cubic-bezier(.16,1,.3,1), box-shadow .55s;" style-hover="transform: translateY(-8px); box-shadow: 0 26px 54px rgba(23,21,15,.26);">
+          <image-slot id="shw-g2" shape="rect" placeholder="Un carruleddhu" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+        <div data-reveal="" style="min-width: 0; border-radius: clamp(20px, 2.6vw, 34px); overflow: hidden; aspect-ratio: 4 / 3; transition: transform .55s cubic-bezier(.16,1,.3,1), box-shadow .55s;" style-hover="transform: translateY(-8px); box-shadow: 0 26px 54px rgba(23,21,15,.26);">
+          <image-slot id="shw-g3" shape="rect" placeholder="Il pubblico" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+        <div data-reveal="" style="min-width: 0; border-radius: clamp(20px, 2.6vw, 34px); overflow: hidden; aspect-ratio: 4 / 3; transition: transform .55s cubic-bezier(.16,1,.3,1), box-shadow .55s;" style-hover="transform: translateY(-8px); box-shadow: 0 26px 54px rgba(23,21,15,.26);">
+          <image-slot id="shw-g4" shape="rect" placeholder="La discesa" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+        <div data-reveal="" style="min-width: 0; border-radius: clamp(20px, 2.6vw, 34px); overflow: hidden; aspect-ratio: 4 / 3; transition: transform .55s cubic-bezier(.16,1,.3,1), box-shadow .55s;" style-hover="transform: translateY(-8px); box-shadow: 0 26px 54px rgba(23,21,15,.26);">
+          <image-slot id="shw-g5" shape="rect" placeholder="Dettaglio" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+        <div data-reveal="" style="min-width: 0; border-radius: clamp(20px, 2.6vw, 34px); overflow: hidden; aspect-ratio: 4 / 3; transition: transform .55s cubic-bezier(.16,1,.3,1), box-shadow .55s;" style-hover="transform: translateY(-8px); box-shadow: 0 26px 54px rgba(23,21,15,.26);">
+          <image-slot id="shw-g6" shape="rect" placeholder="Premiazione" style="width: 100%; height: 100%;"></image-slot>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="iscrizione" data-screen-label="Iscrizione" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(84px, 12vh, 140px); background: var(--c-yellow); color: var(--c-ink); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%;">
+      <div data-i18n="join.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-red); margin-bottom: 14px;" data-reveal="">Iscrizione</div>
+      <h2 data-i18n="join.title" style="font-family: var(--f-disp); font-size: clamp(38px, 8vw, 108px); line-height: .92; margin: 0 0 clamp(28px, 4vw, 54px); max-width: 20ch;" data-reveal="">Tre passi e sei in gara.</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: clamp(14px, 2vw, 24px); margin-bottom: clamp(30px, 4.4vw, 56px);">
+        <div data-reveal="" style="background: var(--c-cream); border-radius: clamp(20px, 2.8vw, 34px); padding: clamp(22px, 2.8vw, 34px); display: flex; flex-direction: column; gap: 14px; transition: transform .5s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateY(-8px);">
+          <span style="width: 46px; height: 46px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-family: var(--f-disp); font-size: 19px;">1</span>
+          <h3 data-i18n="join.1t" style="font-family: var(--f-disp); font-size: clamp(19px, 2.4vw, 27px); line-height: 1.05; margin: 0;">Compila i dati</h3>
+          <p data-i18n="join.1b" style="margin: 0; font-size: clamp(14px, 1.5vw, 16px); line-height: 1.6; color: rgba(23,21,15,.75);">Nome, data di nascita, codice fiscale, contatti e nome del carretto.</p>
+        </div>
+        <div data-reveal="" style="background: var(--c-cream); border-radius: clamp(20px, 2.8vw, 34px); padding: clamp(22px, 2.8vw, 34px); display: flex; flex-direction: column; gap: 14px; transition: transform .5s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateY(-8px);">
+          <span style="width: 46px; height: 46px; border-radius: 50%; background: var(--c-indigo); color: var(--c-cream); display: grid; place-items: center; font-family: var(--f-disp); font-size: 19px;">2</span>
+          <h3 data-i18n="join.2t" style="font-family: var(--f-disp); font-size: clamp(19px, 2.4vw, 27px); line-height: 1.05; margin: 0;">Leggi il regolamento</h3>
+          <p data-i18n="join.2b" style="margin: 0; font-size: clamp(14px, 1.5vw, 16px); line-height: 1.6; color: rgba(23,21,15,.75);">Si scorre fino in fondo: solo allora si può accettare.</p>
+        </div>
+        <div data-reveal="" style="background: var(--c-cream); border-radius: clamp(20px, 2.8vw, 34px); padding: clamp(22px, 2.8vw, 34px); display: flex; flex-direction: column; gap: 14px; transition: transform .5s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateY(-8px);">
+          <span style="width: 46px; height: 46px; border-radius: 50%; background: var(--c-green); color: var(--c-cream); display: grid; place-items: center; font-family: var(--f-disp); font-size: 19px;">3</span>
+          <h3 data-i18n="join.3t" style="font-family: var(--f-disp); font-size: clamp(19px, 2.4vw, 27px); line-height: 1.05; margin: 0;">Ricevi numero e PDF</h3>
+          <p data-i18n="join.3b" style="margin: 0; font-size: clamp(14px, 1.5vw, 16px); line-height: 1.6; color: rgba(23,21,15,.75);">Il regolamento arriva per email già compilato: firmalo e portalo alla partenza. Oppure lo stampiamo noi.</p>
+        </div>
+      </div>
+
+      <div data-reveal="" style="background: var(--c-cream); border-radius: clamp(24px, 3.4vw, 44px); padding: clamp(22px, 3.4vw, 48px); box-shadow: 0 26px 60px rgba(23,21,15,.16);">
+        <sc-if value="{{ showForm }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: clamp(20px, 2.6vw, 30px);">
+            <h3 data-i18n="form.title" style="font-family: var(--f-disp); font-size: clamp(26px, 4vw, 48px); line-height: 1; margin: 0;">Iscrizione</h3>
+            <p data-i18n="form.sub" style="margin: 0; font-family: var(--f-meta); font-size: clamp(14px, 1.6vw, 17px); letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-red);">Gratuita. Due minuti.</p>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(14px, 2vw, 20px);">
+            <div class="field"><label data-i18n="form.name">Nome</label><input class="input" data-f="firstName" type="text" autoComplete="given-name"></div>
+            <div class="field"><label data-i18n="form.surname">Cognome</label><input class="input" data-f="lastName" type="text" autoComplete="family-name"></div>
+            <div class="field" style="position: relative;">
+              <label data-i18n="form.dob">Data di nascita</label>
+              <input data-f="birthDate" type="hidden" value="{{ dobValue }}">
+              <button type="button" onClick="{{ toggleCal }}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; font: inherit; font-size: 16px; text-align: left; padding: 14px 20px; border-radius: 999px; border: 2px solid {{ dobBorder }}; background: var(--c-cream); color: {{ dobColor }}; cursor: pointer; transition: border-color .25s;">
+                <span>{{ dobLabel }}</span>
+                <span style="flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c-ink); color: var(--c-cream); display: grid; place-items: center; font-size: 14px;">▾</span>
+              </button>
+              <sc-if value="{{ calOpen }}" hint-placeholder-val="{{ false }}">
+                <div style="position: absolute; z-index: 40; top: calc(100% + 10px); left: 0; width: min(340px, 86vw); padding: 16px; border-radius: 26px; background: var(--c-cream); color: var(--c-ink); box-shadow: 0 26px 60px rgba(23,21,15,.3); border: 2px solid rgba(23,21,15,.1); animation: crs-pop .3s cubic-bezier(.16,1,.3,1) both;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px;">
+                    <button type="button" onClick="{{ calPrevY }}" aria-label="-1" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(23,21,15,.16); background: transparent; cursor: pointer; font-size: 13px; color: var(--c-ink);">«</button>
+                    <button type="button" onClick="{{ calPrev }}" aria-label="-1m" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(23,21,15,.16); background: transparent; cursor: pointer; font-size: 15px; color: var(--c-ink);">‹</button>
+                    <span style="flex: 1; text-align: center; font-family: var(--f-disp); font-size: 17px;">{{ calLabel }}</span>
+                    <button type="button" onClick="{{ calNext }}" aria-label="+1m" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(23,21,15,.16); background: transparent; cursor: pointer; font-size: 15px; color: var(--c-ink);">›</button>
+                    <button type="button" onClick="{{ calNextY }}" aria-label="+1" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(23,21,15,.16); background: transparent; cursor: pointer; font-size: 13px; color: var(--c-ink);">»</button>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 6px;">
+                    <sc-for list="{{ calWeek }}" as="w" hint-placeholder-count="7">
+                      <span style="text-align: center; font-family: var(--f-meta); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(23,21,15,.5);">{{ w.l }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;">
+                    <sc-for list="{{ calDays }}" as="d" hint-placeholder-count="35">
+                      <button type="button" onClick="{{ d.pick }}" style="aspect-ratio: 1; min-height: 40px; border: 0; border-radius: 50%; cursor: pointer; font: inherit; font-size: 15px; background: {{ d.bg }}; color: {{ d.fg }}; opacity: {{ d.op }}; transition: background .2s, transform .2s;" style-hover="transform: scale(1.08);">{{ d.n }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <div class="field"><label data-i18n="form.cf">Codice fiscale</label><input class="input" data-f="taxCode" type="text"></div>
+            <div class="field"><label data-i18n="form.email">E-mail</label><input class="input" data-f="email" type="email" autoComplete="email"></div>
+            <div class="field"><label data-i18n="form.phone">Telefono</label><input class="input" data-f="phone" type="tel" autoComplete="tel"></div>
+            <div class="field" style="grid-column: 1 / -1;"><label data-i18n="form.address">Indirizzo</label><input class="input" data-f="address" type="text" autoComplete="street-address"></div>
+            <div class="field"><label data-i18n="form.cart">Nome del carretto</label><input class="input" data-f="cartName" type="text"></div>
+            <div class="field"><label data-i18n="form.cat">Categoria</label>
+              <select class="input" data-f="category" style="appearance: none;">
+                <option value="classic">Carruleddhi Classic</option>
+                <option value="art">Carruleddhi ART</option>
+              </select>
+            </div>
+          </div>
+
+          <sc-if value="{{ isMinor }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top: clamp(16px, 2.2vw, 22px); padding: clamp(18px, 2.4vw, 26px); border-radius: clamp(18px, 2.6vw, 30px); background: var(--c-yellow);">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--c-red);"></span>
+                <strong data-i18n="form.guardian" style="font-family: var(--f-disp); font-weight: 400; font-size: clamp(17px, 2vw, 20px);">Genitore o tutore legale</strong>
+              </div>
+              <p data-i18n="form.minor" style="margin: 0 0 14px; font-size: 14px; line-height: 1.55; color: rgba(23,21,15,.78);">Meno di 18 anni: serve la liberatoria firmata da un genitore.</p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+                <div class="field"><label data-i18n="form.gname">Nome e cognome del genitore</label><input class="input" data-f="guardianName" type="text"></div>
+                <div class="field"><label data-i18n="form.gcf">Codice fiscale del genitore</label><input class="input" data-f="guardianTaxCode" type="text"></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="margin-top: clamp(18px, 2.4vw, 26px); display: flex; flex-direction: column; gap: 10px;">
+            <button type="button" onClick="{{ openTerms }}" style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; text-align: left; width: 100%; padding: 16px 22px; border-radius: 999px; border: 2px solid rgba(23,21,15,.18); background: transparent; cursor: pointer; font: inherit; font-size: clamp(14px, 1.6vw, 16px); color: var(--c-ink); transition: border-color .25s, transform .3s cubic-bezier(.16,1,.3,1);" style-hover="border-color: var(--c-red); transform: translateY(-2px);">
+              <span style="flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; background: {{ termsDotBg }}; color: {{ termsDotFg }}; border: 2px solid {{ termsDotBorder }}; transition: background .3s;">{{ termsMark }}</span>
+              <span data-i18n="form.terms" style="flex: 1 1 200px;">Ho letto e accetto il regolamento.</span>
+              <span data-i18n="form.termsopen" style="flex: none; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-red);">Apri il regolamento</span>
+            </button>
+            <label style="display: flex; align-items: center; gap: 14px; padding: 16px 22px; border-radius: 999px; background: rgba(23,21,15,.06); cursor: pointer; font-size: clamp(14px, 1.6vw, 16px);">
+              <input type="checkbox" data-f="printByUs" style="width: 20px; height: 20px; accent-color: #d63a2b;">
+              <span data-i18n="form.printer">Stampate voi il PDF: lo ritiro alla partenza.</span>
+            </label>
+          </div>
+
+          <sc-if value="{{ errorOn }}" hint-placeholder-val="{{ false }}">
+            <p data-i18n="form.required" style="margin: 16px 0 0; font-size: 14px; color: var(--c-red);">Compila tutti i campi obbligatori e accetta il regolamento.</p>
+          </sc-if>
+
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: clamp(20px, 2.8vw, 30px);">
+            <button type="button" data-i18n="form.submit" onClick="{{ submit }}" style="border: 0; cursor: pointer; font-family: var(--f-disp); font-size: clamp(17px, 2.2vw, 24px); padding: clamp(16px, 2vw, 22px) clamp(30px, 3.4vw, 46px); border-radius: 999px; background: var(--c-red); color: var(--c-cream); transition: transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s;" style-hover="transform: translateY(-4px); box-shadow: 0 16px 34px rgba(214,58,43,.4);">Invia iscrizione</button>
+            <span data-i18n="join.free" style="font-family: var(--f-meta); font-size: clamp(14px, 1.7vw, 17px); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(23,21,15,.6);">Nessuna quota di partecipazione</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showDone }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: clamp(22px, 4vw, 48px);">
+            <div style="flex: none; width: clamp(150px, 24vw, 210px); height: clamp(150px, 24vw, 210px); border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; text-align: center; animation: crs-pop .6s cubic-bezier(.16,1,.3,1) both;">
+              <div>
+                <div data-i18n="done.num" style="font-family: var(--f-meta); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; opacity: .85;">Il tuo numero di gara</div>
+                <div style="font-family: var(--f-disp); font-size: clamp(46px, 9vw, 76px); line-height: 1; margin-top: 6px;">{{ raceNumber }}</div>
+              </div>
+            </div>
+            <div style="flex: 1 1 300px;">
+              <h3 data-i18n="done.title" style="font-family: var(--f-disp); font-size: clamp(26px, 4vw, 44px); line-height: 1.02; margin: 0 0 12px;">Iscrizione ricevuta</h3>
+              <p data-i18n="done.body" style="margin: 0; font-size: clamp(15px, 1.7vw, 18px); line-height: 1.6; max-width: 46ch; color: rgba(23,21,15,.78);">Ti abbiamo inviato una email con il regolamento in PDF già compilato: devi solo firmarlo e portarlo alla partenza.</p>
+              <sc-if value="{{ printByUs }}" hint-placeholder-val="{{ false }}">
+                <p data-i18n="done.us" style="margin: 16px 0 0; font-size: 14px; padding: 12px 20px; border-radius: 999px; background: var(--c-yellow); display: inline-block;">Lo stampiamo noi: presentati alla partenza con il tuo numero.</p>
+              </sc-if>
+              <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: clamp(18px, 2.6vw, 26px);">
+                <button type="button" data-i18n="done.pdf" onClick="{{ downloadPdf }}" style="border: 0; cursor: pointer; font-family: var(--f-disp); font-size: 16px; padding: 15px 26px; border-radius: 999px; background: var(--c-ink); color: var(--c-cream);">Scarica il modulo</button>
+                <button type="button" data-i18n="done.print" onClick="{{ printPage }}" style="border: 2px solid rgba(23,21,15,.2); cursor: pointer; font-family: var(--f-disp); font-size: 16px; padding: 13px 24px; border-radius: 999px; background: transparent; color: var(--c-ink);">Stampa</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 28px; margin-top: clamp(26px, 3.4vw, 42px); padding-top: clamp(18px, 2.6vw, 28px); border-top: 2px solid rgba(23,21,15,.18);" data-reveal="">
+        <div style="display: flex; gap: 12px; align-items: flex-start;"><span style="flex: none; width: 9px; height: 9px; margin-top: 8px; border-radius: 50%; background: var(--c-red);"></span><span data-i18n="rules.r1" style="font-size: clamp(14px, 1.5vw, 16px); line-height: 1.55;">Casco di protezione omologato obbligatorio.</span></div>
+        <div style="display: flex; gap: 12px; align-items: flex-start;"><span style="flex: none; width: 9px; height: 9px; margin-top: 8px; border-radius: 50%; background: var(--c-red);"></span><span data-i18n="rules.r2" style="font-size: clamp(14px, 1.5vw, 16px); line-height: 1.55;">Solo maggiorenni. I minori di 18 anni partecipano con liberatoria firmata da un genitore.</span></div>
+        <div style="display: flex; gap: 12px; align-items: flex-start;"><span style="flex: none; width: 9px; height: 9px; margin-top: 8px; border-radius: 50%; background: var(--c-red);"></span><span data-i18n="rules.r3" style="font-size: clamp(14px, 1.5vw, 16px); line-height: 1.55;">Modulo d'iscrizione e liberatoria per danni a cose o persone, con documento d'identità.</span></div>
+        <div style="display: flex; gap: 12px; align-items: flex-start;"><span style="flex: none; width: 9px; height: 9px; margin-top: 8px; border-radius: 50%; background: var(--c-red);"></span><span data-i18n="rules.r4" style="font-size: clamp(14px, 1.5vw, 16px); line-height: 1.55;">Nessuna quota di partecipazione.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" data-screen-label="FAQ" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(90px, 12vh, 120px); background: var(--c-cream); color: var(--c-ink); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 900px; margin: 0 auto; width: 100%;">
+      <h2 data-i18n="faq.title" style="font-family: var(--f-disp); font-size: clamp(28px, 5.4vw, 66px); line-height: .98; margin: 0 0 clamp(18px, 3vw, 34px);" data-reveal="">Domande frequenti</h2>
+      <div style="display: flex; flex-direction: column;">
+        <div data-reveal="" style="border-top: 2px solid rgba(23,21,15,.16);">
+          <button type="button" onClick="{{ toggleFaq1 }}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2.1vw, 22px); padding: clamp(15px, 2vw, 22px) 0; color: var(--c-ink);">
+            <span data-i18n="faq.q1">Chi può partecipare?</span>
+            <span style="flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-size: 17px; transition: transform .4s cubic-bezier(.16,1,.3,1); transform: rotate({{ faq1Rot }});">+</span>
+          </button>
+          <div style="overflow: hidden; transition: max-height .5s cubic-bezier(.16,1,.3,1), opacity .4s; max-height: {{ faq1H }}; opacity: {{ faq1O }};">
+            <p data-i18n="faq.a1" style="margin: 0; padding: 0 0 clamp(18px, 2.4vw, 26px); font-size: 15px; line-height: 1.6; max-width: 62ch; color: rgba(23,21,15,.78);">Chi ha compiuto 18 anni, con modulo d'iscrizione e liberatoria firmati e documento d'identità. I minori di 18 anni partecipano solo con liberatoria firmata da un genitore.</p>
+          </div>
+        </div>
+        <div data-reveal="" style="border-top: 2px solid rgba(23,21,15,.16);">
+          <button type="button" onClick="{{ toggleFaq2 }}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2.1vw, 22px); padding: clamp(15px, 2vw, 22px) 0; color: var(--c-ink);">
+            <span data-i18n="faq.q2">Quanto costa?</span>
+            <span style="flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-size: 17px; transition: transform .4s cubic-bezier(.16,1,.3,1); transform: rotate({{ faq2Rot }});">+</span>
+          </button>
+          <div style="overflow: hidden; transition: max-height .5s cubic-bezier(.16,1,.3,1), opacity .4s; max-height: {{ faq2H }}; opacity: {{ faq2O }};">
+            <p data-i18n="faq.a2" style="margin: 0; padding: 0 0 clamp(18px, 2.4vw, 26px); font-size: 15px; line-height: 1.6; max-width: 62ch; color: rgba(23,21,15,.78);">Niente. Non è prevista nessuna quota di partecipazione.</p>
+          </div>
+        </div>
+        <div data-reveal="" style="border-top: 2px solid rgba(23,21,15,.16);">
+          <button type="button" onClick="{{ toggleFaq3 }}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2.1vw, 22px); padding: clamp(15px, 2vw, 22px) 0; color: var(--c-ink);">
+            <span data-i18n="faq.q3">Il carretto può avere un motore?</span>
+            <span style="flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-size: 17px; transition: transform .4s cubic-bezier(.16,1,.3,1); transform: rotate({{ faq3Rot }});">+</span>
+          </button>
+          <div style="overflow: hidden; transition: max-height .5s cubic-bezier(.16,1,.3,1), opacity .4s; max-height: {{ faq3H }}; opacity: {{ faq3O }};">
+            <p data-i18n="faq.a3" style="margin: 0; padding: 0 0 clamp(18px, 2.4vw, 26px); font-size: 15px; line-height: 1.6; max-width: 62ch; color: rgba(23,21,15,.78);">No. Nessun motore e nessuna propulsione: il carretto scende per gravità.</p>
+          </div>
+        </div>
+        <div data-reveal="" style="border-top: 2px solid rgba(23,21,15,.16);">
+          <button type="button" onClick="{{ toggleFaq4 }}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2.1vw, 22px); padding: clamp(15px, 2vw, 22px) 0; color: var(--c-ink);">
+            <span data-i18n="faq.q4">Serve il casco?</span>
+            <span style="flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-size: 17px; transition: transform .4s cubic-bezier(.16,1,.3,1); transform: rotate({{ faq4Rot }});">+</span>
+          </button>
+          <div style="overflow: hidden; transition: max-height .5s cubic-bezier(.16,1,.3,1), opacity .4s; max-height: {{ faq4H }}; opacity: {{ faq4O }};">
+            <p data-i18n="faq.a4" style="margin: 0; padding: 0 0 clamp(18px, 2.4vw, 26px); font-size: 15px; line-height: 1.6; max-width: 62ch; color: rgba(23,21,15,.78);">Sì: casco di protezione omologato per tutti i partecipanti.</p>
+          </div>
+        </div>
+        <div data-reveal="" style="border-top: 2px solid rgba(23,21,15,.16); border-bottom: 2px solid rgba(23,21,15,.16);">
+          <button type="button" onClick="{{ toggleFaq5 }}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; text-align: left; border: 0; background: transparent; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2.1vw, 22px); padding: clamp(15px, 2vw, 22px) 0; color: var(--c-ink);">
+            <span data-i18n="faq.q5">Come ricevo il numero di gara?</span>
+            <span style="flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-size: 17px; transition: transform .4s cubic-bezier(.16,1,.3,1); transform: rotate({{ faq5Rot }});">+</span>
+          </button>
+          <div style="overflow: hidden; transition: max-height .5s cubic-bezier(.16,1,.3,1), opacity .4s; max-height: {{ faq5H }}; opacity: {{ faq5O }};">
+            <p data-i18n="faq.a5" style="margin: 0; padding: 0 0 clamp(18px, 2.4vw, 26px); font-size: 15px; line-height: 1.6; max-width: 62ch; color: rgba(23,21,15,.78);">Dopo l'iscrizione ricevi per email il numero e il regolamento in PDF già compilato. Puoi stamparlo tu oppure farlo stampare da noi.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="notifiche" data-screen-label="Notifiche" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(84px, 12vh, 140px); background: var(--c-indigo); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: clamp(26px, 4vw, 60px); align-items: start;">
+      <div data-reveal="">
+        <div data-i18n="notify.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 14px;">Promemoria</div>
+        <h2 data-i18n="notify.title" style="font-family: var(--f-disp); font-size: clamp(36px, 7vw, 96px); line-height: .93; margin: 0 0 18px; max-width: 18ch;">Ti avvisiamo noi.</h2>
+        <p data-i18n="notify.body" style="font-size: clamp(15px, 1.8vw, 20px); line-height: 1.6; margin: 0 0 clamp(20px, 2.8vw, 30px); max-width: 42ch; color: rgba(247,236,216,.8);">Lascia nome ed e-mail: ti scriviamo tre volte, e mai per altro.</p>
+        <div style="display: flex; flex-direction: column; gap: 8px; max-width: 460px;">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-radius: 999px; background: rgba(247,236,216,.1);">
+            <span style="flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c-yellow);"></span>
+            <span data-i18n="notify.r1" style="font-family: var(--f-meta); font-size: clamp(14px, 1.6vw, 17px); letter-spacing: 0.1em; text-transform: uppercase;">Una settimana prima</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-radius: 999px; background: rgba(247,236,216,.1);">
+            <span style="flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c-yellow);"></span>
+            <span data-i18n="notify.r2" style="font-family: var(--f-meta); font-size: clamp(14px, 1.6vw, 17px); letter-spacing: 0.1em; text-transform: uppercase;">Il giorno prima</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-radius: 999px; background: rgba(247,236,216,.1);">
+            <span style="flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--c-yellow);"></span>
+            <span data-i18n="notify.r3" style="font-family: var(--f-meta); font-size: clamp(14px, 1.6vw, 17px); letter-spacing: 0.1em; text-transform: uppercase;">Tre ore prima della partenza</span>
+          </div>
+        </div>
+      </div>
+      <div data-reveal="" style="border-radius: clamp(24px, 3.4vw, 44px); background: var(--c-cream); color: var(--c-ink); padding: clamp(22px, 3vw, 40px); box-shadow: 0 26px 60px rgba(0,0,0,.28);">
+        <button type="button" onClick="{{ toggleNotify }}" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; border: 0; background: transparent; cursor: pointer; padding: 0; text-align: left; color: var(--c-ink);">
+          <span style="font-family: var(--f-disp); font-size: clamp(20px, 2.8vw, 30px); line-height: 1.05;">{{ notifyCta }}</span>
+          <span style="flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--c-red); color: var(--c-cream); display: grid; place-items: center; font-size: 22px; transition: transform .45s cubic-bezier(.16,1,.3,1); transform: rotate({{ notifyRot }});">+</span>
+        </button>
+        <div style="overflow: hidden; transition: max-height .55s cubic-bezier(.16,1,.3,1), opacity .4s ease; max-height: {{ notifyH }}; opacity: {{ notifyO }};">
+          <div style="padding-top: clamp(18px, 2.4vw, 26px); display: flex; flex-direction: column; gap: 14px;">
+            <div class="field"><label data-i18n="notify.name">Nome</label><input class="input" data-f="notifyName" type="text" autoComplete="given-name"></div>
+            <div class="field"><label data-i18n="notify.email">E-mail</label><input class="input" data-f="notifyEmail" type="email" autoComplete="email"></div>
+            <sc-if value="{{ notifyErr }}" hint-placeholder-val="{{ false }}">
+              <p data-i18n="notify.err" style="margin: 0; font-size: 14px; color: var(--c-red);">Serve un nome e un'e-mail valida.</p>
+            </sc-if>
+            <button type="button" data-i18n="notify.send" onClick="{{ sendNotify }}" style="border: 0; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2vw, 20px); padding: 16px 30px; border-radius: 999px; background: var(--c-ink); color: var(--c-cream); transition: transform .35s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateY(-3px);">Avvisami</button>
+          </div>
+        </div>
+        <sc-if value="{{ notifyDone }}" hint-placeholder-val="{{ false }}">
+          <p data-i18n="notify.done" style="margin: clamp(16px, 2.2vw, 22px) 0 0; padding: 14px 20px; border-radius: clamp(16px, 2vw, 22px); background: var(--c-green); color: var(--c-cream); font-size: clamp(14px, 1.6vw, 17px); line-height: 1.5;">Fatto. Ti scriviamo una settimana prima, il giorno prima e tre ore prima della partenza.</p>
+        </sc-if>
+      </div>
+    </div>
+  </section>
+
+  <section id="opinioni" data-screen-label="Opinioni" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) 0 clamp(70px, 9vh, 110px); background: var(--c-green); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3); overflow: hidden;">
+    <div style="max-width: 1320px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 56px);">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: clamp(18px, 3vw, 40px); margin-bottom: clamp(26px, 4vw, 48px);" data-reveal="">
+        <div>
+          <div data-i18n="rev.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 14px;">Opinioni</div>
+          <h2 data-i18n="rev.title" style="font-family: var(--f-disp); font-size: clamp(34px, 6.6vw, 92px); line-height: .93; margin: 0; max-width: 20ch;">Lascia la tua opinione.</h2>
+        </div>
+        <div style="display: flex; align-items: center; gap: 18px; padding: 18px 26px; border-radius: 999px; background: var(--c-cream); color: var(--c-ink);">
+          <span style="font-family: var(--f-disp); font-size: clamp(34px, 5vw, 56px); line-height: 1;">{{ revAvg }}</span>
+          <span style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: clamp(15px, 1.8vw, 19px); letter-spacing: .1em; color: var(--c-yellow); text-shadow: 0 0 1px rgba(23,21,15,.4);">{{ revStars }}</span>
+            <span style="font-family: var(--f-meta); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(23,21,15,.6);">{{ revCountLabel }}</span>
+          </span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: clamp(20px, 3vw, 40px); align-items: start;">
+        <div data-reveal="" style="border-radius: clamp(24px, 3.4vw, 44px); background: var(--c-cream); color: var(--c-ink); padding: clamp(22px, 3vw, 38px); box-shadow: 0 26px 60px rgba(0,0,0,.24); display: flex; flex-direction: column; gap: 14px;">
+          <div class="field"><label data-i18n="rev.name">Nome</label><input class="input" data-f="revName" type="text" autoComplete="given-name"></div>
+          <div>
+            <label data-i18n="rev.rate" style="display: block; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(23,21,15,.6); margin-bottom: 8px;">Il tuo voto</label>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" onClick="{{ star1 }}" style="width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer; font-size: 20px; background: {{ s1Bg }}; color: {{ s1Fg }}; transition: transform .25s cubic-bezier(.16,1,.3,1), background .25s;" style-hover="transform: translateY(-4px) scale(1.06);">★</button>
+              <button type="button" onClick="{{ star2 }}" style="width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer; font-size: 20px; background: {{ s2Bg }}; color: {{ s2Fg }}; transition: transform .25s cubic-bezier(.16,1,.3,1), background .25s;" style-hover="transform: translateY(-4px) scale(1.06);">★</button>
+              <button type="button" onClick="{{ star3 }}" style="width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer; font-size: 20px; background: {{ s3Bg }}; color: {{ s3Fg }}; transition: transform .25s cubic-bezier(.16,1,.3,1), background .25s;" style-hover="transform: translateY(-4px) scale(1.06);">★</button>
+              <button type="button" onClick="{{ star4 }}" style="width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer; font-size: 20px; background: {{ s4Bg }}; color: {{ s4Fg }}; transition: transform .25s cubic-bezier(.16,1,.3,1), background .25s;" style-hover="transform: translateY(-4px) scale(1.06);">★</button>
+              <button type="button" onClick="{{ star5 }}" style="width: 46px; height: 46px; border: 0; border-radius: 50%; cursor: pointer; font-size: 20px; background: {{ s5Bg }}; color: {{ s5Fg }}; transition: transform .25s cubic-bezier(.16,1,.3,1), background .25s;" style-hover="transform: translateY(-4px) scale(1.06);">★</button>
+            </div>
+          </div>
+          <div class="field"><label data-i18n="rev.msg">La tua opinione</label><textarea class="input" data-f="revText" rows="4" style="resize: vertical; border-radius: clamp(18px, 2.2vw, 26px);"></textarea></div>
+          <label style="display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-radius: 999px; background: rgba(23,21,15,.06); cursor: pointer;">
+            <span style="flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--c-indigo); color: var(--c-cream); display: grid; place-items: center; font-size: 16px;">＋</span>
+            <span data-i18n="rev.photo" style="font-size: 14px;">Aggiungi una foto</span>
+            <input type="file" accept="image/*" onChange="{{ pickPhoto }}" style="display: none;">
+          </label>
+          <sc-if value="{{ revPhotoOn }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="width: 64px; height: 64px; border-radius: 18px; background-color: rgba(23,21,15,.1); background-size: cover; background-position: center; background-image: {{ revPhotoCss }};"></span>
+              <button type="button" data-i18n="rev.photoDrop" onClick="{{ dropPhoto }}" style="border: 0; background: transparent; cursor: pointer; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-red);">Togli la foto</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ revErr }}" hint-placeholder-val="{{ false }}">
+            <p data-i18n="rev.err" style="margin: 0; font-size: 14px; color: var(--c-red);">Scrivi il tuo nome e due parole.</p>
+          </sc-if>
+          <button type="button" data-i18n="rev.send" onClick="{{ sendReview }}" style="align-self: flex-start; border: 0; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 2vw, 21px); padding: 16px 32px; border-radius: 999px; background: var(--c-red); color: var(--c-cream); transition: transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s;" style-hover="transform: translateY(-3px); box-shadow: 0 14px 30px rgba(214,58,43,.4);">Pubblica</button>
+          <sc-if value="{{ revThanks }}" hint-placeholder-val="{{ false }}">
+            <p data-i18n="rev.thanks" style="margin: 0; font-size: 14px; color: var(--c-indigo);">Grazie: la tua opinione è nella giostra.</p>
+          </sc-if>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 16px;" data-reveal="">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button type="button" onClick="{{ filtAll }}" data-i18n="rev.filterAll" style="border: 2px solid {{ f1Br }}; cursor: pointer; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; padding: 11px 20px; border-radius: 999px; background: {{ f1Bg }}; color: {{ f1Fg }}; transition: background .3s, color .3s;">Tutte</button>
+            <button type="button" onClick="{{ filtTop }}" data-i18n="rev.filterTop" style="border: 2px solid {{ f2Br }}; cursor: pointer; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; padding: 11px 20px; border-radius: 999px; background: {{ f2Bg }}; color: {{ f2Fg }}; transition: background .3s, color .3s;">4 stelle e più</button>
+            <button type="button" onClick="{{ filtPhoto }}" data-i18n="rev.filterPhoto" style="border: 2px solid {{ f3Br }}; cursor: pointer; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; padding: 11px 20px; border-radius: 999px; background: {{ f3Bg }}; color: {{ f3Fg }}; transition: background .3s, color .3s;">Con foto</button>
+          </div>
+          <p data-i18n="rev.body" style="margin: 0; font-size: clamp(15px, 1.7vw, 19px); line-height: 1.55; max-width: 34ch; color: rgba(247,236,216,.82);">Hai corso, guardato o costruito un carruleddhu? Raccontalo.</p>
+          <p data-i18n="rev.drag" style="margin: 0; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-yellow);">Trascina la giostra · scorri per accelerare</p>
+        </div>
+      </div>
+    </div>
+
+    <div data-rail-view="" style="margin-top: clamp(34px, 5vw, 64px); overflow: hidden; cursor: grab; touch-action: pan-y; user-select: none;">
+      <div data-rail="" style="display: flex; gap: clamp(12px, 1.8vw, 22px); width: max-content; will-change: transform;">
+        <sc-for list="{{ railCards }}" as="c" hint-placeholder-count="4">
+          <div style="flex: none; width: clamp(250px, 30vw, 380px); border-radius: clamp(22px, 2.8vw, 34px); background: {{ c.bg }}; color: {{ c.fg }}; padding: clamp(18px, 2.2vw, 26px); display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 44px rgba(0,0,0,.22);">
+            <sc-if value="{{ c.hasPhoto }}" hint-placeholder-val="{{ false }}">
+              <span style="width: 100%; aspect-ratio: 4 / 3; border-radius: clamp(16px, 2vw, 24px); background-color: rgba(23,21,15,.12); background-size: cover; background-position: center; background-image: {{ c.photoCss }};"></span>
+            </sc-if>
+            <span style="font-size: 15px; letter-spacing: .12em; color: var(--c-yellow);">{{ c.stars }}</span>
+            <p style="margin: 0; font-family: var(--f-disp); font-size: clamp(16px, 1.9vw, 21px); line-height: 1.25;">{{ c.text }}</p>
+            <span style="font-family: var(--f-meta); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; opacity: .7;">{{ c.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section id="contatti" data-screen-label="Contatti" style="position: relative; display: block; margin-top: calc(-1 * clamp(20px, 3.4vw, 50px)); padding: clamp(96px, 13vh, 165px) clamp(18px, 4vw, 56px) clamp(84px, 12vh, 140px); background: var(--c-ink); color: var(--c-cream); border-radius: clamp(24px, 4vw, 52px) clamp(24px, 4vw, 52px) 0 0; box-shadow: 0 -20px 60px rgba(0,0,0,.3);">
+    <div style="max-width: 1320px; margin: 0 auto; width: 100%;">
+      <div data-i18n="contact.k" style="font-family: var(--f-meta); font-size: 14px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--c-yellow); margin-bottom: 14px;" data-reveal="">Contatti</div>
+      <h2 data-i18n="contact.title" style="font-family: var(--f-disp); font-size: clamp(38px, 8vw, 108px); line-height: .92; margin: 0 0 20px;" data-reveal="">Scrivici.</h2>
+      <p data-i18n="contact.body" style="font-size: clamp(15px, 1.8vw, 20px); line-height: 1.55; margin: 0 0 clamp(26px, 3.6vw, 44px); max-width: 42ch; color: rgba(247,236,216,.75);" data-reveal="">Per informazioni, iscrizioni di gruppo, stampa o sponsorizzazioni.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: clamp(16px, 3vw, 44px); align-items: center;" data-reveal="">
+        <a href="mailto:antoart@live.it" style="font-family: var(--f-disp); font-size: clamp(22px, 4vw, 52px); color: var(--c-yellow); text-decoration: none; border-bottom: 3px solid rgba(242,181,32,.35); transition: border-color .3s;" style-hover="border-color: var(--c-yellow);">antoart@live.it</a>
+        <a href="tel:+393284981574" style="font-family: var(--f-disp); font-size: clamp(22px, 4vw, 52px); color: var(--c-cream); text-decoration: none; border-bottom: 3px solid rgba(247,236,216,.25); transition: border-color .3s;" style-hover="border-color: var(--c-cream);">328 498 1574</a>
+      </div>
+      <div data-reveal="" style="margin-top: clamp(30px, 4.4vw, 52px); max-width: 560px; border-radius: clamp(24px, 3.4vw, 40px); background: var(--c-cream); color: var(--c-ink); padding: clamp(20px, 2.8vw, 32px); box-shadow: 0 24px 56px rgba(0,0,0,.3);">
+        <h3 data-i18n="contact.ask" style="font-family: var(--f-disp); font-size: clamp(19px, 2.4vw, 26px); line-height: 1.15; margin: 0 0 16px;">Hai una domanda? Scrivici: rispondiamo il prima possibile.</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+          <div class="field"><label data-i18n="contact.fname">Nome</label><input class="input" data-f="askName" type="text"></div>
+          <div class="field"><label data-i18n="contact.femail">E-mail</label><input class="input" data-f="askEmail" type="email"></div>
+        </div>
+        <div class="field" style="margin-top: 12px;"><label data-i18n="contact.fmsg">Il tuo messaggio</label><textarea class="input" data-f="askText" rows="3" style="resize: vertical; border-radius: 24px;"></textarea></div>
+        <sc-if value="{{ askErr }}" hint-placeholder-val="{{ false }}">
+          <p data-i18n="contact.ferr" style="margin: 10px 0 0; font-size: 14px; color: var(--c-red);">Serve un'e-mail valida e due righe.</p>
+        </sc-if>
+        <sc-if value="{{ askDone }}" hint-placeholder-val="{{ false }}">
+          <p data-i18n="contact.fdone" style="margin: 12px 0 0; padding: 12px 18px; border-radius: 20px; background: var(--c-green); color: var(--c-cream); font-size: 14px;">Grazie: rispondiamo il prima possibile.</p>
+        </sc-if>
+        <button type="button" data-i18n="contact.fsend" onClick="{{ sendAsk }}" style="margin-top: 16px; border: 0; cursor: pointer; font-family: var(--f-disp); font-size: clamp(16px, 1.9vw, 19px); padding: 15px 30px; border-radius: 999px; background: var(--c-red); color: var(--c-cream); transition: transform .3s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateY(-3px);">Invia</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: clamp(14px, 3vw, 32px); margin-top: clamp(34px, 5vw, 64px); padding-top: clamp(20px, 2.6vw, 30px); border-top: 2px solid rgba(247,236,216,.18);">
+        <span style="display: inline-flex; padding: 10px 16px; border-radius: 14px; background: var(--c-cream);">
+          <img src="uploads/shardana-logo.png" alt="Shardana Nuragici" style="height: 24px; width: auto; mix-blend-mode: multiply;">
+        </span>
+        <span data-i18n="contact.org" style="font-family: var(--f-meta); font-size: clamp(13px, 1.5vw, 16px); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(247,236,216,.7);">Organizzato da Shardana Nuragici con il comitato FIDALI 82 di Santa Teresa Gallura.</span>
+      </div>
+      <p data-i18n="contact.disclaimer" style="margin: 18px 0 0; font-size: 13px; line-height: 1.5; max-width: 70ch; color: rgba(247,236,216,.45);">La Shardana Nuragici e il comitato FIDALI 82 declinano ogni responsabilità per danni a cose o persone durante l'evento.</p>
+    </div>
+  </section>
+
+  <footer style="position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: clamp(26px, 4vw, 44px) clamp(18px, 4vw, 56px) clamp(34px, 5vw, 56px); background: var(--c-ink); color: rgba(247,236,216,.6); border-top: 2px solid rgba(247,236,216,.12);">
+    <span style="font-family: var(--f-meta); font-size: clamp(12px, 1.4vw, 14px); letter-spacing: 0.16em; text-transform: uppercase;">Carruleddhi Show 2026 · Santa Teresa Gallura</span>
+    <span style="display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-meta); font-size: clamp(12px, 1.4vw, 14px); letter-spacing: 0.16em; text-transform: uppercase;">
+      <span data-i18n="foot.credit">Sito creato da</span>
+      <a href="https://shardananuragici.com" target="_blank" rel="noopener" style="color: var(--c-yellow); text-decoration: none; border-bottom: 2px solid rgba(242,181,32,.4); transition: border-color .3s;" style-hover="border-color: var(--c-yellow);">shardananuragici.com</a>
+    </span>
+  </footer>
+
+  <div data-dock="" style="position: fixed; left: 50%; bottom: clamp(10px, 2vw, 20px); z-index: 108; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 8px 8px 8px 18px; border-radius: clamp(22px, 5vw, 999px); background: var(--c-ink); color: var(--c-cream); box-shadow: 0 16px 40px rgba(0,0,0,.4); width: max-content; max-width: calc(100vw - 16px); transform: translateX(-50%) translateY({{ dockY }}); opacity: {{ dockOp }}; transition: transform .5s cubic-bezier(.16,1,.3,1), opacity .4s ease;">
+    <span style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px clamp(10px, 1.8vw, 18px); font-family: var(--f-meta); letter-spacing: 0.1em; text-transform: uppercase;">
+      <span style="display: flex; align-items: baseline; gap: 7px;"><strong data-count-pilots="" style="font-family: var(--f-disp); font-size: clamp(16px, 2vw, 21px); font-weight: 400; color: var(--c-yellow);">0</strong><span data-i18n="count.pilots" style="font-size: clamp(11px, 1.3vw, 13px); opacity: .75; white-space: nowrap;">piloti iscritti</span></span>
+      <span style="display: flex; align-items: baseline; gap: 7px;"><strong data-count-attend="" style="font-family: var(--f-disp); font-size: clamp(16px, 2vw, 21px); font-weight: 400; color: var(--c-red);">0</strong><span data-i18n="count.attend" style="font-size: clamp(11px, 1.3vw, 13px); opacity: .75; white-space: nowrap;">dicono che ci saranno</span></span>
+    </span>
+    <span style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;">
+      <button type="button" onClick="{{ openNotify }}" style="border: 2px solid rgba(247,236,216,.4); cursor: pointer; font-family: var(--f-meta); font-size: clamp(12px, 1.4vw, 14px); letter-spacing: 0.12em; text-transform: uppercase; padding: 10px 18px; border-radius: 999px; background: transparent; color: var(--c-cream); white-space: nowrap; transition: background .3s, color .3s, transform .3s;" style-hover="background: var(--c-cream); color: var(--c-ink); transform: translateY(-2px);">{{ notifyCta }}</button>
+      <button type="button" data-i18n="nav.signup" onClick="{{ openForm }}" style="border: 0; cursor: pointer; font-family: var(--f-disp); font-size: clamp(14px, 1.7vw, 18px); padding: 12px 24px; border-radius: 999px; background: var(--c-red); color: var(--c-cream); white-space: nowrap; transition: transform .3s cubic-bezier(.16,1,.3,1), box-shadow .3s;" style-hover="transform: translateY(-3px); box-shadow: 0 12px 26px rgba(214,58,43,.5);">Iscriviti</button>
+    </span>
+  </div>
+
+  <canvas data-confetti="" style="position: fixed; inset: 0; z-index: 300; pointer-events: none;"></canvas>
+
+  <sc-if value="{{ termsOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; z-index: 250; background: rgba(23,21,15,.8); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; padding: clamp(8px, 3vw, 34px);">
+      <div style="width: min(740px, 100%); max-height: 88vh; display: flex; flex-direction: column; background: var(--c-cream); color: var(--c-ink); border-radius: clamp(20px, 3vw, 36px); box-shadow: 0 30px 70px rgba(0,0,0,.45); overflow: hidden; animation: crs-pop .45s cubic-bezier(.16,1,.3,1) both;">
+        <div style="padding: clamp(18px, 2.6vw, 28px) clamp(18px, 3vw, 32px) 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
+          <div>
+            <h3 data-i18n="reg.title" style="font-family: var(--f-disp); font-size: clamp(20px, 2.8vw, 28px); margin: 0 0 4px;">Regolamento</h3>
+            <p data-i18n="reg.sub" style="margin: 0; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(23,21,15,.55);">Carruleddhi Show 2026 — Santa Teresa Gallura</p>
+          </div>
+          <div style="flex: none; text-align: right;">
+            <div style="font-family: var(--f-disp); font-size: 16px; color: var(--c-red);">{{ readPct }}</div>
+            <div data-i18n="reg.read" style="font-family: var(--f-meta); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(23,21,15,.5);">letto</div>
+          </div>
+        </div>
+        <div style="height: 4px; background: rgba(23,21,15,.1); flex: none;">
+          <div style="height: 100%; width: {{ readPct }}; background: var(--c-red); transition: width .15s linear;"></div>
+        </div>
+        <div data-terms-scroll="" onScroll="{{ onTermsScroll }}" style="overflow-y: auto; padding: clamp(16px, 2.4vw, 26px) clamp(18px, 3vw, 32px); font-size: 14px; line-height: 1.65; flex: 1;">
+          <h4 data-i18n="reg.p1t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">1. Mezzi ammessi</h4>
+          <p data-i18n="reg.p1" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">Alla competizione potranno partecipare due categorie di mezzi. A) Carruleddhi Classic: telaio in legno con 4 ruote piene o con cuscinetti a sfera, guida con piedi o corda e freno con piede o con leva, costruzione artigianale di qualsiasi grandezza; se non rispetta tali regole parteciperà nella categoria Carruleddhi ART. B) Carruleddhi ART: telaio in qualsiasi materiale purché abbia una costruzione artigianale, da 4 a 10 ruote di qualsiasi tipo, freni di qualsiasi tipo (freno a leva diretta in legno, freno a disco, a tamburo o V-Brake), guida di qualsiasi tipo, qualsiasi grandezza.</p>
+          <h4 data-i18n="reg.p2t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">2. Partecipanti</h4>
+          <p data-i18n="reg.p2" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">Alla gara potranno partecipare solo coloro che abbiano compiuto anni 18 e dovranno compilare il modulo di iscrizione e la liberatoria per danni a cose o persone (munirsi di documento di identità).</p>
+          <h4 data-i18n="reg.p3t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">3. Minori</h4>
+          <p data-i18n="reg.p3" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">I minori di anni 18 potranno partecipare solo se con liberatoria firmata da un genitore.</p>
+          <h4 data-i18n="reg.p4t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">4. Sicurezza</h4>
+          <p data-i18n="reg.p4" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">Tutti i partecipanti dovranno avere un casco di protezione omologato.</p>
+          <h4 data-i18n="reg.p5t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">5. Quota</h4>
+          <p data-i18n="reg.p5" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">Nessuna quota di partecipazione.</p>
+          <h4 data-i18n="reg.p6t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">6. Categorie e premi</h4>
+          <p data-i18n="reg.p6" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">Il più veloce Classic (4 ruote di qualsiasi tipo e con guida a fune o con i piedi); il più veloce Carruleddhi ART; Premio Carruleddhi Show 2026; Carruleddhu più grande; Carruleddhu più simpatico; Carruleddhu Esibizione Show; Carruleddhu Show Classic; premio pilota più giovane; premio pilota più anziano; il più tecnologico; il più lento; persona più Shardana.</p>
+          <h4 data-i18n="reg.p7t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">7. Responsabilità</h4>
+          <p data-i18n="reg.p7" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">La Shardana Nuragici e il comitato FIDALI 82 di Santa Teresa Gallura declinano ogni responsabilità per danni a cose o persone durante l'evento.</p>
+          <h4 data-i18n="reg.p8t" style="font-family: var(--f-disp); font-size: 16px; margin: 0 0 6px;">8. Firma</h4>
+          <p data-i18n="reg.p8" style="margin: 0 0 18px; color: rgba(23,21,15,.82);">L'iscrizione comporta l'accettazione integrale del presente regolamento e va firmata in modo leggibile. Info: 328 498 1574 — antoart@live.it</p>
+          <p data-i18n="reg.note" style="margin: 0; padding: 14px 18px; border-radius: 18px; background: var(--c-yellow); font-size: 13px;">Il regolamento ufficiale è in italiano. Il PDF definitivo arriva per email, già compilato con i tuoi dati: va solo firmato.</p>
+        </div>
+        <div style="padding: 12px clamp(18px, 3vw, 32px) clamp(16px, 2.4vw, 24px); border-top: 2px solid rgba(23,21,15,.12); display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; flex: none;">
+          <span data-i18n="reg.scroll" style="font-family: var(--f-meta); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(23,21,15,.5);">Scorri fino in fondo per accettare</span>
+          <span style="display: flex; gap: 10px;">
+            <button type="button" data-i18n="form.close" onClick="{{ closeTerms }}" style="border: 2px solid rgba(23,21,15,.2); cursor: pointer; font-family: var(--f-meta); font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; padding: 11px 18px; border-radius: 999px; background: transparent; color: var(--c-ink);">Chiudi</button>
+            <button type="button" data-i18n="reg.accept" onClick="{{ acceptTerms }}" disabled="{{ acceptDisabled }}" style="border: 0; cursor: pointer; font-family: var(--f-disp); font-size: 15px; padding: 13px 22px; border-radius: 999px; background: var(--c-red); color: var(--c-cream); opacity: {{ acceptOpacity }}; transition: opacity .3s, transform .3s cubic-bezier(.16,1,.3,1);" style-hover="transform: translateY(-2px);">Accetto il regolamento</button>
+          </span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;preloader&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Comportamento&quot;},&quot;pilotsBase&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:38,&quot;min&quot;:0,&quot;max&quot;:400,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Contatori&quot;},&quot;attendeesBase&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:412,&quot;min&quot;:0,&quot;max&quot;:5000,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Contatori&quot;}}">
+class Component extends DCLogic {
+  state = {
+    lang: "it", preOn: true, preP: 0, preExit: false, hdrCollapsed: false,
+    formOpen: false, termsOpen: false, termsAccepted: false, readPct: 0,
+    isMinor: false, errorOn: false, done: false, raceNumber: "", printByUs: false,
+    attended: false, faq: {}, prizeI: 0,
+    notifyOpen: false, notifyDone: false, notifyErr: false,
+    reviews: [], revErr: false, revThanks: false,
+    revRating: 5, revPhoto: "", revFilter: "all",
+    askErr: false, askDone: false,
+    calOpen: false, calY: 1998, calM: 0, dob: "", dockHidden: true
+  };
+
+  componentDidMount() {
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (this.props.preloader === false || reduce) this.setState({ preOn: false });
+    else this.startPreloader();
+    const saved = this.ls("carruleddhi.lang");
+    const nav = (navigator.language || "it").slice(0, 2).toLowerCase();
+    const supported = ["it", "pl", "de", "es", "fr", "en"];
+    this.setLang(saved || (supported.indexOf(nav) > -1 ? nav : "it"), false);
+    this.setState({ attended: this.ls("carruleddhi.attended") === "1" });
+    let saved0 = [];
+    try { saved0 = JSON.parse(this.ls("carruleddhi.reviews") || "[]"); } catch (e) { saved0 = []; }
+    if (saved0.length) this.setState({ reviews: saved0 });
+    if (this.ls("carruleddhi.notify")) this.setState({ notifyDone: true });
+    // The prize panel cycles on its own until the visitor takes over.
+    this._prizeTimer = setInterval(() => {
+      if (this._prizeLock) return;
+      this.setState((st) => ({ prizeI: (st.prizeI + 1) % 12 }));
+    }, 4200);
+    this.setupReveal();
+    this.setupHeader();
+    this.setupNavTransitions();
+    this.setupScroll();
+    this.paintCounters(true);
+    this._dirty = true;
+  }
+
+  componentWillUnmount() {
+    if (this._raf) cancelAnimationFrame(this._raf);
+    clearTimeout(this._failsafe);
+    clearTimeout(this._exitTimer);
+    if (this._io) this._io.disconnect();
+    clearTimeout(this._revealFailsafe);
+    clearInterval(this._prizeTimer);
+    cancelAnimationFrame(this._loopRaf);
+    if (window.__crsLoopRaf === this._loopRaf) window.__crsLoopRaf = 0;
+    cancelAnimationFrame(this._confRaf);
+    clearInterval(this._watchdog);
+    clearInterval(this._fallback);
+    if (this._railHandlers) {
+      window.removeEventListener("pointermove", this._railHandlers.move);
+      window.removeEventListener("pointerup", this._railHandlers.up);
+      window.removeEventListener("pointercancel", this._railHandlers.up);
+    }
+    if (this._onScrollEvent) window.removeEventListener("scroll", this._onScrollEvent);
+    if (this._onScroll) window.removeEventListener("resize", this._onScroll);
+  }
+
+  ls(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  finishPreloader() {
+    if (!this.state.preOn || this.state.preExit) return;
+    this.setState({ preExit: true });
+    this._exitTimer = setTimeout(() => this.setState({ preOn: false }), 1050);
+  }
+
+  startPreloader() {
+    const t0 = performance.now(), dur = 2000;
+    // Safety net: if rAF is throttled (background tab), never leave the page covered.
+    this._failsafe = setTimeout(() => this.finishPreloader(), 3400);
+    const tick = (t) => {
+      const raw = Math.min(1, (t - t0) / dur);
+      this.setState({ preP: 1 - Math.pow(1 - raw, 2.2) });
+      if (raw < 1) this._raf = requestAnimationFrame(tick);
+      else this.finishPreloader();
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  setupReveal() {
+    const nodes = Array.prototype.slice.call(document.querySelectorAll("[data-reveal]"));
+    if (!nodes.length || !("IntersectionObserver" in window)) return;
+    const vh = window.innerHeight;
+    nodes.forEach((n) => {
+      if (n.getBoundingClientRect().top < vh * 0.92) return;
+      n.style.opacity = "0";
+      n.style.transform = "translateY(30px)";
+      n.style.transition = "opacity .85s cubic-bezier(.16,1,.3,1), transform .95s cubic-bezier(.16,1,.3,1)";
+    });
+    this._io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        this._ioFired = true;
+        const el = e.target;
+        const i = Array.prototype.indexOf.call(el.parentNode.children, el) % 5;
+        setTimeout(() => { el.style.opacity = "1"; el.style.transform = "none"; }, i * 80);
+        this._io.unobserve(el);
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.06 });
+    nodes.forEach((n) => this._io.observe(n));
+  }
+
+  setHeader(collapsed) {
+    // Driven through state: the runtime rewrites style attributes on re-render, so imperative writes here get wiped.
+    if (this.state.hdrCollapsed === collapsed) return;
+    this._collapsed = collapsed;
+    this.setState({ hdrCollapsed: collapsed });
+  }
+
+  setupHeader() {
+    const bar = document.querySelector("[data-header]");
+    if (!bar) return;
+    this._lastY = this.sy();
+    bar.addEventListener("mouseenter", () => { this._hover = true; this.setHeader(false); });
+    bar.addEventListener("mouseleave", () => { this._hover = false; if (this.sy() > 140) this.setHeader(true); });
+  }
+
+  updateHeader() {
+    const y = this.sy();
+    const last = this._lastY == null ? y : this._lastY;
+    if (Math.abs(y - last) > 4) this._lastY = y;
+    if (this._hover) return;
+    // A manual toggle wins until the reader scrolls up a real distance.
+    if (this._pinned) {
+      if (y < last - 24) this._pinned = false;
+      else return;
+    }
+    if (y <= 140) this.setHeader(false);
+    else if (y > last + 4) this.setHeader(true);
+    else if (y < last - 4) this.setHeader(false);
+  }
+
+  // The page may be scrolled by the document or by a scrollable host wrapper (preview frames):
+  // find whichever actually scrolls and move that one.
+  sy() { return this._scroller ? this._scroller.scrollTop : window.scrollY; }
+
+  scrollMax() {
+    const s = this._scroller;
+    if (s) return s.scrollHeight - s.clientHeight;
+    return document.documentElement.scrollHeight - window.innerHeight;
+  }
+
+  // Some hosts pin the document height, so document scrolling silently no-ops.
+  // Detect that once and promote our own wrapper to the scroll container.
+  ensureScroller() {
+    const doc = document.scrollingElement || document.documentElement;
+    if (doc.scrollHeight > doc.clientHeight + 4) {
+      const from = doc.scrollTop;
+      doc.scrollTop = from + 2;
+      const moved = doc.scrollTop !== from;
+      doc.scrollTop = from;
+      if (moved) return null;
+    }
+    const host = document.querySelector(".sc-host") || document.getElementById("dc-root");
+    if (!host) return null;
+    host.style.height = "100svh";
+    host.style.overflowY = "auto";
+    host.style.overflowX = "hidden";
+    this._scroller = host;
+    return host;
+  }
+
+  scrollToEl(target) {
+    const doc = this._scroller || document.scrollingElement || document.documentElement;
+    const top = target.getBoundingClientRect().top;
+    let node = target.parentElement, host = null;
+    while (node && node !== doc && node !== document.body) {
+      const oy = getComputedStyle(node).overflowY;
+      if (/(auto|scroll|overlay)/.test(oy) && node.scrollHeight > node.clientHeight + 4) { host = node; break; }
+      node = node.parentElement;
+    }
+    if (host) { host.scrollTop += top - host.getBoundingClientRect().top - 8; return; }
+    if (this._scroller) { this._scroller.scrollTop += top - this._scroller.getBoundingClientRect().top - 8; return; }
+    if (doc && doc.scrollHeight > doc.clientHeight + 4) { doc.scrollTop += top - 8; return; }
+    window.scrollTo(0, Math.max(0, window.scrollY + top - 8));
+  }
+
+  setupRail() {
+    const view = document.querySelector("[data-rail-view]");
+    const rail = document.querySelector("[data-rail]");
+    if (!view || !rail) return;
+    const st = { view: view, rail: rail, x: 0, dir: 1, boost: 0, drag: false, lastX: 0, vel: 0, w: 0 };
+    this._rail = st;
+    const down = (e) => { st.drag = true; st.lastX = e.clientX; st.vel = 0; view.style.cursor = "grabbing"; };
+    const move = (e) => {
+      if (!st.drag) return;
+      const dx = e.clientX - st.lastX;
+      st.lastX = e.clientX;
+      st.x += dx;
+      st.vel = dx;
+    };
+    const up = () => {
+      if (!st.drag) return;
+      st.drag = false;
+      view.style.cursor = "grab";
+      if (Math.abs(st.vel) > 1) { st.dir = st.vel < 0 ? 1 : -1; st.boost = Math.min(7, Math.abs(st.vel) * 0.4); }
+    };
+    view.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    this._railHandlers = { move: move, up: up };
+  }
+
+  // Runs from the scroll handler too, so the dock never waits on an animation frame.
+  updateDock() {
+    const vh = window.innerHeight;
+    const hero = document.getElementById("hero");
+    const join = document.getElementById("iscrizione");
+    let hide = false;
+    if (hero && hero.getBoundingClientRect().bottom > vh * 0.35) hide = true;
+    if (join && !hide) {
+      const jr = join.getBoundingClientRect();
+      if (jr.top < vh * 0.55 && jr.bottom > vh * 0.45) hide = true;
+    }
+    if (hide !== this._dockHide) { this._dockHide = hide; this.setState({ dockHidden: hide }); }
+  }
+
+  loopStep() {
+    try {
+      if (this._dirty) {
+        this._dirty = false;
+        const bar = document.querySelector("[data-progress]");
+        const max = this.scrollMax();
+        if (bar) bar.style.width = (max > 0 ? (this.sy() / max) * 100 : 0) + "%";
+        const vh = window.innerHeight;
+        const layers = this._layers || [];
+        for (let i = 0; i < layers.length; i++) {
+          const el = layers[i];
+          const host = el.hasAttribute("data-par") ? el : el.parentNode;
+          const r = host.getBoundingClientRect();
+          if (r.bottom < -200 || r.top > vh + 200) continue;
+          const k = parseFloat(el.getAttribute("data-par") || "0.13");
+          const rel = (r.top + r.height / 2 - vh / 2) / vh;
+          el.style.transform = "translate3d(0," + (rel * -100 * k).toFixed(2) + "px,0)";
+        }
+        this.updateDock();
+        this.revealInView(false);
+        this.updateHeader();
+      }
+      this.stepRail();
+    } catch (e) {
+      if (!this._loopErr) { this._loopErr = 1; console.error("scroll loop", e); }
+    }
+  }
+
+  startLoop() {
+    if (window.__crsLoopRaf) cancelAnimationFrame(window.__crsLoopRaf);
+    const frame = () => {
+      this._lastFrame = performance.now();
+      this.loopStep();
+      window.__crsLoopRaf = this._loopRaf = requestAnimationFrame(frame);
+    };
+    window.__crsLoopRaf = this._loopRaf = requestAnimationFrame(frame);
+    clearInterval(this._watchdog);
+    clearInterval(this._fallback);
+    // Background tabs and hidden frames starve rAF: keep the page alive on a timer instead.
+    this._watchdog = setInterval(() => {
+      if (performance.now() - (this._lastFrame || 0) < 900) return;
+      this._layers = Array.prototype.slice.call(document.querySelectorAll("[data-par], [data-parallax]"));
+      if (!this._rail || !this._rail.rail.isConnected) this.setupRail();
+      this._dirty = true;
+      if (!this._fallback) this._fallback = setInterval(() => {
+        if (performance.now() - (this._lastFrame || 0) < 400) return;
+        this._dirty = true;
+        this.loopStep();
+      }, 60);
+    }, 1200);
+  }
+
+  stepRail() {
+    const st = this._rail;
+    if (!st) return;
+    if (!st.w || st.w < 10) st.w = st.rail.scrollWidth / 2;
+    const now = performance.now();
+    const dt = Math.max(0.2, Math.min(4, (now - (st.t || now)) / 16.67));
+    st.t = now;
+    if (!st.drag) {
+      st.x -= st.dir * (0.55 + st.boost) * dt;
+      st.boost *= Math.pow(0.955, dt);
+      if (st.boost < 0.02) st.boost = 0;
+    }
+    if (st.w > 10) {
+      while (st.x <= -st.w) st.x += st.w;
+      while (st.x > 0) st.x -= st.w;
+    }
+    st.rail.style.transform = "translate3d(" + st.x.toFixed(2) + "px,0,0)";
+  }
+
+  confetti() {
+    const cv = document.querySelector("[data-confetti]");
+    if (!cv) return;
+    const w = window.innerWidth, h = window.innerHeight;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = w * dpr; cv.height = h * dpr;
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cols = ["#d63a2b", "#f2b520", "#2f7a45", "#21306e", "#f7ecd8"];
+    const ps = [];
+    for (let i = 0; i < 150; i++) ps.push({
+      x: w / 2 + (Math.random() - 0.5) * 180, y: h * 0.66,
+      vx: (Math.random() - 0.5) * 12, vy: -(7 + Math.random() * 12),
+      s: 5 + Math.random() * 8, a: Math.random() * Math.PI, va: (Math.random() - 0.5) * 0.45,
+      c: cols[i % cols.length]
+    });
+    const t0 = performance.now();
+    const step = (t) => {
+      const el = t - t0;
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = Math.max(0, 1 - el / 2400);
+      ps.forEach((p) => {
+        p.vy += 0.36; p.x += p.vx; p.y += p.vy; p.a += p.va;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * 0.62);
+        ctx.restore();
+      });
+      if (el < 2400) this._confRaf = requestAnimationFrame(step);
+      else ctx.clearRect(0, 0, w, h);
+    };
+    cancelAnimationFrame(this._confRaf);
+    this._confRaf = requestAnimationFrame(step);
+  }
+
+  setupNavTransitions() {
+    const curtain = document.querySelector("[data-curtain]");
+    document.querySelectorAll("[data-nav-link]").forEach((a) => {
+      a.addEventListener("click", (ev) => {
+        const target = document.querySelector(a.getAttribute("href"));
+        if (!target) return;
+        ev.preventDefault();
+        const go = () => this.scrollToEl(target);
+        if (!curtain) { go(); return; }
+        curtain.style.opacity = "1";
+        curtain.style.transform = "translateY(0)";
+        curtain.style.borderRadius = "0";
+        setTimeout(() => {
+          go();
+          curtain.style.transform = "translateY(-100%)";
+          curtain.style.borderRadius = "0 0 50% 50% / 0 0 14% 14%";
+          setTimeout(() => {
+            curtain.style.transition = "none";
+            curtain.style.opacity = "0";
+            curtain.style.transform = "translateY(100%)";
+            curtain.style.borderRadius = "50% 50% 0 0 / 12% 12% 0 0";
+            requestAnimationFrame(() => {
+              curtain.style.transition = "transform .55s cubic-bezier(.76,0,.24,1), opacity .25s ease";
+            });
+          }, 580);
+        }, 430);
+      });
+    });
+  }
+
+  revealInView(all) {
+    document.querySelectorAll("[data-reveal]").forEach((el) => {
+      if (el.style.opacity !== "0") return;
+      if (!all && el.getBoundingClientRect().top > window.innerHeight * 0.95) return;
+      el.style.opacity = "1";
+      el.style.transform = "none";
+    });
+  }
+
+  setupScroll() {
+    this.ensureScroller();
+    const bar = document.querySelector("[data-progress]");
+    // Cached once: querying on every scroll event was the source of the stutter.
+    this._layers = Array.prototype.slice.call(document.querySelectorAll("[data-par], [data-parallax]"));
+    this._dirty = true;
+    this._onScroll = () => { this._dirty = true; };
+    this._scrolled = false;
+    const onScrollEvent = () => {
+      const y = this.sy();
+      const dy = y - (this._railY == null ? y : this._railY);
+      this._railY = y;
+      if (this._rail && Math.abs(dy) > 0.5) {
+        this._rail.dir = dy > 0 ? 1 : -1;
+        this._rail.boost = Math.min(7, this._rail.boost + Math.abs(dy) * 0.05);
+      }
+      this._scrolled = true;
+      this._dirty = true;
+      this.updateDock();
+    };
+    (this._scroller || window).addEventListener("scroll", onScrollEvent, { passive: true });
+    window.addEventListener("resize", this._onScroll, { passive: true });
+    this._onScrollEvent = onScrollEvent;
+    this.setupRail();
+    this.startLoop();
+    // If neither scroll events nor the observer ever fire, show everything rather than nothing.
+    this._revealFailsafe = setTimeout(() => {
+      this._onScroll();
+      if (!this._scrolled && !this._ioFired) this.revealInView(true);
+    }, 1400);
+  }
+
+  counts() {
+    const basePilots = this.props.pilotsBase || 38;
+    const baseAttend = this.props.attendeesBase || 412;
+    const extra = this.ls("carruleddhi.attended") === "1" ? 1 : 0;
+    return { pilots: basePilots, attend: baseAttend + extra };
+  }
+
+  paintCounters(animate) {
+    const c = this.counts();
+    const pilotsEls = document.querySelectorAll("[data-count-pilots]");
+    const attendEls = document.querySelectorAll("[data-count-attend]");
+    const run = (el, to) => {
+      if (!el) return;
+      if (!animate) { el.textContent = String(to); return; }
+      const t0 = performance.now(), dur = 1400;
+      const step = (t) => {
+        const p = Math.min(1, (t - t0) / dur);
+        el.textContent = String(Math.round(to * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    pilotsEls.forEach((el) => run(el, c.pilots));
+    attendEls.forEach((el) => run(el, c.attend));
+  }
+
+  dict(lang) {
+    const all = (typeof window !== "undefined" && window.CARRULEDDHI_I18N) || {};
+    return all[lang] || all.it || {};
+  }
+
+  applyLang(lang) {
+    const d = this.dict(lang);
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const v = d[el.getAttribute("data-i18n")];
+      if (typeof v === "string" && el.textContent !== v) el.textContent = v;
+    });
+    // Flag buttons keep their gradient: mark the active one with a ring, never a background swap.
+    document.querySelectorAll("[data-lang]").forEach((b) => {
+      const on = b.getAttribute("data-lang") === lang;
+      b.style.borderColor = on ? "#f2b520" : "transparent";
+      b.style.opacity = on ? "1" : "0.62";
+    });
+    if (document.documentElement) document.documentElement.lang = lang;
+  }
+
+  setLang(lang, persist) {
+    this.applyLang(lang);
+    if (persist !== false) this.lsSet("carruleddhi.lang", lang);
+    this.setState({ lang }, () => this.paintCounters(false));
+  }
+
+  pickDate(iso) {
+    const race = new Date("2026-10-17"), b = new Date(iso);
+    let age = race.getFullYear() - b.getFullYear();
+    const m = race.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && race.getDate() < b.getDate())) age--;
+    this.setState({ dob: iso, calOpen: false, isMinor: age < 18 }, () => this.reapply());
+  }
+
+  readPhoto(file) {
+    if (!file) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 900;
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * k);
+        cv.height = Math.round(img.height * k);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        this.setState({ revPhoto: cv.toDataURL("image/jpeg", 0.72) });
+      };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  }
+
+  reapply() { requestAnimationFrame(() => { this.applyLang(this.state.lang); this.paintCounters(false); }); }
+
+  read(name) {
+    const el = document.querySelector('[data-f="' + name + '"]');
+    if (!el) return "";
+    return el.type === "checkbox" ? el.checked : (el.value || "").trim();
+  }
+
+  submit() {
+    const req = ["firstName", "lastName", "birthDate", "taxCode", "email", "phone", "address", "cartName"];
+    let ok = this.state.termsAccepted;
+    req.forEach((f) => { if (!this.read(f)) ok = false; });
+    if (this.state.isMinor && (!this.read("guardianName") || !this.read("guardianTaxCode"))) ok = false;
+    if (!ok) { this.setState({ errorOn: true }, () => this.reapply()); return; }
+    const payload = {
+      firstName: this.read("firstName"), lastName: this.read("lastName"),
+      birthDate: this.read("birthDate"), taxCode: this.read("taxCode"),
+      email: this.read("email"), phone: this.read("phone"), address: this.read("address"),
+      cartName: this.read("cartName"), category: this.read("category"),
+      guardianName: this.read("guardianName"), guardianTaxCode: this.read("guardianTaxCode"),
+      printByOrganizer: !!this.read("printByUs"), lang: this.state.lang,
+      termsAcceptedAt: new Date().toISOString(), termsVersion: "v1"
+    };
+    // Prototype only: the real POST goes to /api/registrations — see export/ and make-com-setup.md.
+    console.log("registration payload", payload);
+    const n = String(Math.floor(Math.random() * 180) + 12).padStart(3, "0");
+    this.setState({ done: true, errorOn: false, raceNumber: n, printByUs: payload.printByOrganizer, payload }, () => {
+      this.reapply();
+      const t = document.getElementById("iscrizione");
+      if (t) this.scrollToEl(t);
+      setTimeout(() => this.confetti(), 260);
+    });
+  }
+
+  onTermsScroll(e) {
+    this.measureTerms(e && e.currentTarget);
+  }
+
+  measureTerms(el) {
+    if (!this.state.termsOpen) return;
+    // Always prefer the node currently in the document: sc-if remounts the dialog on re-render.
+    const box = document.querySelector("[data-terms-scroll]") || el || this._termsEl;
+    if (!box) return;
+    const max = box.scrollHeight - box.clientHeight;
+    const p = max <= 8 ? 100 : Math.min(100, Math.round((box.scrollTop / max) * 100));
+    if (p !== this.state.readPct) this.setState({ readPct: p }, () => this.reapply());
+  }
+
+  bindTermsScroller() {
+    const el = document.querySelector("[data-terms-scroll]");
+    if (!el) return;
+    if (el === this._termsEl && el.isConnected) { this.measureTerms(el); return; }
+    this.unbindTermsScroller();
+    this._termsEl = el;
+    this._onTerms = () => this.measureTerms(el);
+    el.addEventListener("scroll", this._onTerms, { passive: true });
+    this.measureTerms(el);
+  }
+
+  unbindTermsScroller() {
+    if (this._termsEl && this._onTerms) this._termsEl.removeEventListener("scroll", this._onTerms);
+    this._termsEl = null;
+  }
+
+  componentDidUpdate() {
+    // sc-if remounts dialogs, so re-apply translations and re-bind the scroller after every render.
+    this.applyLang(this.state.lang);
+    if (this._rail) this._rail.w = 0;
+    if (this.state.termsOpen) requestAnimationFrame(() => this.bindTermsScroller());
+    else this.unbindTermsScroller();
+  }
+
+  renderVals() {
+    const s = this.state, p = s.preP;
+    const faqVal = (i) => {
+      const open = !!s.faq[i];
+      return { rot: open ? 135 + "deg" : "0deg", h: open ? "340px" : "0px", o: open ? "1" : "0" };
+    };
+    const f = [1, 2, 3, 4, 5].map(faqVal);
+    const canAccept = s.readPct >= 96;
+    const d = this.dict(s.lang);
+    const pzPal = [
+      ["var(--c-yellow)", "var(--c-ink)"], ["var(--c-red)", "var(--c-cream)"],
+      ["var(--c-green)", "var(--c-cream)"], ["var(--c-indigo)", "var(--c-cream)"],
+      ["var(--c-cream)", "var(--c-ink)"]
+    ];
+    const pz = {};
+    for (let i = 1; i <= 12; i++) {
+      const on = s.prizeI === i - 1;
+      const pal = pzPal[(i - 1) % pzPal.length];
+      pz["pz" + i + "Bg"] = on ? pal[0] : "rgba(247,236,216,.07)";
+      pz["pz" + i + "Fg"] = on ? pal[1] : "var(--c-cream)";
+      pz["pz" + i + "Br"] = on ? pal[0] : "rgba(247,236,216,.14)";
+      pz["pick" + i] = () => { this._prizeLock = true; this.setState({ prizeI: i - 1 }); };
+    }
+    const pzPalActive = pzPal[s.prizeI % pzPal.length];
+
+    const loc = s.lang === "it" ? "it-IT" : s.lang === "pl" ? "pl-PL" : s.lang === "de" ? "de-DE" : s.lang === "es" ? "es-ES" : s.lang === "fr" ? "fr-FR" : "en-GB";
+    const fmt = (o) => { try { return new Intl.DateTimeFormat(loc, o); } catch (e) { return new Intl.DateTimeFormat("it-IT", o); } };
+    const first = new Date(s.calY, s.calM, 1);
+    const shift = (first.getDay() + 6) % 7;
+    const dim = new Date(s.calY, s.calM + 1, 0).getDate();
+    const wkFmt = fmt({ weekday: "short" });
+    const calWeek = [];
+    for (let i = 0; i < 7; i++) calWeek.push({ l: wkFmt.format(new Date(2024, 0, 1 + i)).slice(0, 2) });
+    const calDays = [];
+    for (let i = 0; i < shift; i++) calDays.push({ n: "", bg: "transparent", fg: "transparent", op: "0", pick: () => {} });
+    for (let day = 1; day <= dim; day++) {
+      const iso = s.calY + "-" + String(s.calM + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+      const on = s.dob === iso;
+      calDays.push({
+        n: String(day), bg: on ? "var(--c-red)" : "rgba(23,21,15,.06)",
+        fg: on ? "var(--c-cream)" : "var(--c-ink)", op: "1",
+        pick: () => this.pickDate(iso)
+      });
+    }
+    const dobPretty = s.dob ? fmt({ day: "2-digit", month: "long", year: "numeric" }).format(new Date(s.dob)) : (d["date.pick"] || "");
+
+    const stars = (n) => "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n);
+    const st = {};
+    for (let i = 1; i <= 5; i++) {
+      const on = s.revRating >= i;
+      st["s" + i + "Bg"] = on ? "var(--c-yellow)" : "rgba(23,21,15,.08)";
+      st["s" + i + "Fg"] = on ? "var(--c-ink)" : "rgba(23,21,15,.35)";
+      st["star" + i] = () => this.setState({ revRating: i });
+    }
+    const filt = {};
+    [["all", 1], ["top", 2], ["photo", 3]].forEach((pair) => {
+      const on = s.revFilter === pair[0];
+      filt["f" + pair[1] + "Bg"] = on ? "var(--c-cream)" : "transparent";
+      filt["f" + pair[1] + "Fg"] = on ? "var(--c-ink)" : "var(--c-cream)";
+      filt["f" + pair[1] + "Br"] = on ? "var(--c-cream)" : "rgba(247,236,216,.45)";
+    });
+    const shown = s.reviews.filter((r) => s.revFilter === "top" ? (r.rating || 5) >= 4 : s.revFilter === "photo" ? !!r.photo : true);
+    const cardPal = [["var(--c-cream)", "var(--c-ink)"], ["var(--c-yellow)", "var(--c-ink)"], ["var(--c-indigo)", "var(--c-cream)"], ["var(--c-ink)", "var(--c-cream)"]];
+    let cards = (shown.length ? shown : [{ name: "Carruleddhi Show", text: d["rev.empty"] || "", rating: 5 }]).map((r, i) => ({
+      text: r.text, name: r.name, stars: stars(r.rating || 5),
+      photoCss: r.photo ? 'url("' + r.photo + '")' : "none", hasPhoto: !!r.photo,
+      bg: cardPal[i % cardPal.length][0], fg: cardPal[i % cardPal.length][1]
+    }));
+    const base = cards.slice();
+    while (cards.length < 8) cards = cards.concat(base.map((c, i) => Object.assign({}, c, { bg: cardPal[(cards.length + i) % cardPal.length][0], fg: cardPal[(cards.length + i) % cardPal.length][1] })));
+    const railCards = cards.concat(cards);
+    const avg = s.reviews.length ? (s.reviews.reduce((a, r) => a + (r.rating || 5), 0) / s.reviews.length) : 0;
+    const setLangTo = (l) => () => this.setLang(l, true);
+    const toggleFaq = (i) => () => {
+      const faq = Object.assign({}, this.state.faq);
+      faq[i] = !faq[i];
+      this.setState({ faq }, () => this.reapply());
+    };
+    return {
+      prizeNum: String(s.prizeI + 1).padStart(2, "0"),
+      prizeName: d["prize." + (s.prizeI + 1)] || "",
+      prizeRank: (s.prizeI < 3 ? d["prize.top"] : d["prize.more"]) || "",
+      prizeBg: pzPalActive[0],
+      prizeFg: pzPalActive[1],
+
+      notifyCta: s.notifyDone ? (d["count.attendDone"] || "") : (d["count.attendCta"] || ""),
+      notifyRot: s.notifyOpen ? "135deg" : "0deg",
+      notifyH: s.notifyOpen ? "460px" : "0px",
+      notifyO: s.notifyOpen ? "1" : "0",
+      notifyDone: s.notifyDone,
+      notifyErr: s.notifyErr,
+      toggleNotify: () => this.setState({ notifyOpen: !this.state.notifyOpen }, () => this.reapply()),
+      openNotify: () => {
+        const t = document.getElementById("notifiche");
+        this.setState({ notifyOpen: true }, () => { this.reapply(); if (t) this.scrollToEl(t); });
+      },
+      sendNotify: () => {
+        const name = this.read("notifyName"), mail = this.read("notifyEmail");
+        if (!name || !/.+@.+\..+/.test(mail)) { this.setState({ notifyErr: true }); return; }
+        this.lsSet("carruleddhi.notify", name + "|" + mail);
+        this.lsSet("carruleddhi.attended", "1");
+        console.log("reminder signup", { name: name, email: mail, remind: ["-7d", "-1d", "-3h"] });
+        this.setState({ notifyErr: false, notifyDone: true, notifyOpen: false, attended: true }, () => {
+          this.reapply();
+          this.paintCounters(false);
+        });
+      },
+
+      calOpen: s.calOpen,
+      calWeek: calWeek,
+      calDays: calDays,
+      calLabel: fmt({ month: "long", year: "numeric" }).format(first),
+      dobValue: s.dob,
+      dobLabel: dobPretty,
+      dobColor: s.dob ? "var(--c-ink)" : "rgba(23,21,15,.5)",
+      dobBorder: s.dob ? "var(--c-green)" : "rgba(23,21,15,.18)",
+      toggleCal: () => this.setState({ calOpen: !this.state.calOpen }, () => this.reapply()),
+      calPrev: () => this.setState((p) => (p.calM === 0 ? { calM: 11, calY: p.calY - 1 } : { calM: p.calM - 1 })),
+      calNext: () => this.setState((p) => (p.calM === 11 ? { calM: 0, calY: p.calY + 1 } : { calM: p.calM + 1 })),
+      calPrevY: () => this.setState((p) => ({ calY: p.calY - 1 })),
+      calNextY: () => this.setState((p) => ({ calY: p.calY + 1 })),
+
+      dockY: s.dockHidden ? "160%" : "0%",
+      dockOp: s.dockHidden ? "0" : "1",
+
+      revAvg: avg ? avg.toFixed(1) : "—",
+      revStars: stars(Math.round(avg) || 5),
+      revCountLabel: s.reviews.length + " " + (d["rev.count"] || ""),
+      revRating: s.revRating,
+      revPhotoCss: s.revPhoto ? 'url("' + s.revPhoto + '")' : "none",
+      revPhotoOn: !!s.revPhoto,
+      dropPhoto: () => this.setState({ revPhoto: "" }),
+      pickPhoto: (e) => this.readPhoto(e.currentTarget.files && e.currentTarget.files[0]),
+      filtAll: () => this.setState({ revFilter: "all" }),
+      filtTop: () => this.setState({ revFilter: "top" }),
+      filtPhoto: () => this.setState({ revFilter: "photo" }),
+      railCards: railCards,
+      s1Bg: st.s1Bg, s1Fg: st.s1Fg, star1: st.star1,
+      s2Bg: st.s2Bg, s2Fg: st.s2Fg, star2: st.star2,
+      s3Bg: st.s3Bg, s3Fg: st.s3Fg, star3: st.star3,
+      s4Bg: st.s4Bg, s4Fg: st.s4Fg, star4: st.star4,
+      s5Bg: st.s5Bg, s5Fg: st.s5Fg, star5: st.star5,
+      f1Bg: filt.f1Bg, f1Fg: filt.f1Fg, f1Br: filt.f1Br,
+      f2Bg: filt.f2Bg, f2Fg: filt.f2Fg, f2Br: filt.f2Br,
+      f3Bg: filt.f3Bg, f3Fg: filt.f3Fg, f3Br: filt.f3Br,
+
+      askErr: s.askErr,
+      askDone: s.askDone,
+      sendAsk: () => {
+        const name = this.read("askName"), mail = this.read("askEmail"), text = this.read("askText");
+        if (!name || !/.+@.+\..+/.test(mail) || text.length < 4) { this.setState({ askErr: true }); return; }
+        console.log("question", { name: name, email: mail, text: text });
+        this.setState({ askErr: false, askDone: true }, () => {
+          this.reapply();
+          const t = document.querySelector('[data-f="askText"]');
+          if (t) t.value = "";
+        });
+      },
+
+      reviews: s.reviews,
+      revEmpty: s.reviews.length === 0,
+      revErr: s.revErr,
+      revThanks: s.revThanks,
+      sendReview: () => {
+        const name = this.read("revName"), text = this.read("revText");
+        if (!name || text.length < 4) { this.setState({ revErr: true }); return; }
+        const list = [{ name: name, text: text, rating: this.state.revRating, photo: this.state.revPhoto }].concat(this.state.reviews).slice(0, 12);
+        this.lsSet("carruleddhi.reviews", JSON.stringify(list));
+        this.setState({ reviews: list, revErr: false, revThanks: true, revPhoto: "" }, () => {
+          this.reapply();
+          const n = document.querySelector('[data-f="revName"]'), t = document.querySelector('[data-f="revText"]');
+          if (n) n.value = "";
+          if (t) t.value = "";
+        });
+      },
+
+      hdrMax: s.hdrCollapsed ? "0px" : "1100px",
+      hdrOp: s.hdrCollapsed ? "0" : "1",
+      hdrBg: s.hdrCollapsed ? "rgba(23,21,15,.34)" : "rgba(23,21,15,.62)",
+      hdrShadow: s.hdrCollapsed ? "0 6px 18px rgba(0,0,0,.14)" : "0 10px 30px rgba(0,0,0,.24)",
+      preOn: s.preOn && this.props.preloader !== false,
+      prePct: Math.round(p * 100) + "%",
+      preRot: Math.round(p * 1080) + "deg",
+      preNum: String(Math.round(p * 100)).padStart(3, "0"),
+      preWord: p > 0.12 ? "0%" : "110%",
+      preFade: s.preExit ? "0" : "1",
+      preLeft: s.preExit ? "-100%" : "0%",
+      preRight: s.preExit ? "100%" : "0%",
+
+      toggleHeader: () => {
+        this._pinned = true;
+        this.setHeader(!this.state.hdrCollapsed);
+      },
+      setLangIt: setLangTo("it"), setLangPl: setLangTo("pl"), setLangDe: setLangTo("de"),
+      setLangEs: setLangTo("es"), setLangFr: setLangTo("fr"), setLangEn: setLangTo("en"),
+
+      toggleFaq1: toggleFaq(1), toggleFaq2: toggleFaq(2), toggleFaq3: toggleFaq(3),
+      toggleFaq4: toggleFaq(4), toggleFaq5: toggleFaq(5),
+      faq1Rot: f[0].rot, faq1H: f[0].h, faq1O: f[0].o,
+      faq2Rot: f[1].rot, faq2H: f[1].h, faq2O: f[1].o,
+      faq3Rot: f[2].rot, faq3H: f[2].h, faq3O: f[2].o,
+      faq4Rot: f[3].rot, faq4H: f[3].h, faq4O: f[3].o,
+      faq5Rot: f[4].rot, faq5H: f[4].h, faq5O: f[4].o,
+      pz1Bg: pz.pz1Bg, pz1Fg: pz.pz1Fg, pz1Br: pz.pz1Br, pick1: pz.pick1,
+      pz2Bg: pz.pz2Bg, pz2Fg: pz.pz2Fg, pz2Br: pz.pz2Br, pick2: pz.pick2,
+      pz3Bg: pz.pz3Bg, pz3Fg: pz.pz3Fg, pz3Br: pz.pz3Br, pick3: pz.pick3,
+      pz4Bg: pz.pz4Bg, pz4Fg: pz.pz4Fg, pz4Br: pz.pz4Br, pick4: pz.pick4,
+      pz5Bg: pz.pz5Bg, pz5Fg: pz.pz5Fg, pz5Br: pz.pz5Br, pick5: pz.pick5,
+      pz6Bg: pz.pz6Bg, pz6Fg: pz.pz6Fg, pz6Br: pz.pz6Br, pick6: pz.pick6,
+      pz7Bg: pz.pz7Bg, pz7Fg: pz.pz7Fg, pz7Br: pz.pz7Br, pick7: pz.pick7,
+      pz8Bg: pz.pz8Bg, pz8Fg: pz.pz8Fg, pz8Br: pz.pz8Br, pick8: pz.pick8,
+      pz9Bg: pz.pz9Bg, pz9Fg: pz.pz9Fg, pz9Br: pz.pz9Br, pick9: pz.pick9,
+      pz10Bg: pz.pz10Bg, pz10Fg: pz.pz10Fg, pz10Br: pz.pz10Br, pick10: pz.pick10,
+      pz11Bg: pz.pz11Bg, pz11Fg: pz.pz11Fg, pz11Br: pz.pz11Br, pick11: pz.pick11,
+      pz12Bg: pz.pz12Bg, pz12Fg: pz.pz12Fg, pz12Br: pz.pz12Br, pick12: pz.pick12,
+
+      attendLabel: s.attended ? this.dict(s.lang)["count.attendDone"] : this.dict(s.lang)["count.attendCta"],
+      attend: () => {
+        if (this.state.attended) return;
+        this.lsSet("carruleddhi.attended", "1");
+        this.setState({ attended: true }, () => this.paintCounters(false));
+      },
+
+      showForm: !s.done,
+      showDone: s.done,
+      openForm: () => {
+        const t = document.getElementById("iscrizione");
+        if (t) this.scrollToEl(t);
+        setTimeout(() => {
+          const f = document.querySelector('[data-f="firstName"]');
+          if (f && !this.state.done) f.focus({ preventScroll: true });
+        }, 700);
+      },
+      openTerms: () => this.setState({ termsOpen: true, readPct: 0 }, () => this.reapply()),
+      closeTerms: () => this.setState({ termsOpen: false }, () => this.reapply()),
+      acceptTerms: () => this.setState({ termsAccepted: true, termsOpen: false, errorOn: false }, () => this.reapply()),
+      termsOpen: s.termsOpen,
+      readPct: s.readPct + "%",
+      acceptDisabled: !canAccept,
+      acceptOpacity: canAccept ? "1" : "0.4",
+      onTermsScroll: (e) => this.onTermsScroll(e),
+
+      termsMark: s.termsAccepted ? "✓" : "",
+      termsDotBg: s.termsAccepted ? "#d63a2b" : "transparent",
+      termsDotFg: s.termsAccepted ? "#f7ecd8" : "#17150f",
+      termsDotBorder: s.termsAccepted ? "#d63a2b" : "rgba(23,21,15,.25)",
+
+      isMinor: s.isMinor,
+      onDob: (e) => {
+        const v = e.currentTarget.value;
+        if (!v) { this.setState({ isMinor: false }); return; }
+        const race = new Date("2026-10-17"), b = new Date(v);
+        let age = race.getFullYear() - b.getFullYear();
+        const m = race.getMonth() - b.getMonth();
+        if (m < 0 || (m === 0 && race.getDate() < b.getDate())) age--;
+        this.setState({ isMinor: age < 18 }, () => this.reapply());
+      },
+
+      errorOn: s.errorOn,
+      submit: () => this.submit(),
+      raceNumber: s.raceNumber,
+      printByUs: s.printByUs,
+      printPage: () => window.print(),
+      downloadPdf: () => {
+        const d = this.state.payload || {};
+        const lines = [
+          "CARRULEDDHI SHOW 2026 — Santa Teresa Gallura",
+          "Numero di gara: " + this.state.raceNumber,
+          "",
+          (d.firstName || "") + " " + (d.lastName || ""),
+          "Data di nascita: " + (d.birthDate || ""),
+          "Codice fiscale: " + (d.taxCode || ""),
+          "E-mail: " + (d.email || ""),
+          "Telefono: " + (d.phone || ""),
+          "Indirizzo: " + (d.address || ""),
+          "Carretto: " + (d.cartName || ""),
+          "Categoria: " + (d.category === "art" ? "Carruleddhi ART" : "Carruleddhi Classic"),
+          d.guardianName ? "Genitore: " + d.guardianName + " (" + (d.guardianTaxCode || "") + ")" : "",
+          "",
+          "Firma leggibile: ______________________"
+        ].filter(Boolean).join("\n");
+        const blob = new Blob([lines], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "carruleddhi-" + this.state.raceNumber + ".txt";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.vite/
+*.log
+
+# Build and deploy scratch.
+.vercel/
+worker/.wrangler/
+
+# Secrets — never commit these.
+.kiro/settings/mcp.json
+.dev.vars
+.env
+.env.*
+worker/.dev.vars
+
+# Measurement output. Screenshots are for looking at, not for keeping in history.
+shots/
+public/__probe.html

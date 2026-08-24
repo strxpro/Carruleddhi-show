@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>{{ params.subject }}</title>
+<!--[if mso]><style>body,table,td{font-family:Arial,Helvetica,sans-serif !important}</style><![endif]-->
+<style>
+  @media only screen and (max-width:620px){
+    .wrap{width:100% !important}
+    .pad{padding-left:20px !important;padding-right:20px !important}
+    .h1{font-size:30px !important}
+    .stack{display:block !important;width:100% !important;border-right:0 !important}
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#e9f1ff;">
+<div style="display:none;font-size:1px;color:#e9f1ff;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">{{ params.body }}</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9f1ff;">
+<tr><td align="center" style="padding:24px 12px;">
+
+<table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+
+  <tr><td class="pad" style="background:#071a3d;padding:26px 34px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="font-size:19px;font-weight:800;color:#ffffff;letter-spacing:-.4px;">CARRULEDDHI <span style="color:#ffc928;">SHOW 2026</span></td>
+      <td align="right" style="font-size:11px;color:#bcd6ff;letter-spacing:1.6px;text-transform:uppercase;">{{ params.stageLabel }}</td>
+    </tr></table>
+  </td></tr>
+
+  <!-- Countdown ribbon: params.stage is 7d / 1d / 3h -->
+  <tr><td style="background:#ffc928;padding:14px 34px;text-align:center;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#071a3d;">
+    {{ params.stageRibbon }}
+  </td></tr>
+
+  <tr><td class="pad" style="padding:32px 34px 6px;">
+    <p style="margin:0 0 8px;font-size:15px;color:#5f709a;">{{ params.hi }}</p>
+    <h1 class="h1" style="margin:0 0 16px;font-size:36px;line-height:1.05;color:#071a3d;font-weight:800;letter-spacing:-1.2px;">{{ params.heading }}</h1>
+    <div style="font-size:15px;line-height:1.7;color:#43516f;">{{ params.body }}</div>
+  </td></tr>
+
+  <tr><td class="pad" style="padding:24px 34px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #dbe5f5;border-radius:14px;">
+      <tr>
+        <td class="stack" width="34%" style="padding:16px 18px;border-right:1px solid #dbe5f5;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#5f709a;">{{ params.labelWhen }}</div>
+          <div style="font-size:20px;font-weight:800;color:#071a3d;padding-top:3px;">{{ params.eventDate }}</div>
+        </td>
+        <td class="stack" width="30%" style="padding:16px 18px;border-right:1px solid #dbe5f5;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#5f709a;">{{ params.labelStart }}</div>
+          <div style="font-size:20px;font-weight:800;color:#f6494f;padding-top:3px;">{{ params.start }}</div>
+        </td>
+        <td class="stack" width="36%" style="padding:16px 18px;font-size:13px;line-height:1.5;color:#5f709a;">{{ params.place }}</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- Only shown when the recipient is also a registered rider. -->
+  {% if params.isRider %}
+  <tr><td class="pad" style="padding:20px 34px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f8ff;border-left:4px solid #2469d8;border-radius:0 12px 12px 0;">
+      <tr><td style="padding:14px 18px;font-size:14px;line-height:1.6;color:#2f3f5e;">
+        <strong style="color:#071a3d;">#{{ params.raceNumber }}</strong> &mdash; {{ params.riderNote }}
+      </td></tr>
+    </table>
+  </td></tr>
+  {% endif %}
+
+  <tr><td class="pad" align="center" style="padding:26px 34px 32px;">
+    <a href="{{ params.mapUrl }}" style="display:inline-block;background:#f6494f;color:#ffffff;font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;text-decoration:none;padding:14px 28px;border-radius:999px;">{{ params.cta }} &rarr;</a>
+  </td></tr>
+
+  <tr><td class="pad" style="background:#071a3d;padding:22px 34px;">
+    <div style="font-size:12px;line-height:1.6;color:#8fb0e8;">{{ params.footerNote }}</div>
+    <div style="font-size:12px;padding-top:10px;">
+      <a href="{{ params.unsubscribeUrl }}" style="color:#ffc928;text-decoration:underline;">{{ params.unsubLabel }}</a>
+      &nbsp;&middot;&nbsp;
+      <a href="mailto:{{ params.orgEmail }}" style="color:#ffffff;text-decoration:none;">{{ params.orgEmail }}</a>
+    </div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
