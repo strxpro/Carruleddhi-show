@@ -33,7 +33,7 @@ const ORG_EMAIL = 'info@carruleddhishow.com';
  * this one number, and CallMeBot ignores anything after "Stop" is sent to the
  * bot — but it is still a live credential, so keep it out of public repos.
  */
-const CALLMEBOT = { phone: '393284981574', apikey: '3364881' };
+const CALLMEBOT = { phone: '48665626101', apikey: '2990681' };
 
 /* ---------------------------------------------------------------- copy deck */
 
