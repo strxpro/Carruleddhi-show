@@ -153,6 +153,156 @@ function wallReady(env) {
   return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY);
 }
 
+/* ============================================================================
+   Store of record
+   ============================================================================
+   Form submissions are written here first, then forwarded to Make for the e-mail.
+
+   WHY THE ORDER MATTERS
+     Make used to be both: it wrote the Google Sheet and sent the mail. That made the
+     spreadsheet the store of record, and a spreadsheet is addressed by column
+     position — insert a field in the middle and every value after it shifts one
+     column to the right, silently. Ten under-18 columns went missing that way, and a
+     `locale` once landed in `race_number`.
+
+     Writing here first also means the race number comes from a sequence instead of a
+     spreadsheet row, so it survives sorting and deleting, and the browser gets the
+     real number in the response rather than a guess.
+
+   WHAT MAKE IS LEFT WITH
+     Sending mail. No Google connection, no column mapping, no row arithmetic.
+   ============================================================================ */
+
+const STORED_TYPES = new Set(['registration', 'reminder', 'contact']);
+const LOCALES = new Set(['it', 'pl', 'en', 'de', 'es', 'fr']);
+
+/** The database has a check constraint on locale; a browser can send anything. */
+function localeOf(value) {
+  const two = String(value || 'it').slice(0, 2).toLowerCase();
+  return LOCALES.has(two) ? two : 'it';
+}
+
+const trimmed = (value, fallback = null) => {
+  const text = String(value ?? '').trim();
+  return text ? text : fallback;
+};
+
+/** POST one row. Returns the inserted row when `select` is asked for. */
+async function insertRow(env, table, row, select = '') {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  if (select) url.searchParams.set('select', select);
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: supabaseHeaders(env, {
+      Prefer: select ? 'return=representation' : 'return=minimal'
+    }),
+    body: JSON.stringify([row])
+  });
+  if (!response.ok) {
+    // Postgres says useful things here — a failed check constraint names itself —
+    // and it is worth having in the log rather than a bare 502.
+    const detail = await response.text().catch(() => '');
+    return { ok: false, status: response.status, detail: detail.slice(0, 400) };
+  }
+  if (!select) return { ok: true, row: null };
+  const rows = await response.json().catch(() => []);
+  return { ok: true, row: Array.isArray(rows) ? rows[0] : null };
+}
+
+/**
+ * Writes a submission and, for a registration, returns the race number.
+ *
+ * `newsConsent` on a registration also adds a newsletter row. That is one form
+ * producing two records on purpose: the entry is for this year and the subscription
+ * outlives it, so withdrawing from the race must not silently unsubscribe them, and
+ * unsubscribing must not touch the entry.
+ */
+async function storeIntake(env, request, type, payload) {
+  const locale = localeOf(payload.locale);
+
+  if (type === 'contact') {
+    const stored = await insertRow(env, 'contact_messages', {
+      name: trimmed(payload.name, 'â€”'),
+      email: String(payload.email || '').trim().toLowerCase(),
+      message: trimmed(payload.message, ''),
+      locale,
+      status: 'new',
+      ip_hash: await hashIp(env, request)
+    });
+    return stored.ok ? { ok: true } : { ok: false, ...stored };
+  }
+
+  if (type === 'reminder') {
+    const stored = await insertRow(env, 'reminder_subscribers', {
+      name: trimmed(payload.name, 'â€”'),
+      email: String(payload.email || '').trim().toLowerCase(),
+      locale,
+      consent_at: new Date().toISOString(),
+      // Lets a future "stop these" link identify the row without exposing its id.
+      unsubscribe_token: crypto.randomUUID().replace(/-/g, ''),
+      status: 'active'
+    });
+    return stored.ok ? { ok: true } : { ok: false, ...stored };
+  }
+
+  // registration
+  const row = {
+    first_name: trimmed(payload.firstName, ''),
+    last_name: trimmed(payload.lastName, ''),
+    birth_date: trimmed(payload.birthDate),
+    postal_code: trimmed(payload.postalCode),
+    email: String(payload.email || '').trim().toLowerCase(),
+    phone: trimmed(payload.phone),
+    address: trimmed(payload.address),
+    cart_name: trimmed(payload.cartName, ''),
+    category: payload.category === 'art' ? 'art' : 'classic',
+    team_name: trimmed(payload.teamName),
+    cart_notes: trimmed(payload.cartNotes),
+    locale,
+    rules_consent: Boolean(payload.rulesConsent),
+    privacy_consent: Boolean(payload.privacyConsent),
+    news_consent: Boolean(payload.newsConsent),
+    status: 'new',
+    email_status: 'pending',
+    is_minor: Boolean(payload.isMinor),
+    rider_age: Number.parseInt(payload.riderAge, 10) || null
+  };
+
+  // Guardian block only on a minor entry. The handler has already stripped these
+  // from an adult one; sending nulls keeps the row honest either way.
+  if (payload.isMinor) {
+    Object.assign(row, {
+      child_kind: ['son', 'daughter', 'child'].includes(payload.childKind) ? payload.childKind : 'child',
+      guardian_relation: ['mother', 'father', 'guardian'].includes(payload.guardianRelation)
+        ? payload.guardianRelation
+        : 'guardian',
+      guardian_name: trimmed(payload.guardianName),
+      guardian_email: String(payload.guardianEmail || '').trim().toLowerCase() || null,
+      guardian_phone: trimmed(payload.guardianPhone),
+      mother_name: trimmed(payload.motherName),
+      father_name: trimmed(payload.fatherName),
+      guardian_consent: Boolean(payload.guardianConsent)
+    });
+  }
+
+  const stored = await insertRow(env, 'registrations', row, 'race_number');
+  if (!stored.ok) return { ok: false, ...stored };
+
+  // Best effort: a failed newsletter row must not fail the registration. They ticked
+  // a box about next year; the entry for this year is the thing that matters.
+  if (payload.newsConsent) {
+    await insertRow(env, 'newsletter_subscribers', {
+      name: `${row.first_name} ${row.last_name}`.trim(),
+      email: row.email,
+      locale,
+      source: 'registration',
+      status: 'active'
+    }).catch(() => {});
+  }
+
+  return { ok: true, raceNumber: stored.row?.race_number ?? null };
+}
+
 function supabaseHeaders(env, extra = {}) {
   return {
     apikey: env.SUPABASE_SERVICE_KEY,
@@ -823,6 +973,37 @@ export default {
       }
     }
 
+    /* Database first, Make second.
+       If the row cannot be written the request fails here, before any e-mail goes
+       out. The alternative — mail sent, nothing stored — produces a rider holding a
+       number that exists in no list, which is worse than a visible error they can
+       act on by trying again. */
+    if (STORED_TYPES.has(type) && wallReady(env)) {
+      const stored = await storeIntake(env, request, type, payload);
+      if (!stored.ok) {
+        return json({ ok: false, code: 'STORE_FAILED', detail: stored.detail || null }, 502, cors);
+      }
+      // Make no longer counts spreadsheet rows to find this. It arrives as a field.
+      if (stored.raceNumber) payload.raceNumber = String(stored.raceNumber).padStart(3, '0');
+    }
+
+    /**
+     * One field that names the branch Make should take.
+     *
+     * Make's filters compare one value at a time, and combining two conditions with
+     * AND — "a registration AND under 18" — is where its blueprint format is easiest
+     * to get subtly wrong, because a failed filter ends the whole route rather than
+     * skipping a module. Deciding it here turns every filter in the scenario into a
+     * single text comparison against this field, which cannot be misread.
+     *
+     * It is also the honest place for the decision: the age was computed above from
+     * the birth date, so the branch is derived from the same fact rather than from a
+     * flag the browser sent.
+     */
+    payload.branch = type === 'registration'
+      ? (payload.isMinor ? 'registration-minor' : 'registration-adult')
+      : type;
+
     const headers = { 'Content-Type': 'application/json' };
     if (env.INTAKE_SHARED_KEY) headers['X-Carruleddhi-Key'] = env.INTAKE_SHARED_KEY;
 
@@ -843,15 +1024,23 @@ export default {
       return json({ ok: false, code: 'UPSTREAM_ERROR', status: upstream.status }, 502, cors);
     }
 
-    // Make often answers "Accepted" in plain text when no Webhook Response module runs.
+    /* Make often answers "Accepted" in plain text when no Webhook Response module
+       runs — and it no longer needs one. The race number comes from the database
+       sequence, which this Worker already has, so the answer is authoritative here
+       and Make is free to be nothing but a mailer. */
+    const answer = { ok: true };
+    if (payload.raceNumber) answer.raceNumber = payload.raceNumber;
+
     try {
       const parsed = JSON.parse(text);
-      if (Array.isArray(parsed)) return json({ ok: true, rows: parsed }, 200, cors);
-      const body = parsed && typeof parsed === 'object' ? parsed : { ok: true };
-      if (body.ok === undefined) body.ok = true;
-      return json(body, 200, cors);
+      if (Array.isArray(parsed)) return json({ ...answer, rows: parsed }, 200, cors);
+      if (parsed && typeof parsed === 'object') {
+        // Our own number wins. Make cannot know it better than the sequence does.
+        return json({ ...parsed, ...answer }, 200, cors);
+      }
+      return json(answer, 200, cors);
     } catch (_) {
-      return json({ ok: true }, 200, cors);
+      return json(answer, 200, cors);
     }
   }
 };

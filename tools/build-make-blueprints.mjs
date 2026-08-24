@@ -50,18 +50,18 @@ function body(file) {
 
 const REG_TEMPLATE = body('emails/make-registration.html')
   // Module 5 in the old note is module 6 here (Sheets row lands in 5).
-  .replace(/\{\{5\.raceNumber\}\}/g, '{{6.raceNumber}}')
+  .replace(/\{\{5\.raceNumber\}\}/g, '{{3.raceNumber}}')
   // These two carry %TOKEN% placeholders, so they are resolved in module 6.
-  .replace(/\{\{3\.t\.regHelp\}\}/g, '{{6.help}}')
-  .replace(/\{\{3\.t\.printFooter\}\}/g, '{{6.printFooter}}');
+  .replace(/\{\{3\.t\.regHelp\}\}/g, '{{3.help}}')
+  .replace(/\{\{3\.t\.printFooter\}\}/g, '{{3.printFooter}}');
 
 /* The minor variant is derived first, while `{{3.t.regHi}}` is still in place —
    it is one of the anchors minorHtml() swaps. Only then is the adult greeting
-   pointed at module 6, and the leftover marker removed from the adult body. */
+   pointed at module 3, and the leftover marker removed from the adult body. */
 const MIN_HTML = minorHtml(REG_TEMPLATE);
 
 const REG_HTML = REG_TEMPLATE
-  .replace(/\{\{3\.t\.regHi\}\}/g, '{{6.hi}}')
+  .replace(/\{\{3\.t\.regHi\}\}/g, '{{3.hi}}')
   .replace('<!--GUARDIAN-ROWS-->', '');
 
 /**
@@ -80,7 +80,7 @@ function minorHtml(adultHtml) {
   const cell = 'padding:9px 0;border-bottom:1px solid #eef2fa;';
   const guardianRows = [
     ['minLabels.guardian', '{{1.guardianName}}'],
-    ['minLabels.relation', '{{6.relWord}}'],
+    ['minLabels.relation', '{{3.relWord}}'],
     ['minLabels.guardianEmail', '{{lower(1.guardianEmail)}}'],
     ['minLabels.guardianPhone', '{{1.guardianPhone}}'],
     ['minLabels.riderAge', '{{1.riderAge}}'],
@@ -95,9 +95,9 @@ function minorHtml(adultHtml) {
   let html = adultHtml;
   const swaps = [
     // Greeting and opening line both carry placeholders, so they come from
-    // module 6 where the guardian name and the child word are already resolved.
-    ['{{3.t.regHi}}', '{{6.minHi}}'],
-    ['{{3.t.regLead}}', '{{6.minLead}}'],
+    // module 3 where the guardian name and the child word are already resolved.
+    ['{{3.t.regHi}}', '{{3.minHi}}'],
+    ['{{3.t.regLead}}', '{{3.minLead}}'],
     ['{{3.t.regPreheader}}', '{{3.t.minPreheader}}'],
     ['{{3.t.regPrintTitle}}', '{{3.t.minPrintTitle}}'],
     ['{{3.t.regPrintBody}}', '{{3.t.minPrintBody}}'],
@@ -116,8 +116,8 @@ function minorHtml(adultHtml) {
   }
   // The age sentence goes under the opening line, before the number block.
   return html.replace(
-    '{{6.minLead}}',
-    '{{6.minLead}}</p>\n    <p style="margin:8px 0 0;font-size:14px;color:#5f709a;">{{6.ageNote}}'
+    '{{3.minLead}}',
+    '{{3.minLead}}</p>\n    <p style="margin:8px 0 0;font-size:14px;color:#5f709a;">{{3.ageNote}}'
   );
 }
 
@@ -129,12 +129,12 @@ const REM_HTML = body('emails/make-reminder.html')
  * Swaps the %RACENUMBER% placeholder for the real Make expression.
  *
  * The bodies are written with a literal placeholder because the templates are also
- * opened in a browser to check the layout, and {{6.raceNumber}} renders as noise
+ * opened in a browser to check the layout, and {{3.raceNumber}} renders as noise
  * there. The substitution happens here, at build time, rather than with a runtime
  * replace() in Make: a replace() around a whole HTML document was what forced the
  * body into a variable in the first place, and that variable is what Make rejected.
  */
-const withRaceNumber = (html) => html.split('%RACENUMBER%').join('{{6.raceNumber}}');
+const withRaceNumber = (html) => html.split('%RACENUMBER%').join('{{1.raceNumber}}');
 
 /* ------------------------------------------------------------ tiny helpers */
 
@@ -235,12 +235,13 @@ function sendEmail(id, x, y, { to, subject, html, replyTo, attachments, filter, 
   };
 }
 
-function httpGetFile(id, x, y, url) {
+function httpGetFile(id, x, y, url, filter) {
   return {
     id,
     module: 'http:ActionGetFile',
     version: 3,
     parameters: { handleErrors: false },
+    ...(filter ? { filter } : {}),
     mapper: {
       url,
       method: 'get',
@@ -562,239 +563,189 @@ const instantFlow = [
       value: '{{replace(get(parseJSON(2.copy); 2.loc).newsHi; "%FIRSTNAME%"; trim(1.firstName))}}'
     },
 
-    /* --- bodies used to be here, and could not be --------------------------
-       There were four more variables in this module: regHtml, minHtml, remHtml
-       and contactHtml, each holding a whole e-mail. Make rejected the scenario
-       with two warnings:
+    /* --- wording for an under-18 entry -------------------------------------
+       These used to live in a module downstream of the spreadsheet write, because
+       they were computed next to the race number and the race number *was* the row
+       number of the sheet that had just been written. The number now arrives from a
+       database sequence as {{1.raceNumber}}, so nothing here waits for anything, and
+       all of it belongs in the one module that holds text.
+
+       minChild is a map, so the word for son / daughter / child is looked up by the
+       submitted value and falls back to the neutral form. An unknown value gives
+       "your child", never an empty gap in the middle of a sentence. */
+    {
+      name: 'childWord',
+      value: '{{get(get(parseJSON(2.copy); 2.loc).minChild; ifempty(1.childKind; "child"))}}'
+    },
+    {
+      name: 'relWord',
+      value: '{{get(get(parseJSON(2.copy); 2.loc).minRel; ifempty(1.guardianRelation; "guardian"))}}'
+    },
+    {
+      name: 'minHi',
+      value: '{{replace(get(parseJSON(2.copy); 2.loc).minHi; "%GUARDIAN%"; trim(1.guardianName))}}'
+    },
+    {
+      name: 'minLead',
+      value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).minLead; "%CHILD%"; '
+        + 'get(get(parseJSON(2.copy); 2.loc).minChild; ifempty(1.childKind; "child"))); '
+        + '"%FIRSTNAME%"; trim(1.firstName))}}'
+    },
+    {
+      name: 'ageNote',
+      value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).minAgeNote; "%FIRSTNAME%"; '
+        + 'trim(1.firstName)); "%AGE%"; 1.riderAge)}}'
+    },
+
+    /* --- the attachment ---------------------------------------------------- */
+    {
+      name: 'pdfUrl',
+      value: `{{if(1.isMinor; "${SITE}/emails/Carruleddhi-modulo-minori.pdf"; `
+        + `"${SITE}/emails/Carruleddhi-modulo.pdf")}}`
+    },
+    { name: 'pdfName', value: '{{if(1.isMinor; "Carruleddhi-minori-"; "Carruleddhi-modulo-")}}' }
+
+    /* --- bodies are NOT here, and that is deliberate -----------------------
+       Four more variables used to hold a whole e-mail each. Make refused the
+       scenario:
 
          [module ID 3] references inaccessible module [module ID 3]
-         [module ID 3] references inaccessible module [module ID 6]
 
-       and both were fair. The bodies quote {{3.t.…}} for their wording, which is a
-       variable being defined by this very module, and the minors body quotes
-       {{6.minHi}}, which belongs to a module that has not run yet. A variable is
-       evaluated when its own module executes, so neither value exists at that
-       moment.
+       and it was right. The bodies quote {{3.t.…}} for their wording, which is a
+       variable this very module is still defining. A variable is evaluated when its
+       own module runs, so the value does not exist yet.
 
-       The bodies now live in the Content field of the Email module that sends them.
-       That is downstream of both 3 and 6, so every reference resolves, and it is
-       also where Make expects an e-mail body to be. The wording is still in
-       copy.json and still reached through {{3.t.…}}, so there is exactly one place
-       to edit a sentence — this module for the short strings, copy.json for the
-       rest. */
+       Each body now sits in the Content field of the Email module that sends it —
+       downstream of here, which is where every reference resolves, and where Make
+       expects an e-mail body anyway. */
   ]),
 
-  {
-    id: 4,
-    module: 'builtin:BasicRouter',
-    version: 1,
-    mapper: null,
-    metadata: at(900, 0),
-    routes: [
-      /* ---- Route A: rider signed up ------------------------------------ */
-      {
-        flow: [
-          addRow(5, 1200, -450, 'Registrations', regRow, eq('registration', '{{1.type}}', 'registration')),
+  /* ==========================================================================
+     One router, six flat routes, no nesting.
+     --------------------------------------------------------------------------
+     WHAT THIS REPLACED
+       A router whose registration branch held a spreadsheet write, a variable
+       module, a webhook response, a PDF fetch and a second router inside it. Six
+       modules deep before an e-mail went out, and every one of them a place for the
+       run to stop.
 
-          /* Only the race number is worked out here. Everything the participant
-             reads was already assembled in module 3; this just drops the number
-             into the two places that need it. */
-          setVars(6, 1500, -450, [
-            { name: 'raceNumber', value: '{{5.`__ROW_NUMBER__` - 1}}' },
+       Three things let it collapse. The Worker writes the database, so the four
+       Google Sheets modules are gone along with mapping by column position. The
+       Worker answers the browser with the race number from the sequence, so the
+       Webhook Response module is gone. And the Worker names the branch, so the
+       adult / under-18 split is a filter on one field instead of a nested router.
 
-            /* --- wording for an under-18 entry -----------------------------
-               Resolved here rather than in module 3 because the greeting needs the
-               guardian's name and the opening line needs the inflected word for
-               son / daughter / child, which comes out of the copy deck by key.
+     WHY A ROUTER AT ALL
+       One webhook receives four different kinds of submission and each needs a
+       different letter. A filter is not an "if" in Make: when it fails, the route
+       ends and everything after it is skipped. So two filtered Email modules in a
+       line cannot both be reachable — the first filter that fails takes the rest of
+       the line with it. A router is the construct that means "one of these", and
+       each route here is one or two modules long.
 
-               `minChild` is a map, so the word is looked up with the submitted
-               childKind and falls back to the neutral form. A missing or unknown
-               value gives "your child", never an empty gap in the sentence. */
-            {
-              name: 'childWord',
-              value: '{{get(get(parseJSON(2.copy); 2.loc).minChild; ifempty(1.childKind; "child"))}}'
-            },
-            {
-              name: 'relWord',
-              value: '{{get(get(parseJSON(2.copy); 2.loc).minRel; ifempty(1.guardianRelation; "guardian"))}}'
-            },
-            {
-              name: 'minHi',
-              value: '{{replace(get(parseJSON(2.copy); 2.loc).minHi; "%GUARDIAN%"; trim(1.guardianName))}}'
-            },
-            {
-              name: 'minLead',
-              value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).minLead; "%CHILD%"; '
-                + 'get(get(parseJSON(2.copy); 2.loc).minChild; ifempty(1.childKind; "child"))); '
-                + '"%FIRSTNAME%"; trim(1.firstName))}}'
-            },
-            {
-              name: 'ageNote',
-              value: '{{replace(replace(get(parseJSON(2.copy); 2.loc).minAgeNote; "%FIRSTNAME%"; '
-                + 'trim(1.firstName)); "%AGE%"; 1.riderAge)}}'
-            },
+     EVERY FILTER IS ONE TEXT COMPARISON
+       Against {{1.branch}}, which the Worker sets from the age it computed itself.
+       No AND, no boolean quirks, nothing to misread.
+     ========================================================================== */
+  router(4, 900, 0, [
+    /* ---- A: adult entry ------------------------------------------------- */
+    {
+      flow: [
+        httpGetFile(7, 1250, -520, '{{3.pdfUrl}}', eq('adult', '{{1.branch}}', 'registration-adult')),
+        sendEmail(8, 1600, -520, {
+          to: '{{lower(1.email)}}',
+          // Blind copy so every entry lands in the organiser's inbox as well,
+          // without the rider seeing a second address on their own confirmation.
+          bcc: [ORG_EMAIL],
+          subject: '{{replace(3.regSubject; "%RACENUMBER%"; 1.raceNumber)}}',
+          html: withRaceNumber(REG_HTML),
+          attachments: [{ fileName: '{{3.pdfName}}{{1.raceNumber}}.pdf', data: '{{7.data}}' }]
+        })
+      ]
+    },
 
-            /* `subject` and `html` used to be computed here with an if(isMinor)
-               picking between two whole bodies held in module 3. Both are gone: the
-               bodies could not live in module 3 at all (see the note there), and
-               once they moved into the Email modules the switch had nowhere left to
-               stand. Two Email modules with a filter each do the same job and read
-               better — you open the one whose audience you meant. */
+    /* ---- B: under-18 entry ---------------------------------------------- */
+    {
+      flow: [
+        httpGetFile(19, 1250, -280, '{{3.pdfUrl}}', eq('under 18', '{{1.branch}}', 'registration-minor')),
+        /* Addressed to the guardian, because they are the one who signs. The rider
+           gets a blind copy so they still see their number without becoming a second
+           visible recipient on a letter written to their parent. */
+        sendEmail(16, 1600, -280, {
+          to: '{{lower(1.guardianEmail)}}',
+          bcc: ['{{"' + ORG_EMAIL + ', " + lower(1.email)}}'],
+          subject: '{{replace(3.minSubject; "%RACENUMBER%"; 1.raceNumber)}}',
+          html: withRaceNumber(MIN_HTML),
+          attachments: [{ fileName: '{{3.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]
+        })
+      ]
+    },
 
-            {
-              name: 'pdfUrl',
-              value: `{{if(1.isMinor; "${SITE}/emails/Carruleddhi-modulo-minori.pdf"; `
-                + `"${SITE}/emails/Carruleddhi-modulo.pdf")}}`
-            },
-            { name: 'pdfName', value: '{{if(1.isMinor; "Carruleddhi-minori-"; "Carruleddhi-modulo-")}}' }
-          ]),
+    /* ---- C: tell the organiser, either way -------------------------------
+       Its own route rather than a module appended to A and B, which would have
+       meant two copies of it and two places to change the number. Filtered on
+       {{1.type}} so it fires for an adult and a minor alike.
 
-          /* Answer the browser now, with the real number. Everything below runs
-             after the response, so the participant does not wait for it. */
-          webhookRespond(10, 1800, -450, '{"ok":true,"raceNumber":"{{6.raceNumber}}"}'),
+       Deliberately no name, e-mail or phone: the query string travels through a
+       third-party host and lands in its logs. A race number and a category are
+       enough to know an entry arrived, and mean nothing to anyone else. */
+    {
+      flow: [
+        httpRequest(9, 1250, -40, 'https://api.callmebot.com/whatsapp.php', [
+          { name: 'phone', value: CALLMEBOT.phone },
+          { name: 'apikey', value: CALLMEBOT.apikey },
+          {
+            name: 'text',
+            value: 'Carruleddhi: nowe zgloszenie nr {{1.raceNumber}}, kategoria {{1.category}}'
+          }
+        ], eq('any entry', '{{1.type}}', 'registration'))
+      ]
+    },
 
-          /* Organiser ping on WhatsApp via CallMeBot.
-             Deliberately no participant name, e-mail, phone or codice fiscale:
-             the query string travels through a third-party host and ends up in
-             its logs. Race number and category are enough to know a signup
-             landed, and both are meaningless to anyone else.
+    /* ---- D: reminder list ----------------------------------------------- */
+    {
+      flow: [
+        sendEmail(12, 1250, 200, {
+          filter: eq('reminder', '{{1.branch}}', 'reminder'),
+          to: '{{lower(1.email)}}',
+          subject: '{{3.remSubject}}',
+          html: reminderOptInHtml()
+        })
+      ]
+    },
 
-             Moved ahead of the PDF fetch on purpose. It used to sit last, so a 404
-             on the attachment — the normal state until the site is deployed — took
-             the notification down with it. A ping that arrives without its e-mail is
-             useful; an e-mail that arrives without its ping is fine too. Neither
-             should be able to cancel the other. */
-          httpRequest(9, 1900, -450, 'https://api.callmebot.com/whatsapp.php', [
-            { name: 'phone', value: CALLMEBOT.phone },
-            { name: 'apikey', value: CALLMEBOT.apikey },
-            {
-              name: 'text',
-              value: 'Carruleddhi: nowe zgloszenie nr {{6.raceNumber}}, kategoria {{1.category}}'
-            }
-          ]),
+    /* ---- E: contact form ------------------------------------------------- */
+    {
+      flow: [
+        sendEmail(14, 1250, 420, {
+          filter: eq('contact', '{{1.branch}}', 'contact'),
+          to: ORG_EMAIL,
+          replyTo: '{{lower(1.email)}}',
+          subject: '{{3.contactSubject}}',
+          html: contactHtml()
+        })
+      ]
+    },
 
-          httpGetFile(7, 2200, -450, '{{6.pdfUrl}}'),
-
-          /* Adult on one route, under-18 on the other. See the note on router()
-             for why this is a router and not two filtered modules in a line. */
-          router(17, 2500, -450, [{ flow: [
-          sendEmail(8, 2800, -560, {
-            filter: {
-              name: 'adult',
-              conditions: [[{ a: '{{1.isMinor}}', o: 'boolean:notequal', b: 'true' }]]
-            },
-            to: '{{lower(1.email)}}',
-            // A blind copy so every signup lands in the organiser's inbox too,
-            // without the participant seeing a second address.
-            bcc: [ORG_EMAIL],
-            subject: '{{replace(3.regSubject; "%RACENUMBER%"; 6.raceNumber)}}',
-            html: withRaceNumber(REG_HTML),
-            attachments: [
-              {
-                fileName: '{{6.pdfName}}{{6.raceNumber}}.pdf',
-                data: '{{7.data}}'
-              }
-            ]
-          }) ] }, { flow: [
-          /* Under-18 entry. Addressed to the guardian, because they are the one who
-             signs; the rider gets a blind copy so they still see their number
-             without becoming a second visible recipient on a letter to their parent. */
-          sendEmail(16, 2800, -320, {
-            filter: {
-              name: 'under 18',
-              conditions: [[{ a: '{{1.isMinor}}', o: 'boolean:equal', b: 'true' }]]
-            },
-            to: '{{lower(1.guardianEmail)}}',
-            bcc: [`{{"${ORG_EMAIL}, " + lower(1.email)}}`],
-            subject: '{{replace(3.minSubject; "%RACENUMBER%"; 6.raceNumber)}}',
-            html: withRaceNumber(MIN_HTML),
-            attachments: [
-              {
-                fileName: '{{6.pdfName}}{{6.raceNumber}}.pdf',
-                data: '{{7.data}}'
-              }
-            ]
-          }) ] }]),
-
-          /**
-           * There used to be a "Update a Cell" module here writing the race number
-           * back into column B. It is gone.
-           *
-           * Two reasons. It arrived broken — its `Cell` field came up empty and red
-           * on import, because the mapper key for that field is not the one this
-           * generator used, and guessing Make's internal parameter names is what
-           * produced the earlier "Module Not Found" as well. And it was never
-           * needed: the number is simply the row's position, which the spreadsheet
-           * can work out on its own with one formula in B2:
-           *
-           *   =ARRAYFORMULA(IF(C2:C<>""; ROW(C2:C)-1; ""))
-           *
-           * The sheet then keeps the column correct forever, including for rows
-           * added by hand, and Make has one module less to go wrong. Module 6 still
-           * computes the same value for the e-mail from __ROW_NUMBER__, so the
-           * number in the message and the number in the sheet always agree.
-           */
-        ]
-      },
-
-      /* ---- Route B: reminder list only -------------------------------- */
-      {
-        flow: [
-          addRow(11, 1200, -150, 'Reminders', remindRow, eq('reminder', '{{1.type}}', 'reminder')),
-
-          sendEmail(12, 1500, -150, {
-            to: '{{lower(1.email)}}',
-            subject: '{{3.remSubject}}',
-            html: reminderOptInHtml()
-          })
-        ]
-      },
-
-      /* ---- Route C: contact form -------------------------------------- */
-      {
-        flow: [
-          addRow(13, 1200, 150, 'Contacts', contactRow, eq('contact', '{{1.type}}', 'contact')),
-
-          sendEmail(14, 1500, 150, {
-            to: ORG_EMAIL,
-            replyTo: '{{lower(1.email)}}',
-            subject: '{{3.contactSubject}}',
-            html: contactHtml()
-          })
-        ]
-      },
-
-      /**
-       * Route D: "tell me about the next editions".
-       *
-       * One module. There used to be a fourth Email here welcoming the person to
-       * the newsletter, sent in the same second as their registration
-       * confirmation — two e-mails for one form submission, one of which said
-       * nothing they did not already know. The row is recorded, and the
-       * confirmation they do get already mentions it.
-       */
-      {
-        flow: [
-          addRow(15, 1200, 450, 'Newsletter', newsRow, {
+    /* ---- F: "tell me about the next edition" -----------------------------
+       Fires alongside A or B when the box was ticked, which is why it is a route of
+       its own and not a step inside them. A row in a table is not a promise anyone
+       can see; this is the one message that says the box did something, and states
+       the limit out loud. */
+    {
+      flow: [
+        sendEmail(18, 1250, 640, {
+          filter: {
             name: 'newsletter opt-in',
             conditions: [[{ a: '{{1.newsConsent}}', o: 'boolean:equal', b: 'true' }]]
-          }),
-
-          /* A row in a spreadsheet is not a promise anyone can see.
-             Somebody ticked "tell me about future editions" and, until now, the only
-             thing that happened was a line in a sheet they will never look at. That
-             is the kind of silence people read as "the box did nothing". One short
-             e-mail closes the loop, in their language, and states the limit out loud:
-             one message, when the next date exists, and nothing else ever. */
-          sendEmail(18, 1500, 450, {
-            to: '{{lower(1.email)}}',
-            subject: '{{3.newsSubject}}',
-            html: newsletterOptInHtml()
-          })
-        ]
-      }
-    ]
-  }
+          },
+          to: '{{lower(1.email)}}',
+          subject: '{{3.newsSubject}}',
+          html: newsletterOptInHtml()
+        })
+      ]
+    }
+  ])
 ];
 
 /* --------------------------------------------------- small inline templates */
