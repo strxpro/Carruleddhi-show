@@ -605,19 +605,41 @@ const instantFlow = [
     },
     { name: 'pdfName', value: '{{if(1.isMinor; "Carruleddhi-minori-"; "Carruleddhi-modulo-")}}' }
 
-    /* --- bodies are NOT here, and that is deliberate -----------------------
-       Four more variables used to hold a whole e-mail each. Make refused the
-       scenario:
+    /* --- the bodies are in module 5, one step later ------------------------
+       They cannot be here. Make refuses the scenario:
 
          [module ID 3] references inaccessible module [module ID 3]
 
-       and it was right. The bodies quote {{3.t.…}} for their wording, which is a
+       and it is right — the bodies quote {{3.t.…}} for their wording, which is a
        variable this very module is still defining. A variable is evaluated when its
        own module runs, so the value does not exist yet.
 
-       Each body now sits in the Content field of the Email module that sends it —
-       downstream of here, which is where every reference resolves, and where Make
-       expects an e-mail body anyway. */
+       One module later it does. See module 5. */
+  ]),
+
+  /**
+   * Module 5 — the five e-mail bodies, one variable each.
+   *
+   * WHY IT IS A MODULE OF ITS OWN
+   *   The bodies were pasted straight into each Email module's Content field, which
+   *   worked and was horrible to live with: nine kilobytes of table markup in a
+   *   four-line text area, and the same header and footer repeated five times with
+   *   no way to see that they were the same. Opening an Email module to change a
+   *   recipient meant scrolling past a document.
+   *
+   *   Here, the Content field of every Email module is one item — {{5.regHtml}} —
+   *   and the markup is in one place. Which is where it was before, except that
+   *   place was module 3, and module 3 is where the wording the markup quotes is
+   *   still being defined. Module 5 sits after 3, so {{3.t.regPreheader}} and
+   *   {{3.minHi}} are both resolved by the time these are built. Same idea, one
+   *   module further along, and Make accepts it.
+   */
+  setVars(5, 1150, 0, [
+    { name: 'regHtml', value: withRaceNumber(REG_HTML) },
+    { name: 'minHtml', value: withRaceNumber(MIN_HTML) },
+    { name: 'remHtml', value: reminderOptInHtml() },
+    { name: 'contactHtml', value: contactHtml() },
+    { name: 'newsHtml', value: newsletterOptInHtml() }
   ]),
 
   /* ==========================================================================
@@ -658,7 +680,7 @@ const instantFlow = [
           // without the rider seeing a second address on their own confirmation.
           bcc: [ORG_EMAIL],
           subject: '{{replace(3.regSubject; "%RACENUMBER%"; 1.raceNumber)}}',
-          html: withRaceNumber(REG_HTML),
+          html: '{{5.regHtml}}',
           attachments: [{ fileName: '{{3.pdfName}}{{1.raceNumber}}.pdf', data: '{{7.data}}' }]
         })
       ]
@@ -675,7 +697,7 @@ const instantFlow = [
           to: '{{lower(1.guardianEmail)}}',
           bcc: ['{{"' + ORG_EMAIL + ', " + lower(1.email)}}'],
           subject: '{{replace(3.minSubject; "%RACENUMBER%"; 1.raceNumber)}}',
-          html: withRaceNumber(MIN_HTML),
+          html: '{{5.minHtml}}',
           attachments: [{ fileName: '{{3.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]
         })
       ]
@@ -709,7 +731,7 @@ const instantFlow = [
           filter: eq('reminder', '{{1.branch}}', 'reminder'),
           to: '{{lower(1.email)}}',
           subject: '{{3.remSubject}}',
-          html: reminderOptInHtml()
+          html: '{{5.remHtml}}'
         })
       ]
     },
@@ -722,7 +744,7 @@ const instantFlow = [
           to: ORG_EMAIL,
           replyTo: '{{lower(1.email)}}',
           subject: '{{3.contactSubject}}',
-          html: contactHtml()
+          html: '{{5.contactHtml}}'
         })
       ]
     },
@@ -741,7 +763,7 @@ const instantFlow = [
           },
           to: '{{lower(1.email)}}',
           subject: '{{3.newsSubject}}',
-          html: newsletterOptInHtml()
+          html: '{{5.newsHtml}}'
         })
       ]
     }
