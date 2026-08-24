@@ -398,7 +398,7 @@
                   },
                   {
                     "name": "text",
-                    "value": "Carruleddhi: nowe zgloszenie nr {{1.raceNumber}}, kategoria {{1.category}}"
+                    "value": "Carruleddhi — nowe zgloszenie nr {{1.raceNumber}}\n{{1.firstName}} {{1.lastName}}\nKategoria: {{upper(1.category)}}\nWozek: {{1.cartName}}\nJezyk: {{upper(1.loc)}}\nTel: {{1.phone}}\nMail: {{lower(1.email)}}\n{{if(1.isMinor; \"NIEPELNOLETNI — opiekun: \"; \"\")}}{{1.guardianName}}"
                   }
                 ],
                 "bodyType": null,

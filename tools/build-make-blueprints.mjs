@@ -625,8 +625,23 @@ const instantFlow = [
           { name: 'phone', value: CALLMEBOT.phone },
           { name: 'apikey', value: CALLMEBOT.apikey },
           {
+            /* Full details, at your request.
+               Worth knowing what that costs: CallMeBot is not an official WhatsApp
+               gateway, so this query string travels through somebody else's server
+               and lands in their logs. A name and a phone number in there is a
+               participant's data sitting somewhere neither of you controls.
+               It goes to your own number and it is your call — but the earlier
+               version deliberately sent only a race number for this reason, and the
+               same information is one click away in the admin panel. */
             name: 'text',
-            value: 'Carruleddhi: nowe zgloszenie nr {{1.raceNumber}}, kategoria {{1.category}}'
+            value: 'Carruleddhi — nowe zgloszenie nr {{1.raceNumber}}'
+              + '\n{{1.firstName}} {{1.lastName}}'
+              + '\nKategoria: {{upper(1.category)}}'
+              + '\nWozek: {{1.cartName}}'
+              + '\nJezyk: {{upper(1.loc)}}'
+              + '\nTel: {{1.phone}}'
+              + '\nMail: {{lower(1.email)}}'
+              + '\n{{if(1.isMinor; "NIEPELNOLETNI — opiekun: "; "")}}{{1.guardianName}}'
           }
         ], eq('any entry', '{{1.type}}', 'registration'))
       ]

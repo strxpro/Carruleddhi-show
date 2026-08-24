@@ -636,7 +636,10 @@ img, svg { display: block; max-width: 100%; }
 .footer__links { display: grid; gap: 11px; }
 .footer__links a, .footer__links button { width: fit-content; padding: 0; border: 0; background: transparent; color: var(--white); text-align: left; text-decoration: none; cursor: pointer; }
 .footer__links a:hover, .footer__links button:hover { color: var(--yellow); }
-.footer__bottom { display: flex; justify-content: space-between; gap: 18px; padding-top: 25px; color: rgba(255,255,255,.52); font-family: var(--font-meta); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.footer__bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding-top: 25px; color: rgba(255,255,255,.52); font-family: var(--font-meta); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+/* Quieter than the two spans beside it: this one is for the two of us. */
+.footer__admin { color: rgba(255,255,255,.3); text-decoration: none; transition: color .25s; }
+.footer__admin:hover, .footer__admin:focus-visible { color: var(--yellow); }
 
 .modal { position: fixed; z-index: 1100; inset: 0; display: none; align-items: center; justify-content: center; padding: 18px; }
 .modal.is-open { display: flex; }

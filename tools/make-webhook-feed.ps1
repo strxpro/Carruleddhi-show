@@ -352,14 +352,20 @@ if ($DryRun) {
 Write-Host "Done: $ok / $($payloads.Count) delivered." -ForegroundColor Yellow
 Write-Host ''
 Write-Host 'Next in Make:' -ForegroundColor Yellow
-Write-Host ("  1. The Webhooks panel must now say {0} values detected. If it says fewer," -f $unionPayload.Count)
-Write-Host '     click "Detect new values" and run this script again.'
+if ($WorkerBase) {
+  Write-Host '  1. The Webhooks panel should now list the fields the function adds:'
+  Write-Host '     copy, subject, hi, minHi, pdfUrl, branch, raceNumber, loc.'
+  Write-Host '     If they are missing, click "Detect new values" and run this again.'
+} else {
+  Write-Host ("  1. The Webhooks panel will show {0} values - but NOT the fields the" -f $unionPayload.Count)
+  Write-Host '     function adds. Rerun with -WorkerBase to teach it the real shape.'
+}
 Write-Host '  2. Click OK, then Save (the diskette on the bottom bar).'
-Write-Host '  3. Click Run once. Until a scenario has run once, Make does not know'
-Write-Host '     which variables modules 2, 3 and 6 produce, so references to'
-Write-Host '     2.copy / 2.loc / 3.t are drawn as unresolved. One successful run'
-Write-Host '     fills that in - it is a display state, not a broken mapping.'
-Write-Host '  4. Check the sheet: rows in Registrations, Reminders, Contacts, Newsletter.'
+Write-Host '  3. Open the clock icon at the top and read the runs. A red one names the'
+Write-Host '     module that stopped it, which is the only thing worth reading here.'
+Write-Host '  4. Check Supabase > Table Editor: rows in registrations,'
+Write-Host '     reminder_subscribers, contact_messages, newsletter_subscribers.'
 Write-Host ''
-Write-Host 'A later detection REPLACES the structure, it does not add to it. That is why'
-Write-Host 'the combined message is always sent first.' -ForegroundColor DarkGray
+Write-Host 'A 502 from one message means the row was stored and Make refused the mail.' -ForegroundColor DarkGray
+Write-Host 'The database is the store of record, so nothing is lost - fix the module and' -ForegroundColor DarkGray
+Write-Host 'the row is still there.' -ForegroundColor DarkGray
