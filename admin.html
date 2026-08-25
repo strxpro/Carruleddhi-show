@@ -2,32 +2,19 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Never indexed. The password gate keeps strangers out; this keeps the page out of
-       search results in the first place, which is the cheaper of the two. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Never indexed. It is a back office, and a search result for it is only ever an
+       invitation to try the door. The password is checked on the server regardless. -->
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#071a3d">
   <title>Panel — Carruleddhi Show 2026</title>
 
-  <!-- Fonts are self-hosted for the public site; the panel reuses the display face for
-       headings only, so a missing file costs nothing but a fallback. -->
-  <link rel="preload" href="/assets/fonts/bungee-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
+  <!-- Set before React mounts, so there is no white flash on a dark panel opened at
+       night. Cheaper than a loading screen and it cannot get out of step with the CSS. -->
   <style>
-    @font-face {
-      font-family: 'Bungee';
-      src: url('/assets/fonts/bungee-latin-ext.woff2') format('woff2');
-      font-display: swap;
-      unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
-    }
-    @font-face {
-      font-family: 'Bungee';
-      src: url('/assets/fonts/bungee-latin.woff2') format('woff2');
-      font-display: swap;
-      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-    }
-    /* Shown until React mounts. Without it the first paint is a white flash on a dark
-       page, which reads as a broken load. */
+    html, body { margin: 0; background: #071a3d; }
     #admin-root:empty::after {
-      content: '';
+      content: "";
       position: fixed;
       inset: 0;
       background: #071a3d;
@@ -36,11 +23,6 @@
 </head>
 <body>
   <div id="admin-root"></div>
-  <noscript>
-    <p style="padding:24px;font-family:system-ui;color:#fff;background:#071a3d;">
-      Panel wymaga JavaScriptu. — Il pannello richiede JavaScript.
-    </p>
-  </noscript>
-  <script type="module" src="/admin-src/main.tsx"></script>
+  <script type="module" src="/src/admin/main.tsx"></script>
 </body>
 </html>

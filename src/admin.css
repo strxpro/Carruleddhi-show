@@ -1,0 +1,88 @@
+/**
+ * Tailwind for the admin panel only.
+ *
+ * Loaded from admin.html and nowhere else, so the public pages keep their own
+ * stylesheets untouched and never download this.
+ */
+@import "tailwindcss";
+
+/* The event's own palette, as Tailwind theme tokens. The panel is a tool rather than a
+   poster, so it uses these sparingly — navy for structure, yellow for the one thing on
+   a screen that wants attention, coral for anything destructive. */
+@theme {
+  --color-navy-950: #071a3d;
+  --color-navy-900: #0d2452;
+  --color-navy-800: #143069;
+  --color-blue-600: #174ea6;
+  --color-blue-500: #2469d8;
+  --color-blue-100: #e9f1ff;
+  --color-yellow: #ffc928;
+  --color-coral: #f6494f;
+  --color-green: #2fbf71;
+  --color-paper: #fdfaf3;
+
+  --font-display: "Bungee", system-ui, sans-serif;
+  --font-meta: "Baloo 2", system-ui, sans-serif;
+}
+
+/* Dark by default. This is looked at on a phone, at a race, in sunlight and at
+   midnight; the light theme was the one nobody used. */
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-navy-950);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Same jelly scrollbar as the public site, so the two do not feel like different
+   products when you move between them. */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-navy-900);
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--color-yellow), var(--color-coral) 60%, var(--color-blue-500))
+    padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  filter: saturate(1.25) brightness(1.05);
+}
+
+/* Used by the chat's "typing" marker. */
+@keyframes shimmer-sweep {
+  to {
+    background-position: -200% 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0.35) 0%,
+    rgb(255 255 255 / 0.9) 40%,
+    rgb(255 255 255 / 0.35) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.6s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    color: rgb(255 255 255 / 0.8);
+    -webkit-text-fill-color: currentColor;
+  }
+}
