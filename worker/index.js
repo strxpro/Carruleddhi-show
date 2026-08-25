@@ -20,11 +20,19 @@ const ALLOWED_TYPES = new Set([
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
   // Public wall. `wall` reads approved messages, `wall-post` adds one,
   // `wall-translate` translates one on demand, `wall-admin` moderates.
-  'wall', 'wall-post', 'wall-translate', 'wall-admin'
+  'wall', 'wall-post', 'wall-translate', 'wall-admin',
+  // Live chat. `chat` is the visitor side (open a thread, send, poll);
+  // `chat-admin` is the organiser side and needs the passphrase.
+  'chat', 'chat-admin',
+  // Unread counts for the bell in the admin panel. Passphrase too.
+  'inbox'
 ]);
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
-const SUPABASE_TYPES = new Set(['wall', 'wall-post', 'wall-translate', 'wall-admin']);
+const SUPABASE_TYPES = new Set([
+  'wall', 'wall-post', 'wall-translate', 'wall-admin',
+  'chat', 'chat-admin', 'inbox'
+]);
 
 /**
  * The wall actions the page is allowed to select with the request body.
@@ -55,7 +63,7 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * A shared passphrase is the minimum bar; put Cloudflare Access in front of
  * admin.html as well before using this on a public hostname.
  */
-const PROTECTED_TYPES = new Set(['roster', 'wall-admin']);
+const PROTECTED_TYPES = new Set(['roster', 'wall-admin', 'chat-admin', 'inbox']);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
 /** Only these keys are forwarded. Anything else is dropped, not rejected. */
@@ -81,7 +89,14 @@ const FIELD_WHITELIST = {
   'wall-post': ['name', 'place', 'message', 'rating', 'photo', 'photoWidth', 'photoHeight'],
   'wall-translate': ['text', 'from', 'to'],
   // Moderation, behind the same passphrase as the roster.
-  'wall-admin': ['action', 'id', 'limit']
+  'wall-admin': ['action', 'id', 'limit'],
+  /* Live chat, visitor side. `token` is the browser-held thread identifier; it is
+     never generated here, because a token minted server-side and handed back would
+     let anyone who omits it be given somebody else's fresh thread. */
+  chat: ['action', 'token', 'message', 'name', 'email', 'since'],
+  // Organiser side. Same passphrase as the roster.
+  'chat-admin': ['action', 'threadId', 'message', 'mode', 'limit'],
+  inbox: ['action']
 };
 
 const MAX_FIELD_LENGTH = 3000;
@@ -152,6 +167,342 @@ const WALL_POST_MAX = 3;
 
 function wallReady(env) {
   return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY);
+}
+
+/* ============================================================================
+   Live chat
+   ============================================================================
+   Visitor side and organiser side, both answered from here.
+
+   WHY THE VISITOR NEEDS NO ACCOUNT
+     Their browser makes a random token and keeps it. It names one thread and grants
+     nothing else, so losing it costs a conversation and not an identity. Asking
+     somebody to register before they can ask "is a helmet compulsory" would end the
+     conversation before it started.
+
+   HOW ANSWERS HAPPEN
+     Most questions are the five in the FAQ, and those are answered from the copy deck
+     with no model involved — instantly, in the visitor's language, at no cost and
+     with no chance of an invented fact. Anything else is escalated: the thread flips
+     to `human`, the bell counts it, and the visitor is told a person will reply.
+
+     If AI_API_KEY is set the unmatched question goes to an OpenAI-compatible endpoint
+     first, with the FAQ and the rules as its entire knowledge and instructions to
+     escalate rather than guess. Without the key the escalation happens immediately,
+     which is the honest default: better a slower human answer than a confident wrong
+     one about who is allowed to race.
+   ============================================================================ */
+
+const CHAT_MAX_MESSAGES = 200;
+
+/** Answers built from the copy deck. Keys are the FAQ entries the site already has. */
+function faqAnswer(deck, question) {
+  const text = String(question || '').toLowerCase();
+  // Deliberately crude, and crude is the point: these fire only on an unmistakable
+  // word, and everything else goes to a person rather than to a guess.
+  const topics = [
+    { keys: ['kask', 'casco', 'helmet', 'helm', 'casque'], answer: deck.faqHelmet },
+    { keys: ['koszt', 'cena', 'płac', 'plac', 'costo', 'quanto costa', 'cost', 'price', 'preis', 'precio', 'prix', 'gratis', 'free'], answer: deck.faqCost },
+    { keys: ['silnik', 'motore', 'engine', 'motor', 'moteur'], answer: deck.faqEngine },
+    { keys: ['kto może', 'kto moze', 'wiek', 'lat', 'chi può', 'chi puo', 'who can', 'age', 'alter', 'edad', 'âge', 'minor', 'nieletni', 'niepełnoletni'], answer: deck.faqWho },
+    { keys: ['numer startowy', 'numer', 'numero', 'race number', 'startnummer', 'dorsal'], answer: deck.faqNumber },
+    { keys: ['gdzie', 'kiedy', 'dojechać', 'dojechac', 'dove', 'quando', 'where', 'when', 'wann', 'wo', 'cuándo', 'dónde', 'quand', 'où'], answer: deck.faqWhen }
+  ];
+  for (const topic of topics) {
+    if (topic.keys.some((key) => text.includes(key)) && topic.answer) return topic.answer;
+  }
+  return null;
+}
+
+/** Loads a thread by its browser token, creating it on first contact. */
+async function chatThread(env, request, payload, create = false) {
+  const token = String(payload.token || '').trim();
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return { error: 'CHAT_BAD_TOKEN', status: 422 };
+
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_threads`);
+  url.searchParams.set('select', 'id,mode,locale,display_name,email,unread_for_admin');
+  url.searchParams.set('visitor_token', `eq.${token}`);
+  url.searchParams.set('limit', '1');
+  const found = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!found.ok) return { error: 'CHAT_READ_FAILED', status: 502 };
+  const rows = await found.json();
+  if (rows[0]) return { thread: rows[0] };
+  if (!create) return { error: 'CHAT_NO_THREAD', status: 404 };
+
+  const made = await insertRow(env, 'chat_threads', {
+    visitor_token: token,
+    locale: localeOf(payload.locale),
+    display_name: trimmed(payload.name),
+    email: String(payload.email || '').trim().toLowerCase() || null,
+    ip_hash: await hashIp(env, request)
+  }, 'id,mode,locale,display_name,email,unread_for_admin');
+  if (!made.ok) return { error: 'CHAT_WRITE_FAILED', status: 502 };
+  return { thread: made.row, fresh: true };
+}
+
+async function chatMessages(env, threadId, since = '') {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_messages`);
+  url.searchParams.set('select', 'id,created_at,author,body');
+  url.searchParams.set('thread_id', `eq.${threadId}`);
+  url.searchParams.set('order', 'created_at.asc');
+  url.searchParams.set('limit', String(CHAT_MAX_MESSAGES));
+  if (since) url.searchParams.set('created_at', `gt.${since}`);
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!response.ok) return null;
+  const rows = await response.json();
+  return rows.map((row) => ({
+    id: row.id,
+    at: row.created_at,
+    author: row.author,
+    body: row.body
+  }));
+}
+
+/** Sets the thread's mode without touching anything else. */
+function setThreadMode(env, threadId, mode, extra = {}) {
+  return fetch(`${env.SUPABASE_URL}/rest/v1/chat_threads?id=eq.${threadId}`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify({ mode, ...extra })
+  });
+}
+
+/**
+ * Asks a model, but only with what it is allowed to know.
+ *
+ * Returns null on anything unexpected — no key, a refusal, a timeout, an answer that
+ * looks like a hedge. Null means "a person should take this", which is the safe
+ * direction to fail in when the subject is who may race and what they must wear.
+ */
+async function askModel(env, deck, history, question) {
+  if (!env.AI_API_KEY) return null;
+  const facts = [deck.faqWho, deck.faqCost, deck.faqEngine, deck.faqHelmet, deck.faqNumber, deck.faqWhen]
+    .filter(Boolean)
+    .join('\n');
+  const system = 'You answer questions about the Carruleddhi Show 2026 cart race in Santa Teresa Gallura.\n'
+    + `Reply in the same language as the question. Keep it under 60 words.\n`
+    + 'These are the only facts you have:\n' + facts + '\n'
+    + 'If the question is not answered by those facts, reply with exactly: ESCALATE\n'
+    + 'Never invent a date, a price, a rule or a safety requirement.';
+  try {
+    const response = await fetch(env.AI_BASE_URL || 'https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.AI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: env.AI_MODEL || 'gpt-4o-mini',
+        max_tokens: 200,
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: system },
+          ...history.slice(-6).map((m) => ({
+            role: m.author === 'visitor' ? 'user' : 'assistant',
+            content: m.body
+          })),
+          { role: 'user', content: question }
+        ]
+      }),
+      signal: AbortSignal.timeout(12000)
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const answer = String(body?.choices?.[0]?.message?.content || '').trim();
+    if (!answer || answer.includes('ESCALATE')) return null;
+    return answer;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Visitor side: open, send, poll. */
+async function chatVisitor(env, request, payload, cors) {
+  const action = String(payload.action || 'open');
+
+  if (action === 'open') {
+    const { thread, error, status } = await chatThread(env, request, payload, true);
+    if (error) return json({ ok: false, code: error }, status, cors);
+    const messages = await chatMessages(env, thread.id) || [];
+    return json({ ok: true, mode: thread.mode, messages }, 200, cors);
+  }
+
+  if (action === 'poll') {
+    const { thread, error, status } = await chatThread(env, request, payload, false);
+    if (error) return json({ ok: false, code: error }, status, cors);
+    const messages = await chatMessages(env, thread.id, String(payload.since || '')) || [];
+    return json({ ok: true, mode: thread.mode, messages }, 200, cors);
+  }
+
+  if (action !== 'send') return json({ ok: false, code: 'CHAT_UNKNOWN_ACTION' }, 400, cors);
+
+  const body = String(payload.message || '').trim();
+  if (body.length < 1 || body.length > 2000) return json({ ok: false, code: 'CHAT_BAD_MESSAGE' }, 422, cors);
+
+  const { thread, error, status } = await chatThread(env, request, payload, true);
+  if (error) return json({ ok: false, code: error }, status, cors);
+
+  const stored = await insertRow(env, 'chat_messages', {
+    thread_id: thread.id,
+    author: 'visitor',
+    body
+  });
+  if (!stored.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+
+  // A name or an address given mid-conversation is worth keeping, so the organiser
+  // knows who they are talking to without asking twice.
+  const details = {};
+  if (payload.name && !thread.display_name) details.display_name = trimmed(payload.name);
+  if (payload.email && !thread.email) details.email = String(payload.email).trim().toLowerCase();
+  if (Object.keys(details).length) await setThreadMode(env, thread.id, thread.mode, details);
+
+  // Already with a person: nothing to answer automatically, and answering anyway
+  // would talk over them.
+  if (thread.mode === 'human') {
+    return json({ ok: true, mode: 'human', reply: null }, 200, cors);
+  }
+
+  const deck = COPY_DECK[localeOf(thread.locale)] || COPY_DECK.it;
+  let reply = faqAnswer(deck, body);
+  if (!reply) {
+    const history = await chatMessages(env, thread.id) || [];
+    reply = await askModel(env, deck, history, body);
+  }
+
+  if (!reply) {
+    await setThreadMode(env, thread.id, 'human');
+    const handover = deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.';
+    await insertRow(env, 'chat_messages', { thread_id: thread.id, author: 'ai', body: handover });
+    return json({ ok: true, mode: 'human', reply: handover }, 200, cors);
+  }
+
+  await insertRow(env, 'chat_messages', { thread_id: thread.id, author: 'ai', body: reply });
+  return json({ ok: true, mode: 'ai', reply }, 200, cors);
+}
+
+/** Organiser side. Behind the same passphrase as the participant list. */
+async function chatAdmin(env, payload, cors) {
+  const action = String(payload.action || 'list');
+  const threadId = String(payload.threadId || '');
+  const validId = /^[0-9a-f-]{36}$/i.test(threadId);
+
+  if (action === 'list') {
+    const limit = Math.min(Math.max(Number(payload.limit) || 40, 1), 200);
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_threads`);
+    url.searchParams.set('select', 'id,created_at,last_message_at,display_name,email,locale,mode,unread_for_admin');
+    url.searchParams.set('order', 'last_message_at.desc');
+    url.searchParams.set('limit', String(limit));
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) return json({ ok: false, code: 'CHAT_READ_FAILED' }, 502, cors);
+    const rows = await response.json();
+    return json({
+      ok: true,
+      threads: rows.map((row) => ({
+        id: row.id,
+        createdAt: row.created_at,
+        lastAt: row.last_message_at,
+        name: row.display_name || '',
+        email: row.email || '',
+        locale: row.locale,
+        mode: row.mode,
+        unread: row.unread_for_admin
+      }))
+    }, 200, cors);
+  }
+
+  if (!validId) return json({ ok: false, code: 'CHAT_BAD_ID' }, 422, cors);
+
+  if (action === 'messages') {
+    const messages = await chatMessages(env, threadId);
+    if (!messages) return json({ ok: false, code: 'CHAT_READ_FAILED' }, 502, cors);
+    // Opening a thread is reading it.
+    await fetch(`${env.SUPABASE_URL}/rest/v1/chat_threads?id=eq.${threadId}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ unread_for_admin: 0 })
+    }).catch(() => {});
+    return json({ ok: true, messages }, 200, cors);
+  }
+
+  if (action === 'reply') {
+    const body = String(payload.message || '').trim();
+    if (body.length < 1 || body.length > 2000) return json({ ok: false, code: 'CHAT_BAD_MESSAGE' }, 422, cors);
+    const stored = await insertRow(env, 'chat_messages', {
+      thread_id: threadId,
+      author: 'organiser',
+      body
+    });
+    if (!stored.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+    // Once a person has spoken the bot stays out of it.
+    await setThreadMode(env, threadId, 'human', { unread_for_admin: 0 });
+    return json({ ok: true }, 200, cors);
+  }
+
+  if (action === 'mode') {
+    const mode = ['ai', 'human', 'closed'].includes(payload.mode) ? payload.mode : null;
+    if (!mode) return json({ ok: false, code: 'CHAT_BAD_MODE' }, 422, cors);
+    const response = await setThreadMode(env, threadId, mode, { unread_for_admin: 0 });
+    if (!response.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+    return json({ ok: true, mode }, 200, cors);
+  }
+
+  return json({ ok: false, code: 'CHAT_UNKNOWN_ACTION' }, 400, cors);
+}
+
+/**
+ * The bell.
+ *
+ * Counts rather than rows: the panel wants a number next to an icon, and shipping
+ * forty registrations to render "3" is forty times the payload for the same pixel.
+ * `Prefer: count=exact` with a zero-row range asks Postgres for the count alone.
+ */
+async function inbox(env, payload, cors) {
+  if (String(payload.action || 'counts') === 'seen') {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/admin_state?key=eq.inbox`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ seen_at: new Date().toISOString() })
+    });
+    return json({ ok: true }, 200, cors);
+  }
+
+  const stateUrl = new URL(`${env.SUPABASE_URL}/rest/v1/admin_state`);
+  stateUrl.searchParams.set('select', 'seen_at');
+  stateUrl.searchParams.set('key', 'eq.inbox');
+  stateUrl.searchParams.set('limit', '1');
+  const stateResponse = await fetch(stateUrl, { headers: supabaseHeaders(env) });
+  const stateRows = stateResponse.ok ? await stateResponse.json() : [];
+  const since = stateRows[0]?.seen_at || new Date(0).toISOString();
+
+  async function countSince(table, column = 'created_at', extra = null) {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+    url.searchParams.set('select', 'id');
+    url.searchParams.set(column, `gt.${since}`);
+    if (extra) url.searchParams.set(extra[0], extra[1]);
+    const response = await fetch(url, {
+      headers: supabaseHeaders(env, { Prefer: 'count=exact', Range: '0-0' })
+    });
+    if (!response.ok) return 0;
+    // "0-0/12" — the total is what matters, not the row.
+    const range = response.headers.get('content-range') || '';
+    return Number.parseInt(range.split('/')[1], 10) || 0;
+  }
+
+  const [registrations, contacts, reminders, newsletter, wall, chats] = await Promise.all([
+    countSince('registrations'),
+    countSince('contact_messages'),
+    countSince('reminder_subscribers'),
+    countSince('newsletter_subscribers'),
+    countSince('wall_comments', 'created_at', ['approved', 'is.false']),
+    countSince('chat_threads', 'last_message_at', ['mode', 'eq.human'])
+  ]);
+
+  return json({
+    ok: true,
+    since,
+    counts: { registrations, contacts, reminders, newsletter, wall, chats },
+    total: registrations + contacts + reminders + newsletter + wall + chats
+  }, 200, cors);
 }
 
 /* ============================================================================
@@ -1010,6 +1361,9 @@ export default {
       if (type === 'wall') return wallList(env, payload, cors);
       if (type === 'wall-post') return wallPost(env, request, payload, cors);
       if (type === 'wall-translate') return wallTranslate(env, payload, cors);
+      if (type === 'chat') return chatVisitor(env, request, payload, cors);
+      if (type === 'chat-admin') return chatAdmin(env, payload, cors);
+      if (type === 'inbox') return inbox(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 
