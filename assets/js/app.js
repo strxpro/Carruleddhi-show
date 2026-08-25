@@ -2818,33 +2818,28 @@ import { flagSvg } from './flags.js';
      * vanishing without warning, and any click or key press cancels it — being
      * interrupted while reading your own race number would be worse than waiting.
      */
+    /**
+     * The thank-you screen now stays until it is dismissed.
+     *
+     * It used to count down from twelve and put the empty form back by itself. That is
+     * wrong for what this screen is: it carries the race number, and the person
+     * reading it is often reaching for a phone to photograph it. Removing itself
+     * mid-sentence is the one thing it must not do.
+     *
+     * Two ways out, both deliberate: the cross closes it, "new registration" hands
+     * back an empty form. The countdown element stays in the markup and stays empty —
+     * it is announced by aria-live, and text appearing there would be read aloud for
+     * no reason.
+     */
     function startSuccessReturn() {
-      const note = $('[data-success-countdown]');
-      let left = 12;
       window.clearInterval(successTimer);
-
-      const tick = () => {
-        if (note) note.textContent = text('success.backIn').replace('%S%', String(left));
-        if (left <= 0) {
-          resetRegistrationForm();
-          return;
-        }
-        left -= 1;
-      };
-      tick();
-      successTimer = window.setInterval(tick, 1000);
-
-      const cancel = () => {
-        window.clearInterval(successTimer);
-        successTimer = 0;
-        if (note) note.textContent = '';
-      };
-      const success = $('[data-form-success]');
-      success?.addEventListener('pointerdown', cancel, { once: true });
-      success?.addEventListener('keydown', cancel, { once: true });
+      successTimer = 0;
+      const note = $('[data-success-countdown]');
+      if (note) note.textContent = '';
     }
 
     $('[data-new-registration]')?.addEventListener('click', resetRegistrationForm);
+    $('[data-form-success-close]')?.addEventListener('click', resetRegistrationForm);
 
     $('[data-download-summary]')?.addEventListener('click', () => {
       const data = state.lastRegistration;

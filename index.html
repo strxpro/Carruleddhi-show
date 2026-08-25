@@ -790,6 +790,11 @@
                  when, and then hands the form back on its own so the next person can
                  sign up without hunting for a button. -->
             <div class="form-success" data-form-success role="status">
+              <!-- A way out that is not "sign somebody else up". Somebody who has
+                   just registered one person and is done needs to close this, and
+                   the only alternative was waiting for a timer to take it away. -->
+              <button class="form-success__close" type="button" data-form-success-close
+                      data-i18n-aria-label="success.close" aria-label="Chiudi">&times;</button>
               <div>
                 <div class="race-number"><div><span data-i18n="success.number">Il tuo numero</span><strong data-race-number>039</strong></div></div>
                 <span class="eyebrow" data-i18n="success.kicker">Iscrizione ricevuta</span>

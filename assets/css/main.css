@@ -600,8 +600,29 @@ img, svg { display: block; max-width: 100%; }
 .checkbox + .checkbox { margin-top: 14px; }
 .checkbox input { width: 20px; height: 20px; flex: none; margin-top: 1px; accent-color: var(--blue-600); }
 .form-nav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 34px; }
-.form-success { display: none; height: 100%; place-items: center; text-align: center; animation: form-in .55s var(--ease-out) both; }
+.form-success { position: relative; display: none; height: 100%; place-items: center; text-align: center; animation: form-in .55s var(--ease-out) both; }
 .form-success.is-active { display: grid; }
+/* Top right, outside the reading column, so it is findable without competing with
+   the race number for attention. 44px because it is tapped on a phone. */
+.form-success__close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(7, 26, 61, .16);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .2s, color .2s, transform .25s var(--ease-snap);
+}
+.form-success__close:hover,
+.form-success__close:focus-visible { background: var(--coral); border-color: var(--coral); color: var(--white); transform: rotate(90deg); }
 .race-number { display: grid; width: 180px; aspect-ratio: 1; margin: 0 auto 28px; place-items: center; border-radius: 50%; background: var(--yellow); box-shadow: 0 20px 0 #e4a800, 0 35px 55px rgba(7,26,61,.2); }
 .race-number span { display: block; color: var(--muted); font-family: var(--font-meta); font-size: 11px; letter-spacing: .15em; text-transform: uppercase; }
 .race-number strong { display: block; font-family: var(--font-display); font-size: 60px; font-weight: 400; line-height: 1; }
