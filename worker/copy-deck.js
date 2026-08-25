@@ -151,7 +151,7 @@ export const COPY_DECK = {
     "minSubject": "%FIRSTNAME% jedzie — Carruleddhi Show 2026, numer %RACENUMBER%",
     "minPreheader": "Zgłoszenie przyjęte. Oświadczenie podpisujecie Państwo.",
     "minHi": "Dzień dobry, %GUARDIAN%,",
-    "minLead": "zgłoszenie %CHILD% %FIRSTNAME% na Carruleddhi Show 2026 zostało przyjęte. To jego numer startowy:",
+    "minLead": "zgłoszenie %CHILD% %FIRSTNAME% na Carruleddhi Show 2026 zostało przyjęte. To numer startowy:",
     "minAgeNote": "W dniu zjazdu %FIRSTNAME% będzie mieć %AGE% lat, więc udział wymaga Państwa pisemnej zgody.",
     "minPdfTitle": "Formularz dla niepełnoletnich, w załączniku",
     "minPdfBody": "W załączniku jest formularz dla niepełnoletnich zawodników, już uzupełniony podanymi danymi. Zawiera miejsce na podpis rodzica lub opiekuna prawnego.",
@@ -348,9 +348,9 @@ export const COPY_DECK = {
       "guardian": "erziehungsberechtigte Person"
     },
     "minChild": {
-      "son": "Ihres Sohnes",
+      "son": "Ihrem Sohn",
       "daughter": "Ihrer Tochter",
-      "child": "Ihres Kindes"
+      "child": "Ihrem Kind"
     },
     "newsSubject": "Wir schreiben zur nächsten Ausgabe — Carruleddhi Show",
     "newsHi": "Hallo %FIRSTNAME%,",
