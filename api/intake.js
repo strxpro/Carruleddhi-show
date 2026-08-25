@@ -1,43 +1,123 @@
 /**
  * The API, on Vercel.
  *
- * WHY THIS FILE IS SIX LINES OF LOGIC
- *   worker/index.js was written for Cloudflare, but it only ever uses web platform
- *   APIs — Request, Response, fetch, crypto, URL. No imports of its own, no node:
- *   modules, no process. So it runs unchanged on Vercel's Edge runtime and this file
- *   is an adapter, not a second implementation to keep in step.
+ * WHY THIS FILE IS AN ADAPTER AND NOT AN IMPLEMENTATION
+ *   worker/index.js was written for Cloudflare but only ever uses web platform APIs —
+ *   Request, Response, fetch, crypto, URL. No node: modules, no process. So it runs
+ *   unchanged here, and there is one copy of the validation, rate limiting, Supabase
+ *   access and Make forwarding rather than two to keep in step.
  *
- * WHY IT IS NOT api/carruleddhi/[...type].js ANY MORE
- *   It was, and a deployment failed after a green build with `Error: Unhandled type:
- *   "ColonToken"` — which never reached the site, so every change looked ignored while
- *   an older deployment stayed live. A catch-all filename and an exported `config`
- *   object are both read by Vercel's static analyser before deploy, and neither is
- *   worth the risk when a rewrite in vercel.json does the same routing with a plain
- *   filename. The path the code sees is unchanged, so worker/index.js and the site's
- *   endpoint configuration did not have to move.
+ * WHY IT HANDLES TWO CALLING CONVENTIONS
+ *   This cost a day, so it is worth writing down. Vercel decides a function's runtime
+ *   from an exported marker, and the two spellings are not interchangeable:
  *
- * WHAT THE ADAPTER TRANSLATES
- *   env — Cloudflare passes bindings as an argument, Vercel puts them on process.env.
- *         Same names, so the variables set in the dashboard are the ones the code
- *         already looks for.
- *   ctx — Cloudflare's waitUntil keeps a promise alive past the response. There is no
- *         dependency-free equivalent here, so the shim swallows rejections and lets it
- *         run as long as the invocation does. One call site uses it: the copy of an
- *         attendance press forwarded to Make. If that copy is dropped, the count in
- *         Supabase — the number the page actually shows — is unaffected.
+ *     export const config = { runtime: 'edge' }   Vercel Functions
+ *     export const runtime = 'edge'               Next.js App Router
+ *
+ *   Using the second one in a project that is not Next means the marker is ignored and
+ *   the file runs on Node — where the handler is called as (req, res) with Node
+ *   streams, not with a Request. Passing an IncomingMessage to worker.fetch() throws,
+ *   and the whole thing surfaces as a bare HTTP 500 with no clue in it.
+ *
+ *   Rather than pick a spelling and hope, this detects which convention it was called
+ *   with. On Edge it hands the Request straight through. On Node it builds a Request
+ *   from the stream and writes the Response back out. Node 18+ on Vercel has Request,
+ *   Response and Headers as globals, so the conversion needs no dependency.
+ *
+ *   The result cannot be broken by a change of runtime, which is exactly the property
+ *   this file was missing.
  */
 import worker from '../worker/index.js';
 
-export const runtime = 'edge';
+// The Vercel Functions spelling. Kept because Edge is what this should run on: it is
+// faster to start and closer to what the code was written for. If the platform ignores
+// it, the Node branch below still works.
+export const config = { runtime: 'edge' };
 
-export default function handler(request) {
-  const ctx = {
-    waitUntil(promise) {
-      // Nothing to hand it to. The catch is the point: an unhandled rejection in the
-      // Edge runtime is logged as a crash of the whole request, and this promise is a
-      // best-effort copy, not the answer.
-      if (promise && typeof promise.catch === 'function') promise.catch(() => {});
+/**
+ * `waitUntil` has nothing to hand a promise to here.
+ *
+ * The catch is the point: an unhandled rejection is logged as a crash of the whole
+ * request. One call site uses it — the copy of an attendance press forwarded to Make —
+ * and if that copy is dropped the count in Supabase, which is the number the page
+ * actually shows, is unaffected.
+ */
+const ctx = {
+  waitUntil(promise) {
+    if (promise && typeof promise.catch === 'function') promise.catch(() => {});
+  }
+};
+
+/** Collects a Node request body. Returns undefined for GET, which may not have one. */
+function readBody(req) {
+  if (req.method === 'GET' || req.method === 'HEAD') return Promise.resolve(undefined);
+  // Vercel's Node runtime often parses JSON for us; when it has, re-reading the
+  // stream yields nothing and the body has to come back from req.body.
+  if (req.body !== undefined && req.body !== null) {
+    return Promise.resolve(typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+  }
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+/**
+ * Puts the request type back into the path.
+ *
+ * The rewrite in vercel.json sends /api/carruleddhi/registration here as
+ * /api/intake?type=registration, so by the time the code runs the path no longer says
+ * what was asked for. That matters more than it looks: worker/index.js deliberately
+ * takes the type from the path rather than the body, so a request that claims
+ * "type": "roster" in its JSON cannot reach the participant list through the
+ * registration endpoint. Losing the path would hand that decision to the body.
+ *
+ * The query parameter is filled in by the platform from the path pattern, not by the
+ * caller, so it keeps the same property. This restores the URL the Worker expects and
+ * leaves that file untouched.
+ */
+function normalise(rawUrl, origin) {
+  const url = new URL(rawUrl, origin);
+  if (url.pathname === '/api/intake' || url.pathname === '/api/intake/') {
+    const type = url.searchParams.get('type') || '';
+    // Letters and dashes only. The pattern cannot produce anything else, and a path
+    // built from an unchecked value is not worth the saving.
+    if (/^[a-z-]{1,24}$/.test(type)) {
+      url.pathname = `/api/carruleddhi/${type}`;
+      url.searchParams.delete('type');
     }
-  };
-  return worker.fetch(request, process.env, ctx);
+  }
+  return url.toString();
+}
+
+export default async function handler(first, second) {
+  // Edge: one argument, a Request. Node: (IncomingMessage, ServerResponse).
+  const isEdge = typeof first?.headers?.get === 'function' && typeof first?.url === 'string';
+
+  if (isEdge) {
+    const request = new Request(normalise(first.url, first.url), first);
+    return worker.fetch(request, process.env, ctx);
+  }
+
+  const req = first;
+  const res = second;
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  const origin = `${proto}://${host}`;
+
+  const request = new Request(normalise(req.url, origin), {
+    method: req.method,
+    headers: new Headers(
+      Object.entries(req.headers).map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : String(value)])
+    ),
+    body: await readBody(req)
+  });
+
+  const response = await worker.fetch(request, process.env, ctx);
+  res.statusCode = response.status;
+  response.headers.forEach((value, key) => res.setHeader(key, value));
+  res.end(Buffer.from(await response.arrayBuffer()));
+  return undefined;
 }
