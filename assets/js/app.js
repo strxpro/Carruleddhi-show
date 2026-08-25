@@ -1909,18 +1909,36 @@ import { flagSvg } from './flags.js';
   function setupQuickActions() {
     const dock = $('[data-quick-actions]');
     if (!dock) return;
-    const formSections = ['#signup', '#contact'].map((selector) => $(selector)).filter(Boolean);
-    const visibleSections = new Set();
+    /**
+     * The dock hides while a real button for the same thing is on screen.
+     *
+     * It used to watch the #signup and #contact sections, which is nearly right and
+     * wrong at the top of the page: the hero has "Iscriviti alla gara" and "Ci sarò"
+     * in view, and the dock sat underneath offering exactly those two again. Two of
+     * the same button on one screen makes both look like a guess.
+     *
+     * Watching the controls instead of the sections also means the dock reappears the
+     * moment the hero scrolls away, which is the point at which it starts being useful
+     * rather than redundant.
+     */
+    const rivals = [
+      ...$$('a[href="#signup"]'),
+      ...$$('[data-open-reminder]'),
+      $('#signup'),
+      $('#contact')
+    ].filter(Boolean).filter((element) => !dock.contains(element));
+
+    const onScreen = new Set();
 
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) visibleSections.add(entry.target);
-          else visibleSections.delete(entry.target);
+          if (entry.isIntersecting) onScreen.add(entry.target);
+          else onScreen.delete(entry.target);
         });
-        dock.classList.toggle('is-over-form', visibleSections.size > 0);
+        dock.classList.toggle('is-over-form', onScreen.size > 0);
       }, { threshold: 0.08 });
-      formSections.forEach((section) => observer.observe(section));
+      rivals.forEach((element) => observer.observe(element));
     }
 
     const formControlSelector = 'input, textarea, select, [contenteditable="true"]';
