@@ -1129,37 +1129,43 @@
       'wall.askLead': 'Hai una domanda per gli organizzatori? La bacheca non è il posto giusto: le scrivi in pubblico e passano dal controllo.',
       'wall.askCta': 'Scrivici direttamente',
       'form.sendError': 'Non siamo riusciti a inviare l’iscrizione. I dati sono corretti: è la connessione. Riprova tra un momento.',
-      'form.tooMany': 'Hai inviato poco fa. Attendi qualche minuto e riprova.'
+      'form.tooMany': 'Hai inviato poco fa. Attendi qualche minuto e riprova.',
+      'form.duplicate': 'Questo indirizzo e gia iscritto. Se non hai ricevuto la conferma, scrivici: la ritroviamo noi.'
     },
     pl: {
       'wall.askLead': 'Masz pytanie do organizatorów? Tablica nie jest na to miejscem — wpisy są publiczne i czekają na sprawdzenie.',
       'wall.askCta': 'Napisz do nas',
       'form.sendError': 'Nie udało się wysłać zgłoszenia. Dane są poprawne — zawiodło połączenie. Spróbuj jeszcze raz.',
-      'form.tooMany': 'Wysyłałeś chwilę temu. Odczekaj kilka minut i spróbuj ponownie.'
+      'form.tooMany': 'Wysyłałeś chwilę temu. Odczekaj kilka minut i spróbuj ponownie.',
+      'form.duplicate': 'Ten adres jest już zapisany. Jeśli nie dostałeś potwierdzenia, napisz do nas — odszukamy je.'
     },
     en: {
       'wall.askLead': 'Got a question for the organisers? The wall is not the place: posts are public and wait for approval.',
       'wall.askCta': 'Write to us directly',
       'form.sendError': 'We could not send the entry. Your details are fine — the connection failed. Please try again.',
-      'form.tooMany': 'You sent one a moment ago. Wait a few minutes and try again.'
+      'form.tooMany': 'You sent one a moment ago. Wait a few minutes and try again.',
+      'form.duplicate': 'That address is already registered. If the confirmation never arrived, write to us and we will find it.'
     },
     de: {
       'wall.askLead': 'Eine Frage an die Organisatoren? Die Pinnwand ist dafür nicht gedacht: Beiträge sind öffentlich und werden erst geprüft.',
       'wall.askCta': 'Schreib uns direkt',
       'form.sendError': 'Die Anmeldung konnte nicht gesendet werden. Deine Daten sind in Ordnung — die Verbindung hat versagt. Bitte nochmal versuchen.',
-      'form.tooMany': 'Du hast gerade erst gesendet. Warte ein paar Minuten und versuche es erneut.'
+      'form.tooMany': 'Du hast gerade erst gesendet. Warte ein paar Minuten und versuche es erneut.',
+      'form.duplicate': 'Diese Adresse ist bereits angemeldet. Kam die Bestaetigung nicht an, schreib uns — wir finden sie.'
     },
     es: {
       'wall.askLead': '¿Tienes una pregunta para la organización? El muro no es el lugar: los mensajes son públicos y pasan por revisión.',
       'wall.askCta': 'Escríbenos directamente',
       'form.sendError': 'No hemos podido enviar la inscripción. Tus datos están bien: falló la conexión. Inténtalo de nuevo.',
-      'form.tooMany': 'Acabas de enviar una. Espera unos minutos e inténtalo otra vez.'
+      'form.tooMany': 'Acabas de enviar una. Espera unos minutos e inténtalo otra vez.',
+      'form.duplicate': 'Esa direccion ya esta inscrita. Si no llego la confirmacion, escribenos y la buscamos.'
     },
     fr: {
       'wall.askLead': 'Une question pour les organisateurs ? Le mur n’est pas l’endroit : les messages sont publics et passent par une validation.',
       'wall.askCta': 'Écrivez-nous directement',
       'form.sendError': 'L’inscription n’a pas pu être envoyée. Vos données sont correctes : c’est la connexion. Réessayez.',
-      'form.tooMany': 'Vous venez d’en envoyer une. Patientez quelques minutes et réessayez.'
+      'form.tooMany': 'Vous venez d’en envoyer une. Patientez quelques minutes et réessayez.',
+      'form.duplicate': 'Cette adresse est deja inscrite. Si la confirmation n a pas arrive, ecrivez-nous.'
     }
   };
 

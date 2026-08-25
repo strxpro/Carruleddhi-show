@@ -2778,7 +2778,19 @@ import { flagSvg } from './flags.js';
         // Its own message. This used to borrow contact.error — "check the fields and
         // try again" — which is a lie here: the fields were already validated three
         // times above, and the only way to reach this line is the request failing.
-        showToast(text(error.status === 429 ? 'form.tooMany' : 'form.sendError'), 6000);
+        /* Three different failures, three different things to say. The duplicate is
+           the one that matters: it is not a fault at all, it is the person already
+           being on the list, and telling them "connection failed" would send them
+           round the form again for nothing. */
+        const key = error.payload?.code === 'ALREADY_REGISTERED'
+          ? 'form.duplicate'
+          : (error.status === 429 ? 'form.tooMany' : 'form.sendError');
+        showToast(text(key), 7000);
+        if (key === 'form.duplicate') {
+          const emailField = form.elements.namedItem('email');
+          setFormStep(1, { focus: false });
+          requestAnimationFrame(() => focusRegistrationControl(emailField));
+        }
       } finally {
         submit.disabled = false;
         submit.innerHTML = original;

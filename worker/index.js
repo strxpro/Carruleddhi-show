@@ -624,22 +624,47 @@ const trimmed = (value, fallback = null) => {
   return text ? text : fallback;
 };
 
-/** POST one row. Returns the inserted row when `select` is asked for. */
-async function insertRow(env, table, row, select = '') {
+/**
+ * POST one row. Returns the inserted row when `select` is asked for.
+ *
+ * `upsertOn` names a column with a unique index, and turns the insert into "leave the
+ * existing row alone". Three tables here have a unique index on email, and the right
+ * answer to a duplicate differs by table:
+ *
+ *   reminder_subscribers, newsletter_subscribers — asking to be reminded twice is
+ *     the same wish twice. Silently fine.
+ *   registrations — a second entry on one address is a real conflict. It is not
+ *     upserted; the caller is told, and tells the person.
+ *
+ * Without this, a duplicate came back as a bare 502 with no explanation, which is how
+ * a returning visitor would have met the form.
+ */
+async function insertRow(env, table, row, select = '', upsertOn = '') {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
   if (select) url.searchParams.set('select', select);
+  if (upsertOn) url.searchParams.set('on_conflict', upsertOn);
+
+  const prefer = [select ? 'return=representation' : 'return=minimal'];
+  // "ignore" and not "merge": a second signup must not overwrite the name and locale
+  // recorded the first time, which may well be the better data.
+  if (upsertOn) prefer.push('resolution=ignore-duplicates');
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: supabaseHeaders(env, {
-      Prefer: select ? 'return=representation' : 'return=minimal'
-    }),
+    headers: supabaseHeaders(env, { Prefer: prefer.join(',') }),
     body: JSON.stringify([row])
   });
+
   if (!response.ok) {
-    // Postgres says useful things here — a failed check constraint names itself —
-    // and it is worth having in the log rather than a bare 502.
+    // Postgres says useful things here — a violated constraint names itself — and
+    // 23505 is specifically "that already exists", which the caller can act on.
     const detail = await response.text().catch(() => '');
-    return { ok: false, status: response.status, detail: detail.slice(0, 400) };
+    return {
+      ok: false,
+      status: response.status,
+      duplicate: detail.includes('23505') || detail.includes('duplicate key'),
+      detail: detail.slice(0, 400)
+    };
   }
   if (!select) return { ok: true, row: null };
   const rows = await response.json().catch(() => []);
@@ -659,7 +684,7 @@ async function storeIntake(env, request, type, payload) {
 
   if (type === 'contact') {
     const stored = await insertRow(env, 'contact_messages', {
-      name: trimmed(payload.name, 'â€”'),
+      name: trimmed(payload.name, ''),
       email: String(payload.email || '').trim().toLowerCase(),
       message: trimmed(payload.message, ''),
       locale,
@@ -671,14 +696,14 @@ async function storeIntake(env, request, type, payload) {
 
   if (type === 'reminder') {
     const stored = await insertRow(env, 'reminder_subscribers', {
-      name: trimmed(payload.name, 'â€”'),
+      name: trimmed(payload.name, ''),
       email: String(payload.email || '').trim().toLowerCase(),
       locale,
       consent_at: new Date().toISOString(),
       // Lets a future "stop these" link identify the row without exposing its id.
       unsubscribe_token: crypto.randomUUID().replace(/-/g, ''),
       status: 'active'
-    });
+    }, '', 'email');
     return stored.ok ? { ok: true } : { ok: false, ...stored };
   }
 
@@ -723,7 +748,12 @@ async function storeIntake(env, request, type, payload) {
   }
 
   const stored = await insertRow(env, 'registrations', row, 'race_number');
-  if (!stored.ok) return { ok: false, ...stored };
+  if (!stored.ok) {
+    /* A second entry on one address is not a server fault, it is a fact the person
+       needs to hear. Told apart here so the API can answer 409 with something the
+       form can put on screen, instead of the 502 they used to get. */
+    return { ok: false, ...stored, code: stored.duplicate ? 'ALREADY_REGISTERED' : 'STORE_FAILED' };
+  }
 
   // Best effort: a failed newsletter row must not fail the registration. They ticked
   // a box about next year; the entry for this year is the thing that matters.
@@ -734,7 +764,7 @@ async function storeIntake(env, request, type, payload) {
       locale,
       source: 'registration',
       status: 'active'
-    }).catch(() => {});
+    }, '', 'email').catch(() => {});
   }
 
   return { ok: true, raceNumber: stored.row?.race_number ?? null };
@@ -1421,7 +1451,14 @@ export default {
     if (STORED_TYPES.has(type) && wallReady(env)) {
       const stored = await storeIntake(env, request, type, payload);
       if (!stored.ok) {
-        return json({ ok: false, code: 'STORE_FAILED', detail: stored.detail || null }, 502, cors);
+        // 409 for "you are already on the list", 502 for anything actually broken.
+        // Same shape either way, so the form can branch on the code.
+        const duplicate = stored.code === 'ALREADY_REGISTERED';
+        return json(
+          { ok: false, code: stored.code || 'STORE_FAILED', detail: duplicate ? null : stored.detail || null },
+          duplicate ? 409 : 502,
+          cors
+        );
       }
       // Make no longer counts spreadsheet rows to find this. It arrives as a field.
       if (stored.raceNumber) payload.raceNumber = String(stored.raceNumber).padStart(3, '0');

@@ -63,6 +63,19 @@ $polishNote = "Drewniana rama, ko$($lStroke)a z $($lStroke)o$($zDot)yskami, hamu
 
 $stamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
+# Unique suffix per run.
+#
+#   registrations, reminder_subscribers and newsletter_subscribers each have a unique
+#   index on email (0002_event_data.sql, lines 71/137/161). Fixed test addresses meant
+#   the first run stored them and every run after it was refused as a duplicate - four
+#   of five messages coming back 502, with contact_messages the only table without such
+#   an index and so the only one that kept working.
+#
+#   A duplicate is now answered properly by the API (409, "already registered"), which
+#   is right for a real visitor and useless for a test that wants to exercise the happy
+#   path. So the addresses change every run.
+$run = (Get-Date).ToString('MMddHHmmss')
+
 # One message carrying every field of all four branches.
 #
 # WHY THIS EXISTS
@@ -86,7 +99,7 @@ $unionPayload = [ordered]@{
   lastName      = 'Testowy'
   birthDate     = '1994-03-18'
   postalCode    = '07028'
-  email         = 'test.registration@example.com'
+  email         = "test.registration+$run@example.com"
   phone         = '+48 600 100 200'
   address       = 'Via Giuseppe Verdi 12, Santa Teresa Gallura (SS)'
   cartName      = 'Bolide Rosso'
@@ -115,7 +128,7 @@ $unionPayload = [ordered]@{
   childKind        = 'daughter'
   guardianRelation = 'mother'
   guardianName     = 'Anna Testowa'
-  guardianEmail    = 'test.guardian@example.com'
+  guardianEmail    = "test.guardian+$run@example.com"
   guardianPhone    = '+48 600 300 400'
   motherName       = 'Anna Testowa'
   fatherName       = 'Piotr Testowy'
@@ -156,7 +169,7 @@ $payloads = [ordered]@{
     lastName      = 'Testowy'
     birthDate     = '1994-03-18'
     postalCode    = '07028'
-    email         = 'test.registration@example.com'
+    email         = "test.registration+$run@example.com"
     phone         = '+48 600 100 200'
     address       = "Via Giuseppe Verdi 12, 07028 Santa Teresa Gallura (SS)"
     cartName      = 'Bolide Rosso'
@@ -194,7 +207,7 @@ $payloads = [ordered]@{
     lastName         = 'Testowa'
     birthDate        = '2012-03-04'
     postalCode       = '07028'
-    email            = 'test.minor@example.com'
+    email            = "test.minor+$run@example.com"
     phone            = '+48 600 500 600'
     address          = 'Via Giuseppe Verdi 12, 07028 Santa Teresa Gallura (SS)'
     cartName         = 'Piccola Freccia'
@@ -209,7 +222,7 @@ $payloads = [ordered]@{
     childKind        = 'daughter'
     guardianRelation = 'mother'
     guardianName     = 'Anna Testowa'
-    guardianEmail    = 'test.guardian@example.com'
+    guardianEmail    = "test.guardian+$run@example.com"
     guardianPhone    = '+48 600 300 400'
     motherName       = 'Anna Testowa'
     fatherName       = 'Piotr Testowy'
@@ -226,7 +239,7 @@ $payloads = [ordered]@{
     source           = 'powershell-feed'
     submittedAt      = $stamp
     name             = 'Giulia Prova'
-    email            = 'test.reminder@example.com'
+    email            = "test.reminder+$run@example.com"
     consent          = $true
     reminderSchedule = '7d,1d,3h'
     branch           = 'reminder'
@@ -240,7 +253,7 @@ $payloads = [ordered]@{
     source      = 'powershell-feed'
     submittedAt = $stamp
     name        = 'Hans Probe'
-    email       = 'test.contact@example.com'
+    email       = "test.contact+$run@example.com"
     message     = "Frage zum Helm. Test der Sonderzeichen: $aOgonek $eGrave"
     branch      = 'contact'
   }
