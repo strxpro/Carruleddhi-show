@@ -3265,6 +3265,15 @@ import { flagSvg } from './flags.js';
 
     function jump(target) {
       const scrollTo = () => {
+        /* The first section means the top of the document, not the top of the section.
+           Clicking the wordmark is "take me home", and scrollIntoView on #hero leaves
+           the page a few pixels down — below the progress bar, under the sticky header —
+           which reads as "the logo is broken". */
+        if (target === $('main > section')) {
+          window.scrollTo({ top: 0, behavior: 'instant' });
+          history.replaceState(null, '', window.location.pathname);
+          return;
+        }
         // `instant`, not `auto`. `auto` means "whatever scroll-behavior says", so a
         // single CSS declaration elsewhere could turn this back into an animation
         // happening behind a wipe that is already lifting.
