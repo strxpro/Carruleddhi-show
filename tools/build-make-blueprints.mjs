@@ -61,21 +61,50 @@ function body(file) {
   return read(file).replace(/^<!--[\s\S]*?-->\s*/, '').trim();
 }
 
-const REG_TEMPLATE = body('emails/make-registration.html')
-  // Module 5 in the old note is module 6 here (Sheets row lands in 5).
-  .replace(/\{\{5\.raceNumber\}\}/g, '{{1.raceNumber}}')
-  // These two carry %TOKEN% placeholders, so they are resolved in module 6.
-  .replace(/\{\{3\.t\.regHelp\}\}/g, '{{1.help}}')
-  .replace(/\{\{3\.t\.printFooter\}\}/g, '{{1.printFooter}}');
+/* Anchors that must point at a resolved field rather than at the deck.
+   Each of these deck strings carries a %TOKEN% the renderer knows nothing about, so
+   quoting the deck directly puts the token itself into the letter. The help line went
+   out as "Napisz na %ORGEMAIL% albo zadzwoń: %ORGPHONE%." for exactly this reason: the
+   rewrite below used to look for `{{3.t.regHelp}}`, an anchor from an older version of
+   the template, and a String.replace that matches nothing fails silently.
+   swap() throws instead, so a renamed anchor stops the build. */
+const REG_TEMPLATE = swap(body('emails/make-registration.html'), '{{1.copy.regHelp}}', '{{1.help}}');
 
-/* The minor variant is derived first, while `{{1.copy.regHi}}` is still in place —
-   it is one of the anchors minorHtml() swaps. Only then is the adult greeting
-   pointed at module 3, and the leftover marker removed from the adult body. */
-const MIN_HTML = minorHtml(REG_TEMPLATE);
+/**
+ * The block about the attachments, in both bodies, pointed at precomputed fields.
+ *
+ * Four strings that used to be read straight out of the deck, and cannot be any more:
+ * how many forms are attached now depends on the language. An Italian rider gets one
+ * file, so "Two PDFs attached / print only the Italian copy" is simply untrue for
+ * them — and the renderer has no if() to decide with.
+ *
+ * So the function decides. attachCopy() picks adult or under-18 wording and one-file
+ * or two-file wording, and writes the four it settled on. The template quotes a field,
+ * the same as it does for the subject.
+ */
+const attachmentBlock = (html) => html
+  .replace(/\{\{1\.copy\.regPrintTitle\}\}/g, '{{1.printTitle}}')
+  .replace(/\{\{1\.copy\.regPrintBody\}\}/g, '{{1.printBody}}')
+  .replace(/\{\{1\.copy\.regPdfTitle\}\}/g, '{{1.pdfTitle}}')
+  .replace(/\{\{1\.copy\.regPdfBody\}\}/g, '{{1.pdfBody}}');
 
-const REG_HTML = REG_TEMPLATE
-  .replace(/\{\{3\.t\.regHi\}\}/g, '{{1.hi}}')
-  .replace('<!--GUARDIAN-ROWS-->', '');
+const MIN_HTML = attachmentBlock(minorHtml(REG_TEMPLATE));
+
+/* The greeting carries %FIRSTNAME%, so it has to come from the resolved field and not
+   from the deck. This used to rewrite `{{3.t.regHi}}` — an anchor that stopped existing
+   when the template was moved onto `{{1.copy.*}}`, so the replace matched nothing and
+   every adult confirmation went out reading "Ciao %FIRSTNAME%," in full.
+   Throwing on a missing anchor rather than replacing quietly, because that is the only
+   difference between the bug and the fix. */
+const REG_HTML = attachmentBlock(
+  swap(REG_TEMPLATE, '{{1.copy.regHi}}', '{{1.hi}}').replace('<!--GUARDIAN-ROWS-->', '')
+);
+
+/** Replaces an anchor, or throws if the template no longer contains it. */
+function swap(html, from, to) {
+  if (!html.includes(from)) throw new Error(`anchor not found in the template: ${from}`);
+  return html.split(from).join(to);
+}
 
 /**
  * The under-18 version of the same e-mail.
@@ -112,10 +141,11 @@ function minorHtml(adultHtml) {
     ['{{1.copy.regHi}}', '{{1.minHi}}'],
     ['{{1.copy.regLead}}', '{{1.minLead}}'],
     ['{{1.copy.regPreheader}}', '{{1.copy.minPreheader}}'],
-    ['{{1.copy.regPrintTitle}}', '{{1.copy.minPrintTitle}}'],
-    ['{{1.copy.regPrintBody}}', '{{1.copy.minPrintBody}}'],
-    ['{{1.copy.regPdfTitle}}', '{{1.copy.minPdfTitle}}'],
-    ['{{1.copy.regPdfBody}}', '{{1.copy.minPdfBody}}'],
+    /* The four attachment strings are NOT swapped here.
+       They are rewritten afterwards by attachmentBlock(), for both bodies alike,
+       because the choice between adult and under-18 wording is now made in the same
+       breath as the choice between one attached form and two — and only the function
+       knows both. See attachmentBlock() above. */
     ['{{1.copy.regCta}}', '{{1.copy.minCta}}'],
     ['<!--GUARDIAN-ROWS-->', guardianRows]
   ];
@@ -387,6 +417,70 @@ function sleep(id, x, y, seconds, filter) {
 
 const eq = (name, a, b) => ({ name, conditions: [[{ a, b, o: 'text:equal' }]] });
 
+/**
+ * One of the four registration routes.
+ *
+ * `{{1.branch}}` is a single word the function computed from the birth date and the
+ * chosen language: registration-adult-it, registration-adult-xx, registration-minor-it,
+ * registration-minor-xx. So the filter is one text comparison, as everywhere else in
+ * this scenario, and the two facts behind it were settled in one place.
+ *
+ * What actually differs between the four:
+ *
+ *   minor    who the letter goes to, and which of the two bodies the function rendered
+ *   foreign  one attachment or two
+ *
+ * The body itself does not vary here — {{1.html}} is already the right letter in the
+ * right language, because the function picked the template before sending the request.
+ */
+function registrationRoute({ y, minor, foreign, pdfIt, pdfOwn, mail }) {
+  const branch = `registration-${minor ? 'minor' : 'adult'}-${foreign ? 'xx' : 'it'}`;
+  const label = `${minor ? 'under 18' : 'adult'} — ${foreign ? 'foreign language' : 'italiano'}`;
+
+  const flow = [
+    // The Italian form. Always fetched, always attached: it is the only version the
+    // organisers accept, whoever is entering.
+    httpGetFile(pdfIt, 1250, y, '{{1.pdfUrl}}', eq(label, '{{1.branch}}', branch))
+  ];
+
+  const attachments = [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: `{{${pdfIt}.data}}` }];
+
+  if (foreign) {
+    /* The same form in the rider's own language, as a second file rather than a second
+       page. It is a courtesy copy — it says so on it — and keeping it separate means
+       the thing they have to print and hand in is a one-page document and not page one
+       of two. No filter on this module: the route it sits on is already the foreign
+       one, and a second filter would be a second place for the same decision. */
+    flow.push(httpGetFile(pdfOwn, 1470, y, '{{1.pdfUrlOwn}}'));
+    attachments.push({ fileName: '{{1.pdfNameOwn}}{{1.raceNumber}}.pdf', data: `{{${pdfOwn}.data}}` });
+  }
+
+  flow.push(sendEmail(mail, foreign ? 1750 : 1600, y, {
+    /* Under 18: both of them, openly.
+       The guardian first, because they are the one who signs and the letter is written
+       to them. The rider second, as a visible recipient rather than a blind copy: a
+       fourteen-year-old who typed their own address in expects to hear something back,
+       and "we sent it to your mother" is not that. Seeing each other on the same
+       message is also the point — the form and the number are one thing they have to
+       sort out together.
+
+       If the rider left no address the second slot resolves to the organiser's, which
+       is a duplicate of the blind copy and harmless. An empty recipient is not
+       harmless: most servers reject the whole message for it. */
+    to: minor
+      ? ['{{lower(1.guardianEmail)}}', `{{ifempty(lower(1.email); "${ORG_EMAIL}")}}`]
+      : '{{lower(1.email)}}',
+    // Blind copy so every entry lands in the organiser's inbox as well, without the
+    // rider seeing a second address on their own confirmation.
+    bcc: [ORG_EMAIL],
+    subject: '{{1.subject}}',
+    html: '{{1.html}}',
+    attachments
+  }));
+
+  return { flow };
+}
+
 function wrap(name, flow, instant) {
   return {
     name,
@@ -618,49 +712,20 @@ const instantFlow = [
        No AND, no boolean quirks, nothing to misread.
      ========================================================================== */
   router(4, 900, 0, [
-    /* ---- A: adult entry ------------------------------------------------- */
-    {
-      flow: [
-        httpGetFile(7, 1250, -520, '{{1.pdfUrl}}', eq('adult', '{{1.branch}}', 'registration-adult')),
-        sendEmail(8, 1600, -520, {
-          to: '{{lower(1.email)}}',
-          // Blind copy so every entry lands in the organiser's inbox as well,
-          // without the rider seeing a second address on their own confirmation.
-          bcc: [ORG_EMAIL],
-          subject: '{{1.subject}}',
-          html: '{{1.html}}',
-          attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{7.data}}' }]
-        })
-      ]
-    },
+    /* ---- A / B: the four registration routes ----------------------------
+       Two questions, so four routes: under 18 or not, Italian or not.
 
-    /* ---- B: under-18 entry ---------------------------------------------- */
-    {
-      flow: [
-        httpGetFile(19, 1250, -280, '{{1.pdfUrl}}', eq('under 18', '{{1.branch}}', 'registration-minor')),
-        /* Both of them, openly.
-           The guardian first, because they are the one who signs and the letter is
-           written to them. The rider second, as a visible recipient rather than a
-           blind copy: a fourteen-year-old who typed their own address in expects to
-           hear something back, and "we sent it to your mother" is not that. Seeing
-           each other on the same message is also the point — the form and the number
-           are one thing they have to sort out together.
-
-           If the rider left no address the second slot resolves to the organiser's,
-           which is a duplicate of the blind copy and harmless. An empty recipient is
-           not harmless: most servers reject the whole message for it. */
-        sendEmail(16, 1600, -280, {
-          to: [
-            '{{lower(1.guardianEmail)}}',
-            `{{ifempty(lower(1.email); "${ORG_EMAIL}")}}`
-          ],
-          bcc: [ORG_EMAIL],
-          subject: '{{1.subject}}',
-          html: '{{1.html}}',
-          attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]
-        })
-      ]
-    },
+       The age decides which letter and which form; the language decides how many
+       forms are attached. An Italian rider gets the Italian one and nothing else. A
+       foreign rider gets two files — the Italian form to sign and the same form in
+       their own language to read it by — which needs a second HTTP module, and a
+       module cannot be skipped on a shared route: a filter in Make ends the route it
+       sits on, taking the e-mail with it. Hence four routes rather than two with an
+       if() in them. See registrationRoute() for what differs between them. */
+    registrationRoute({ y: -760, minor: false, foreign: false, pdfIt: 7,  mail: 8 }),
+    registrationRoute({ y: -560, minor: false, foreign: true,  pdfIt: 22, pdfOwn: 23, mail: 24 }),
+    registrationRoute({ y: -360, minor: true,  foreign: false, pdfIt: 19, mail: 16 }),
+    registrationRoute({ y: -160, minor: true,  foreign: true,  pdfIt: 25, pdfOwn: 26, mail: 27 }),
 
     /* ---- C: tell the organiser, either way -------------------------------
        Its own route rather than a module appended to A and B, which would have
@@ -672,11 +737,15 @@ const instantFlow = [
        enough to know an entry arrived, and mean nothing to anyone else. */
     {
       flow: CALLMEBOT.map((recipient, index) => httpRequest(
-        // 9 for the first, then 20, 21… so existing module numbers do not shift when
-        // somebody is added and the instructions stop matching the canvas.
-        index === 0 ? 9 : 19 + index,
+        /* 9 for the first, then 30, 31… so existing module numbers do not shift when
+           somebody is added and the instructions stop matching the canvas. Numbered
+           from 30 rather than from 20: the registration routes now use 22 to 27, and
+           the earlier `19 + index` would have handed the second organiser id 21, which
+           is the Sleep module in front of the newsletter. Two modules with one id is a
+           blueprint Make imports and then behaves strangely on. */
+        index === 0 ? 9 : 29 + index,
         1250,
-        -40 + index * 130,
+        60 + index * 130,
         'https://api.callmebot.com/whatsapp.php',
         [
           { name: 'phone', value: recipient.phone },

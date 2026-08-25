@@ -31,18 +31,25 @@ function resolve(payload) {
       ? fill(deck.minSubject, { FIRSTNAME: first, RACENUMBER: payload.raceNumber })
       : fill(deck.regSubject, { FIRSTNAME: first, RACENUMBER: payload.raceNumber }),
     hi: fill(deck.regHi, { FIRSTNAME: first }),
-    pdfUrl: payload.isMinor ? 'Carruleddhi-modulo-minori.pdf' : 'Carruleddhi-modulo.pdf',
-    branch: payload.isMinor ? 'registration-minor' : 'registration-adult'
+    /* Two file names now, not one. The Italian form is what gets signed, so it goes to
+       everybody; a rider who chose another language also gets the same form in that
+       language, which is why the second line is empty for an Italian entry. */
+    pdfUrl: `${payload.isMinor ? 'Carruleddhi-minori' : 'Carruleddhi-modulo'}-it.pdf`,
+    pdfUrlOwn: locale === 'it'
+      ? '(brak — Wloch dostaje jeden plik)'
+      : `${payload.isMinor ? 'Carruleddhi-minori' : 'Carruleddhi-modulo'}-${locale}.pdf`,
+    branch: `registration-${payload.isMinor ? 'minor' : 'adult'}-${locale === 'it' ? 'it' : 'xx'}`
   };
+  const oneForm = locale === 'it';
   if (payload.isMinor) {
     const childWord = deck.minChild?.[payload.childKind] || deck.minChild?.child || '';
     out.minHi = fill(deck.minHi, { GUARDIAN: payload.guardianName });
     out.minLead = fill(deck.minLead, { CHILD: childWord, FIRSTNAME: first });
     out.ageNote = fill(deck.minAgeNote, { FIRSTNAME: first, AGE: payload.riderAge });
-    out.printBody = deck.minPrintBody;
+    out.printBody = oneForm ? deck.minPrintBodyOne : deck.minPrintBody;
   } else {
     out.lead = deck.regLead;
-    out.printBody = deck.regPrintBody;
+    out.printBody = oneForm ? deck.regPrintBodyOne : deck.regPrintBody;
   }
   return out;
 }

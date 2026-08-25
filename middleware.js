@@ -19,10 +19,72 @@
  *   Secure so it never travels in clear, SameSite=Lax so it survives a normal link.
  *
  * TURNING IT OFF
- *   Delete the SITE_PASSWORD environment variable in Vercel. With no password set
- *   the gate lets everyone through, which is what you want on the day the site goes
- *   public — no code change, no redeploy of anything but the variable.
+ *   Two ways, and the second is the one to use on the day:
+ *
+ *   1. The switch in the admin panel, Settings > "Blokada strony". It writes
+ *      `siteLocked: false` into the site_settings row and this file reads it. No
+ *      deploy, no environment variable, no laptop — which matters, because the person
+ *      who needs the site open at 9am on the day of the event is standing in a street
+ *      in Santa Teresa with a phone.
+ *
+ *   2. Delete the SITE_PASSWORD environment variable in Vercel. With no password set
+ *      there is nothing to check against, so the gate cannot exist at all. Slower
+ *      (it needs a redeploy) but it is the one that does not depend on the database
+ *      answering.
  */
+
+/**
+ * The database answer, cached per isolate.
+ *
+ * This runs before every page, so asking Supabase each time would add a round trip to
+ * every single request. Thirty seconds is short enough that flipping the switch in the
+ * panel feels immediate and long enough that a busy minute is a handful of queries
+ * rather than hundreds.
+ *
+ * Module scope, so it lives as long as the isolate does — which on Vercel is minutes,
+ * not the lifetime of one request. That is the whole point.
+ */
+let unlockedCache = { at: 0, value: null };
+const UNLOCK_TTL_MS = 30_000;
+
+/**
+ * Has the organiser opened the site from the panel?
+ *
+ * Fails closed, deliberately. If Supabase is unreachable, or not configured, or the row
+ * is missing, the answer is "still locked" — an unfinished site staying hidden because
+ * a query timed out is a bad afternoon; an unfinished site becoming public because a
+ * query timed out is the thing this file exists to prevent.
+ */
+async function siteOpened() {
+  const now = Date.now();
+  if (unlockedCache.value !== null && now - unlockedCache.at < UNLOCK_TTL_MS) {
+    return unlockedCache.value;
+  }
+
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY;
+  if (!base || !key) return false;
+
+  let opened = false;
+  try {
+    const url = `${base}/rest/v1/site_settings?select=data&id=is.true&limit=1`;
+    const response = await fetch(url, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      // A gate that hangs is worse than a gate that guesses. If the database is slow,
+      // stay locked and try again on the next request.
+      signal: AbortSignal.timeout(1500)
+    });
+    if (response.ok) {
+      const rows = await response.json();
+      opened = rows?.[0]?.data?.siteLocked === false;
+    }
+  } catch (_) {
+    opened = false;
+  }
+
+  unlockedCache = { at: now, value: opened };
+  return opened;
+}
 
 /**
  * WHAT IS EXCLUDED, AND WHY IT IS DECIDED IN CODE
@@ -68,12 +130,15 @@ function same(a, b) {
 export default async function middleware(request) {
   const password = process.env.SITE_PASSWORD;
 
-  // No password configured: the gate does not exist. This is the switch that opens
-  // the site to the public.
+  // No password configured: the gate does not exist, so there is nothing to check.
   if (!password) return;
 
   const url = new URL(request.url);
   if (OPEN_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return;
+
+  // The switch in the admin panel. Checked after the path exclusions so opening the
+  // site costs one query per isolate per half-minute and not one per asset.
+  if (await siteOpened()) return;
 
   const expected = await sha256(password);
 

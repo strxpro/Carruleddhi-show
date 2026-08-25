@@ -59,12 +59,12 @@
                 "handleErrors": false
               },
               "filter": {
-                "name": "adult",
+                "name": "adult — italiano",
                 "conditions": [
                   [
                     {
                       "a": "{{1.branch}}",
-                      "b": "registration-adult",
+                      "b": "registration-adult-it",
                       "o": "text:equal"
                     }
                   ]
@@ -90,7 +90,7 @@
               "metadata": {
                 "designer": {
                   "x": 1250,
-                  "y": -520
+                  "y": -760
                 }
               }
             },
@@ -130,7 +130,176 @@
               "metadata": {
                 "designer": {
                   "x": 1600,
-                  "y": -520
+                  "y": -760
+                },
+                "restore": {
+                  "expect": {
+                    "to": {
+                      "mode": "chose",
+                      "items": [
+                        null
+                      ]
+                    },
+                    "cc": {
+                      "mode": "chose"
+                    },
+                    "bcc": {
+                      "mode": "chose"
+                    },
+                    "priority": {
+                      "label": "Normal"
+                    },
+                    "references": {
+                      "mode": "chose"
+                    },
+                    "attachments": {
+                      "mode": "chose"
+                    },
+                    "contentType": {
+                      "label": "HTML"
+                    }
+                  },
+                  "parameters": {
+                    "saveAfterSent": {
+                      "label": "No"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "account",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  },
+                  {
+                    "name": "saveAfterSent",
+                    "type": "boolean",
+                    "label": "Save message after sending",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 22,
+              "module": "http:ActionGetFile",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "filter": {
+                "name": "adult — foreign language",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.branch}}",
+                      "b": "registration-adult-xx",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "url": "{{1.pdfUrl}}",
+                "method": "get",
+                "headers": [],
+                "qs": [],
+                "serializeUrl": false,
+                "shareCookies": false,
+                "ca": null,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "authUser": "",
+                "authPass": "",
+                "timeout": null
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": -560
+                }
+              }
+            },
+            {
+              "id": 23,
+              "module": "http:ActionGetFile",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "mapper": {
+                "url": "{{1.pdfUrlOwn}}",
+                "method": "get",
+                "headers": [],
+                "qs": [],
+                "serializeUrl": false,
+                "shareCookies": false,
+                "ca": null,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "authUser": "",
+                "authPass": "",
+                "timeout": null
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1470,
+                  "y": -560
+                }
+              }
+            },
+            {
+              "id": 24,
+              "module": "email:ActionSendEmail",
+              "version": 7,
+              "parameters": {
+                "account": null,
+                "saveAfterSent": false
+              },
+              "mapper": {
+                "to": [
+                  "{{lower(1.email)}}"
+                ],
+                "subject": "{{1.subject}}",
+                "contentType": "html",
+                "html": "{{1.html}}",
+                "attachments": [
+                  {
+                    "fileName": "{{1.pdfName}}{{1.raceNumber}}.pdf",
+                    "data": "{{22.data}}"
+                  },
+                  {
+                    "fileName": "{{1.pdfNameOwn}}{{1.raceNumber}}.pdf",
+                    "data": "{{23.data}}"
+                  }
+                ],
+                "cc": [],
+                "bcc": [
+                  "info@carruleddhishow.com"
+                ],
+                "from": "",
+                "sender": "",
+                "replyTo": "info@carruleddhishow.com",
+                "headers": [],
+                "priority": "normal",
+                "inReplyTo": "",
+                "references": []
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1750,
+                  "y": -560
                 },
                 "restore": {
                   "expect": {
@@ -193,12 +362,12 @@
                 "handleErrors": false
               },
               "filter": {
-                "name": "under 18",
+                "name": "under 18 — italiano",
                 "conditions": [
                   [
                     {
                       "a": "{{1.branch}}",
-                      "b": "registration-minor",
+                      "b": "registration-minor-it",
                       "o": "text:equal"
                     }
                   ]
@@ -224,7 +393,7 @@
               "metadata": {
                 "designer": {
                   "x": 1250,
-                  "y": -280
+                  "y": -360
                 }
               }
             },
@@ -265,7 +434,177 @@
               "metadata": {
                 "designer": {
                   "x": 1600,
-                  "y": -280
+                  "y": -360
+                },
+                "restore": {
+                  "expect": {
+                    "to": {
+                      "mode": "chose",
+                      "items": [
+                        null
+                      ]
+                    },
+                    "cc": {
+                      "mode": "chose"
+                    },
+                    "bcc": {
+                      "mode": "chose"
+                    },
+                    "priority": {
+                      "label": "Normal"
+                    },
+                    "references": {
+                      "mode": "chose"
+                    },
+                    "attachments": {
+                      "mode": "chose"
+                    },
+                    "contentType": {
+                      "label": "HTML"
+                    }
+                  },
+                  "parameters": {
+                    "saveAfterSent": {
+                      "label": "No"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "account",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  },
+                  {
+                    "name": "saveAfterSent",
+                    "type": "boolean",
+                    "label": "Save message after sending",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 25,
+              "module": "http:ActionGetFile",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "filter": {
+                "name": "under 18 — foreign language",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.branch}}",
+                      "b": "registration-minor-xx",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "url": "{{1.pdfUrl}}",
+                "method": "get",
+                "headers": [],
+                "qs": [],
+                "serializeUrl": false,
+                "shareCookies": false,
+                "ca": null,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "authUser": "",
+                "authPass": "",
+                "timeout": null
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": -160
+                }
+              }
+            },
+            {
+              "id": 26,
+              "module": "http:ActionGetFile",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false
+              },
+              "mapper": {
+                "url": "{{1.pdfUrlOwn}}",
+                "method": "get",
+                "headers": [],
+                "qs": [],
+                "serializeUrl": false,
+                "shareCookies": false,
+                "ca": null,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "authUser": "",
+                "authPass": "",
+                "timeout": null
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1470,
+                  "y": -160
+                }
+              }
+            },
+            {
+              "id": 27,
+              "module": "email:ActionSendEmail",
+              "version": 7,
+              "parameters": {
+                "account": null,
+                "saveAfterSent": false
+              },
+              "mapper": {
+                "to": [
+                  "{{lower(1.guardianEmail)}}",
+                  "{{ifempty(lower(1.email); \"info@carruleddhishow.com\")}}"
+                ],
+                "subject": "{{1.subject}}",
+                "contentType": "html",
+                "html": "{{1.html}}",
+                "attachments": [
+                  {
+                    "fileName": "{{1.pdfName}}{{1.raceNumber}}.pdf",
+                    "data": "{{25.data}}"
+                  },
+                  {
+                    "fileName": "{{1.pdfNameOwn}}{{1.raceNumber}}.pdf",
+                    "data": "{{26.data}}"
+                  }
+                ],
+                "cc": [],
+                "bcc": [
+                  "info@carruleddhishow.com"
+                ],
+                "from": "",
+                "sender": "",
+                "replyTo": "info@carruleddhishow.com",
+                "headers": [],
+                "priority": "normal",
+                "inReplyTo": "",
+                "references": []
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1750,
+                  "y": -160
                 },
                 "restore": {
                   "expect": {
@@ -376,7 +715,7 @@
               "metadata": {
                 "designer": {
                   "x": 1250,
-                  "y": -40
+                  "y": 60
                 }
               }
             }

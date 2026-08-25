@@ -143,3 +143,38 @@ export const replyToThread = (key: string, threadId: string, message: string) =>
 
 export const setThreadMode = (key: string, threadId: string, mode: ChatThread['mode']) =>
   call<{ ok: true; mode: string }>('chat-admin', key, { action: 'mode', threadId, mode });
+
+/* ---------------------------------------------------------------- settings */
+
+export interface Sponsor {
+  name: string;
+  url: string;
+  /** A path in the bucket when saving, a signed URL when reading. See the function. */
+  logo: string;
+}
+
+export interface SiteSettings {
+  siteLocked: boolean;
+  sponsors: Sponsor[];
+  showGallery: boolean;
+  showWall: boolean;
+  showPrizes: boolean;
+  showCounters: boolean;
+}
+
+export const fetchSettings = (key: string) =>
+  call<{ ok: true; settings: SiteSettings }>('settings-admin', key, {});
+
+/**
+ * Saves part of the settings.
+ *
+ * Partial on purpose: the server merges onto what is stored, so flipping one switch
+ * sends one switch. Sending the whole object back would mean every save rewrites values
+ * the panel may have read minutes ago.
+ */
+export const saveSettings = (key: string, settings: Partial<SiteSettings>) =>
+  call<{ ok: true; settings: SiteSettings }>('settings-admin', key, { settings });
+
+/** Uploads a logo and returns its bucket path plus a signed URL to preview it with. */
+export const uploadSponsorLogo = (key: string, photo: string) =>
+  call<{ ok: true; logo: string; url: string }>('settings-admin', key, { action: 'logo', photo });

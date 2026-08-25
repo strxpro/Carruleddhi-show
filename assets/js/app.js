@@ -3476,6 +3476,279 @@ import { flagSvg } from './flags.js';
     $$('[data-current-year]').forEach((element) => { element.textContent = String(new Date().getFullYear()); });
   }
 
+  /**
+   * Settings the organiser changed in the admin panel.
+   *
+   * WHY THIS IS A FETCH AND NOT PART OF THE BUILD
+   *   Sponsors arrive one at a time over weeks, and a section whose photos have not
+   *   turned up yet should not be on the page. Both used to live in the config baked
+   *   into the bundle, which meant every one of them was a git push by whoever had the
+   *   laptop. They are rows in Supabase now, written by the panel and read here.
+   *
+   * WHY IT RUNS AFTER EVERYTHING ELSE AND NOT BEFORE
+   *   The page must be complete and usable before this answers, because it might never
+   *   answer — a slow network, a cold function, Supabase having a bad minute. So the
+   *   built-in config renders first and this refines it. The visible cost is a sponsor
+   *   band that appears a moment late, which is the right thing to lose.
+   *
+   * A failure is silent on purpose. There is nothing a visitor could do about it, and
+   * the page they already have is the whole page.
+   */
+  async function applyServerSettings() {
+    const endpoint = config.endpoints.settings;
+    if (!endpoint) return;
+
+    let settings;
+    try {
+      const result = await postJSON(endpoint, {});
+      if (!result || result.ok !== true || !result.settings) return;
+      settings = result.settings;
+    } catch (_) {
+      return;
+    }
+
+    /* Sponsors. The panel stores a bucket path and the function hands back a signed URL,
+       so what arrives here is ready to put in a src. `image` is the name the renderer
+       already uses; renaming it there would touch the CSS as well for no gain. */
+    if (Array.isArray(settings.sponsors)) {
+      const usable = settings.sponsors
+        .filter((sponsor) => sponsor && sponsor.name && sponsor.logo)
+        .map((sponsor) => ({
+          name: String(sponsor.name),
+          url: String(sponsor.url || ''),
+          image: String(sponsor.logo)
+        }));
+      // Only replace the built-in list once there is something to replace it with. An
+      // empty list from a half-configured database should not blank a working band.
+      if (usable.length) {
+        config.sponsors = usable;
+        try {
+          setupSponsors();
+        } catch (error) {
+          console.error('Carruleddhi: sponsors failed to re-render.', error);
+        }
+      }
+    }
+
+    /* Section switches. `showCounters` has no data-feature attribute of its own, so it
+       is handled by the same selector the counters already carry. */
+    const switches = [
+      ['showGallery', 'gallery'],
+      ['showWall', 'wall'],
+      ['showPrizes', 'prizes'],
+      ['showCounters', 'counters']
+    ];
+    switches.forEach(([field, feature]) => {
+      if (typeof settings[field] !== 'boolean') return;
+      const enabled = settings[field];
+      config.features[feature] = enabled;
+      $$(`[data-feature="${feature}"]`).forEach((element) => { element.hidden = !enabled; });
+      $$(`[data-feature-link="${feature}"]`).forEach((element) => { element.hidden = !enabled; });
+    });
+
+    // Prizes has an id but no data-feature marker, and adding one would mean the
+    // built-in config could hide it too — which is not what that config is for.
+    if (typeof settings.showPrizes === 'boolean') {
+      const prizes = document.getElementById('prizes');
+      if (prizes) prizes.hidden = !settings.showPrizes;
+    }
+  }
+
+  /* ==========================================================================
+     Text effects
+     ==========================================================================
+     Five effects, driven by attributes in the markup:
+
+       data-text-effect="rise"          each character lifts into place
+       data-text-effect="jump"          each word springs in, rotated
+       data-text-unit="char|word|line"  what to split by; the effects have defaults
+       data-text-jitter                 a word that will not sit still
+       data-text-ghost                  the word twice, faint behind and solid in front
+       data-text-roll                   a label that rolls over on hover
+
+     WHY IT IS BUILT HERE INSTEAD OF INSTALLED
+       The components these come from are React, and they bring `motion` with them. The
+       public page has no React: adding it to animate six headings would cost more than
+       every other script on the page put together. What is left after taking React out
+       is a function that wraps characters in spans and a stylesheet.
+
+     WHAT THE SPLITTING HAS TO SURVIVE
+       A language change. i18n rewrites the text of anything carrying `data-i18n`, which
+       throws the spans away — so the original text is kept on the element and the whole
+       thing is rebuilt when `carruleddhi:language` fires. Rebuilt, not patched: the new
+       language has a different number of characters.
+
+     WHAT IS DELIBERATELY NOT HERE
+       The flipping word list and the counting number. The flip needs a list of words per
+       language, which is copy in six languages for one decoration. The counter would
+       have to write into the two numbers in the hero — and those are written by
+       loadGlobalCounts() from the real totals, so a count-up animation would be two
+       pieces of code fighting over the same element and the visitor watching the loser.
+     ======================================================================== */
+
+  /**
+   * Rebuilds a heading as animatable pieces.
+   *
+   * WORDS ARE WRAPPED, ALWAYS.
+   *   An animated piece has to be `inline-block` to be transformable, and a line of
+   *   `inline-block` characters can be broken between any two of them — so a
+   *   per-character effect on a heading gives you "CARRULEDD" on one line and "HI" on
+   *   the next, which is the exact bug that took an afternoon to find in the menu. Each
+   *   word therefore gets an `inline-block` wrapper of its own, and only the spaces
+   *   between the wrappers are ordinary text the browser may break at.
+   *
+   *   Spaces stay text nodes rather than becoming units. A space that is a unit consumes
+   *   a stagger step, and the wave then has a gap in it wherever the sentence does.
+   */
+  function buildTextEffect(element) {
+    // Remembered the first time, because after a build the element's textContent is the
+    // concatenation of the spans — right today, and wrong the moment an effect adds
+    // anything of its own.
+    if (element.dataset.textOriginal === undefined) {
+      element.dataset.textOriginal = element.textContent || '';
+    }
+    const text = element.dataset.textOriginal;
+    const effect = element.dataset.textEffect;
+    const unit = element.dataset.textUnit || (effect === 'jump' ? 'word' : 'char');
+
+    const fragment = document.createDocumentFragment();
+    let index = 0;
+
+    const makeUnit = (piece, extra = '') => {
+      const span = document.createElement('span');
+      span.className = extra ? `fx-unit ${extra}` : 'fx-unit';
+      span.textContent = piece;
+      span.style.setProperty('--i', String(index));
+      index += 1;
+      return span;
+    };
+
+    if (unit === 'line') {
+      for (const line of String(text).split('\n')) fragment.appendChild(makeUnit(line, 'fx-unit--line'));
+      element.replaceChildren(fragment);
+      return;
+    }
+
+    for (const piece of String(text).match(/\S+|\s+/g) || []) {
+      if (!/\S/.test(piece)) {
+        // A real space, breakable, outside every wrapper.
+        fragment.appendChild(document.createTextNode(piece));
+        continue;
+      }
+      if (unit === 'word') {
+        fragment.appendChild(makeUnit(piece));
+        continue;
+      }
+      const word = document.createElement('span');
+      word.className = 'fx-word';
+      for (const character of piece) word.appendChild(makeUnit(character));
+      fragment.appendChild(word);
+    }
+
+    element.replaceChildren(fragment);
+  }
+
+  function setupTextEffects() {
+    /* ---- entrance effects: rise and jump ------------------------------- */
+    const entrances = $$('[data-text-effect]');
+    entrances.forEach(buildTextEffect);
+
+    /* Played on first sight, once. An entrance animation that replays every time a
+       heading scrolls back into view stops being an entrance. */
+    if ('IntersectionObserver' in window && !reducedMotion) {
+      const watcher = new IntersectionObserver((records) => {
+        for (const record of records) {
+          if (!record.isIntersecting) continue;
+          record.target.classList.add('is-playing');
+          watcher.unobserve(record.target);
+        }
+      }, { rootMargin: '0px 0px -12% 0px', threshold: 0.15 });
+      entrances.forEach((element) => watcher.observe(element));
+    } else {
+      // No observer, or motion turned down: the text simply is where it belongs.
+      entrances.forEach((element) => element.classList.add('is-playing'));
+    }
+
+    /* ---- jitter -------------------------------------------------------- */
+    $$('[data-text-jitter]').forEach((element) => {
+      if (element.querySelector('.fx-jitter')) return;
+      const inner = document.createElement('span');
+      inner.className = 'fx-jitter';
+      inner.textContent = element.textContent || '';
+      element.replaceChildren(inner);
+    });
+
+    /* ---- ghost (bold-copy) --------------------------------------------- */
+    $$('[data-text-ghost]').forEach((element) => {
+      const label = (element.dataset.textOriginal ?? element.textContent ?? '').trim();
+      if (!label) return;
+      element.dataset.textOriginal = label;
+      element.classList.add('fx-ghost');
+
+      const back = document.createElement('span');
+      back.className = 'fx-ghost__back';
+      back.setAttribute('aria-hidden', 'true');
+      back.textContent = label;
+
+      const front = document.createElement('span');
+      front.className = 'fx-ghost__front';
+      front.setAttribute('aria-hidden', 'true');
+      front.textContent = label;
+
+      const read = document.createElement('span');
+      read.className = 'fx-sr';
+      read.textContent = label;
+
+      element.replaceChildren(back, front, read);
+    });
+
+    /* ---- roll ---------------------------------------------------------- */
+    $$('[data-text-roll]').forEach((element) => {
+      const label = (element.dataset.textOriginal ?? element.textContent ?? '').trim();
+      if (!label) return;
+      element.dataset.textOriginal = label;
+      element.classList.add('fx-roll');
+
+      // The sizer is what gives the clipped box the text's own width and baseline.
+      const sizer = document.createElement('span');
+      sizer.className = 'fx-roll__sizer';
+      sizer.setAttribute('aria-hidden', 'true');
+      sizer.textContent = label;
+
+      const stack = document.createElement('span');
+      stack.className = 'fx-roll__stack';
+      stack.setAttribute('aria-hidden', 'true');
+      for (let copy = 0; copy < 2; copy += 1) {
+        const line = document.createElement('span');
+        line.className = 'fx-roll__line';
+        line.textContent = label;
+        stack.appendChild(line);
+      }
+
+      const read = document.createElement('span');
+      read.className = 'fx-sr';
+      read.textContent = label;
+
+      element.replaceChildren(sizer, stack, read);
+    });
+  }
+
+  /* New words, new spans. The elements carrying an effect are also the ones i18n
+     rewrites, so everything above has to be built again — and the entrance effects have
+     already played, so they are marked as playing straight away rather than made to
+     animate a second time for somebody who only changed language. */
+  window.addEventListener('carruleddhi:language', () => {
+    try {
+      const played = new Set($$('[data-text-effect].is-playing'));
+      $$('[data-text-effect], [data-text-jitter], [data-text-ghost], [data-text-roll]')
+        .forEach((element) => { delete element.dataset.textOriginal; });
+      setupTextEffects();
+      played.forEach((element) => element.classList.add('is-playing'));
+    } catch (error) {
+      console.error('Carruleddhi: text effects failed to rebuild.', error);
+    }
+  });
+
   function initialize() {
     // The intro overlay goes first and is released independently, so a failure
     // further down can never leave the page hidden behind it.
@@ -3508,7 +3781,8 @@ import { flagSvg } from './flags.js';
       ['routeDraw', setupRouteDraw],
       ['sponsors', setupSponsors],
       ['gallery3d', setupGalleryCarousel],
-      ['footerYear', setupFooterYear]
+      ['footerYear', setupFooterYear],
+      ['textEffects', setupTextEffects]
     ];
 
     // One broken feature must not take the whole page down with it.
@@ -3519,6 +3793,9 @@ import { flagSvg } from './flags.js';
         console.error(`Carruleddhi: "${name}" failed to initialise.`, error);
       }
     });
+
+    // Last, and not awaited: the page is already finished without it.
+    applyServerSettings().catch(() => {});
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });

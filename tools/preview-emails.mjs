@@ -69,6 +69,22 @@ function payloadFor({ locale, isMinor }) {
     name: 'Hans Probe',
     message: 'Frage zum Helm.'
   };
+  /* The attachment block. One form for an Italian rider, two for everybody else, which
+     is the same choice attachCopy() makes and the reason these are fields at all. */
+  const oneForm = locale === 'it';
+  Object.assign(p, isMinor
+    ? {
+      pdfTitle: deck.minPdfTitle,
+      pdfBody: deck.minPdfBody,
+      printTitle: deck.minPrintTitle,
+      printBody: oneForm ? deck.minPrintBodyOne : deck.minPrintBody
+    }
+    : {
+      pdfTitle: oneForm ? deck.regPdfTitleOne : deck.regPdfTitle,
+      pdfBody: oneForm ? deck.regPdfBodyOne : deck.regPdfBody,
+      printTitle: deck.regPrintTitle,
+      printBody: oneForm ? deck.regPrintBodyOne : deck.regPrintBody
+    });
   if (isMinor) {
     const childWord = deck.minChild.daughter;
     Object.assign(p, {
@@ -96,22 +112,55 @@ const wanted = [
   ['reminder', 'pl', false], ['contact', 'pl', false], ['newsletter', 'pl', false]
 ];
 
-let leftovers = 0;
+/**
+ * Every path a template asks for, and whether the payload actually has it.
+ *
+ * The renderer turns an unknown path into an empty string, which is the friendly
+ * behaviour at runtime and useless here: a heading that silently vanished looks like a
+ * design decision. This is the check that was missing — it is how "Ciao %FIRSTNAME%,"
+ * shipped in full to every adult, and how four attachment headings came out blank.
+ */
+function missingPaths(template, payload) {
+  const paths = new Set([...String(template).matchAll(/\{\{\s*1\.([A-Za-z0-9_.]+)\s*\}\}/g)].map((m) => m[1]));
+  const missing = [];
+  for (const path of paths) {
+    let value = payload;
+    for (const key of path.split('.')) {
+      if (value === null || value === undefined) break;
+      value = value[key];
+    }
+    if (value === undefined || value === null || value === '') missing.push(path);
+  }
+  return missing;
+}
+
+let problems = 0;
 for (const [template, locale, isMinor] of wanted) {
-  const html = renderTemplate(EMAIL_TEMPLATES[template], payloadFor({ locale, isMinor }));
+  const payload = payloadFor({ locale, isMinor });
+  const html = renderTemplate(EMAIL_TEMPLATES[template], payload);
+
   const gaps = [...html.matchAll(/\{\{[^}]*\}\}/g)].map((m) => m[0]);
+  // A deck string reached the body without being resolved. %FIRSTNAME% printed
+  // literally in a greeting is the worst-looking bug on this list.
+  const tokens = [...new Set([...html.matchAll(/%[A-Z]+%/g)].map((m) => m[0]))];
+  const missing = missingPaths(EMAIL_TEMPLATES[template], payload);
   const empty = [...html.matchAll(/>\s*—\s*</g)].length;
+
   const name = `${template}-${locale}.html`;
   writeFileSync(new URL(`../shots/emails/${name}`, import.meta.url), html, 'utf8');
-  leftovers += gaps.length;
+  problems += gaps.length + tokens.length + missing.length;
+
   console.log(
     `${name.padEnd(24)} ${(html.length / 1024).toFixed(1)} kB   `
-    + `nieuzupelnione: ${gaps.length ? gaps.slice(0, 3).join(' ') : 'brak'}   pola z kreska: ${empty}`
+    + `nieuzupelnione: ${gaps.length ? gaps.slice(0, 3).join(' ') : 'brak'}   `
+    + `%TOKEN%: ${tokens.length ? tokens.join(' ') : 'brak'}   `
+    + `puste pola: ${missing.length ? missing.join(' ') : 'brak'}   `
+    + `kreski: ${empty}`
   );
 }
 
 console.log(`\nshots/emails/ — otworz w przegladarce.`);
-if (leftovers) {
-  console.error(`\n${leftovers} nieuzupelnionych miejsc. Kazde to puste miejsce w mailu.`);
+if (problems) {
+  console.error(`\n${problems} problemow. Kazdy to widoczna dziura albo surowy placeholder w mailu.`);
   process.exit(1);
 }

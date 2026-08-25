@@ -1,0 +1,225 @@
+/* ============================================================================
+   Text effects
+   ============================================================================
+   Vanilla versions of five React components (animata's jumping text, per-character
+   rise, jitter, bold-copy and roll-text). The page is plain HTML and one module of
+   JavaScript; pulling React, motion and a component library in to animate six
+   headings would be a hundred kilobytes for six headings.
+
+   HOW THE WORK IS DIVIDED
+     JavaScript splits a heading into spans and sets one custom property per span:
+     --i, its position in the line. Everything after that is CSS. So the animation
+     runs on the compositor, survives a language change (the spans are rebuilt, the
+     rules are not), and reduces to a single `animation: none` when somebody has asked
+     for less motion.
+
+   WHY THE SPANS ARE MADE AT RUNTIME AND NOT WRITTEN INTO THE HTML
+     The site is in six languages and the words are swapped by i18n. A heading split
+     into <span>C</span><span>i</span>… in the markup would be Italian forever.
+   ========================================================================== */
+
+/* Nothing animates before its element has been seen, and nothing animates at all for
+   a visitor who asked for less motion. Both are handled by the absence of the
+   `is-playing` class rather than by a second set of rules. */
+/* The word wrapper, and the reason it exists.
+   An animated piece has to be inline-block to be transformable, and a run of
+   inline-block characters may be broken between any two of them — which turns
+   "CARRULEDDHI" into "CARRULEDD" on one line and "HI" on the next. Wrapping each word
+   in its own inline-block box moves every legal break point out to the spaces between
+   words, where it belongs. This rule is load-bearing, not cosmetic. */
+[data-text-effect] .fx-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+[data-text-effect] .fx-unit {
+  display: inline-block;
+  /* Preserves the spaces between words: they are units too, and a collapsed one turns
+     "Giù verso il mare" into "Giùversoilmare". */
+  white-space: pre;
+  backface-visibility: hidden;
+  transform-origin: 50% 60%;
+  will-change: transform, opacity;
+}
+
+/* A line-level unit has to be a block or two lines sit side by side. */
+[data-text-effect] .fx-unit--line {
+  display: block;
+}
+
+/* ---------------------------------------------------------------- rise ----
+   Each character lifts into place. The stagger is `--i` multiplied by a step, so a
+   long heading takes longer than a short one and every character keeps the same
+   speed — which is the difference between a wave and a scramble. */
+[data-text-effect='rise'] .fx-unit {
+  opacity: 0;
+  transform: translateY(0.7em);
+}
+
+[data-text-effect='rise'].is-playing .fx-unit {
+  animation: fx-rise 0.62s cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+  animation-delay: calc(var(--i) * 26ms);
+}
+
+@keyframes fx-rise {
+  from { opacity: 0; transform: translateY(0.7em); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------------------------------------------------------------- jump ----
+   The spring entrance: up from below, rotated, overshooting slightly on the way in.
+   Used per word, because per character it reads as a fairground sign. */
+[data-text-effect='jump'] .fx-unit {
+  opacity: 0;
+  transform: translateY(0.85em) rotate(-9deg);
+}
+
+[data-text-effect='jump'].is-playing .fx-unit {
+  animation: fx-jump 0.78s cubic-bezier(0.24, 1.42, 0.4, 1) forwards;
+  animation-delay: calc(var(--i) * 52ms);
+}
+
+@keyframes fx-jump {
+  from { opacity: 0; transform: translateY(0.85em) rotate(-9deg); }
+  60%  { opacity: 1; transform: translateY(-0.06em) rotate(1.2deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* -------------------------------------------------------------- jitter ----
+   A continuous nervous wobble, for a word that is meant to look like it cannot sit
+   still. Deliberately tiny: the values are hundredths of an em, because anything
+   bigger reads as a rendering fault rather than a choice. No splitting — it moves as
+   one piece, so it costs nothing and cannot be broken by a translation. */
+.fx-jitter {
+  display: inline-block;
+  animation: fx-jitter 0.62s ease-in-out infinite alternate;
+  animation-delay: 0.4s;
+  will-change: transform;
+}
+
+@keyframes fx-jitter {
+  0%   { transform: translate(0, 0.045em) rotate(0.5deg); }
+  25%  { transform: translate(-0.03em, 0.03em) rotate(-1.3deg); }
+  50%  { transform: translate(0.04em, -0.03em) rotate(0.9deg); }
+  75%  { transform: translate(-0.04em, 0.03em) rotate(-1deg); }
+  100% { transform: translate(0.015em, 0) rotate(0.4deg); }
+}
+
+/* ---------------------------------------------------------------- ghost ---
+   bold-copy: the same word twice, a large faint one behind and a smaller solid one on
+   top, which grows towards the ghost on hover. Pure CSS and pure decoration — the
+   ghost is aria-hidden, so a screen reader hears the word once.
+
+   Sized in em so it inherits whatever the heading is set to, rather than carrying its
+   own type scale and fighting the responsive clamp() the section titles use. */
+.fx-ghost {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.fx-ghost__back {
+  font-size: 1.9em;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: color-mix(in srgb, currentColor 14%, transparent);
+  transition: opacity 0.3s ease;
+  user-select: none;
+}
+
+.fx-ghost__front {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  line-height: 1;
+  transition: font-size 0.3s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+/* Hover only where there is a pointer. On a phone there is no hover, and the
+   :hover rules would latch on after a tap and stay. */
+@media (hover: hover) {
+  .fx-ghost:hover .fx-ghost__back { opacity: 0.5; }
+  .fx-ghost:hover .fx-ghost__front { font-size: 1.55em; }
+}
+
+/* ---------------------------------------------------------------- roll ----
+   roll-text: the label slides up and out while an identical copy rises into its
+   place. Two stacked copies inside a clipped box; the box is sized by a hidden third
+   copy so it keeps the text's own width and baseline.
+
+   The visible copies are aria-hidden and the real label is a visually hidden child,
+   so the word is announced once and not three times. */
+.fx-roll {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  vertical-align: baseline;
+  line-height: inherit;
+}
+
+.fx-roll__sizer,
+.fx-roll__stack {
+  grid-area: 1 / 1;
+  line-height: inherit;
+  white-space: pre;
+}
+
+.fx-roll__sizer {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fx-roll__stack {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(0);
+  transition: transform 0.42s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.fx-roll__line { display: block; line-height: inherit; }
+
+@media (hover: hover) {
+  /* -50% because the stack holds exactly two copies: moving it up by half its own
+     height puts the second copy where the first one was. */
+  .fx-roll:hover .fx-roll__stack,
+  .fx-roll:focus-visible .fx-roll__stack,
+  a:hover .fx-roll .fx-roll__stack,
+  button:hover .fx-roll .fx-roll__stack {
+    transform: translateY(-50%);
+  }
+}
+
+/* Screen-reader-only, matching the utility the rest of the site already uses. */
+.fx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------- less motion ----
+   Not "faster" — off. Somebody who has set this has said that movement is a problem,
+   and a shorter version of the problem is still the problem. The text has to end up
+   in its final state, which for the entrance effects means visible and unmoved. */
+@media (prefers-reduced-motion: reduce) {
+  [data-text-effect] .fx-unit,
+  [data-text-effect].is-playing .fx-unit {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .fx-jitter { animation: none !important; }
+  .fx-roll__stack { transition: none; }
+  .fx-ghost__front { transition: none; }
+}

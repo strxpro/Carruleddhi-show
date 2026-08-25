@@ -1,90 +1,150 @@
 /**
- * Reads the generated blueprint back and asserts the minor branch is really in it.
+ * Reads the generated blueprint and the compiled templates back, and asserts the parts
+ * that are easy to break and impossible to see.
  *
- * The generator succeeding only proves it produced valid JSON. This proves the
- * things that matter: the guardian columns exist and are at the end, the e-mail
- * switches on isMinor, and the minor body is addressed to the guardian.
+ * The generator succeeding only proves it produced valid JSON. This proves the things
+ * that matter: that all four registration routes exist and are reachable, that a
+ * foreign entry really carries two attachments and an Italian one exactly one, that the
+ * under-18 letter is addressed to the guardian, and that no language is missing a key.
+ *
+ * It used to check module 2, 3 and 6 — a dictionary variable, a wording variable and a
+ * switch variable — none of which exist any more. The Vercel function does that work,
+ * so the assertions moved with it.
  */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const blueprint = JSON.parse(readFileSync(resolve(root, 'make/blueprint-1-instant.json'), 'utf8'));
+const read = (path) => readFileSync(resolve(root, path), 'utf8');
+const blueprint = JSON.parse(read('make/blueprint-1-instant.json'));
+const copy = JSON.parse(read('emails/copy.json'));
+const pdfCopy = JSON.parse(read('emails/pdf-copy.json'));
 
+/* Every module, plus the ids that were reachable when it ran. A route in Make can only
+   quote a module on the trunk or earlier on its own route; a reference to a module
+   sitting on a sibling route imports fine and then fails at runtime with
+   "references inaccessible module", which is the error this whole file exists for. */
 const modules = [];
-const walk = (flow) => {
+const walk = (flow, seen = []) => {
+  const trunk = [...seen];
   for (const node of flow || []) {
-    modules.push(node);
-    for (const route of node.routes || []) walk(route.flow);
+    modules.push({ node, visible: [...trunk] });
+    trunk.push(node.id);
+    for (const route of node.routes || []) walk(route.flow, trunk);
   }
 };
 walk(blueprint.flow);
 
-const byId = new Map(modules.map((m) => [m.id, m]));
+const byId = new Map(modules.map(({ node }) => [node.id, node]));
 const results = [];
 const check = (label, pass, extra = '') => results.push({ label, pass, extra });
 
-// --- sheet row: guardian columns present, and nothing shifted.
-const sheets = modules.find((m) => m.module === 'google-sheets:addRow' && m.id === 5);
-const values = sheets?.mapper?.values || {};
-check('Registrations row has 32 columns', Object.keys(values).length === 32, `got ${Object.keys(values).length}`);
-check('column 0 is still created_at (nothing shifted)', String(values['0']).includes('formatDate'));
-check('column 5 is still postalCode', String(values['5']).includes('postalCode'), String(values['5']));
-check('column 22 is is_minor', String(values['22']).includes('isMinor'), String(values['22']));
-check('column 26 is guardian_name', String(values['26']).includes('guardianName'), String(values['26']));
-check('column 31 is guardian_consent', String(values['31']).includes('guardianConsent'), String(values['31']));
+const LANGS = ['it', 'pl', 'en', 'de', 'es', 'fr'];
 
-// --- module 3 carries both bodies and both subjects.
-const vars3 = (byId.get(3)?.mapper?.variables || []).reduce((acc, v) => {
-  acc[v.name] = v.value;
-  return acc;
-}, {});
-check('module 3 has minHtml', typeof vars3.minHtml === 'string' && vars3.minHtml.length > 4000, `${(vars3.minHtml || '').length} chars`);
-check('module 3 has minSubject', Boolean(vars3.minSubject));
-check('adult body still present', typeof vars3.regHtml === 'string' && vars3.regHtml.length > 4000);
-check('adult body has no leftover anchor', !String(vars3.regHtml).includes('GUARDIAN-ROWS'));
+/* --- structure ----------------------------------------------------------- */
 
-// --- the minor body is addressed to the guardian, not the child.
-const min = String(vars3.minHtml || '');
-check('minor body greets the guardian', min.includes('{{6.minHi}}'));
-check('minor body says whose entry it is', min.includes('{{6.minLead}}'));
-check('minor body carries the age sentence', min.includes('{{6.ageNote}}'));
-check('minor body has the guardian rows', min.includes('{{1.guardianName}}') && min.includes('{{6.relWord}}'));
-check('minor body uses the minors PDF wording', min.includes('{{3.t.minPdfBody}}'));
-check('minor body does NOT reuse the adult greeting', !min.includes('{{3.t.regHi}}') && !min.includes('{{6.hi}}'));
+check('one webhook, and it is the trigger', byId.get(1)?.module === 'gateway:CustomWebHook');
+check('one router', modules.filter(({ node }) => node.module === 'builtin:BasicRouter').length === 1);
+check('no Google Sheets modules left', !modules.some(({ node }) => node.module.startsWith('google-sheets')));
+check('no variable modules left', !modules.some(({ node }) => node.module === 'util:SetVariables'));
 
-// --- module 6 switches everything on isMinor.
-const vars6 = (byId.get(6)?.mapper?.variables || []).reduce((acc, v) => {
-  acc[v.name] = v.value;
-  return acc;
-}, {});
-for (const key of ['subject', 'html', 'recipient', 'pdfUrl', 'pdfName']) {
-  check(`module 6 "${key}" switches on isMinor`, String(vars6[key] || '').includes('1.isMinor'), String(vars6[key] || '').slice(0, 60));
+const ids = modules.map(({ node }) => node.id);
+check('no module id used twice', new Set(ids).size === ids.length, ids.join(','));
+
+/* --- the four registration routes ---------------------------------------- */
+
+const mails = modules.filter(({ node }) => node.module === 'email:ActionSendEmail');
+const routeOf = (branch) => {
+  const filtered = modules.find(({ node }) => node.filter?.conditions?.[0]?.[0]?.b === branch);
+  if (!filtered) return null;
+  // The filter sits on the first module of the route; the mail is the last module that
+  // can see it.
+  const mail = mails.find(({ visible }) => visible.includes(filtered.node.id));
+  return { first: filtered.node, mail: mail?.node };
+};
+
+for (const branch of ['registration-adult-it', 'registration-adult-xx', 'registration-minor-it', 'registration-minor-xx']) {
+  const route = routeOf(branch);
+  check(`route ${branch} exists`, Boolean(route?.mail), route ? 'no mail after the filter' : 'no filter');
+  if (!route?.mail) continue;
+
+  const attachments = route.mail.mapper.attachments || [];
+  const expected = branch.endsWith('-xx') ? 2 : 1;
+  check(`route ${branch} attaches ${expected} PDF`, attachments.length === expected, `got ${attachments.length}`);
+
+  // Every attachment must quote an HTTP module that this route can actually see.
+  for (const attachment of attachments) {
+    const quoted = Number(String(attachment.data).match(/\{\{(\d+)\.data\}\}/)?.[1]);
+    const source = modules.find(({ node }) => node.id === quoted);
+    const reachable = mails.find(({ node }) => node === route.mail)?.visible || [];
+    check(
+      `route ${branch} attachment reads a reachable module (${quoted})`,
+      source?.node.module === 'http:ActionGetFile' && reachable.includes(quoted),
+      `visible: ${reachable.join(',')}`
+    );
+  }
+
+  // The Italian form is the one that gets signed, so it is on every route.
+  check(`route ${branch} fetches the Italian form`, JSON.stringify(route.first.mapper?.url) === '"{{1.pdfUrl}}"', String(route.first.mapper?.url));
+
+  const to = [route.mail.mapper.to].flat().join(' ');
+  if (branch.includes('minor')) {
+    check(`route ${branch} writes to the guardian`, to.includes('1.guardianEmail'), to);
+    check(`route ${branch} also copies the rider`, to.includes('1.email'), to);
+  } else {
+    check(`route ${branch} writes to the rider`, to.includes('1.email') && !to.includes('guardianEmail'), to);
+  }
 }
-check('module 6 resolves the child word', String(vars6.childWord || '').includes('minChild'));
-check('module 6 resolves the relation word', String(vars6.relWord || '').includes('minRel'));
 
-// --- the PDF module and the mail follow module 6.
-check('PDF module pulls a dynamic URL', String(byId.get(7)?.mapper?.url) === '{{6.pdfUrl}}', String(byId.get(7)?.mapper?.url));
-const mail = byId.get(8);
-check('mail goes to the resolved recipient', String(mail?.mapper?.to?.[0] ?? mail?.mapper?.to) .includes('6.recipient'), JSON.stringify(mail?.mapper?.to));
-check('minors PDF url is in the blueprint', JSON.stringify(blueprint).includes('Carruleddhi-modulo-minori.pdf'));
+const foreign = routeOf('registration-adult-xx');
+check(
+  'the foreign route fetches the rider\'s own language too',
+  JSON.stringify(foreign?.mail?.mapper?.attachments).includes('1.pdfNameOwn'),
+  JSON.stringify(foreign?.mail?.mapper?.attachments)
+);
 
-// --- copy deck has the minor keys in all six languages.
-// The deck lives in module 2, not 3: module 2 resolves the locale and holds the
-// dictionary, module 3 reads out of it.
-const vars2 = (byId.get(2)?.mapper?.variables || []).reduce((acc, v) => {
-  acc[v.name] = v.value;
-  return acc;
-}, {});
-const copy = JSON.parse(vars2.copy);
-const langs = ['it', 'pl', 'en', 'de', 'es', 'fr'];
-const needed = ['minSubject', 'minHi', 'minLead', 'minAgeNote', 'minPdfBody', 'minPrintBody', 'minLabels', 'minRel', 'minChild'];
-for (const lang of langs) {
-  const missing = needed.filter((key) => !copy[lang]?.[key]);
-  check(`copy deck ${lang} complete`, missing.length === 0, missing.join(','));
+/* --- the newsletter waits, and the wait is what is filtered --------------- */
+
+const sleepNode = modules.find(({ node }) => node.module === 'builtin:BasicSleep');
+check('newsletter sits behind a sleep', Boolean(sleepNode));
+check('the filter is on the sleep, not the mail', Boolean(sleepNode?.node.filter), 'an unfiltered sleep delays every route');
+
+/* --- nothing quotes a module it cannot see -------------------------------- */
+
+for (const { node, visible } of modules) {
+  const { routes, ...own } = node;
+  const quoted = [...new Set([...JSON.stringify(own).matchAll(/\{\{[^}]*?(\d+)\./g)].map((m) => Number(m[1])))];
+  const bad = quoted.filter((id) => id !== node.id && byId.has(id) && !visible.includes(id));
+  check(`module ${node.id} only quotes reachable modules`, bad.length === 0, `unreachable: ${bad.join(',')}`);
 }
+
+/* --- copy: every language complete --------------------------------------- */
+
+const mailKeys = Object.keys(copy.it);
+for (const lang of LANGS) {
+  const missing = mailKeys.filter((key) => copy[lang]?.[key] === undefined);
+  check(`emails/copy.json ${lang} complete`, missing.length === 0, missing.join(','));
+}
+
+const pdfKeys = Object.keys(pdfCopy.it);
+for (const lang of LANGS) {
+  const missing = pdfKeys.filter((key) => pdfCopy[lang]?.[key] === undefined);
+  check(`emails/pdf-copy.json ${lang} complete`, missing.length === 0, missing.join(','));
+}
+
+// The health clause the guardian has to accept. Its absence is not a crash, it is a
+// missing sentence on a form with legal weight, which is worse.
+for (const lang of LANGS) {
+  const declared = (pdfCopy[lang]?.declMinor || []).join(' ').toLowerCase();
+  check(`${lang} minors form declares the child is fit to take part`, declared.length > 200 && (pdfCopy[lang].declMinor || []).length >= 7, `${(pdfCopy[lang]?.declMinor || []).length} points`);
+}
+
+/* --- the rendered bodies ------------------------------------------------- */
+
+const templates = read('worker/email-templates.js');
+check('five bodies compiled', ['registration', 'minor', 'reminder', 'contact', 'newsletter'].every((k) => templates.includes(`"${k}":`)));
+check('no template calls a Make function', !/\{\{\s*(?:if|get|lower|upper|ifempty|parseJSON|formatDate)\s*\(/.test(templates));
 
 let failed = 0;
 for (const { label, pass, extra } of results) {

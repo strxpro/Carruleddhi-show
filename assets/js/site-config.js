@@ -45,7 +45,12 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
     gallery: true,
     attendance: true,
     registration: true,
-    wall: true
+    wall: true,
+    // Prizes and the two counters at the top. Both were always on the page; they became
+    // switches when the panel got the ability to turn a section off without a deploy,
+    // for the weeks when the photos or the numbers are not ready to be shown.
+    prizes: true,
+    counters: true
   },
   endpoints: {
     registration: '',
@@ -55,7 +60,12 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
     contact: '',
     // Public wall. Both reading and writing go through this one path; the request
     // body carries `type: 'wall'` or `type: 'wall-post'`.
-    wall: ''
+    wall: '',
+    /* Read-only, and read once on load. Carries the sponsor list and the section
+       switches the organiser set in the admin panel. Defaulted rather than left blank
+       because unlike the others it takes no input and returns nothing private, so
+       there is no configuration step for it to wait on. */
+    settings: '/api/carruleddhi/settings'
   }
 });
 
@@ -225,7 +235,15 @@ export function normalizeSiteConfig(input = {}) {
     },
     sponsors: cleanSponsors(source.sponsors),
     features: Object.fromEntries(featureNames.map((name) => [name, typeof features[name] === 'boolean' ? features[name] : DEFAULT_SITE_CONFIG.features[name]])),
-    endpoints: Object.fromEntries(endpointNames.map((name) => [name, cleanEndpoint(endpoints[name])]))
+    /* Falls back to the built-in default rather than to an empty string.
+       Every other endpoint is blank until somebody configures it, and blank means
+       "this feature is off". `settings` is different: it has a working default, so an
+       absent or malformed override must land back on that default and not switch the
+       sponsor band off. */
+    endpoints: Object.fromEntries(endpointNames.map((name) => [
+      name,
+      cleanEndpoint(endpoints[name]) || DEFAULT_SITE_CONFIG.endpoints[name]
+    ]))
   };
 }
 

@@ -22,6 +22,12 @@ const ALLOWED_TYPES = new Set([
   // Public wall. `wall` reads approved messages, `wall-post` adds one,
   // `wall-translate` translates one on demand, `wall-admin` moderates.
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
+  /* Settings the organiser changes from the panel. `settings` is a public read — the
+     page needs the sponsor list and the section switches before it can render — and
+     `settings-admin` writes, behind the passphrase. Two types rather than one with an
+     action, so the read can never be talked into a write by a crafted body. */
+  'settings', 'settings-admin',
+
   // Live chat. `chat` is the visitor side (open a thread, send, poll);
   // `chat-admin` is the organiser side and needs the passphrase.
   'chat', 'chat-admin',
@@ -32,6 +38,7 @@ const ALLOWED_TYPES = new Set([
 /** These never reach Make; they are served from Supabase by the Worker itself. */
 const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
+  'settings', 'settings-admin',
   'chat', 'chat-admin', 'inbox'
 ]);
 
@@ -64,7 +71,7 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * A shared passphrase is the minimum bar; put Cloudflare Access in front of
  * admin.html as well before using this on a public hostname.
  */
-const PROTECTED_TYPES = new Set(['roster', 'wall-admin', 'chat-admin', 'inbox']);
+const PROTECTED_TYPES = new Set(['roster', 'wall-admin', 'chat-admin', 'inbox', 'settings-admin']);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
 /** Only these keys are forwarded. Anything else is dropped, not rejected. */
@@ -97,7 +104,12 @@ const FIELD_WHITELIST = {
   chat: ['action', 'token', 'message', 'name', 'email', 'since'],
   // Organiser side. Same passphrase as the roster.
   'chat-admin': ['action', 'threadId', 'message', 'mode', 'limit'],
-  inbox: ['action']
+  inbox: ['action'],
+  // A public read takes no input at all, which is the shortest possible answer to
+  // "what can a visitor ask this endpoint to do".
+  settings: [],
+  // `photo` is a data URL, downscaled in the browser, only used by action 'logo'.
+  'settings-admin': ['settings', 'action', 'photo']
 };
 
 const MAX_FIELD_LENGTH = 3000;
@@ -507,6 +519,204 @@ async function inbox(env, payload, cors) {
 }
 
 /* ============================================================================
+   Settings the organiser changes without a deploy
+   ============================================================================
+   Sponsors arrive one at a time over weeks, the password gate has to come off on the
+   morning of the event, and a section whose photos have not arrived yet should not be
+   on the page. None of that is code, and none of it should need somebody with the
+   laptop and a git remote.
+
+   One jsonb row in site_settings, one shape, validated here. Every unknown key is
+   dropped rather than stored: the row is read by the public page and by the
+   middleware, so it is not a place to let a caller put whatever they like.
+   ========================================================================== */
+
+/**
+ * The complete object. Not a starting point — a fallback.
+ *
+ * Every read merges onto this, so a key that is missing from the row (an older row, a
+ * half-finished write, a hand edit in the table editor) is a default and not an
+ * `undefined` that renders as a blank section. `siteLocked: true` in particular is the
+ * safe direction to fail in: an unreadable settings row must not open a site that was
+ * meant to be closed.
+ */
+const SETTINGS_DEFAULTS = {
+  siteLocked: true,
+  sponsors: [],
+  showGallery: true,
+  showWall: true,
+  showPrizes: true,
+  showCounters: true
+};
+
+const SETTINGS_FLAGS = ['siteLocked', 'showGallery', 'showWall', 'showPrizes', 'showCounters'];
+const MAX_SPONSORS = 30;
+
+/**
+ * Validates a settings object from the panel.
+ *
+ * Rejects rather than repairs, except where repair is unambiguous (trimming, clamping a
+ * list length). A setting that was silently corrected is a setting the organiser thinks
+ * they changed and did not.
+ */
+function cleanSettings(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { error: 'SETTINGS_SHAPE' };
+  }
+
+  const out = {};
+  for (const flag of SETTINGS_FLAGS) {
+    if (input[flag] === undefined) continue;
+    if (typeof input[flag] !== 'boolean') return { error: `SETTINGS_${flag}` };
+    out[flag] = input[flag];
+  }
+
+  if (input.sponsors !== undefined) {
+    if (!Array.isArray(input.sponsors)) return { error: 'SETTINGS_SPONSORS' };
+    if (input.sponsors.length > MAX_SPONSORS) return { error: 'SETTINGS_TOO_MANY_SPONSORS' };
+
+    const sponsors = [];
+    for (const entry of input.sponsors) {
+      if (!entry || typeof entry !== 'object') return { error: 'SETTINGS_SPONSOR_SHAPE' };
+      const name = String(entry.name || '').trim().slice(0, 80);
+      if (!name) return { error: 'SETTINGS_SPONSOR_NAME' };
+
+      /* Only http(s), and only if it parses. A sponsor tile is a link the whole town
+         clicks, so `javascript:` in there is not a typo to tidy up later. */
+      let url = '';
+      if (entry.url) {
+        try {
+          const parsed = new URL(String(entry.url));
+          if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return { error: 'SETTINGS_SPONSOR_URL' };
+          }
+          url = parsed.toString();
+        } catch (_) {
+          return { error: 'SETTINGS_SPONSOR_URL' };
+        }
+      }
+
+      /* Either a path in the bucket (uploaded here, so it is known-good) or a plain
+         site-relative path for the logos that ship with the repo. Anything else — a
+         full URL, a data URL, a `..` — is refused: this string ends up in a src
+         attribute on the public page. */
+      const logo = String(entry.logo || '').trim().slice(0, 240);
+      const logoOk = logo === ''
+        || /^sponsors\/[A-Za-z0-9._/-]+$/.test(logo)
+        || /^\/assets\/[A-Za-z0-9._/-]+$/.test(logo);
+      if (!logoOk || logo.includes('..')) return { error: 'SETTINGS_SPONSOR_LOGO' };
+
+      sponsors.push({ name, url, logo });
+    }
+    out.sponsors = sponsors;
+  }
+
+  if (Object.keys(out).length === 0) return { error: 'SETTINGS_EMPTY' };
+  return { value: out };
+}
+
+/** The stored row, merged onto the defaults. Never throws; worst case, defaults. */
+async function readSettings(env) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/site_settings`);
+  url.searchParams.set('select', 'data');
+  url.searchParams.set('id', 'is.true');
+  url.searchParams.set('limit', '1');
+  try {
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) return { ...SETTINGS_DEFAULTS };
+    const rows = await response.json();
+    const data = rows?.[0]?.data;
+    if (!data || typeof data !== 'object') return { ...SETTINGS_DEFAULTS };
+    return { ...SETTINGS_DEFAULTS, ...data };
+  } catch (_) {
+    return { ...SETTINGS_DEFAULTS };
+  }
+}
+
+/**
+ * Signs the sponsor logos so the page can show them.
+ *
+ * The bucket is private, the same as the wall's, so a stored path is not a URL anybody
+ * can fetch. Signed for an hour, which is longer than a visit and short enough that a
+ * copied link stops working — and the page asks for settings on load anyway, so it
+ * always has fresh ones.
+ *
+ * A path starting with `/assets/` is a file in the repository and is passed through
+ * untouched; there is nothing to sign.
+ */
+async function withSignedLogos(env, sponsors) {
+  return Promise.all(sponsors.map(async (sponsor) => {
+    if (!sponsor.logo || sponsor.logo.startsWith('/')) return sponsor;
+    return { ...sponsor, logo: await signPhoto(env, sponsor.logo) };
+  }));
+}
+
+/** Public read. No input, and `siteLocked` is included because the page says so. */
+async function settingsRead(env, cors) {
+  const settings = await readSettings(env);
+  return json({
+    ok: true,
+    settings: { ...settings, sponsors: await withSignedLogos(env, settings.sponsors) }
+  }, 200, cors);
+}
+
+/**
+ * Organiser read and write, behind the passphrase.
+ *
+ * A body without `settings` is a read. With it, a partial update: only the keys that
+ * arrived are written, so the panel can save one switch without having to send — and
+ * risk clobbering — everything else.
+ */
+async function settingsAdmin(env, payload, cors) {
+  /* Uploading a logo, which is a separate step from saving the list.
+     The panel uploads first, gets a path back, and only then saves a sponsor pointing
+     at it — so a failed upload leaves the stored list exactly as it was rather than
+     half-updated with a broken image in it.
+
+     Same decoder and the same bucket as the wall: media type checked against the allow
+     list and the first bytes of the file checked as well, because a declaration is a
+     string the caller chose and the magic bytes are not. */
+  if (String(payload.action || '') === 'logo') {
+    const photo = decodePhoto(payload.photo);
+    if (photo.error) return json({ ok: false, code: photo.error }, 422, cors);
+    const path = await uploadPhoto(env, photo, 'sponsors');
+    if (!path) return json({ ok: false, code: 'SETTINGS_LOGO_UPLOAD_FAILED' }, 502, cors);
+    return json({ ok: true, logo: path, url: await signPhoto(env, path) }, 200, cors);
+  }
+
+  if (payload.settings === undefined) {
+    const settings = await readSettings(env);
+    return json({
+      ok: true,
+      settings: { ...settings, sponsors: await withSignedLogos(env, settings.sponsors) }
+    }, 200, cors);
+  }
+
+  const cleaned = cleanSettings(payload.settings);
+  if (cleaned.error) return json({ ok: false, code: cleaned.error }, 422, cors);
+
+  /* Read, merge, write. Not `jsonb_merge` in a single statement, because two organisers
+     saving different switches within a second of each other is not a scenario worth
+     designing for here, and a read-modify-write is the shape the panel already sends. */
+  const current = await readSettings(env);
+  const merged = { ...current, ...cleaned.value };
+
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify({ data: merged })
+  });
+  if (!response.ok) {
+    return json({ ok: false, code: 'SETTINGS_WRITE_FAILED', detail: await response.text() }, 502, cors);
+  }
+
+  return json({
+    ok: true,
+    settings: { ...merged, sponsors: await withSignedLogos(env, merged.sponsors) }
+  }, 200, cors);
+}
+
+/* ============================================================================
    Store of record
    ============================================================================
    Form submissions are written here first, then forwarded to Make for the e-mail.
@@ -587,20 +797,49 @@ function attachCopy(payload) {
   payload.subject = payload.isMinor
     ? fill(deck.minSubject, { FIRSTNAME: firstName, RACENUMBER: raceNumber })
     : fill(deck.regSubject, { FIRSTNAME: firstName, RACENUMBER: raceNumber });
+  /* The block that talks about the attachments.
+     Two decisions at once, which is why it is here and not in the template: whether
+     this is an adult or an under-18 letter, and whether one form is attached or two.
+     An Italian rider gets only the Italian form, so the older "two PDFs attached,
+     print the Italian one" was a sentence about an attachment that was not there. */
+  const oneForm = locale === 'it';
+  if (payload.isMinor) {
+    payload.pdfTitle = deck.minPdfTitle;
+    payload.pdfBody = deck.minPdfBody;
+    payload.printTitle = deck.minPrintTitle;
+    payload.printBody = oneForm ? deck.minPrintBodyOne : deck.minPrintBody;
+  } else {
+    payload.pdfTitle = oneForm ? deck.regPdfTitleOne : deck.regPdfTitle;
+    payload.pdfBody = oneForm ? deck.regPdfBodyOne : deck.regPdfBody;
+    payload.printTitle = deck.regPrintTitle;
+    payload.printBody = oneForm ? deck.regPrintBodyOne : deck.regPrintBody;
+  }
+
   payload.remSubject = deck.remSubject7;
   payload.newsSubject = deck.newsSubject;
   payload.contactSubject = `Kontakt ze strony — ${String(payload.name || '').trim()}`;
   payload.newsHi = fill(deck.newsHi, { FIRSTNAME: firstName });
 
-  /* The attachment. Decided here rather than with an if() in Make, for the same
-     reason as everything else on this list: the flag it depends on was computed here
-     from the birth date, and a copy of that decision in a second place is a copy that
-     can disagree. */
+  /* The attachments. Decided here rather than with an if() in Make, for the same
+     reason as everything else on this list: the flags they depend on were computed
+     here, and a copy of that decision in a second place is a copy that can disagree.
+     ------------------------------------------------------------------------------
+     Italian rider  -> one file, the Italian form. It is the version the organisers
+                       accept, and it is already in a language they read.
+     Everyone else  -> two files. The Italian one to print and sign, plus the same
+                       form in their own language so they know what they are signing.
+                       Both are static files built by tools/build-pdfs.mjs; nothing is
+                       generated per submission.
+     `pdfUrlOwn` is empty for an Italian entry. Make cannot skip an attachment on a
+     shared route — a filter there would end the route and take the e-mail with it —
+     so the scenario has a separate route for each case and reads this field only on
+     the foreign one. */
   const base = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
-  payload.pdfUrl = payload.isMinor
-    ? `${base}/emails/Carruleddhi-modulo-minori.pdf`
-    : `${base}/emails/Carruleddhi-modulo.pdf`;
-  payload.pdfName = payload.isMinor ? 'Carruleddhi-minori-' : 'Carruleddhi-modulo-';
+  const stem = payload.isMinor ? 'Carruleddhi-minori' : 'Carruleddhi-modulo';
+  payload.pdfUrl = `${base}/emails/${stem}-it.pdf`;
+  payload.pdfName = `${stem}-IT-`;
+  payload.pdfUrlOwn = locale === 'it' ? '' : `${base}/emails/${stem}-${locale}.pdf`;
+  payload.pdfNameOwn = `${stem}-${locale.toUpperCase()}-`;
 
   /* --- the handful of values a template cannot work out for itself -----------
      The bodies are rendered below by substituting plain paths and nothing else, so
@@ -1098,11 +1337,18 @@ function decodePhoto(dataUrl) {
   return { bytes, contentType: match[1], ext: spec.ext };
 }
 
-/** Stores the file and returns its path, or an empty string if the upload failed. */
-async function uploadPhoto(env, photo) {
+/**
+ * Stores the file and returns its path, or an empty string if the upload failed.
+ *
+ * `folder` keeps wall photos and sponsor logos apart in the same bucket. It is a fixed
+ * string chosen by the calling code and never anything a request supplied — a bucket
+ * path assembled from a caller's input is a path traversal with extra steps.
+ */
+async function uploadPhoto(env, photo, folder = '') {
   // Random name, not the visitor's: a predictable path in a bucket is a directory
   // listing waiting to happen, and a caller-supplied one is a path traversal.
-  const path = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${photo.ext}`;
+  const prefix = folder === 'sponsors' ? 'sponsors/' : `${new Date().toISOString().slice(0, 10)}/`;
+  const path = `${prefix}${crypto.randomUUID()}.${photo.ext}`;
   const response = await fetch(
     `${env.SUPABASE_URL}/storage/v1/object/wall-photos/${path}`,
     {
@@ -1411,7 +1657,11 @@ export default {
     // The ceiling depends on the route, and the route is in the path, so it is read
     // before the body. Only the wall may carry an image.
     const pathType = url.pathname.replace(/^\/api\/carruleddhi\/?/, '').replace(/\/+$/, '');
-    const bodyCeiling = WALL_FAMILY.has(pathType) ? MAX_PHOTO_BODY_BYTES : MAX_BODY_BYTES;
+    /* `settings-admin` is on this list because a sponsor logo arrives the same way a
+       wall photo does — as a data URL in the body — and the default ceiling would
+       reject it before the handler ever saw it. */
+    const carriesImage = WALL_FAMILY.has(pathType) || pathType === 'settings-admin';
+    const bodyCeiling = carriesImage ? MAX_PHOTO_BODY_BYTES : MAX_BODY_BYTES;
 
     const raw = await request.text();
     if (raw.length > bodyCeiling) return json({ ok: false, code: 'PAYLOAD_TOO_LARGE' }, 413, cors);
@@ -1473,6 +1723,8 @@ export default {
       if (type === 'chat') return chatVisitor(env, request, payload, cors);
       if (type === 'chat-admin') return chatAdmin(env, payload, cors);
       if (type === 'inbox') return inbox(env, payload, cors);
+      if (type === 'settings') return settingsRead(env, cors);
+      if (type === 'settings-admin') return settingsAdmin(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 
@@ -1556,9 +1808,18 @@ export default {
      * the birth date, so the branch is derived from the same fact rather than from a
      * flag the browser sent.
      */
-    payload.branch = type === 'registration'
-      ? (payload.isMinor ? 'registration-minor' : 'registration-adult')
-      : type;
+    /* Four values for a registration, not two.
+       The second half names the language group rather than the language: `it` gets one
+       attachment, everybody else gets two, and that is the only thing the scenario has
+       to know. Six languages would have meant twelve routes to configure for a
+       difference the Email module cannot see. */
+    if (type === 'registration') {
+      const age = payload.isMinor ? 'minor' : 'adult';
+      const group = localeOf(payload.locale) === 'it' ? 'it' : 'xx';
+      payload.branch = `registration-${age}-${group}`;
+    } else {
+      payload.branch = type;
+    }
 
     attachCopy(payload);
     attachHtml(payload, type);

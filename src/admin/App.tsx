@@ -11,7 +11,13 @@ import {
   Settings,
   StickyNote
 } from 'lucide-react';
-import { Sidebar, SidebarBody, SidebarLink, type SidebarLinkItem } from '@/components/ui/sidebar';
+import {
+  Sidebar,
+  SidebarBody,
+  SidebarLink,
+  SidebarToggle,
+  type SidebarLinkItem
+} from '@/components/ui/sidebar';
 import { dictionaries, type PanelLocale, type TranslateKey } from './i18n';
 import { fetchInbox, markInboxSeen, type Inbox } from './api';
 import { useSession } from './useSession';
@@ -150,17 +156,18 @@ export default function App() {
 
   const nav = (
     <>
-      <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
-          <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-yellow text-sm font-black text-navy-950">
-            C
-          </span>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
+        {/* The button first, so on a phone held in one hand it is the nearest thing to
+            the thumb. It is also the only way to widen the rail on a touch screen —
+            hover does not exist there. */}
+        <div className="flex items-center gap-2">
+          <SidebarToggle label={t('nav.menu')} />
           {sidebarOpen ? (
             <span className="truncate text-sm font-bold text-white">Carruleddhi 2026</span>
           ) : null}
         </div>
 
-        <nav className="mt-6 flex flex-col gap-1">
+        <nav className="mt-5 flex flex-col gap-1">
           {links.map((link) => (
             <SidebarLink
               key={link.id}
@@ -202,9 +209,9 @@ export default function App() {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-navy-950 md:flex-row">
+    <div className="flex min-h-dvh bg-navy-950">
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen}>
-        <SidebarBody className="justify-between gap-6">{nav}</SidebarBody>
+        <SidebarBody className="justify-between gap-4">{nav}</SidebarBody>
       </Sidebar>
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -250,14 +257,22 @@ export default function App() {
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-7">
-          {tab === 'dashboard' ? <Dashboard t={t} locale={locale} inbox={inbox} onGo={setTab} /> : null}
+          {tab === 'dashboard' ? (
+            <Dashboard t={t} locale={locale} inbox={inbox} onGo={setTab} apiKey={key} />
+          ) : null}
           {tab === 'registrations' ? <Registrations t={t} locale={locale} apiKey={key} /> : null}
           {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'reminders' ? <Subscribers t={t} kind="reminders" /> : null}
           {tab === 'newsletter' ? <Subscribers t={t} kind="newsletter" /> : null}
           {tab === 'settings' ? (
-            <SettingsView t={t} locale={locale} setLocale={setLocale} onForget={lock} />
+            <SettingsView
+              t={t}
+              locale={locale}
+              setLocale={setLocale}
+              onForget={lock}
+              apiKey={key}
+            />
           ) : null}
         </div>
       </main>

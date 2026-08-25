@@ -2,6 +2,7 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import type { Inbox } from '../api';
+import { SignupsChart } from './SignupsChart';
 
 /**
  * What changed since you last looked.
@@ -15,12 +16,14 @@ export function Dashboard({
   t,
   locale,
   inbox,
-  onGo
+  onGo,
+  apiKey
 }: {
   t: (key: TranslateKey) => string;
   locale: PanelLocale;
   inbox: Inbox | null;
   onGo: (tab: 'registrations' | 'chat' | 'wall' | 'reminders' | 'newsletter') => void;
+  apiKey: string;
 }) {
   const tiles = [
     { key: 'registrations', label: t('dash.registrations'), value: inbox?.counts.registrations ?? 0, go: 'registrations' },
@@ -83,6 +86,8 @@ export function Dashboard({
           );
         })}
       </div>
+
+      <SignupsChart t={t} apiKey={apiKey} intl={t('locale.intl')} />
 
       <p className="mt-6 text-xs text-white/30">
         {locale === 'pl'
