@@ -24,20 +24,30 @@
  *   public — no code change, no redeploy of anything but the variable.
  */
 
-export const config = {
-  /**
-   * Everything except the API, /emails/, Vercel's internals and the favicon.
-   *
-   * `/emails/` is the exclusion that was missing, and it cost a working scenario. The
-   * registration form's PDF is fetched by Make, server-side, with no browser and no
-   * cookie — so the gate answered 401, the HTTP module treated that as a failure, and
-   * the whole branch died before the confirmation could be sent. A file whose entire
-   * purpose is to be attached to an e-mail and handed to a stranger has no business
-   * behind a password anyway: the gate exists to hide an unfinished site, not the form
-   * somebody has to print and sign.
-   */
-  matcher: ['/((?!api/|emails/|_vercel/|favicon).*)']
-};
+/**
+ * WHAT IS EXCLUDED, AND WHY IT IS DECIDED IN CODE
+ *
+ * There is deliberately no `export const config = { matcher: [...] }` here. Vercel
+ * reads that export with a static analyser before the build is deployed, and it is
+ * the most likely source of `Error: Unhandled type: "ColonToken"` — a failure that
+ * happened *after* a green Vite build, so the deployment never went live and every
+ * change looked like it had simply been ignored. A plain list of prefixes checked
+ * inside the function cannot be mis-parsed, and costs one string comparison.
+ *
+ * `/emails/` is the exclusion that was missing and it cost a working scenario: the
+ * registration PDF is fetched by Make, server-side, with no browser and no cookie, so
+ * the gate answered 401 and the branch died before the confirmation was sent. A file
+ * whose whole purpose is to be attached to an e-mail and handed to a stranger does not
+ * belong behind a password — the gate hides an unfinished site, not the form somebody
+ * has to print and sign.
+ */
+const OPEN_PREFIXES = [
+  '/api/',      // the site's own endpoints; they fetch with credentials omitted
+  '/emails/',   // PDFs fetched by Make and opened from an inbox
+  '/_vercel/',  // platform internals
+  '/assets/',   // CSS, JS and images, requested by a page that already passed
+  '/favicon'
+];
 
 const COOKIE = 'car_gate';
 const THIRTY_DAYS = 60 * 60 * 24 * 30;
@@ -62,8 +72,10 @@ export default async function middleware(request) {
   // the site to the public.
   if (!password) return;
 
-  const expected = await sha256(password);
   const url = new URL(request.url);
+  if (OPEN_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return;
+
+  const expected = await sha256(password);
 
   // The form posts here. Handled in the middleware so the gate needs no function of
   // its own and no route to forget about later.

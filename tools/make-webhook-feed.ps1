@@ -74,6 +74,13 @@ $stamp = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 #   A duplicate is now answered properly by the API (409, "already registered"), which
 #   is right for a real visitor and useless for a test that wants to exercise the happy
 #   path. So the addresses change every run.
+#   And the local parts differ per message, not only per run. They were all
+#   "test.registration+<run>", so the teaching message stored that address and the
+#   adult one right after it was refused as a duplicate of itself:
+#
+#     23505  Key (lower(email))=(test.registration+0825032241@example.com) already exists
+#
+#   union / adult / minor / reminder / contact each have their own now.
 $run = (Get-Date).ToString('MMddHHmmss')
 
 # One message carrying every field of all four branches.
@@ -99,7 +106,7 @@ $unionPayload = [ordered]@{
   lastName      = 'Testowy'
   birthDate     = '1994-03-18'
   postalCode    = '07028'
-  email         = "test.registration+$run@example.com"
+  email         = "test.union+$run@example.com"
   phone         = '+48 600 100 200'
   address       = 'Via Giuseppe Verdi 12, Santa Teresa Gallura (SS)'
   cartName      = 'Bolide Rosso'
@@ -169,7 +176,7 @@ $payloads = [ordered]@{
     lastName      = 'Testowy'
     birthDate     = '1994-03-18'
     postalCode    = '07028'
-    email         = "test.registration+$run@example.com"
+    email         = "test.adult+$run@example.com"
     phone         = '+48 600 100 200'
     address       = "Via Giuseppe Verdi 12, 07028 Santa Teresa Gallura (SS)"
     cartName      = 'Bolide Rosso'
