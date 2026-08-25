@@ -1,0 +1,93 @@
+# =============================================================================
+# The clock for the reminders.
+# =============================================================================
+# WHY THIS AND NOT A MAKE SCENARIO
+#   Make bills an operation per module run. A scenario waking up every hour to ask
+#   "anything to send?" spends around 720 operations a month answering "no" — most of
+#   the free plan, before a single e-mail has gone out, and for eleven months of the
+#   year the answer is always no.
+#
+#   This runs the clock instead. It costs nothing: scheduled workflows are free on
+#   public repositories, and on a private one a curl every hour is a few minutes of the
+#   2000 included each month. Make is only touched when there is a letter to send, so
+#   its operations become proportional to e-mails rather than to hours.
+#
+# WHY NOT VERCEL CRON
+#   Vercel's Hobby plan allows one cron job and only runs it once a day. The 3-hour
+#   reminder needs better resolution than that.
+#
+# WHAT IT ACTUALLY DOES
+#   One authenticated POST. The function works out how long is left, which reminder is
+#   due, who is eligible for it, renders each letter in that person's language, records
+#   what it handed over, and pushes the finished letters to the Make webhook. Nothing in
+#   this file knows any of that, which is the point — the schedule is the only thing
+#   here, so changing the wording never means editing a workflow.
+#
+# SETUP (once)
+#   GitHub → the repository → Settings → Secrets and variables → Actions → New secret:
+#     ROSTER_KEY   the same value as in Vercel
+#     SITE_URL     https://www.carruleddhishow.com     (optional; defaults below)
+#
+#   Then Actions → "Reminders" → Run workflow, to check it before trusting the clock.
+# =============================================================================
+
+name: Reminders
+
+on:
+  schedule:
+    # Every hour, on the hour. GitHub runs scheduled jobs on a best-effort basis and can
+    # be late by several minutes under load — which is exactly why the function decides
+    # what is due from windows rather than from an exact hour count. A late run catches
+    # up; a missed run costs nothing.
+    - cron: '0 * * * *'
+  # So it can be tested, and so a run can be forced if one is ever missed.
+  workflow_dispatch:
+
+# Nothing in the repository is read or written. Least privilege, stated.
+permissions: {}
+
+concurrency:
+  # Two overlapping runs would each read the same pending rows before either marked them,
+  # and somebody would get two copies of the same reminder.
+  group: reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask the site to send whatever is due
+        env:
+          ROSTER_KEY: ${{ secrets.ROSTER_KEY }}
+          SITE_URL: ${{ secrets.SITE_URL || 'https://www.carruleddhishow.com' }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${ROSTER_KEY}" ]; then
+            echo "::error::ROSTER_KEY is not set. Add it in Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          # --fail-with-body so a 502 still prints what the function said. Without it curl
+          # exits silently and the log shows a failed step with no reason in it.
+          http_status=$(curl --silent --show-error --fail-with-body \
+            --max-time 120 \
+            --retry 2 --retry-delay 10 --retry-connrefused \
+            --output response.json \
+            --write-out '%{http_code}' \
+            -X POST "${SITE_URL}/api/carruleddhi/reminders-due" \
+            -H 'Content-Type: application/json' \
+            -H "X-Carruleddhi-Roster-Key: ${ROSTER_KEY}" \
+            -d '{"deliver": true}') || true
+
+          echo "HTTP ${http_status}"
+          cat response.json
+          echo
+
+          # A 200 with nothing to send is the normal case for most of the year, so it must
+          # not look like a failure. Anything else is worth a red mark in the run list.
+          case "${http_status}" in
+            200) echo "::notice::Delivered whatever was due." ;;
+            *) echo "::error::reminders-due answered ${http_status}"; exit 1 ;;
+          esac

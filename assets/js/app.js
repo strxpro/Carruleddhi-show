@@ -3823,6 +3823,61 @@ import { flagSvg } from './flags.js';
    * Runs before everything else, because a panel in the wrong layer is not a detail that
    * can wait for the rest of the page to finish.
    */
+  /**
+   * The three reminder windows, and which of them are still ahead.
+   *
+   * A reminder is sent only to somebody who was on the list before it fell due — that is
+   * the whole rule, and it is the same one the function applies when sending (see
+   * remindersStillAhead in worker/index.js). Read from this side it answers a different
+   * question: what can this visitor still be promised?
+   *
+   * Five days before the race, "7 days before" is not a reminder anybody can receive, so
+   * the chip is removed. Twenty hours before, only "3 hours before" is left. Two hours
+   * before, nothing is, and the form says that instead of taking an address and sending
+   * nothing — which is the version that looks like a bug to the person who filled it in.
+   *
+   * Hard-coded nowhere: the hours come from the same list as the sender, and the date from
+   * the site config.
+   */
+  const REMINDER_WINDOWS = [
+    { code: '7d', hours: 168 },
+    { code: '1d', hours: 24 },
+    { code: '3h', hours: 3 }
+  ];
+
+  function remindersStillAhead(now = Date.now()) {
+    const start = new Date(config.eventDate).getTime();
+    if (Number.isNaN(start)) return REMINDER_WINDOWS.map((window) => window.code);
+    return REMINDER_WINDOWS
+      .filter((window) => now <= start - window.hours * 3600000)
+      .map((window) => window.code);
+  }
+
+  function setupReminderWindows() {
+    const ahead = new Set(remindersStillAhead());
+    $$('[data-reminder-window]').forEach((chip) => {
+      chip.hidden = !ahead.has(chip.dataset.reminderWindow);
+    });
+
+    const none = ahead.size === 0;
+    $$('[data-reminder-times]').forEach((list) => { list.hidden = none; });
+    $$('[data-reminder-none]').forEach((note) => { note.hidden = !none; });
+
+    /* Nothing left to promise: the form is closed rather than left looking willing.
+       The "I'll be there" button keeps working — turning up is still a thing you can do
+       three hours before the start. */
+    $$('[data-reminder-form]').forEach((form) => {
+      form.hidden = none;
+      form.querySelectorAll('input, button, textarea, select').forEach((field) => {
+        field.disabled = none;
+      });
+    });
+
+    // Recomputed on a language change because the chips carry translated text, and once
+    // an hour so a page left open overnight does not keep offering a passed window.
+    return ahead;
+  }
+
   function setupPanelDepth() {
     const panels = $$('#main > section');
     panels.forEach((section, index) => {
@@ -3869,6 +3924,7 @@ import { flagSvg } from './flags.js';
       ['sponsors', setupSponsors],
       ['gallery3d', setupGalleryCarousel],
       ['footerYear', setupFooterYear],
+      ['reminderWindows', setupReminderWindows],
       ['textEffects', setupTextEffects]
     ];
 
@@ -3879,6 +3935,21 @@ import { flagSvg } from './flags.js';
       } catch (error) {
         console.error(`Carruleddhi: "${name}" failed to initialise.`, error);
       }
+    });
+
+    /* A page left open crosses a window boundary eventually. Once an hour is often enough
+       to catch that and cheap enough to ignore. */
+    window.setInterval(() => {
+      try {
+        setupReminderWindows();
+      } catch (_) {
+        /* Not worth a console line every hour. */
+      }
+    }, 3600000);
+    window.addEventListener('carruleddhi:language', () => {
+      try {
+        setupReminderWindows();
+      } catch (_) { /* the chips keep whatever they had */ }
     });
 
     // Last, and not awaited: the page is already finished without it.

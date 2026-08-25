@@ -859,6 +859,31 @@ const instantFlow = [
       ]
     },
 
+    /* ---- H: the outbox ---------------------------------------------------
+       Everything the clock sends: the three reminders, and the newsletter confirmations
+       that used to sit behind a Sleep module.
+
+       This route is the whole of what scenario 2 used to be. The letter arrives finished
+       — `to`, `subject`, `html`, nothing to resolve — because the function rendered it in
+       the recipient's language before making the request.
+
+       WHY IT IS HERE AND NOT IN A SCHEDULED SCENARIO
+         Make bills an operation per module run, so a scenario waking up hourly to ask
+         "anything to send?" spends about 720 operations a month answering "no" — most of
+         the free plan, and for eleven months of the year the answer is always no. The
+         clock lives outside Make now (a free cron calls the function), and Make is only
+         touched when there is a letter. Operations become proportional to letters. */
+    {
+      flow: [
+        sendEmail(31, 1250, 860, {
+          filter: eq('outbox', '{{1.branch}}', 'outbox'),
+          to: '{{1.to}}',
+          subject: '{{1.subject}}',
+          html: '{{1.html}}'
+        })
+      ]
+    },
+
     /* ---- F: "tell me about the next edition" — MOVED OUT OF THIS SCENARIO
        There was a sixth route here: Tools > Sleep for 90 seconds, then an Email. The
        delay existed so the courtesy note about next year would not land in the same
@@ -1166,9 +1191,14 @@ console.log(`worker/copy-deck.js  ${(Buffer.byteLength(JSON.stringify(copyRaw), 
 
 mkdirSync(resolve(root, 'make'), { recursive: true });
 
+/* ONE scenario, not two.
+   blueprint-2-reminders.json is still written, but only as a fallback for somebody who
+   would rather have Make hold the clock. The supported route is the cron: it costs
+   nothing, and the second scenario cost 720 Make operations a month to answer "nothing to
+   send" — see the outbox route in scenario 1 and .github/workflows/reminders.yml. */
 const files = [
-  ['make/blueprint-1-instant.json', wrap('Carruleddhi — 1 — natychmiastowe (webhook)', instantFlow, true)],
-  ['make/blueprint-2-reminders.json', wrap('Carruleddhi — 2 — przypomnienia (co godzine)', remindersFlow, false)]
+  ['make/blueprint-1-instant.json', wrap('Carruleddhi — 1 — wszystko (webhook)', instantFlow, true)],
+  ['make/blueprint-2-reminders.json', wrap('Carruleddhi — 2 — przypomnienia (zapas, gdy nie chcesz crona)', remindersFlow, false)]
 ];
 
 for (const [file, data] of files) {

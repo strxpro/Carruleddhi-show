@@ -1,5 +1,5 @@
 {
-  "name": "Carruleddhi — 1 — natychmiastowe (webhook)",
+  "name": "Carruleddhi — 1 — wszystko (webhook)",
   "flow": [
     {
       "id": 1,
@@ -921,6 +921,102 @@
                 "designer": {
                   "x": 1250,
                   "y": 420
+                },
+                "restore": {
+                  "expect": {
+                    "to": {
+                      "mode": "chose",
+                      "items": [
+                        null
+                      ]
+                    },
+                    "cc": {
+                      "mode": "chose"
+                    },
+                    "bcc": {
+                      "mode": "chose"
+                    },
+                    "priority": {
+                      "label": "Normal"
+                    },
+                    "references": {
+                      "mode": "chose"
+                    },
+                    "attachments": {
+                      "mode": "chose"
+                    },
+                    "contentType": {
+                      "label": "HTML"
+                    }
+                  },
+                  "parameters": {
+                    "saveAfterSent": {
+                      "label": "No"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "account",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  },
+                  {
+                    "name": "saveAfterSent",
+                    "type": "boolean",
+                    "label": "Save message after sending",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 31,
+              "module": "email:ActionSendEmail",
+              "version": 7,
+              "parameters": {
+                "account": null,
+                "saveAfterSent": false
+              },
+              "filter": {
+                "name": "outbox",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.branch}}",
+                      "b": "outbox",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "to": [
+                  "{{1.to}}"
+                ],
+                "subject": "{{1.subject}}",
+                "contentType": "html",
+                "html": "{{1.html}}",
+                "attachments": [],
+                "cc": [],
+                "bcc": [],
+                "from": "",
+                "sender": "",
+                "replyTo": "info@carruleddhishow.com",
+                "headers": [],
+                "priority": "normal",
+                "inReplyTo": "",
+                "references": []
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": 860
                 },
                 "restore": {
                   "expect": {

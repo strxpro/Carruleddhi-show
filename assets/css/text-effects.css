@@ -231,6 +231,21 @@
   border: 0;
 }
 
+/* ------------------------------------------------- reminders, once it is late
+   Shown in place of the three chips when every reminder window has passed. Lives here
+   rather than in main.css because it belongs to the same behaviour as the chips it
+   replaces, and keeping the pair together is how they stay in step. */
+.reminder-none {
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-left: 3px solid #ffc928;
+  border-radius: 0 10px 10px 0;
+  background: rgb(255 201 40 / 0.08);
+  font-size: 14px;
+  line-height: 1.55;
+  color: #43516f;
+}
+
 /* --------------------------------------------------------- less motion ----
    Not "faster" — off. Somebody who has set this has said that movement is a problem,
    and a shorter version of the problem is still the problem. The text has to end up

@@ -117,10 +117,14 @@ const FIELD_WHITELIST = {
   settings: [],
   // `photo` is a data URL, downscaled in the browser, only used by action 'logo'.
   'settings-admin': ['settings', 'action', 'photo'],
-  // The clock supplies nothing: the function works out what is due from the date it
-  // already knows. `dryRun` renders the letters without recording that they went out,
-  // so the scenario can be tested without spending the list.
-  'reminders-due': ['dryRun'],
+  /* The clock supplies nothing: the function works out what is due from the date it
+     already knows.
+       dryRun   render the letters without recording that they went out, so the whole
+                thing can be tested without spending the list
+       deliver  push each letter to the Make webhook instead of returning it. This is
+                what a free cron calls; without it the endpoint just answers with the
+                letters, which is what Make's own scenario used to do. */
+  'reminders-due': ['dryRun', 'deliver'],
   // Wiping test data. `scope` names what to wipe, `confirm` has to spell it out.
   purge: ['scope', 'confirm']
 };
@@ -559,9 +563,9 @@ async function inbox(env, payload, cors) {
  * happens to fire.
  */
 const REMINDER_WINDOWS = [
-  { code: '7d', upTo: 168, over: 24 },
-  { code: '1d', upTo: 24, over: 3 },
-  { code: '3h', upTo: 3, over: 0 }
+  { code: '7d', upTo: 168, over: 24, at: 168 },
+  { code: '1d', upTo: 24, over: 3, at: 24 },
+  { code: '3h', upTo: 3, over: 0, at: 3 }
 ];
 
 /** How many letters one run will render. The next tick picks up the rest. */
@@ -572,6 +576,33 @@ function reminderWindow(hoursLeft) {
     if (hoursLeft <= window.upTo && hoursLeft > window.over) return window.code;
   }
   return '';
+}
+
+/**
+ * Which reminders somebody who signs up at `signedUpAt` can still receive.
+ *
+ * ONE RULE: you get a reminder if you were on the list before it was due.
+ *
+ * The 7-day reminder is due at start minus 168 hours. Somebody who signs up five days
+ * before the race was not on the list then, so there is nothing to send them — telling
+ * them "seven days to go" when there are five is worse than saying nothing. They are on
+ * the list before the 24-hour and 3-hour moments, so they get those two.
+ *
+ * Signed up twenty hours before: only the 3-hour one. Signed up two hours before: nothing
+ * at all, because every moment has already passed. That is the whole behaviour, and it
+ * falls out of the one rule rather than out of three special cases.
+ *
+ * Exported shape is the list of codes, because two callers want it for different reasons:
+ * the sender, to decide what to send, and the form on the website, to tell somebody what
+ * they are signing up for before they sign up.
+ */
+function remindersStillAhead(signedUpAt, startAt) {
+  const signed = signedUpAt instanceof Date ? signedUpAt.getTime() : new Date(signedUpAt).getTime();
+  const start = startAt.getTime();
+  if (Number.isNaN(signed)) return [];
+  return REMINDER_WINDOWS
+    .filter((window) => signed <= start - window.at * 3_600_000)
+    .map((window) => window.code);
 }
 
 /** The start of the race, from the one place that already knew it. */
@@ -612,6 +643,16 @@ async function remindersDue(env, payload, cors) {
   url.searchParams.set('select', 'id,name,email,locale');
   url.searchParams.set('status', 'eq.active');
   url.searchParams.set('or', `(last_reminder.is.null,last_reminder.neq.${due})`);
+
+  /* Only people who were already on the list when this reminder became due.
+     Somebody who signed up five days before the race never had a "seven days to go"
+     moment, and sending them one now would be telling them something untrue about the
+     date. The cut-off is the reminder's own moment, so this single filter is the whole of
+     that rule — see remindersStillAhead() for the same arithmetic from the other side. */
+  const window = REMINDER_WINDOWS.find((entry) => entry.code === due);
+  const cutOff = new Date(eventStartAt(env).getTime() - window.at * 3_600_000).toISOString();
+  url.searchParams.set('created_at', `lte.${cutOff}`);
+
   url.searchParams.set('order', 'created_at.asc');
   url.searchParams.set('limit', String(REMINDER_BATCH));
 
@@ -706,9 +747,12 @@ async function remindersDue(env, payload, cors) {
     }
   }
 
-  /* Reminders first, newsletter notes after. Make iterates in order, so the letter with
-     the race number in it is handed over before the courtesy note about next year. */
+  /* Reminders first, newsletter notes after, so the letter with a race number in it is
+     handed over before the courtesy note about next year. */
   const all = [...messages, ...newsletters.messages];
+
+  if (payload.deliver) return deliverOutbox(env, all, { due, hoursLeft: hours }, cors);
+
   return json({
     ok: true,
     due,
@@ -719,6 +763,71 @@ async function remindersDue(env, payload, cors) {
     newsletters: newsletters.messages.length,
     messages: all
   }, 200, cors);
+}
+
+/**
+ * Hands finished letters to Make one at a time, and the reason that is cheaper.
+ *
+ * WHAT THIS REPLACES
+ *   A second Make scenario on an hourly clock. Make charges an operation per module run,
+ *   so a scenario that wakes up every hour to ask "anything to send?" spends 720
+ *   operations a month answering "no" — most of the free plan, before a single e-mail has
+ *   gone out. For eleven months of the year the answer is always no.
+ *
+ *   The clock moves outside Make instead: a free cron calls this endpoint, and Make is
+ *   only touched when there is something to deliver. Operations become proportional to
+ *   letters sent rather than to hours elapsed. Scenario 2 stops existing.
+ *
+ * WHY ONE REQUEST PER LETTER
+ *   The webhook already fans out on `branch`, and one bundle per e-mail is the shape its
+ *   Email module expects. Sending an array instead would need an Iterator, which is the
+ *   module the second scenario existed to hold.
+ *
+ * SEQUENTIAL, NOT PARALLEL
+ *   Fifty simultaneous requests to one webhook is a burst Make queues and an SMTP server
+ *   may refuse outright. These go one after another; a batch is capped, and the next cron
+ *   tick continues.
+ */
+async function deliverOutbox(env, messages, meta, cors) {
+  if (!env.MAKE_WEBHOOK_URL) {
+    return json({ ok: false, code: 'OUTBOX_NO_WEBHOOK', ...meta }, 503, cors);
+  }
+  if (messages.length === 0) {
+    return json({ ok: true, delivered: 0, failed: 0, ...meta }, 200, cors);
+  }
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (env.INTAKE_SHARED_KEY) headers['X-Carruleddhi-Key'] = env.INTAKE_SHARED_KEY;
+
+  let delivered = 0;
+  const failures = [];
+  for (const message of messages) {
+    try {
+      const response = await fetch(env.MAKE_WEBHOOK_URL, {
+        method: 'POST',
+        headers,
+        /* `branch` is what the router reads, exactly as it does for a registration. The
+           letter is already rendered, so this route carries no copy deck and no language:
+           three fields and nothing to resolve. */
+        body: JSON.stringify({ type: 'outbox', branch: 'outbox', ...message })
+      });
+      if (response.ok) delivered += 1;
+      else failures.push(`${message.to}: HTTP ${response.status}`);
+    } catch (error) {
+      failures.push(`${message.to}: ${error.message}`);
+    }
+  }
+
+  /* Reported, not thrown. The rows were already marked, so a letter that failed here is
+     lost — and the honest thing is to say which one in a response the cron logs, rather
+     than to fail the whole run and leave it unclear whether anything went out. */
+  return json({
+    ok: failures.length === 0,
+    ...meta,
+    delivered,
+    failed: failures.length,
+    ...(failures.length ? { failures: failures.slice(0, 20) } : {})
+  }, failures.length ? 502 : 200, cors);
 }
 
 /**
@@ -1446,6 +1555,25 @@ async function storeIntake(env, request, type, payload) {
       status: 'active'
     }, '', 'email').catch(() => {});
   }
+
+  /* Everybody who enters the race is put on the reminder list.
+     Not a box to tick: a rider who does not know the start moved, or who forgets the
+     helmet rule, is a person standing at the top of a hill unable to race. The three
+     reminders are about the thing they signed up for, which is the one case where opting
+     somebody in is the service rather than the imposition. There is an unsubscribe link
+     at the foot of every one of them.
+
+     `ignore-duplicates` on the e-mail, because they may have asked for reminders from the
+     "I'll be there" form first — in which case that row already exists and is theirs.
+     Best effort for the same reason as the newsletter above. */
+  await insertRow(env, 'reminder_subscribers', {
+    name: `${row.first_name} ${row.last_name}`.trim(),
+    email: row.email,
+    locale,
+    consent_at: new Date().toISOString(),
+    unsubscribe_token: crypto.randomUUID().replace(/-/g, ''),
+    status: 'active'
+  }, '', 'email').catch(() => {});
 
   return { ok: true, raceNumber: stored.row?.race_number ?? null };
 }

@@ -1135,7 +1135,17 @@
         <div class="modal__icon" aria-hidden="true">✦</div>
         <h2 id="reminder-title" data-i18n="modal.title">Ci sarai? Ti ricordiamo noi quando partire.</h2>
         <p class="modal__lead" data-i18n="modal.lead">Lascia nome ed e-mail. Riceverai solo tre promemoria relativi all’evento, niente spam.</p>
-        <div class="reminder-times"><span data-i18n="modal.time1">7 giorni prima</span><span data-i18n="modal.time2">1 giorno prima</span><span data-i18n="modal.time3">3 ore prima</span></div>
+        <!-- Which reminders are still possible depends on when this is being read.
+             Somebody signing up five days before the race cannot be told "seven days to
+             go", so that chip is removed rather than shown as a promise nobody can keep,
+             and once the last one has passed the whole form says so instead of taking an
+             address for nothing. Decided in app.js — setupReminderWindows(). -->
+        <div class="reminder-times" data-reminder-times>
+          <span data-reminder-window="7d" data-i18n="modal.time1">7 giorni prima</span>
+          <span data-reminder-window="1d" data-i18n="modal.time2">1 giorno prima</span>
+          <span data-reminder-window="3h" data-i18n="modal.time3">3 ore prima</span>
+        </div>
+        <p class="reminder-none" data-reminder-none hidden data-i18n="modal.tooLate">Ormai è troppo tardi per un promemoria: la discesa è tra poche ore.</p>
         <form data-reminder-form novalidate>
           <div class="form-grid">
             <div class="field" data-field><input id="reminder-name" name="name" type="text" autocomplete="given-name" placeholder=" " required><label for="reminder-name" data-i18n="modal.name">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
