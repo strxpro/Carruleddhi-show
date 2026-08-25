@@ -3679,21 +3679,48 @@ import { flagSvg } from './flags.js';
     const entrances = $$('[data-text-effect]');
     entrances.forEach(buildTextEffect);
 
-    /* Played on first sight, once. An entrance animation that replays every time a
-       heading scrolls back into view stops being an entrance. */
-    if ('IntersectionObserver' in window && !reducedMotion) {
-      const watcher = new IntersectionObserver((records) => {
-        for (const record of records) {
-          if (!record.isIntersecting) continue;
-          record.target.classList.add('is-playing');
-          watcher.unobserve(record.target);
-        }
-      }, { rootMargin: '0px 0px -12% 0px', threshold: 0.15 });
-      entrances.forEach((element) => watcher.observe(element));
-    } else {
-      // No observer, or motion turned down: the text simply is where it belongs.
-      entrances.forEach((element) => element.classList.add('is-playing'));
+    /**
+     * Arming and playing, in that order, with a way out of both.
+     *
+     * The hidden start state lives behind `is-armed` (see text-effects.css) so that
+     * nothing here is load-bearing for whether the words are readable. This code adds
+     * `is-armed` only when it has also set up two ways to remove it: the observer, and a
+     * timer for when the observer does not fire.
+     *
+     * That timer is not defensive padding — it was needed. Measured in a real browser:
+     * spans built, stylesheet loaded, headings on screen, and the observer callback never
+     * ran, so `is-playing` was never added and six headings sat at opacity 0. Whatever
+     * starves the callback (a throttled background tab, a headless renderer, a device
+     * under load), the text has to appear anyway.
+     */
+    if (!('IntersectionObserver' in window) || reducedMotion) {
+      // Nothing to animate with, or motion turned down: leave the text exactly as it is.
+      return;
     }
+
+    const play = (element) => {
+      element.classList.add('is-playing');
+      window.clearTimeout(Number(element.dataset.fxTimer) || 0);
+      delete element.dataset.fxTimer;
+    };
+
+    const watcher = new IntersectionObserver((records) => {
+      for (const record of records) {
+        if (!record.isIntersecting) continue;
+        play(record.target);
+        watcher.unobserve(record.target);
+      }
+    }, { rootMargin: '0px 0px -10% 0px', threshold: 0.01 });
+
+    entrances.forEach((element) => {
+      if (element.classList.contains('is-playing')) return;
+      element.classList.add('is-armed');
+      /* Two and a half seconds is longer than any scroll a visitor makes to reach the
+         first heading and short enough that a stuck observer is a late animation rather
+         than missing text. */
+      element.dataset.fxTimer = String(window.setTimeout(() => play(element), 2500));
+      watcher.observe(element);
+    });
 
     /* ---- jitter -------------------------------------------------------- */
     $$('[data-text-jitter]').forEach((element) => {
@@ -3765,11 +3792,15 @@ import { flagSvg } from './flags.js';
      animate a second time for somebody who only changed language. */
   window.addEventListener('carruleddhi:language', () => {
     try {
-      const played = new Set($$('[data-text-effect].is-playing'));
+      /* A heading that has already played keeps that state: somebody switching language
+         is not arriving at the section for the first time, and replaying the entrance
+         under their cursor is a flicker, not a flourish. Marked before the rebuild so the
+         new spans are visible from their first frame. */
+      const played = $$('[data-text-effect].is-playing');
       $$('[data-text-effect], [data-text-jitter], [data-text-ghost], [data-text-roll]')
         .forEach((element) => { delete element.dataset.textOriginal; });
-      setupTextEffects();
       played.forEach((element) => element.classList.add('is-playing'));
+      setupTextEffects();
     } catch (error) {
       console.error('Carruleddhi: text effects failed to rebuild.', error);
     }

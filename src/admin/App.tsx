@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Activity,
   Bell,
   BellRing,
   LayoutDashboard,
   ListChecks,
   LogOut,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   RefreshCw,
+  Search,
   Send,
   Settings,
   StickyNote
 } from 'lucide-react';
 import {
-  Sidebar,
-  SidebarBody,
-  SidebarLink,
-  SidebarToggle,
-  type SidebarLinkItem
-} from '@/components/ui/sidebar';
+  CommandPalette,
+  DashboardSidebar,
+  flattenNav,
+  useMediaQuery,
+  type NavGroupData,
+  type NavItemData
+} from '@/components/ui/dashboard-sidebar';
 import { dictionaries, type PanelLocale, type TranslateKey } from './i18n';
 import { fetchInbox, markInboxSeen, type Inbox } from './api';
 import { useSession } from './useSession';
@@ -62,7 +67,19 @@ export default function App() {
     sessionStorage.setItem(TAB_KEY, tab);
   }, [tab]);
 
+  /* The rail starts open on a wide screen and closed on a phone.
+     Not a stored preference: the right answer is a property of the device, and somebody
+     who opened it once on a laptop should not find it covering their phone screen. */
+  const wide = useMediaQuery('(min-width: 768px)');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [railInitialised, setRailInitialised] = useState(false);
+  useEffect(() => {
+    if (railInitialised) return;
+    setSidebarOpen(wide);
+    setRailInitialised(true);
+  }, [wide, railInitialised]);
+
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [inbox, setInbox] = useState<Inbox | null>(null);
 
   const key = state.status === 'open' ? state.key : '';
@@ -93,47 +110,102 @@ export default function App() {
     };
   }, [key, refreshInbox]);
 
-  const links = useMemo<(SidebarLinkItem & { id: TabId })[]>(
+  /* Cmd+K / Ctrl+K anywhere in the panel. Registered once, at the top, because a shortcut
+     that only works when a particular element has focus is a shortcut nobody finds. */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((value) => !value);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /**
+   * The navigation, grouped.
+   *
+   * Three groups rather than one flat list of seven. "Skrzynka" is what you open the panel
+   * to check, "Wydarzenie" is the event's own data, and Settings sits at the bottom with
+   * the way out — which is where a destructive action belongs, away from the rows you press
+   * every day.
+   */
+  const groups = useMemo<NavGroupData[]>(
     () => [
-      { id: 'dashboard', label: t('nav.dashboard'), icon: <LayoutDashboard className="size-5" /> },
       {
-        id: 'registrations',
-        label: t('nav.registrations'),
-        icon: <ListChecks className="size-5" />,
-        badge: inbox?.counts.registrations
+        items: [
+          { id: 'search', title: t('nav.search'), icon: Search, shortcut: '⌘K' },
+          { id: 'dashboard', title: t('nav.dashboard'), icon: LayoutDashboard }
+        ]
       },
       {
-        id: 'chat',
-        label: t('nav.chat'),
-        icon: <MessageSquare className="size-5" />,
-        badge: inbox?.counts.chats
+        heading: t('nav.groupInbox'),
+        items: [
+          { id: 'chat', title: t('nav.chat'), icon: MessageSquare, badge: inbox?.counts.chats },
+          { id: 'wall', title: t('nav.wall'), icon: StickyNote, badge: inbox?.counts.wall }
+        ]
       },
       {
-        id: 'wall',
-        label: t('nav.wall'),
-        icon: <StickyNote className="size-5" />,
-        badge: inbox?.counts.wall
-      },
-      {
-        id: 'reminders',
-        label: t('nav.reminders'),
-        icon: <Bell className="size-5" />,
-        badge: inbox?.counts.reminders
-      },
-      {
-        id: 'newsletter',
-        label: t('nav.newsletter'),
-        icon: <Send className="size-5" />,
-        badge: inbox?.counts.newsletter
-      },
-      { id: 'settings', label: t('nav.settings'), icon: <Settings className="size-5" /> }
+        heading: t('nav.groupEvent'),
+        items: [
+          {
+            id: 'registrations',
+            title: t('nav.registrations'),
+            icon: ListChecks,
+            badge: inbox?.counts.registrations
+          },
+          {
+            id: 'audience',
+            title: t('nav.audience'),
+            icon: Activity,
+            // Grouped because they are one question — who wants to hear from us — asked
+            // in two places. Collapsed by default; opens itself when one is active.
+            children: [
+              { id: 'reminders', title: t('nav.reminders'), icon: Bell, badge: inbox?.counts.reminders },
+              { id: 'newsletter', title: t('nav.newsletter'), icon: Send, badge: inbox?.counts.newsletter }
+            ]
+          }
+        ]
+      }
     ],
     [t, inbox]
   );
 
+  const bottom = useMemo<NavItemData[]>(
+    () => [
+      { id: 'settings', title: t('nav.settings'), icon: Settings },
+      { id: 'logout', title: t('nav.logout'), icon: LogOut }
+    ],
+    [t]
+  );
+
+  const flat = useMemo(() => flattenNav(groups, bottom), [groups, bottom]);
+
+  const go = useCallback(
+    (id: string) => {
+      if (id === 'logout') {
+        lock();
+        return;
+      }
+      if (id === 'search') {
+        setPaletteOpen(true);
+        return;
+      }
+      // `audience` is a group heading, not a screen. Pressing it opens the group; if it
+      // ever reaches here, land on the first thing inside it rather than a blank panel.
+      if (id === 'audience') {
+        setTab('reminders');
+        return;
+      }
+      setTab(id as TabId);
+    },
+    [lock]
+  );
+
   if (state.status === 'checking' && !key) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-navy-950 text-sm text-white/50">
+      <div className="grid min-h-dvh place-items-center bg-background text-sm text-muted-foreground">
         {t('common.loading')}
       </div>
     );
@@ -153,83 +225,65 @@ export default function App() {
   }
 
   const total = inbox?.total ?? 0;
-
-  const nav = (
-    <>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-        {/* The button first, so on a phone held in one hand it is the nearest thing to
-            the thumb. It is also the only way to widen the rail on a touch screen —
-            hover does not exist there. */}
-        <div className="flex items-center gap-2">
-          <SidebarToggle label={t('nav.menu')} />
-          {sidebarOpen ? (
-            <span className="truncate text-sm font-bold text-white">Carruleddhi 2026</span>
-          ) : null}
-        </div>
-
-        <nav className="mt-5 flex flex-col gap-1">
-          {links.map((link) => (
-            <SidebarLink
-              key={link.id}
-              link={link}
-              isActive={tab === link.id}
-              onSelect={(id) => {
-                setTab(id as TabId);
-                setSidebarOpen(false);
-              }}
-            />
-          ))}
-        </nav>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-1 border-t border-white/10 pt-3">
-        <div className="flex gap-1 px-2 pb-1">
-          {(['pl', 'it'] as const).map((code) => (
-            <button
-              key={code}
-              type="button"
-              onClick={() => setLocale(code)}
-              aria-pressed={locale === code}
-              className={
-                locale === code
-                  ? 'rounded-lg bg-white/12 px-2.5 py-1 text-[11px] font-bold text-white'
-                  : 'rounded-lg px-2.5 py-1 text-[11px] font-semibold text-white/40 hover:text-white'
-              }
-            >
-              {code.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <SidebarLink
-          link={{ id: 'logout', label: t('nav.logout'), icon: <LogOut className="size-5" /> }}
-          onSelect={lock}
-        />
-      </div>
-    </>
-  );
+  const activeTitle = flat.find((item) => item.id === tab)?.title ?? t('nav.dashboard');
 
   return (
-    <div className="flex min-h-dvh bg-navy-950">
-      <Sidebar open={sidebarOpen} setOpen={setSidebarOpen}>
-        <SidebarBody className="justify-between gap-4">{nav}</SidebarBody>
-      </Sidebar>
+    <div className="flex min-h-dvh bg-background">
+      <DashboardSidebar
+        groups={groups}
+        bottom={bottom}
+        activeId={tab}
+        onSelect={go}
+        open={sidebarOpen}
+        setOpen={setSidebarOpen}
+        brand="Carruleddhi 2026"
+        subtitle={t('nav.subtitle')}
+        menuLabel={t('nav.menu')}
+        onSearch={() => setPaletteOpen(true)}
+      />
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-white/10 bg-navy-900/60 px-4 py-3 md:px-7">
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold tracking-tight text-white">
-              {t(`nav.${tab}` as TranslateKey)}
-            </h1>
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/60 bg-card px-4 md:px-6">
+          {/* The same toggle as in the rail, in the place a dashboard usually puts it.
+              Two ways to reach it because on a phone the rail's own button is behind the
+              scrim once the rail is open. */}
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((value) => !value)}
+            aria-label={t('nav.menu')}
+            className="hidden rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:block"
+          >
+            {sidebarOpen ? (
+              <PanelLeftClose className="size-[18px]" strokeWidth={1.5} />
+            ) : (
+              <PanelLeftOpen className="size-[18px]" strokeWidth={1.5} />
+            )}
+          </button>
+
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+            <span className="hidden truncate sm:inline">Carruleddhi 2026</span>
+            <span className="hidden sm:inline">/</span>
+            <span className="truncate font-medium text-foreground">{activeTitle}</span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className="hidden items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:flex"
+          >
+            <Search className="size-3.5" strokeWidth={1.5} />
+            {t('nav.search')}
+            <kbd className="ml-4 font-mono text-[10px] text-muted-foreground/60">⌘K</kbd>
+          </button>
 
           <button
             type="button"
             onClick={refreshInbox}
             title={t('top.refresh')}
             aria-label={t('top.refresh')}
-            className="grid size-9 place-items-center rounded-xl text-white/55 hover:bg-white/10 hover:text-white"
+            className="grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <RefreshCw className="size-4" />
+            <RefreshCw className="size-4" strokeWidth={1.5} />
           </button>
 
           {/* The bell. Clicking it marks everything read and takes you to the summary,
@@ -245,11 +299,15 @@ export default function App() {
               }
             }}
             title={t('top.markSeen')}
-            className="relative grid size-9 place-items-center rounded-xl text-white/55 hover:bg-white/10 hover:text-white"
+            className="relative grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            {total > 0 ? <BellRing className="size-4 text-yellow" /> : <Bell className="size-4" />}
             {total > 0 ? (
-              <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">
+              <BellRing className="size-4 text-primary" strokeWidth={1.5} />
+            ) : (
+              <Bell className="size-4" strokeWidth={1.5} />
+            )}
+            {total > 0 ? (
+              <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
                 {total > 99 ? '99+' : total}
               </span>
             ) : null}
@@ -276,6 +334,15 @@ export default function App() {
           ) : null}
         </div>
       </main>
+
+      <CommandPalette
+        items={flat}
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onSelect={go}
+        placeholder={t('nav.searchPlaceholder')}
+        emptyLabel={t('nav.searchEmpty')}
+      />
     </div>
   );
 }

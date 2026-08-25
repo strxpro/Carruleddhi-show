@@ -859,29 +859,22 @@ const instantFlow = [
       ]
     },
 
-    /* ---- F: "tell me about the next edition" -----------------------------
-       Fires alongside A or B when the box was ticked, which is why it is a route of
-       its own and not a step inside them. A row in a table is not a promise anyone
-       can see; this is the one message that says the box did something, and states
-       the limit out loud. */
-    {
-      flow: [
-        /* Ninety seconds behind the confirmation.
-           Both letters come from one form submission, so without this they arrive in the
-           same second — and the courtesy note about next year buries the one carrying a
-           race number and a form to sign. The filter is on the sleep rather than the
-           e-mail so an entry without the box ticked does not sit here waiting first. */
-        sleep(21, 1250, 640, 90, {
-          name: 'newsletter opt-in',
-          conditions: [[{ a: '{{1.newsConsent}}', o: 'boolean:equal', b: 'true' }]]
-        }),
-        sendEmail(18, 1580, 640, {
-          to: '{{lower(1.email)}}',
-          subject: '{{1.newsSubject}}',
-          html: '{{1.newsletterHtml}}'
-        })
-      ]
-    }
+    /* ---- F: "tell me about the next edition" — MOVED OUT OF THIS SCENARIO
+       There was a sixth route here: Tools > Sleep for 90 seconds, then an Email. The
+       delay existed so the courtesy note about next year would not land in the same
+       second as the letter carrying the race number and the form to sign.
+
+       Make could not resolve the Sleep module. It imported as a grey circle reading
+       "Module Not Found — builtin:BasicSleep", which stops the route it sits on. Rather
+       than try a different identifier — the identifiers in this file have already cost
+       two rounds of that, the Email module turning out to be version 7 and not 4 — the
+       whole thing moved to where no module is needed.
+
+       The function stamps `newsletter_subscribers.confirmation_sent_at`, the hourly
+       scenario asks for pending letters along with the reminders, and the note goes out
+       within the hour. That separates the two letters better than ninety seconds did,
+       and this scenario is two modules shorter with nothing left in it that Make cannot
+       draw. See pendingNewsletters() in worker/index.js and migration 0008. */
   ])
 ];
 

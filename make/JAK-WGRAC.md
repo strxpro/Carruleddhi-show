@@ -7,8 +7,14 @@ Pliki do importu:
 
 | Plik | Nazwa w Make | Moduły | Uruchamiany przez |
 |---|---|---|---|
-| `make/blueprint-1-instant.json` | Carruleddhi — 1 — natychmiastowe (webhook) | 18 | zgłoszenie na stronie |
+| `make/blueprint-1-instant.json` | Carruleddhi — 1 — natychmiastowe (webhook) | 16 | zgłoszenie na stronie |
 | `make/blueprint-2-reminders.json` | Carruleddhi — 2 — przypomnienia (co godzinę) | 3 | zegar |
+
+> **Jeśli widziałeś szary krążek „Module Not Found — builtin:BasicSleep"** — to był
+> moduł Sleep przed mailem newslettera. Make nie umie go rozwiązać i taka trasa się
+> zatrzymuje. Usunięty. Newsletter wychodzi teraz ze scenariusza 2, w ciągu godziny.
+> Zaimportuj scenariusz 1 jeszcze raz: ma 16 modułów i nie ma w nim nic, czego Make
+> nie potrafi narysować.
 
 Trzeciego scenariusza (ogłoszenie nowej edycji) jeszcze nie ma — patrz koniec pliku.
 
@@ -19,7 +25,7 @@ Trzeciego scenariusza (ogłoszenie nowej edycji) jeszcze nie ma — patrz koniec
 Trzy rzeczy muszą być gotowe, inaczej import się uda, a scenariusz nie.
 
 1. **Migracje w Supabase.** SQL Editor → wklej → Run, po kolei:
-   `0001` … `0007`. Jeśli któraś już przeszła, uruchom ją ponownie — wszystkie są
+   `0001` … `0008`. Jeśli któraś już przeszła, uruchom ją ponownie — wszystkie są
    napisane tak, że drugie uruchomienie nic nie psuje (`if not exists`,
    `on conflict do nothing`, `create or replace`).
 
@@ -57,9 +63,16 @@ Jeden webhook, jeden router, sześć tras.
    ├─ D  registration-minor-xx    25 HTTP(it) → 26 HTTP(jego jęz.) → 27 Email
    ├─ E  type = registration       9 HTTP WhatsApp, 30 HTTP WhatsApp
    ├─ F  reminder                 12 Email
-   ├─ G  contact                  14 Email
-   └─ H  newsConsent = true       21 Sleep 90 s → 18 Email
+   └─ G  contact                  14 Email
 ```
+
+Newslettera tu nie ma — jest w scenariuszu 2. Był, za modułem Sleep na 90 sekund, żeby
+grzecznościowa notka o przyszłym roku nie wylądowała w tej samej sekundzie co list
+z numerem startowym. Make nie rozpoznaje tego modułu (`builtin:BasicSleep`, szary
+krążek „Module Not Found"), a zgadywanie kolejnego identyfikatora już dwa razy
+kosztowało rundę poprawek. Funkcja stempluje teraz `confirmation_sent_at`, a zegar
+zbiera zaległe listy razem z przypomnieniami. Godzina rozdziela te dwa maile lepiej
+niż 90 sekund, a scenariusz jest o dwa moduły krótszy.
 
 **Dlaczego cztery trasy rejestracji, a nie dwie.** Filtr w Make nie jest „jeżeli” —
 kiedy nie przechodzi, **kończy całą trasę**, a nie pomija moduł. Włoch dostaje jeden
@@ -97,7 +110,7 @@ Vercelu wylicza to pole z daty urodzenia i wybranego języka, więc w Make nie m
 
    Potem **OK** i **Save** (dyskietka na dolnym pasku).
 
-5. **Podłącz SMTP w siedmiu modułach Email**: 8, 24, 16, 27, 12, 14, 18.
+5. **Podłącz SMTP w sześciu modułach Email**: 8, 24, 16, 27, 12, 14.
    W pierwszym utwórz połączenie, w pozostałych wybierz je z listy.
 
    | Pole | Wartość |
@@ -136,9 +149,9 @@ Co powinno przyjść:
 | przypomnienie | 1 potwierdzenie zapisu | — | — |
 | kontakt | 1 na Twój adres, Reply-To = nadawca | — | — |
 
-Zaznaczony newsletter → drugi mail **90 sekund później**. To celowo: oba listy
-wychodzą z jednego wysłania formularza, więc bez opóźnienia lądują w tej samej
-sekundzie i grzecznościowa notka o przyszłym roku przykrywa tę z numerem startowym.
+Zaznaczony newsletter → drugi mail **ze scenariusza 2, w ciągu godziny**. Nie ze
+scenariusza 1. Jeśli chcesz go zobaczyć od razu, uruchom scenariusz 2 ręcznie
+(**Run once**).
 
 ### Jak czytać błąd
 
@@ -173,6 +186,15 @@ Najczęstsze:
 decyduje które przypomnienie jest należne, czyta listę z Supabase, renderuje list
 w języku każdej osoby, dokleja jej numer startowy jeśli startuje, i **zapisuje**
 komu co wysłała. Make dostaje gotowe listy.
+
+Ten sam przebieg wysyła też **zaległe potwierdzenia newslettera** — to one przeniosły
+się tu ze scenariusza 1, gdy zniknął moduł Sleep. Przypomnienia są w tablicy pierwsze,
+newsletter po nich, więc list z numerem startowym wychodzi wcześniej. W odpowiedzi
+widać to jako `reminders` i `newsletters`.
+
+Kolejka newslettera opróżnia się **na każdym przebiegu**, także wtedy gdy żadne
+przypomnienie nie jest należne. Musi: do zjazdu jest rok „za wcześnie" i jeden tydzień
+„teraz", a potwierdzenia nie mogą czekać do października.
 
 Poprzednia wersja miała 6 modułów: odczyt 500 wierszy z arkusza, arytmetykę dat
 z `parseDate`, cały 26-kilobajtowy słownik w zmiennej, drugą zmienną do wyboru

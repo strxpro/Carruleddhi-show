@@ -55,11 +55,27 @@
   display: block;
 }
 
+/* ============================================================================
+   THE HIDDEN START STATE IS OPT-IN, AND THIS IS THE MOST IMPORTANT RULE HERE
+   ============================================================================
+   It used to be the default: `.fx-unit { opacity: 0 }`, made visible again by the
+   animation that `is-playing` starts. So the text was invisible until an
+   IntersectionObserver callback fired — and when that callback did not fire, six
+   headings stayed at opacity 0 and simply were not on the page. Measured in a real
+   browser: spans built, stylesheet loaded, `is-playing` never added, computed opacity 0.
+
+   An entrance animation must never be the thing that decides whether text is readable.
+   So the hidden state now requires `is-armed`, which JavaScript adds only when it has
+   also armed a way out — an observer *and* a timeout. No JavaScript, a starved observer,
+   a browser that does not support it: none of them can hide the words, because none of
+   them adds the class.
+   ========================================================================== */
+
 /* ---------------------------------------------------------------- rise ----
    Each character lifts into place. The stagger is `--i` multiplied by a step, so a
    long heading takes longer than a short one and every character keeps the same
    speed — which is the difference between a wave and a scramble. */
-[data-text-effect='rise'] .fx-unit {
+[data-text-effect='rise'].is-armed:not(.is-playing) .fx-unit {
   opacity: 0;
   transform: translateY(0.7em);
 }
@@ -77,7 +93,7 @@
 /* ---------------------------------------------------------------- jump ----
    The spring entrance: up from below, rotated, overshooting slightly on the way in.
    Used per word, because per character it reads as a fairground sign. */
-[data-text-effect='jump'] .fx-unit {
+[data-text-effect='jump'].is-armed:not(.is-playing) .fx-unit {
   opacity: 0;
   transform: translateY(0.85em) rotate(-9deg);
 }

@@ -40,7 +40,14 @@ function Bubble({
       <span
         className={cn(
           'grid size-7 shrink-0 place-items-center rounded-full text-[11px] font-bold',
-          mine ? 'bg-yellow text-navy-950' : bot ? 'bg-white/10 text-white/60' : 'bg-blue-500 text-white'
+          /* Three distinguishable avatars, and only one of them is the accent colour.
+             The visitor used to be `bg-blue-500`, which no longer exists — the palette has
+             one accent now, and it belongs to the organiser's own messages. */
+          mine
+            ? 'bg-primary text-primary-foreground'
+            : bot
+              ? 'bg-muted text-muted-foreground'
+              : 'bg-secondary text-secondary-foreground'
         )}
         title={mine ? t('chat.you') : bot ? t('chat.bot') : t('chat.visitor')}
       >
@@ -280,7 +287,7 @@ export function Chat({
                       ? 'bg-coral/20 text-coral'
                       : current.mode === 'closed'
                         ? 'bg-white/10 text-white/50'
-                        : 'bg-blue-500/20 text-blue-100'
+                        : 'bg-primary/15 text-primary'
                   )}
                 >
                   {current.mode === 'human'

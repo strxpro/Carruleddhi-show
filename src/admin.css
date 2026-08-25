@@ -5,21 +5,81 @@
  * stylesheets untouched and never download this.
  */
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
 
-/* The event's own palette, as Tailwind theme tokens. The panel is a tool rather than a
-   poster, so it uses these sparingly — navy for structure, yellow for the one thing on
-   a screen that wants attention, coral for anything destructive. */
+/* ============================================================================
+   The palette, as shadcn tokens
+   ============================================================================
+   The panel used the event's own colours directly: navy-950 for the page, white/10 for
+   every border, yellow for anything that mattered. That is the right palette for a
+   poster and the wrong one for a tool you stare at for an hour — a saturated navy behind
+   dense tables reads as loud, and `border-white/10` is a different grey depending on what
+   is behind it.
+
+   So the structural colours are shadcn's semantic tokens now: `background`, `card`,
+   `border`, `muted-foreground`, `primary`. Near-black, one flat border colour, and one
+   accent. The event's colours stay for the things that are about the event — the yellow
+   race number, the coral delete button — rather than for the furniture.
+
+   WHY THE OLD NAMES ARE STILL HERE
+     Six view files and about four hundred class names use `navy-900`, `white/10` and
+     `yellow`. Renaming all of them in one pass is four hundred chances to change a colour
+     and a layout at the same time and not know which one broke. They are aliased onto the
+     new palette instead: `bg-navy-900` now paints a card, `text-yellow` is still yellow.
+     The screens change appearance without a single className moving, and anything written
+     from here on uses the semantic name.
+
+   HSL and not hex, because that is what `color-mix` and the `/50` opacity modifiers in
+   the component below expect to find.
+   ========================================================================== */
+
 @theme {
-  --color-navy-950: #071a3d;
-  --color-navy-900: #0d2452;
-  --color-navy-800: #143069;
-  --color-blue-600: #174ea6;
-  --color-blue-500: #2469d8;
-  --color-blue-100: #e9f1ff;
+  /* --- structure ---------------------------------------------------------- */
+  --color-background: hsl(0 0% 6%);
+  --color-foreground: hsl(0 0% 96%);
+  --color-card: hsl(0 0% 9%);
+  --color-card-foreground: hsl(0 0% 96%);
+  --color-popover: hsl(0 0% 11%);
+  --color-popover-foreground: hsl(0 0% 96%);
+  --color-muted: hsl(0 0% 14%);
+  --color-muted-foreground: hsl(0 0% 61%);
+  --color-border: hsl(0 0% 20%);
+  --color-input: hsl(0 0% 20%);
+  --color-ring: hsl(45 100% 58%);
+
+  /* --- the one accent ----------------------------------------------------- */
+  /* Still the event's yellow. It is the colour of a race number, so it is the right one
+     for "this is the thing to look at" — but it is now the only saturated colour in the
+     furniture rather than one of four. */
+  --color-primary: hsl(45 100% 58%);
+  --color-primary-foreground: hsl(0 0% 6%);
+  --color-secondary: hsl(0 0% 16%);
+  --color-secondary-foreground: hsl(0 0% 96%);
+  --color-accent: hsl(0 0% 16%);
+  --color-accent-foreground: hsl(0 0% 96%);
+  --color-destructive: hsl(358 91% 63%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+
+  /* --- the event's own colours, for the event's own things ---------------- */
   --color-yellow: #ffc928;
   --color-coral: #f6494f;
   --color-green: #2fbf71;
-  --color-paper: #fdfaf3;
+
+  /* --- aliases, so the existing views keep working ----------------------- */
+  /* Deliberately not the old navy. `bg-navy-950` was the page and `bg-navy-900` was a
+     card; they now paint the new background and card, which is what those class names
+     were always being used to mean. */
+  --color-navy-950: hsl(0 0% 6%);
+  --color-navy-900: hsl(0 0% 9%);
+  --color-navy-800: hsl(0 0% 13%);
+
+  /* The blue tokens are deliberately NOT aliased.
+     Aliasing `blue-500` onto the new accent would have made every old `bg-blue-500` come
+     out yellow — including the chat's visitor avatar, which sits next to an organiser
+     avatar that is also yellow, and its `text-white` label on top of it. An alias that
+     produces yellow-on-yellow is worse than a missing class, because a missing class fails
+     visibly and at build time. The two places that used them were changed to semantic
+     tokens instead; see views/Chat.tsx. */
 
   --font-display: "Bungee", system-ui, sans-serif;
   --font-meta: "Baloo 2", system-ui, sans-serif;
@@ -33,30 +93,32 @@ html {
 
 body {
   margin: 0;
-  background: var(--color-navy-950);
+  background: var(--color-background);
+  color: var(--color-foreground);
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Same jelly scrollbar as the public site, so the two do not feel like different
-   products when you move between them. */
+/* A plain scrollbar, thin and grey.
+   The public site has a jelly-gradient one, which suits a carnival page. Here it sat
+   beside a table of participants and pulled the eye away from it every time the list
+   moved. The panel is furniture. */
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-navy-900);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--color-yellow), var(--color-coral) 60%, var(--color-blue-500))
-    padding-box;
+  background: var(--color-border) padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  filter: saturate(1.25) brightness(1.05);
+  background: var(--color-muted-foreground) padding-box;
 }
 
 /* Used by the chat's "typing" marker. */

@@ -104,11 +104,23 @@ check(
   JSON.stringify(foreign?.mail?.mapper?.attachments)
 );
 
-/* --- the newsletter waits, and the wait is what is filtered --------------- */
-
-const sleepNode = modules.find(({ node }) => node.module === 'builtin:BasicSleep');
-check('newsletter sits behind a sleep', Boolean(sleepNode));
-check('the filter is on the sleep, not the mail', Boolean(sleepNode?.node.filter), 'an unfiltered sleep delays every route');
+/* --- only modules Make can actually draw ---------------------------------
+   Every identifier in a blueprint is a guess until Make renders it, and a wrong one
+   imports as a grey "Module Not Found" circle that silently stops the route it is on.
+   `builtin:BasicSleep` was exactly that. These four are the ones observed working in the
+   real editor, so anything else appearing here needs verifying before it ships. */
+const KNOWN_MODULES = new Set([
+  'gateway:CustomWebHook',
+  'gateway:WebhookRespond',
+  'builtin:BasicRouter',
+  'builtin:BasicFeeder',
+  'http:ActionGetFile',
+  'http:ActionSendData',
+  'email:ActionSendEmail'
+]);
+for (const { node } of modules) {
+  check(`module ${node.id} is one Make can resolve (${node.module})`, KNOWN_MODULES.has(node.module));
+}
 
 /* --- nothing quotes a module it cannot see -------------------------------- */
 
@@ -159,6 +171,15 @@ check('reminders: asks the function what is due', remModules.some((m) => String(
 check('reminders: sends the passphrase', JSON.stringify(reminders).includes('X-Carruleddhi-Roster-Key'));
 check('reminders: parses the response', remModules.find((m) => m.module === 'http:ActionSendData')?.mapper?.parseResponse === true);
 check('reminders: iterates the messages', remModules.some((m) => m.module === 'builtin:BasicFeeder'));
+
+for (const node of remModules) {
+  check(`reminders: module ${node.id} is one Make can resolve (${node.module})`, KNOWN_MODULES.has(node.module));
+}
+check(
+  'no Sleep module in either scenario',
+  ![...modules.map(({ node }) => node), ...remModules].some((node) => String(node.module).includes('Sleep')),
+  'builtin:BasicSleep imports as "Module Not Found" and stops its route'
+);
 
 const remMail = remModules.find((m) => m.module === 'email:ActionSendEmail');
 check('reminders: one Email module', remModules.filter((m) => m.module === 'email:ActionSendEmail').length === 1);

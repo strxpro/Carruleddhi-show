@@ -585,9 +585,24 @@ async function remindersDue(env, payload, cors) {
   const due = reminderWindow(hoursLeft);
   const hours = Math.round(hoursLeft);
 
-  // Too early, or the race has been and gone. Answered plainly so a run that sent
-  // nothing is distinguishable from a run that broke.
-  if (!due) return json({ ok: true, due: '', hoursLeft: hours, messages: [] }, 200, cors);
+  /* The newsletter queue is drained on every run, whether or not a reminder is due.
+     It has to be: the race is a year of "too early" and one week of "due", and those
+     confirmations cannot wait for October. */
+  const newsletters = await pendingNewsletters(env, Boolean(payload.dryRun));
+
+  // Too early for a reminder, or the race has been and gone. Answered plainly so a run
+  // that sent nothing is distinguishable from a run that broke.
+  if (!due) {
+    return json({
+      ok: true,
+      due: '',
+      hoursLeft: hours,
+      dryRun: Boolean(payload.dryRun),
+      count: newsletters.messages.length,
+      messages: newsletters.messages,
+      ...(newsletters.note ? { note: newsletters.note } : {})
+    }, 200, cors);
+  }
 
   /* Active subscribers who have not had this particular reminder.
      `last_reminder is null` has to be spelled out: in SQL, NULL <> '7d' is not true, so
@@ -606,7 +621,15 @@ async function remindersDue(env, payload, cors) {
   }
   const rows = await response.json();
   if (!Array.isArray(rows) || rows.length === 0) {
-    return json({ ok: true, due, hoursLeft: hours, messages: [] }, 200, cors);
+    // Nobody is owed this reminder, but the newsletter queue may still have something.
+    return json({
+      ok: true,
+      due,
+      hoursLeft: hours,
+      dryRun: Boolean(payload.dryRun),
+      count: newsletters.messages.length,
+      messages: newsletters.messages
+    }, 200, cors);
   }
 
   /* Race numbers, so a subscriber who is also racing sees their own number in the
@@ -683,14 +706,93 @@ async function remindersDue(env, payload, cors) {
     }
   }
 
+  /* Reminders first, newsletter notes after. Make iterates in order, so the letter with
+     the race number in it is handed over before the courtesy note about next year. */
+  const all = [...messages, ...newsletters.messages];
   return json({
     ok: true,
     due,
     hoursLeft: hours,
     dryRun: Boolean(payload.dryRun),
-    count: messages.length,
-    messages
+    count: all.length,
+    reminders: messages.length,
+    newsletters: newsletters.messages.length,
+    messages: all
   }, 200, cors);
+}
+
+/**
+ * The newsletter confirmations still waiting to go out.
+ *
+ * WHY THESE TRAVEL WITH THE REMINDERS
+ *   They used to be sent by scenario 1, behind a Tools > Sleep module set to 90 seconds —
+ *   long enough that the note about next year would not land in the same second as the
+ *   letter carrying the race number and the form to sign. Make could not resolve that
+ *   module: it imported as a grey "Module Not Found — builtin:BasicSleep" and stopped the
+ *   route.
+ *
+ *   So the separation moved here. An hourly scenario separates the two letters better than
+ *   ninety seconds did, and it is a courtesy note about a race in a year's time — nobody
+ *   is refreshing their inbox for it. Scenario 1 is two modules shorter and has nothing
+ *   left in it that Make cannot draw.
+ *
+ * Marked the same way and for the same reason as the reminders: before Make sends, because
+ * "one person misses a note" beats "everybody gets it twice an hour from now".
+ */
+const NEWSLETTER_BATCH = 100;
+
+async function pendingNewsletters(env, dryRun) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/newsletter_subscribers`);
+  url.searchParams.set('select', 'id,name,email,locale');
+  url.searchParams.set('status', 'eq.active');
+  url.searchParams.set('confirmation_sent_at', 'is.null');
+  url.searchParams.set('order', 'created_at.asc');
+  url.searchParams.set('limit', String(NEWSLETTER_BATCH));
+
+  let rows;
+  try {
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    // A missing column means migration 0008 has not run. The reminders still work, so
+    // this is reported rather than fatal.
+    if (!response.ok) return { messages: [], note: `newsletter read failed: ${response.status}` };
+    rows = await response.json();
+  } catch (_) {
+    return { messages: [], note: 'newsletter read threw' };
+  }
+  if (!Array.isArray(rows) || rows.length === 0) return { messages: [] };
+
+  const event = COPY_DECK._event || {};
+  const messages = rows.map((row) => {
+    const locale = localeOf(row.locale);
+    const deck = COPY_DECK[locale] || COPY_DECK.it;
+    const firstName = String(row.name || '').trim().split(/\s+/)[0] || '';
+    return {
+      to: String(row.email || '').trim().toLowerCase(),
+      subject: deck.newsSubject || '',
+      html: renderTemplate(EMAIL_TEMPLATES.newsletter, {
+        copy: deck,
+        ev: event,
+        loc: locale,
+        newsHi: fill(deck.newsHi, { FIRSTNAME: firstName })
+      })
+    };
+  });
+
+  if (!dryRun) {
+    const ids = rows.map((row) => row.id).filter(Boolean);
+    const patch = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/newsletter_subscribers?id=in.(${ids.join(',')})`,
+      {
+        method: 'PATCH',
+        headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ confirmation_sent_at: new Date().toISOString() })
+      }
+    );
+    // Handing over letters that were not recorded means sending them again in an hour.
+    if (!patch.ok) return { messages: [], note: 'newsletter mark failed' };
+  }
+
+  return { messages };
 }
 
 /* ============================================================================
