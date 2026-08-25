@@ -104,7 +104,13 @@
     "minPrintBodyOne": "Stampate il modulo, firmatelo e portatelo il giorno della gara. Chi firma deve essere presente alla partenza con un documento d’identità valido.",
     "remWindow7": "7 giorni",
     "remWindow1": "1 giorno",
-    "remWindow3": "3 ore"
+    "remWindow3": "3 ore",
+    "unsubFooter": "Non voglio più questi avvisi",
+    "unsubSubject": "Il tuo codice: %CODE%",
+    "unsubCodeTitle": "Ecco il codice",
+    "unsubCodeLead": "Inseriscilo sul sito per disattivare gli avvisi. Vale 15 minuti.",
+    "unsubCodeNote": "Se non hai chiesto tu questo codice, ignora il messaggio: non cambia nulla.",
+    "unsubDone": "Fatto. Non ti scriveremo più."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -200,7 +206,13 @@
     "minPrintBodyOne": "Wydrukujcie formularz, podpiszcie go i weźmy ze sobą w dniu zjazdu. Osoba podpisująca musi być na starcie z ważnym dokumentem tożsamości.",
     "remWindow7": "7 dni",
     "remWindow1": "1 dzie",
-    "remWindow3": "3 godziny"
+    "remWindow3": "3 godziny",
+    "unsubFooter": "Nie chcę już tych powiadomień",
+    "unsubSubject": "Twój kod: %CODE%",
+    "unsubCodeTitle": "Oto kod",
+    "unsubCodeLead": "Wpisz go na stronie, żeby wyłączyć powiadomienia. Jest ważny 15 minut.",
+    "unsubCodeNote": "Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — nic się nie zmieni.",
+    "unsubDone": "Gotowe. Nie będziemy już pisać."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -296,7 +308,13 @@
     "minPrintBodyOne": "Print the form, sign it and bring it on race day. Whoever signs has to be at the start with valid photo identification.",
     "remWindow7": "7 days",
     "remWindow1": "1 day",
-    "remWindow3": "3 hours"
+    "remWindow3": "3 hours",
+    "unsubFooter": "I no longer want these",
+    "unsubSubject": "Your code: %CODE%",
+    "unsubCodeTitle": "Here is the code",
+    "unsubCodeLead": "Enter it on the website to switch the reminders off. It lasts 15 minutes.",
+    "unsubCodeNote": "If you did not ask for this code, ignore this message — nothing changes.",
+    "unsubDone": "Done. We will not write again."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -392,7 +410,13 @@
     "minPrintBodyOne": "Drucken Sie das Formular aus, unterschreiben Sie es und bringen Sie es am Renntag mit. Die unterschreibende Person muss mit einem gültigen Ausweis am Start sein.",
     "remWindow7": "7 Tage",
     "remWindow1": "1 Tag",
-    "remWindow3": "3 Stunden"
+    "remWindow3": "3 Stunden",
+    "unsubFooter": "Ich möchte das nicht mehr",
+    "unsubSubject": "Dein Code: %CODE%",
+    "unsubCodeTitle": "Hier ist der Code",
+    "unsubCodeLead": "Gib ihn auf der Website ein, um die Erinnerungen abzuschalten. Er gilt 15 Minuten.",
+    "unsubCodeNote": "Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — es ändert sich nichts.",
+    "unsubDone": "Erledigt. Wir schreiben nicht mehr."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -488,7 +512,13 @@
     "minPrintBodyOne": "Imprimid el formulario, firmadlo y llevadlo el día de la carrera. Quien firma debe estar en la salida con un documento de identidad válido.",
     "remWindow7": "7 días",
     "remWindow1": "1 día",
-    "remWindow3": "3 horas"
+    "remWindow3": "3 horas",
+    "unsubFooter": "Ya no quiero estos avisos",
+    "unsubSubject": "Tu código: %CODE%",
+    "unsubCodeTitle": "Aquí tienes el código",
+    "unsubCodeLead": "Escríbelo en la web para desactivar los avisos. Vale 15 minutos.",
+    "unsubCodeNote": "Si no has pedido este código, ignora el mensaje: no cambia nada.",
+    "unsubDone": "Hecho. No volveremos a escribir."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -584,6 +614,12 @@
     "minPrintBodyOne": "Imprimez le formulaire, signez-le et apportez-le le jour de la course. Le signataire doit être présent au départ avec une pièce d’identité valide.",
     "remWindow7": "7 jours",
     "remWindow1": "1 jour",
-    "remWindow3": "3 heures"
+    "remWindow3": "3 heures",
+    "unsubFooter": "Je ne veux plus ces rappels",
+    "unsubSubject": "Votre code : %CODE%",
+    "unsubCodeTitle": "Voici le code",
+    "unsubCodeLead": "Saisissez-le sur le site pour désactiver les rappels. Il est valable 15 minutes.",
+    "unsubCodeNote": "Si vous n’avez pas demandé ce code, ignorez ce message : rien ne change.",
+    "unsubDone": "C’est fait. Nous n’écrirons plus."
   }
 }

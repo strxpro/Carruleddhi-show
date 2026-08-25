@@ -3878,6 +3878,160 @@ import { flagSvg } from './flags.js';
     return ahead;
   }
 
+  /**
+   * Turning reminders off, in three steps.
+   *
+   * Arrives as `#unsub=<token>` — the link at the foot of every reminder and newsletter.
+   * A fragment rather than a query string, so the token never reaches a server log and is
+   * never sent in a Referer header to anything the page loads. It is read once and wiped
+   * from the address bar immediately, so a shared screenshot of the URL is worth nothing.
+   *
+   * Step 1 shows the masked address the server resolved and offers to send a code. Step 2
+   * takes the six digits. Step 3 says it is done. A code rather than one click because an
+   * unsubscribe link in an e-mail gets forwarded, and gets prefetched by mail clients, and
+   * then somebody else's reminders are off and nobody knows why.
+   *
+   * The panel stays hidden for every other visitor. Nobody arrives at the contact section
+   * wanting to see an unsubscribe form.
+   */
+  function setupUnsubscribe() {
+    const panel = $('[data-unsub-panel]');
+    if (!panel) return;
+
+    const match = /(?:^|[#&])unsub=([a-f0-9]{16,64})/i.exec(window.location.hash);
+    if (!match) return;
+    const token = match[1];
+
+    /* Cleared from the address bar before anything else happens. replaceState so the back
+       button does not walk back into a URL carrying the token. */
+    try {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}#contact`);
+    } catch (_) {
+      /* Not worth failing the flow over; the token is single-purpose anyway. */
+    }
+
+    const steps = {
+      start: $('[data-unsub-step="start"]', panel),
+      code: $('[data-unsub-step="code"]', panel),
+      done: $('[data-unsub-step="done"]', panel)
+    };
+    const emailOut = $('[data-unsub-email]', panel);
+    const status = $('[data-unsub-status]', panel);
+    const codeField = $('[data-unsub-code]', panel);
+    const sendButton = $('[data-unsub-send]', panel);
+    const confirmButton = $('[data-unsub-confirm]', panel);
+
+    const show = (name) => {
+      Object.entries(steps).forEach(([key, element]) => {
+        if (element) element.hidden = key !== name;
+      });
+    };
+    const say = (key, fallback = '') => {
+      if (!status) return;
+      status.textContent = key ? (text(key) || fallback) : '';
+    };
+
+    panel.hidden = false;
+    show('start');
+    // The panel is below the fold of a long section, and somebody who pressed a link in an
+    // e-mail should not have to hunt for what it opened.
+    requestAnimationFrame(() => panel.scrollIntoView({ block: 'center' }));
+
+    const endpoint = (name) => `/api/carruleddhi/${name}`;
+
+    async function post(name, body) {
+      const response = await fetch(endpoint(name), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'omit'
+      });
+      const payload = await response.json().catch(() => ({}));
+      return { ok: response.ok, status: response.status, payload };
+    }
+
+    /* The address is asked for straight away, before any button is pressed: the first thing
+       somebody needs to see is which address this is about, in case it is not theirs. */
+    (async () => {
+      const { ok, payload } = await post('unsub-start', { token, peek: true });
+      if (!ok) {
+        say('unsub.badLink', 'Ten link już nie działa.');
+        return;
+      }
+      if (emailOut) emailOut.textContent = payload.email || '';
+      if (payload.already) {
+        show('done');
+        say('unsub.alreadyOff', '');
+      }
+    })().catch(() => say('unsub.offline', ''));
+
+    sendButton?.addEventListener('click', async () => {
+      sendButton.disabled = true;
+      say('unsub.sending', '');
+      try {
+        const { ok, payload } = await post('unsub-start', { token });
+        if (payload.already) {
+          show('done');
+          say('unsub.alreadyOff', '');
+          return;
+        }
+        if (!ok) {
+          say('unsub.sendFailed', '');
+          sendButton.disabled = false;
+          return;
+        }
+        show('code');
+        say('unsub.sent', '');
+        codeField?.focus();
+      } catch (_) {
+        say('unsub.offline', '');
+        sendButton.disabled = false;
+      }
+    });
+
+    confirmButton?.addEventListener('click', async () => {
+      const code = String(codeField?.value || '').replace(/\D/g, '');
+      if (code.length !== 6) {
+        say('unsub.codeShort', '');
+        return;
+      }
+      confirmButton.disabled = true;
+      say('unsub.checking', '');
+      try {
+        const { ok, payload } = await post('unsub-confirm', { token, code });
+        if (ok) {
+          show('done');
+          say('', '');
+          return;
+        }
+        /* The server says how many tries are left. Showing it is the difference between
+           "wrong code" and "wrong code, and you have two goes before you need a new one". */
+        const left = Number(payload.left);
+        say(
+          payload.code === 'UNSUB_CODE_EXPIRED' ? 'unsub.codeExpired'
+            : payload.code === 'UNSUB_TOO_MANY_TRIES' ? 'unsub.codeBlocked'
+              : 'unsub.codeWrong',
+          ''
+        );
+        if (Number.isFinite(left) && left > 0 && status) {
+          status.textContent = `${status.textContent} (${left})`;
+        }
+        confirmButton.disabled = false;
+      } catch (_) {
+        say('unsub.offline', '');
+        confirmButton.disabled = false;
+      }
+    });
+
+    // Enter is what somebody does after typing six digits.
+    codeField?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        confirmButton?.click();
+      }
+    });
+  }
+
   function setupPanelDepth() {
     const panels = $$('#main > section');
     panels.forEach((section, index) => {
@@ -3925,6 +4079,7 @@ import { flagSvg } from './flags.js';
       ['gallery3d', setupGalleryCarousel],
       ['footerYear', setupFooterYear],
       ['reminderWindows', setupReminderWindows],
+      ['unsubscribe', setupUnsubscribe],
       ['textEffects', setupTextEffects]
     ];
 

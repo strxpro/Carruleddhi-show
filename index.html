@@ -1019,6 +1019,48 @@
     </section>
 
     <section class="section section-card contact" id="contact" aria-labelledby="contact-title">
+      <!-- Turning reminders off.
+           Hidden until somebody arrives with `#unsub=<token>` in the address, which is what
+           the small link at the foot of every reminder and newsletter points at. It is here
+           rather than on a page of its own because "stop writing to me" is a thing you say
+           to the organisers, and this is where the organisers are.
+
+           Three steps, one at a time: this is your address, here is the code we sent it,
+           confirm. A code rather than one click because a link in an e-mail gets forwarded
+           and prefetched, and then somebody else's reminders are off. -->
+      <div class="container" data-unsub-panel hidden>
+        <div class="unsub">
+          <h3 class="unsub__title" data-i18n="unsub.title">Wyłączyć powiadomienia?</h3>
+
+          <div data-unsub-step="start">
+            <p class="unsub__lead">
+              <span data-i18n="unsub.leadStart">Wyślemy kod na ten adres:</span>
+              <strong data-unsub-email></strong>
+            </p>
+            <button class="btn btn--small" type="button" data-unsub-send>
+              <span data-i18n="unsub.send">Wyślij kod</span>
+            </button>
+          </div>
+
+          <div data-unsub-step="code" hidden>
+            <p class="unsub__lead" data-i18n="unsub.leadCode">Wpisz sześć cyfr z wiadomości. Kod jest ważny 15 minut.</p>
+            <div class="unsub__row">
+              <input class="unsub__code" data-unsub-code type="text" inputmode="numeric" autocomplete="one-time-code"
+                     maxlength="6" pattern="[0-9]*" aria-label="Kod" data-i18n-aria-label="unsub.codeLabel">
+              <button class="btn btn--small" type="button" data-unsub-confirm>
+                <span data-i18n="unsub.confirm">Potwierdź</span>
+              </button>
+            </div>
+          </div>
+
+          <div data-unsub-step="done" hidden>
+            <p class="unsub__lead unsub__lead--done" data-i18n="unsub.done">Gotowe. Nie będziemy już pisać.</p>
+          </div>
+
+          <p class="unsub__status" data-unsub-status role="status" aria-live="polite"></p>
+        </div>
+      </div>
+
       <div class="container contact__grid">
         <div class="reveal">
           <span class="eyebrow" data-i18n="contact.kicker">Parliamone</span>

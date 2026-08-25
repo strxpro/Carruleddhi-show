@@ -44,6 +44,7 @@ const ALLOWED_TYPES = new Set([
 const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
+  'unsub-start', 'unsub-confirm',
   'chat', 'chat-admin', 'inbox'
 ]);
 
@@ -126,7 +127,15 @@ const FIELD_WHITELIST = {
                 letters, which is what Make's own scenario used to do. */
   'reminders-due': ['dryRun', 'deliver'],
   // Wiping test data. `scope` names what to wipe, `confirm` has to spell it out.
-  purge: ['scope', 'confirm']
+  purge: ['scope', 'confirm'],
+  /* Turning reminders off. Not behind the passphrase — the person using these is a
+     visitor with a letter, not an organiser. The token is the guard. */
+  /* `peek` asks who this token belongs to without sending anything. The page needs the
+     masked address before it offers to send a code — the first thing somebody has to see is
+     which address this is about, in case it is not theirs — and doing that with the same
+     call that sends would mean a code goes out before any button is pressed. */
+  'unsub-start': ['token', 'peek'],
+  'unsub-confirm': ['token', 'code']
 };
 
 const MAX_FIELD_LENGTH = 3000;
@@ -640,7 +649,7 @@ async function remindersDue(env, payload, cors) {
      a `neq` filter on its own would silently skip everybody who has never been written
      to — which is everybody, on the first run. */
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/reminder_subscribers`);
-  url.searchParams.set('select', 'id,name,email,locale');
+  url.searchParams.set('select', 'id,name,email,locale,unsubscribe_token');
   url.searchParams.set('status', 'eq.active');
   url.searchParams.set('or', `(last_reminder.is.null,last_reminder.neq.${due})`);
 
@@ -715,7 +724,10 @@ async function remindersDue(env, payload, cors) {
       remBody: deck[`remBody${suffix}`] || '',
       // A subscriber who is not racing gets the ordinary footer line instead of an
       // empty "#" followed by nothing.
-      remRiderLine: raceNumber ? `#${raceNumber} — ${deck.remRiderNote}` : deck.footerNote
+      remRiderLine: raceNumber ? `#${raceNumber} — ${deck.remRiderNote}` : deck.footerNote,
+      // The row's own token, so the link at the foot of the letter identifies the reader
+      // without carrying their address through a URL.
+      unsubUrl: unsubscribeUrl(row.unsubscribe_token)
     };
 
     messages.push({
@@ -852,7 +864,7 @@ const NEWSLETTER_BATCH = 100;
 
 async function pendingNewsletters(env, dryRun) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/newsletter_subscribers`);
-  url.searchParams.set('select', 'id,name,email,locale');
+  url.searchParams.set('select', 'id,name,email,locale,unsubscribe_token');
   url.searchParams.set('status', 'eq.active');
   url.searchParams.set('confirmation_sent_at', 'is.null');
   url.searchParams.set('order', 'created_at.asc');
@@ -882,7 +894,8 @@ async function pendingNewsletters(env, dryRun) {
         copy: deck,
         ev: event,
         loc: locale,
-        newsHi: fill(deck.newsHi, { FIRSTNAME: firstName })
+        newsHi: fill(deck.newsHi, { FIRSTNAME: firstName }),
+        unsubUrl: unsubscribeUrl(row.unsubscribe_token)
       })
     };
   });
@@ -902,6 +915,281 @@ async function pendingNewsletters(env, dryRun) {
   }
 
   return { messages };
+}
+
+/* ============================================================================
+   Turning reminders off
+   ============================================================================
+   Two steps, because one is not enough and three is too many.
+
+     unsub-start    a token from the footer of a letter. Answers with the masked address
+                    and which lists it is on, and e-mails a six-digit code to it.
+     unsub-confirm  the token and the code. Verifies, then sets the rows to unsubscribed.
+
+   WHY NOT ONE CLICK
+     A one-click link is the usual thing and it is fine until the link is forwarded, or
+     prefetched by a mail client, or pasted into a group chat. Then somebody else's
+     reminders are off and nobody knows why. A code sent to the address being removed
+     proves the person asking is reading that inbox.
+
+   WHY THE LINK CARRIES A TOKEN
+     `?unsub=someone@example.com` puts an address into a URL, and a URL travels through
+     browser history, the Referer header of everything the page loads, and the logs of
+     every hop on the way. The token means nothing outside the database.
+
+   NEITHER STEP IS BEHIND THE PASSPHRASE
+     They cannot be: the person using them is a visitor with a letter, not an organiser.
+     What guards them is the token — unguessable, and useless without the inbox it points
+     at — plus the attempt counter on the code.
+   ========================================================================== */
+
+const CODE_ATTEMPT_LIMIT = 5;
+
+/**
+ * The link at the foot of a letter.
+ *
+ * A fragment, not a query string: `#unsub=…` never reaches the server, so the token stays
+ * out of access logs and out of the Referer header the page would otherwise send to
+ * anything it loads. The page reads it, posts it once, and clears it from the address bar.
+ *
+ * An empty token gives an empty string rather than a broken link — the footer is on every
+ * letter and a receipt has nothing to unsubscribe from.
+ */
+function unsubscribeUrl(token) {
+  if (!token) return '';
+  const base = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
+  return `${base}/#unsub=${token}`;
+}
+
+/** Six digits, from the platform's own randomness rather than Math.random. */
+function newVerificationCode() {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return String(bytes[0] % 1_000_000).padStart(6, '0');
+}
+
+/** Hashed with the same salt as the IP hashes, so the row can check a guess without
+ *  holding the answer. */
+async function hashCode(env, email, code) {
+  const data = new TextEncoder().encode(`${env.WALL_SALT || 'carruleddhi'}:${email}:${code}`);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** `m****o@example.com`. Enough to recognise your own address, not enough to learn one. */
+function maskEmail(email) {
+  const [name = '', domain = ''] = String(email).split('@');
+  if (!domain) return '';
+  const head = name.slice(0, 1);
+  const tail = name.length > 1 ? name.slice(-1) : '';
+  return `${head}${'*'.repeat(Math.max(name.length - 2, 1))}${tail}@${domain}`;
+}
+
+/**
+ * Finds every list a token belongs to.
+ *
+ * Both lists are checked whichever letter the token came from, because somebody pressing
+ * "no more reminders" at the foot of a newsletter means all of it. Answering only for the
+ * list that happened to send the letter is how a person ends up unsubscribing three times
+ * and still hearing from you.
+ */
+async function findSubscriptions(env, token) {
+  const lists = [
+    { name: 'reminders', table: 'reminder_subscribers' },
+    { name: 'newsletter', table: 'newsletter_subscribers' }
+  ];
+
+  let email = '';
+  const found = [];
+  for (const list of lists) {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${list.table}`);
+    url.searchParams.set('select', 'id,email,locale,status');
+    url.searchParams.set('unsubscribe_token', `eq.${token}`);
+    url.searchParams.set('limit', '1');
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) continue;
+    const row = (await response.json())?.[0];
+    if (row?.email) {
+      email = String(row.email).trim().toLowerCase();
+      found.push({ ...list, row });
+    }
+  }
+
+  /* The token identified one list; the address it revealed identifies the other. So a
+     token from a reminder still finds the newsletter row for the same person. */
+  if (email) {
+    for (const list of lists) {
+      if (found.some((entry) => entry.table === list.table)) continue;
+      const url = new URL(`${env.SUPABASE_URL}/rest/v1/${list.table}`);
+      url.searchParams.set('select', 'id,email,locale,status');
+      url.searchParams.set('email', `eq.${email}`);
+      url.searchParams.set('limit', '1');
+      const response = await fetch(url, { headers: supabaseHeaders(env) });
+      if (!response.ok) continue;
+      const row = (await response.json())?.[0];
+      if (row?.email) found.push({ ...list, row });
+    }
+  }
+
+  return { email, lists: found };
+}
+
+async function unsubStart(env, payload, cors) {
+  const token = String(payload.token || '').trim();
+  if (!/^[a-f0-9]{16,64}$/i.test(token)) return json({ ok: false, code: 'UNSUB_BAD_TOKEN' }, 422, cors);
+
+  const { email, lists } = await findSubscriptions(env, token);
+  /* Deliberately the same answer as a token that exists but is already unsubscribed: an
+     endpoint that says "no such token" is an endpoint that confirms which tokens are real. */
+  if (!email) return json({ ok: false, code: 'UNSUB_NOT_FOUND' }, 404, cors);
+
+  const active = lists.filter((entry) => entry.row.status === 'active');
+  if (active.length === 0) {
+    // Already done. Said plainly, because "nothing happened" is the wrong thing to show
+    // somebody who pressed the link twice.
+    return json({ ok: true, already: true, email: maskEmail(email), lists: [] }, 200, cors);
+  }
+
+  /* Just asking who this is. No row written, no letter sent — so the page can show the
+     address before offering to do anything with it, and a reload of that page does not
+     spend a code. */
+  if (payload.peek) {
+    return json({
+      ok: true,
+      peek: true,
+      email: maskEmail(email),
+      lists: active.map((entry) => entry.name)
+    }, 200, cors);
+  }
+
+  const locale = localeOf(active[0].row.locale);
+  const deck = COPY_DECK[locale] || COPY_DECK.it;
+  const code = newVerificationCode();
+
+  const stored = await insertRow(env, 'verification_codes', {
+    purpose: 'unsubscribe',
+    email,
+    code_hash: await hashCode(env, email, code)
+  });
+  if (!stored.ok) return json({ ok: false, code: 'UNSUB_CODE_FAILED' }, 502, cors);
+
+  /* Sent through the same outbox as everything else, so there is one path out of this
+     system for e-mail and not two. */
+  const delivered = await sendThroughOutbox(env, {
+    to: email,
+    subject: fill(deck.unsubSubject, { CODE: code }),
+    html: renderTemplate(EMAIL_TEMPLATES.code, {
+      copy: deck,
+      ev: COPY_DECK._event || {},
+      loc: locale,
+      codeTitle: deck.unsubCodeTitle,
+      codeLead: deck.unsubCodeLead,
+      code,
+      codeNote: deck.unsubCodeNote
+    })
+  });
+  if (!delivered) return json({ ok: false, code: 'UNSUB_MAIL_FAILED' }, 502, cors);
+
+  // Housekeeping on the way past, rather than a scheduled job of its own.
+  fetch(`${env.SUPABASE_URL}/rest/v1/rpc/purge_expired_codes`, {
+    method: 'POST',
+    headers: supabaseHeaders(env),
+    body: '{}'
+  }).catch(() => {});
+
+  return json({
+    ok: true,
+    email: maskEmail(email),
+    lists: active.map((entry) => entry.name)
+  }, 200, cors);
+}
+
+async function unsubConfirm(env, payload, cors) {
+  const token = String(payload.token || '').trim();
+  const code = String(payload.code || '').replace(/\D/g, '');
+  if (!/^[a-f0-9]{16,64}$/i.test(token)) return json({ ok: false, code: 'UNSUB_BAD_TOKEN' }, 422, cors);
+  if (code.length !== 6) return json({ ok: false, code: 'UNSUB_BAD_CODE' }, 422, cors);
+
+  const { email, lists } = await findSubscriptions(env, token);
+  if (!email) return json({ ok: false, code: 'UNSUB_NOT_FOUND' }, 404, cors);
+
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/verification_codes`);
+  url.searchParams.set('select', 'id,code_hash,expires_at,attempts');
+  url.searchParams.set('email', `eq.${email}`);
+  url.searchParams.set('purpose', 'eq.unsubscribe');
+  url.searchParams.set('consumed_at', 'is.null');
+  url.searchParams.set('order', 'created_at.desc');
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  const row = response.ok ? (await response.json())?.[0] : null;
+  if (!row) return json({ ok: false, code: 'UNSUB_NO_CODE' }, 410, cors);
+
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    return json({ ok: false, code: 'UNSUB_CODE_EXPIRED' }, 410, cors);
+  }
+  if (row.attempts >= CODE_ATTEMPT_LIMIT) {
+    return json({ ok: false, code: 'UNSUB_TOO_MANY_TRIES' }, 429, cors);
+  }
+
+  const matches = row.code_hash === (await hashCode(env, email, code));
+  if (!matches) {
+    /* Counted before answering. Six digits is a million possibilities, which sounds like
+       plenty until a script tries them; five wrong guesses and the code is dead and a new
+       one has to be asked for, which needs the inbox again. */
+    await fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${row.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ attempts: row.attempts + 1 })
+    }).catch(() => {});
+    return json({
+      ok: false,
+      code: 'UNSUB_CODE_WRONG',
+      left: Math.max(CODE_ATTEMPT_LIMIT - row.attempts - 1, 0)
+    }, 422, cors);
+  }
+
+  // Consumed first: a code that unsubscribed somebody must not work a second time, even
+  // if what follows fails halfway.
+  await fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${row.id}`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify({ consumed_at: new Date().toISOString() })
+  }).catch(() => {});
+
+  const cleared = [];
+  for (const entry of lists) {
+    const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/${entry.table}?id=eq.${entry.row.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ status: 'unsubscribed' })
+    });
+    if (patch.ok) cleared.push(entry.name);
+  }
+
+  if (cleared.length === 0) return json({ ok: false, code: 'UNSUB_WRITE_FAILED' }, 502, cors);
+  return json({ ok: true, email: maskEmail(email), cleared }, 200, cors);
+}
+
+/**
+ * One finished letter, handed to Make.
+ *
+ * Shares the outbox route with the reminders, so every e-mail this system sends leaves by
+ * the same door — one place where a webhook URL, a shared key and a `branch` are decided.
+ */
+async function sendThroughOutbox(env, message) {
+  if (!env.MAKE_WEBHOOK_URL) return false;
+  const headers = { 'Content-Type': 'application/json' };
+  if (env.INTAKE_SHARED_KEY) headers['X-Carruleddhi-Key'] = env.INTAKE_SHARED_KEY;
+  try {
+    const response = await fetch(env.MAKE_WEBHOOK_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ type: 'outbox', branch: 'outbox', ...message })
+    });
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
 }
 
 /* ============================================================================
@@ -1484,16 +1772,23 @@ async function storeIntake(env, request, type, payload) {
   }
 
   if (type === 'reminder') {
+    const email = String(payload.email || '').trim().toLowerCase();
     const stored = await insertRow(env, 'reminder_subscribers', {
       name: trimmed(payload.name, ''),
-      email: String(payload.email || '').trim().toLowerCase(),
+      email,
       locale,
       consent_at: new Date().toISOString(),
-      // Lets a future "stop these" link identify the row without exposing its id.
+      // Lets the "stop these" link identify the row without exposing its id or the address.
       unsubscribe_token: crypto.randomUUID().replace(/-/g, ''),
       status: 'active'
     }, '', 'email');
-    return stored.ok ? { ok: true } : { ok: false, ...stored };
+    if (!stored.ok) return { ok: false, ...stored };
+    /* Read back rather than reused.
+       The insert is an upsert that ignores conflicts, so somebody signing up a second time
+       keeps the row — and the token — they already had. Using the one generated above would
+       put a token in this letter that matches nothing, and the unsubscribe link would 404
+       for exactly the people who have been on the list longest. */
+    return { ok: true, unsubToken: await readToken(env, 'reminder_subscribers', email) };
   }
 
   // registration
@@ -1576,6 +1871,28 @@ async function storeIntake(env, request, type, payload) {
   }, '', 'email').catch(() => {});
 
   return { ok: true, raceNumber: stored.row?.race_number ?? null };
+}
+
+/**
+ * The unsubscribe token that ended up on a row.
+ *
+ * Read rather than remembered, because the write that created the row may have been an
+ * upsert that left an older row — and an older token — in place. Empty string on any
+ * failure: a letter with no way out is worse than one with a link, but it is much better
+ * than a letter whose link points at nothing.
+ */
+async function readToken(env, table, email) {
+  try {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+    url.searchParams.set('select', 'unsubscribe_token');
+    url.searchParams.set('email', `eq.${email}`);
+    url.searchParams.set('limit', '1');
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) return '';
+    return (await response.json())?.[0]?.unsubscribe_token || '';
+  } catch (_) {
+    return '';
+  }
 }
 
 function supabaseHeaders(env, extra = {}) {
@@ -2217,6 +2534,8 @@ export default {
       if (type === 'settings-admin') return settingsAdmin(env, payload, cors);
       if (type === 'reminders-due') return remindersDue(env, payload, cors);
       if (type === 'purge') return purge(env, payload, cors);
+      if (type === 'unsub-start') return unsubStart(env, payload, cors);
+      if (type === 'unsub-confirm') return unsubConfirm(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 
@@ -2285,6 +2604,10 @@ export default {
       }
       // Make no longer counts spreadsheet rows to find this. It arrives as a field.
       if (stored.raceNumber) payload.raceNumber = String(stored.raceNumber).padStart(3, '0');
+      /* The way out of the list, in the letter that puts them on it. Only the reminder
+         opt-in returns a token: a registration confirmation is a receipt, and a contact
+         reply is one message, so neither has anything to unsubscribe from. */
+      if (stored.unsubToken) payload.unsubUrl = unsubscribeUrl(stored.unsubToken);
     }
 
     /**

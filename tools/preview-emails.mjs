@@ -67,7 +67,23 @@ function payloadFor({ locale, isMinor }) {
     checklistHtml: (deck.regChecklist || []).map(escapeHtml).join('</li><li>'),
     newsHi: fill(deck.newsHi, { FIRSTNAME: first }),
     name: 'Hans Probe',
-    message: 'Frage zum Helm.'
+    message: 'Frage zum Helm.',
+    /* The way out, at the foot of the letters that are subscriptions. A real-looking token
+       so the rendered preview shows the link the recipient actually gets; the letters that
+       are receipts do not carry the footer at all, so this goes unused in them. */
+    unsubUrl: 'https://www.carruleddhishow.com/#unsub=8f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f',
+    codeTitle: deck.unsubCodeTitle,
+    codeLead: deck.unsubCodeLead,
+    codeNote: deck.unsubCodeNote,
+    code: '408912',
+    /* The 7-day version of the reminder that actually goes out. The three-way choice
+       between 7 days, 1 day and 3 hours is made in the function, so the template quotes a
+       field — which means a preview has to pick one, and the earliest is the one whose
+       wording is longest and therefore worth looking at. */
+    remWindow: deck.remWindow7,
+    remHeading: deck.remHeading7,
+    remBody: deck.remBody7,
+    remRiderLine: `#041 — ${deck.remRiderNote}`
   };
   /* The attachment block. One form for an Italian rider, two for everybody else, which
      is the same choice attachCopy() makes and the reason these are fields at all. */
@@ -109,7 +125,10 @@ mkdirSync(new URL('../shots/emails/', import.meta.url), { recursive: true });
 const wanted = [
   ['registration', 'it', false], ['registration', 'pl', false],
   ['minor', 'pl', true], ['minor', 'de', true],
-  ['reminder', 'pl', false], ['contact', 'pl', false], ['newsletter', 'pl', false]
+  ['reminder', 'pl', false], ['contact', 'pl', false], ['newsletter', 'pl', false],
+  // The letter that actually goes out 7 days / 1 day / 3 hours before, and the one
+  // carrying an unsubscribe code. Both were only visible in production until now.
+  ['reminderDue', 'pl', false], ['code', 'pl', false]
 ];
 
 /**

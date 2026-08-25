@@ -186,7 +186,16 @@ const REM_SWITCHES = [
   ['{{switch(2.due; "7d"; 4.t.remBody7; "1d"; 4.t.remBody1; 4.t.remBody3)}}', '{{1.remBody}}'],
   ['{{if(length(1.race_number) > 0; "#" + 1.race_number + " — " + 4.t.remRiderNote; 4.t.footerNote)}}', '{{1.remRiderLine}}'],
   // Carries %FIRSTNAME%, so it cannot come straight from the deck.
-  ['{{1.copy.regHi}}', '{{1.hi}}']
+  ['{{1.copy.regHi}}', '{{1.hi}}'],
+  /* The real way out, in place of a mailto.
+     It used to be `mailto:…?subject=STOP promemoria` — which asks the reader to send an
+     e-mail and then asks somebody to read it and edit a database by hand. Nobody was ever
+     going to do the second half, so the link was decoration. Now it goes to the page,
+     carries the row's own token, and switches the reminders off after a code. */
+  [
+    '<a href="mailto:{{1.ev.email}}?subject=STOP%20promemoria" style="color:#ffc928;text-decoration:underline;">{{1.copy.remUnsub}}</a>',
+    '<a href="{{1.unsubUrl}}" style="color:#ffc928;text-decoration:underline;">{{1.copy.unsubFooter}}</a>'
+  ]
 ];
 
 const REM_DUE_HTML = REM_SWITCHES.reduce((html, [from, to]) => swap(html, from, to), body('emails/make-reminder.html'));
@@ -905,7 +914,19 @@ const instantFlow = [
 
 /* --------------------------------------------------- small inline templates */
 
-function shell(inner) {
+/**
+ * The wrapper every short letter shares.
+ *
+ * `unsub` decides whether the grey "I no longer want these" line appears at the foot.
+ * It is not on by default, and that distinction is the point: a registration confirmation
+ * and a reply to a contact form are receipts, not subscriptions, and there is nothing to
+ * unsubscribe from. Putting the footer on everything meant those letters carried a link
+ * with an empty href — a line of grey text that looks like a way out and is not one.
+ *
+ * On:  the reminder opt-in, the reminders themselves, the newsletter.
+ * Off: the contact reply, and the letter carrying an unsubscribe code.
+ */
+function shell(inner, { unsub = false } = {}) {
   return [
     '<!doctype html><html><body style="margin:0;padding:0;background:#e9f1ff;">',
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"',
@@ -937,8 +958,58 @@ function shell(inner) {
     '{{1.copy.footerNote}}<br>',
     `<a href="mailto:${ORG_EMAIL}" style="color:#ffc928;">${ORG_EMAIL}</a>`,
     ` &middot; <a href="${SITE}/#contact" style="color:#ffc928;">{{1.copy.askCta}}</a>`,
+    unsub ? UNSUB_FOOTER : '',
     '</td></tr></table></td></tr></table></body></html>'
   ].join('');
+}
+
+/**
+ * The way out, at the foot of every letter.
+ *
+ * Small, grey and always there. A list you cannot leave from the letter itself is a list
+ * people leave by pressing "spam", and that costs the deliverability of every message to
+ * everyone else.
+ *
+ * `{{1.unsubUrl}}` is empty on the letters where unsubscribing makes no sense — a
+ * registration confirmation is a receipt, not a subscription — and an anchor with an empty
+ * href is a line of grey text nobody clicks. The reminders and the newsletter fill it.
+ * Nothing is conditional, because the renderer has no conditionals.
+ */
+const UNSUB_FOOTER = [
+  '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(143,176,232,.25);',
+  'font-size:11px;line-height:1.5;color:#6f8dc4;">',
+  '<a href="{{1.unsubUrl}}" style="color:#6f8dc4;text-decoration:underline;">',
+  '{{1.copy.unsubFooter}}</a></div>'
+].join('');
+
+/**
+ * The e-mail carrying a six-digit code.
+ *
+ * Deliberately the plainest letter in the set: one number, large, and one sentence saying
+ * where to type it. Everything else on a page like this competes with the thing the reader
+ * came for, and a code they have to hunt for is a code they give up on.
+ *
+ * The last line matters as much as the code. Somebody who did not ask for this needs to be
+ * told, in the message itself, that ignoring it changes nothing.
+ */
+function codeHtml() {
+  return shell(
+    [
+      '<tr><td style="padding:32px 32px 6px;">',
+      '<h1 style="margin:0 0 10px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;',
+      'letter-spacing:-.6px;">{{1.codeTitle}}</h1>',
+      '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{1.codeLead}}</div>',
+      '</td></tr>',
+      '<tr><td align="center" style="padding:18px 32px 8px;">',
+      '<div style="display:inline-block;background:#071a3d;border-radius:16px;padding:18px 30px;">',
+      '<span style="font-size:38px;line-height:1;font-weight:800;letter-spacing:.24em;',
+      'color:#ffc928;font-family:\'Courier New\',monospace;">{{1.code}}</span>',
+      '</div></td></tr>',
+      '<tr><td style="padding:10px 32px 28px;">',
+      '<div style="font-size:13px;line-height:1.6;color:#6b7c9c;">{{1.codeNote}}</div>',
+      '</td></tr>'
+    ].join('')
+  );
 }
 
 function reminderOptInHtml() {
@@ -954,7 +1025,9 @@ function reminderOptInHtml() {
       'font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;',
       'text-decoration:none;padding:14px 26px;border-radius:999px;">{{1.copy.remCta}} &rarr;</a>',
       '</td></tr>'
-    ].join('')
+    ].join(''),
+    // This one is a subscription: three letters are promised, so a way out is owed.
+    { unsub: true }
   );
 }
 
@@ -988,10 +1061,12 @@ function newsletterOptInHtml() {
       'font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;',
       'text-decoration:none;padding:14px 26px;border-radius:999px;">{{1.copy.newsCta}} &rarr;</a>',
       '</td></tr>',
-      '<tr><td align="center" style="padding:0 32px 28px;font-size:12px;color:#8091b5;">',
-      `<a href="mailto:${ORG_EMAIL}?subject=STOP%20newsletter" style="color:#8091b5;">`,
-      '{{1.copy.newsUnsub}}</a></td></tr>'
-    ].join('')
+      /* The old "STOP newsletter" mailto is gone.
+         It asked the reader to send an e-mail and then asked somebody to read it and edit a
+         database by hand. The second half was never going to happen, so the link was
+         decoration on a promise. The real one is in the footer below, added by shell(). */
+    ].join(''),
+    { unsub: true }
   );
 }
 
@@ -1021,6 +1096,7 @@ function contactHtml() {
       '{{1.message}}</div>',
       '</td></tr>'
     ].join('')
+    // No unsubscribe footer: this is one message to the organiser, not a list.
   );
 }
 
@@ -1149,6 +1225,10 @@ const EMAIL_TEMPLATES = {
      the start by the scheduled scenario — which until now rendered it inside Make out of
      a Google Sheet row. */
   reminderDue: forWorker(REM_DUE_HTML),
+  /* The six-digit code for turning reminders off. Not sent by any Make route: the function
+     renders it and pushes it straight to the outbox when somebody presses the link at the
+     foot of a letter. */
+  code: forWorker(codeHtml()),
   contact: forWorker(contactHtml()),
   newsletter: forWorker(newsletterOptInHtml())
 };
