@@ -633,15 +633,28 @@ const instantFlow = [
                It goes to your own number and it is your call — but the earlier
                version deliberately sent only a race number for this reason, and the
                same information is one click away in the admin panel. */
+            /* Italian, because this arrives on the organisers' phones and the event
+               is Italian. One fact per line: a WhatsApp notification is read from a
+               lock screen in two seconds, and a paragraph is not.
+
+               *asterisks* are WhatsApp's own bold. The newlines are real newlines in
+               the query string; Make percent-encodes them and CallMeBot renders them
+               as line breaks.
+
+               The last line only exists for an under-18 entry — an empty if() branch
+               leaves nothing behind rather than a stray label. */
             name: 'text',
-            value: 'Carruleddhi — nowe zgloszenie nr {{1.raceNumber}}'
-              + '\n{{1.firstName}} {{1.lastName}}'
-              + '\nKategoria: {{upper(1.category)}}'
-              + '\nWozek: {{1.cartName}}'
-              + '\nJezyk: {{upper(1.loc)}}'
-              + '\nTel: {{1.phone}}'
-              + '\nMail: {{lower(1.email)}}'
-              + '\n{{if(1.isMinor; "NIEPELNOLETNI — opiekun: "; "")}}{{1.guardianName}}'
+            value: '🏁 *CARRULEDDHI SHOW 2026*'
+              + '\nNuova iscrizione ricevuta'
+              + '\n'
+              + '\n🔢 Numero di partenza: *{{1.raceNumber}}*'
+              + '\n👤 {{1.firstName}} {{1.lastName}}'
+              + '\n🛞 Carruleddhu: {{1.cartName}}'
+              + '\n🏷️ Categoria: {{upper(1.category)}}'
+              + '\n🌍 Lingua: {{upper(1.loc)}}'
+              + '\n📞 {{1.phone}}'
+              + '\n✉️ {{lower(1.email)}}'
+              + '{{if(1.isMinor; "\n\n⚠️ *MINORENNE* — chi firma: " + 1.guardianName + " (" + lower(1.guardianEmail) + ")"; "")}}'
           }
         ], eq('any entry', '{{1.type}}', 'registration'))
       ]
@@ -782,7 +795,7 @@ function contactHtml() {
     [
       '<tr><td style="padding:30px 32px 6px;">',
       '<div style="font-family:monospace;font-size:12px;letter-spacing:.08em;color:#8091b5;',
-      'text-transform:uppercase;">{{upper(2.loc)}} &middot; {{formatDate(now; "DD.MM.YYYY HH:mm"; "Europe/Rome")}}</div>',
+      'text-transform:uppercase;">{{upper(1.loc)}} &middot; {{formatDate(now; "DD.MM.YYYY HH:mm"; "Europe/Rome")}}</div>',
       '<h1 style="margin:8px 0 4px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;',
       'letter-spacing:-1px;">{{1.name}}</h1>',
       '<a href="mailto:{{lower(1.email)}}" style="font-size:14px;color:#2469d8;">{{lower(1.email)}}</a>',
@@ -975,7 +988,19 @@ for (const [file, data] of files) {
     // from being blamed for what its children quote.
     const { routes, ...own } = module;
     const refs = new Set();
-    JSON.stringify(own).replace(/\{\{\s*(\d+)\./g, (_, n) => refs.add(Number(n)));
+    /* Every module number inside {{ }}, not only the ones sitting right after the
+       braces. The version that only matched /\{\{(\d+)\./ passed a blueprint Make
+       then refused with "references non-existing module [module ID 2]", because a
+       real expression buries them in function calls:
+
+         {{get(parseJSON(2.copy); 2.loc)}}
+         {{join(3.t.regChecklist; "</li><li>")}}
+
+       Guarded on both sides so a colour like rgba(0,0,0,.16) or a size like 1.5
+       inside an e-mail's inline CSS is not read as a module reference. */
+    for (const [, expression] of JSON.stringify(own).matchAll(/\{\{([^}]*)\}\}/g)) {
+      for (const [, n] of expression.matchAll(/(?:^|[^\w.])(\d+)\.(?=[A-Za-z_`])/g)) refs.add(Number(n));
+    }
     for (const ref of refs) {
       if (ref === module.id) problems.push(`module ${module.id} references itself`);
       else if (!visible.has(ref)) problems.push(`module ${module.id} references ${ref}, which runs later or on another route`);
