@@ -282,6 +282,14 @@ function httpRequest(id, x, y, url, qs, filter) {
       ca: null,
       rejectUnauthorized: true,
       followRedirect: true,
+      /* Make refuses to run the module without this, with a message that names it:
+         "The required followAllRedirects field is missing." It is a separate switch
+         from followRedirect — that one follows a redirect on the initial method, this
+         one follows redirects after the method has been rewritten to GET. `false`
+         because the target is a fixed API endpoint that does not redirect, and a
+         notification that quietly follows a redirect somewhere else is not a
+         notification worth having. */
+      followAllRedirects: false,
       useQuerystring: false,
       gzip: true,
       useMtls: false,
@@ -665,7 +673,16 @@ const instantFlow = [
               + '\n🌍 Lingua: {{upper(1.loc)}}'
               + '\n📞 {{1.phone}}'
               + '\n✉️ {{lower(1.email)}}'
-              + '{{if(1.isMinor; "\n\n⚠️ *MINORENNE* — chi firma: " + 1.guardianName + " (" + lower(1.guardianEmail) + ")"; "")}}'
+              /* The age is on this line and not above it on purpose. On an adult entry
+                 the whole block disappears, and a "Età: 32" floating in a notice about
+                 a grown-up is noise. Where it matters — somebody who needs a signature
+                 — it sits next to the name of the person who has to give it. */
+              /* One expression, no nested braces. {{ }} inside {{ }} is not a thing in
+                 Make — the inner pair closes the outer one and the rest of the line is
+                 sent as literal text. Fields are joined with + instead. */
+              + '{{if(1.isMinor; "\n\n⚠️ *MINORENNE* — " + 1.riderAge + " anni'
+                + '\n✍️ Chi firma: " + 1.guardianName + "\n📧 " + lower(1.guardianEmail)'
+                + ' + "\n📱 " + 1.guardianPhone; "")}}'
           }
         ], eq('any entry', '{{1.type}}', 'registration'))
       ]

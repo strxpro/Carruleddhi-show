@@ -399,7 +399,7 @@
                   },
                   {
                     "name": "text",
-                    "value": "🏁 *CARRULEDDHI SHOW 2026*\nNuova iscrizione ricevuta\n\n🔢 Numero di partenza: *{{1.raceNumber}}*\n👤 {{1.firstName}} {{1.lastName}}\n🛞 Carruleddhu: {{1.cartName}}\n🏷️ Categoria: {{upper(1.category)}}\n🌍 Lingua: {{upper(1.loc)}}\n📞 {{1.phone}}\n✉️ {{lower(1.email)}}{{if(1.isMinor; \"\n\n⚠️ *MINORENNE* — chi firma: \" + 1.guardianName + \" (\" + lower(1.guardianEmail) + \")\"; \"\")}}"
+                    "value": "🏁 *CARRULEDDHI SHOW 2026*\nNuova iscrizione ricevuta\n\n🔢 Numero di partenza: *{{1.raceNumber}}*\n👤 {{1.firstName}} {{1.lastName}}\n🛞 Carruleddhu: {{1.cartName}}\n🏷️ Categoria: {{upper(1.category)}}\n🌍 Lingua: {{upper(1.loc)}}\n📞 {{1.phone}}\n✉️ {{lower(1.email)}}{{if(1.isMinor; \"\n\n⚠️ *MINORENNE* — \" + 1.riderAge + \" anni\n✍️ Chi firma: \" + 1.guardianName + \"\n📧 \" + lower(1.guardianEmail) + \"\n📱 \" + 1.guardianPhone; \"\")}}"
                   }
                 ],
                 "bodyType": null,
@@ -409,6 +409,7 @@
                 "ca": null,
                 "rejectUnauthorized": true,
                 "followRedirect": true,
+                "followAllRedirects": false,
                 "useQuerystring": false,
                 "gzip": true,
                 "useMtls": false,

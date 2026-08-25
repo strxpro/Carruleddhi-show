@@ -40,11 +40,29 @@ function refsIn(value) {
   return found;
 }
 
+/**
+ * Finds `{{ ... {{ ... }} ... }}`.
+ *
+ * Make has no nested expressions: the inner closing braces end the outer one and
+ * everything after it is sent as literal text — so a notification would arrive with
+ * `+ 1.guardianName + "` printed in it. Cheap to write by accident when building a
+ * long expression from concatenated strings, and invisible in the JSON.
+ */
+function nestedBraces(json) {
+  const bad = [];
+  for (const [, inner] of json.matchAll(/\{\{((?:[^{}]|\{(?!\{))*\{\{)/g)) bad.push(inner.slice(0, 60));
+  return bad;
+}
+
 let failures = 0;
 for (const file of ['make/blueprint-1-instant.json', 'make/blueprint-2-reminders.json']) {
   const data = JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'));
   const problems = [];
   let count = 0;
+
+  for (const snippet of nestedBraces(JSON.stringify(data))) {
+    problems.push(`nested {{ }} — Make cannot parse this: ${snippet}`);
+  }
 
   for (const { module, visible } of withVisibility(data.flow)) {
     count += 1;
