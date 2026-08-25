@@ -15,6 +15,7 @@
  *   WALL_SALT          secret, optional — salt for the stored IP hash
  */
 import { COPY_DECK } from './copy-deck.js';
+import { EMAIL_TEMPLATES } from './email-templates.js';
 
 const ALLOWED_TYPES = new Set([
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
@@ -601,16 +602,94 @@ function attachCopy(payload) {
     : `${base}/emails/Carruleddhi-modulo.pdf`;
   payload.pdfName = payload.isMinor ? 'Carruleddhi-minori-' : 'Carruleddhi-modulo-';
 
-  if (!payload.isMinor) return;
+  /* --- the handful of values a template cannot work out for itself -----------
+     The bodies are rendered below by substituting plain paths and nothing else, so
+     anything that needed a function call is computed here instead. Five lines of
+     renderer rather than an expression language, and the generator refuses to emit a
+     template that still contains one. */
+  payload.emailLower = String(payload.email || '').trim().toLowerCase();
+  payload.guardianEmailLower = String(payload.guardianEmail || '').trim().toLowerCase();
+  payload.categoryUpper = String(payload.category || '').toUpperCase();
+  payload.localeUpper = locale.toUpperCase();
+  payload.birthDateLabel = dayMonthYear(payload.birthDate);
+  payload.teamLabel = trimmed(payload.teamName, '—');
+  payload.notesLabel = trimmed(payload.cartNotes, '—');
+  payload.motherLabel = trimmed(payload.motherName, '—');
+  payload.fatherLabel = trimmed(payload.fatherName, '—');
+  payload.checklistHtml = Array.isArray(deck.regChecklist)
+    ? deck.regChecklist.map(escapeHtml).join('</li><li>')
+    : '';
 
-  // Under-18 wording. The inflected words come out of the deck by key, so an unknown
-  // value gives the neutral form rather than an empty gap in a sentence.
-  const childWord = deck.minChild?.[payload.childKind] || deck.minChild?.child || '';
-  payload.childWord = childWord;
-  payload.relWord = deck.minRel?.[payload.guardianRelation] || deck.minRel?.guardian || '';
-  payload.minHi = fill(deck.minHi, { GUARDIAN: String(payload.guardianName || '').trim() });
-  payload.minLead = fill(deck.minLead, { CHILD: childWord, FIRSTNAME: firstName });
-  payload.ageNote = fill(deck.minAgeNote, { FIRSTNAME: firstName, AGE: payload.riderAge });
+  if (payload.isMinor) {
+    // Under-18 wording. The inflected words come out of the deck by key, so an unknown
+    // value gives the neutral form rather than an empty gap in a sentence.
+    const childWord = deck.minChild?.[payload.childKind] || deck.minChild?.child || '';
+    payload.childWord = childWord;
+    payload.relWord = deck.minRel?.[payload.guardianRelation] || deck.minRel?.guardian || '';
+    payload.minHi = fill(deck.minHi, { GUARDIAN: String(payload.guardianName || '').trim() });
+    payload.minLead = fill(deck.minLead, { CHILD: childWord, FIRSTNAME: firstName });
+    payload.ageNote = fill(deck.minAgeNote, { FIRSTNAME: firstName, AGE: payload.riderAge });
+  }
+}
+
+/** dd.mm.yyyy from an ISO date, or the input unchanged if it is not one. */
+function dayMonthYear(value) {
+  const parts = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return parts ? `${parts[3]}.${parts[2]}.${parts[1]}` : String(value || '');
+}
+
+/**
+ * The four characters that matter inside an HTML attribute or element.
+ *
+ * Everything a visitor typed goes through this on its way into a body. A cart called
+ * `<script>` is a silly name, not an attack on the recipient's mail client.
+ */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Fills a template.
+ *
+ * Only `{{1.some.path}}` — no functions, no conditionals, no loops. That is the whole
+ * grammar, which is why this is five lines and not a parser: every value that needed
+ * computing was computed in attachCopy() above, and the generator will not emit a
+ * template containing anything else.
+ *
+ * `checklistHtml` is the one field allowed through unescaped, because it is markup
+ * this code built itself out of already-escaped strings. Everything else is escaped,
+ * including anything the visitor typed.
+ */
+const RAW_FIELDS = new Set(['checklistHtml']);
+
+function renderTemplate(template, payload) {
+  return String(template).replace(/\{\{\s*1\.([A-Za-z0-9_.]+)\s*\}\}/g, (_, path) => {
+    let value = payload;
+    for (const key of path.split('.')) {
+      if (value === null || value === undefined) break;
+      value = value[key];
+    }
+    if (value === null || value === undefined) return '';
+    return RAW_FIELDS.has(path) ? String(value) : escapeHtml(value);
+  });
+}
+
+/** Picks the body for this submission and renders it. */
+function attachHtml(payload, type) {
+  const template = type === 'registration'
+    ? (payload.isMinor ? EMAIL_TEMPLATES.minor : EMAIL_TEMPLATES.registration)
+    : EMAIL_TEMPLATES[type];
+  if (!template) return;
+  payload.html = renderTemplate(template, payload);
+  // The newsletter body is a second letter sent alongside a registration, so it is
+  // rendered too rather than replacing the confirmation.
+  if (type === 'registration' && payload.newsConsent) {
+    payload.newsletterHtml = renderTemplate(EMAIL_TEMPLATES.newsletter, payload);
+  }
 }
 
 /** The database has a check constraint on locale; a browser can send anything. */
@@ -1482,6 +1561,7 @@ export default {
       : type;
 
     attachCopy(payload);
+    attachHtml(payload, type);
 
     const headers = { 'Content-Type': 'application/json' };
     if (env.INTAKE_SHARED_KEY) headers['X-Carruleddhi-Key'] = env.INTAKE_SHARED_KEY;

@@ -96,7 +96,9 @@ export const COPY_DECK = {
     "newsLead": "insieme all’iscrizione di quest’anno hai chiesto di essere avvisato quando annunceremo la prossima edizione del Carruleddhi Show. Fatto: sei in lista.",
     "newsBody": "Non ti scriveremo per altro. Una sola e-mail, quando la data della prossima edizione sarà decisa. Nient’altro, mai.",
     "newsCta": "Torna al sito",
-    "newsUnsub": "Non voglio essere avvisato"
+    "newsUnsub": "Non voglio essere avvisato",
+    "askAny": "Domande? Rispondi a questa e-mail: la leggiamo noi, non un robot.",
+    "askCta": "Scrivici dal sito"
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -183,7 +185,9 @@ export const COPY_DECK = {
     "newsLead": "poza zgłoszeniem na ten rok poprosiłeś, żebyśmy dali znać, kiedy ogłosimy kolejną edycję Carruleddhi Show. Gotowe — jesteś na liście.",
     "newsBody": "Nie napiszemy w żadnej innej sprawie. Jeden mail, wtedy gdy data kolejnej edycji będzie ustalona. Nic więcej, nigdy.",
     "newsCta": "Wróć na stronę",
-    "newsUnsub": "Nie chcę być powiadamiany"
+    "newsUnsub": "Nie chcę być powiadamiany",
+    "askAny": "Pytania? Odpowiedz na tego maila — czyta go człowiek, nie automat.",
+    "askCta": "Napisz przez stronę"
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -270,7 +274,9 @@ export const COPY_DECK = {
     "newsLead": "along with this year’s entry you asked to hear from us when we announce the next Carruleddhi Show. Done: you are on the list.",
     "newsBody": "We will not write about anything else. One e-mail, once the date of the next edition is settled. Nothing more, ever.",
     "newsCta": "Back to the site",
-    "newsUnsub": "Do not notify me"
+    "newsUnsub": "Do not notify me",
+    "askAny": "Questions? Just reply to this e-mail — a person reads it, not a robot.",
+    "askCta": "Write to us on the site"
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -357,7 +363,9 @@ export const COPY_DECK = {
     "newsLead": "zusammen mit deiner Anmeldung hast du gebeten, Bescheid zu bekommen, wenn wir die nächste Carruleddhi Show ankündigen. Erledigt: du stehst auf der Liste.",
     "newsBody": "Wir schreiben zu nichts anderem. Eine E-Mail, sobald das Datum der nächsten Ausgabe feststeht. Sonst nie.",
     "newsCta": "Zurück zur Website",
-    "newsUnsub": "Keine Benachrichtigung"
+    "newsUnsub": "Keine Benachrichtigung",
+    "askAny": "Fragen? Antworte einfach auf diese E-Mail — ein Mensch liest sie, kein Bot.",
+    "askCta": "Über die Website schreiben"
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -444,7 +452,9 @@ export const COPY_DECK = {
     "newsLead": "junto con la inscripción de este año pediste que te avisáramos cuando anunciemos la próxima Carruleddhi Show. Hecho: estás en la lista.",
     "newsBody": "No escribiremos por nada más. Un solo correo, cuando la fecha de la próxima edición esté decidida. Nada más, nunca.",
     "newsCta": "Volver a la web",
-    "newsUnsub": "No quiero avisos"
+    "newsUnsub": "No quiero avisos",
+    "askAny": "¿Dudas? Responde a este correo: lo lee una persona, no un robot.",
+    "askCta": "Escríbenos desde la web"
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -531,6 +541,8 @@ export const COPY_DECK = {
     "newsLead": "en même temps que votre inscription, vous avez demandé à être prévenu lorsque nous annoncerons la prochaine Carruleddhi Show. C’est fait : vous êtes sur la liste.",
     "newsBody": "Nous n’écrirons pour rien d’autre. Un seul e-mail, quand la date de la prochaine édition sera fixée. Rien de plus, jamais.",
     "newsCta": "Retour au site",
-    "newsUnsub": "Ne pas me prévenir"
+    "newsUnsub": "Ne pas me prévenir",
+    "askAny": "Des questions ? Répondez à cet e-mail — une personne le lit, pas un robot.",
+    "askCta": "Nous écrire depuis le site"
   }
 };

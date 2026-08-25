@@ -533,30 +533,21 @@ const instantFlow = [
      wording to live, and nothing left in the scenario that reads a variable of a
      variable of a variable. */
 
-  /**
-   * Module 5 — the five e-mail bodies, one variable each.
-   *
-   * WHY IT IS A MODULE OF ITS OWN
-   *   The bodies were pasted straight into each Email module's Content field, which
-   *   worked and was horrible to live with: nine kilobytes of table markup in a
-   *   four-line text area, and the same header and footer repeated five times with
-   *   no way to see that they were the same. Opening an Email module to change a
-   *   recipient meant scrolling past a document.
-   *
-   *   Here, the Content field of every Email module is one item — {{5.regHtml}} —
-   *   and the markup is in one place. Which is where it was before, except that
-   *   place was module 3, and module 3 is where the wording the markup quotes is
-   *   still being defined. Module 5 sits after 3, so {{1.copy.regPreheader}} and
-   *   {{1.minHi}} are both resolved by the time these are built. Same idea, one
-   *   module further along, and Make accepts it.
-   */
-  setVars(5, 1150, 0, [
-    { name: 'regHtml', value: withRaceNumber(REG_HTML) },
-    { name: 'minHtml', value: withRaceNumber(MIN_HTML) },
-    { name: 'remHtml', value: reminderOptInHtml() },
-    { name: 'contactHtml', value: contactHtml() },
-    { name: 'newsHtml', value: newsletterOptInHtml() }
-  ]),
+  /* Module 5 used to sit here too, holding the five e-mail bodies.
+
+     Twenty-four kilobytes of table markup in a tool whose job is sending mail, and
+     every reference inside it a variable of a variable — which is exactly why Make
+     drew them differently from ordinary fields and why one missing reference was so
+     hard to spot.
+
+     The Vercel function renders them now and the finished letter arrives as one
+     field: {{1.html}}. The Content box of every Email module holds that single item.
+
+     Templates live in emails/make-registration.html and are compiled into
+     worker/email-templates.js at build time. They may contain plain paths and
+     nothing else; the generator throws if one still calls a Make function, and the
+     value it needed gets computed in attachCopy() instead. That is what keeps the
+     renderer in the function five lines long rather than an expression language. */
 
   /* ==========================================================================
      One router, six flat routes, no nesting.
@@ -596,7 +587,7 @@ const instantFlow = [
           // without the rider seeing a second address on their own confirmation.
           bcc: [ORG_EMAIL],
           subject: '{{1.subject}}',
-          html: '{{5.regHtml}}',
+          html: '{{1.html}}',
           attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{7.data}}' }]
         })
       ]
@@ -624,7 +615,7 @@ const instantFlow = [
           ],
           bcc: [ORG_EMAIL],
           subject: '{{1.subject}}',
-          html: '{{5.minHtml}}',
+          html: '{{1.html}}',
           attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]
         })
       ]
@@ -695,7 +686,7 @@ const instantFlow = [
           filter: eq('reminder', '{{1.branch}}', 'reminder'),
           to: '{{lower(1.email)}}',
           subject: '{{1.remSubject}}',
-          html: '{{5.remHtml}}'
+          html: '{{1.html}}'
         })
       ]
     },
@@ -708,7 +699,7 @@ const instantFlow = [
           to: ORG_EMAIL,
           replyTo: '{{lower(1.email)}}',
           subject: '{{1.contactSubject}}',
-          html: '{{5.contactHtml}}'
+          html: '{{1.html}}'
         })
       ]
     },
@@ -727,7 +718,7 @@ const instantFlow = [
           },
           to: '{{lower(1.email)}}',
           subject: '{{1.newsSubject}}',
-          html: '{{5.newsHtml}}'
+          html: '{{1.newsletterHtml}}'
         })
       ]
     }
@@ -747,9 +738,27 @@ function shell(inner) {
     '<tr><td style="background:#071a3d;padding:24px 32px;font-size:19px;font-weight:800;color:#ffffff;">',
     'CARRULEDDHI <span style="color:#ffc928;">SHOW 2026</span></td></tr>',
     inner,
+
+    /* "Any questions" — on every letter, above the small print.
+       Reply is offered first because it is the least work for the reader and it lands
+       in the same inbox; the button is for whoever has lost the message or would
+       rather use a form. Both go to a person. A letter that gives somebody a race
+       number and a document to sign has to say how to ask about it. */
+    '<tr><td style="background:#f2f6ff;padding:20px 32px;border-top:1px solid #dbe6fb;">',
+    '<div style="font-size:14px;line-height:1.6;color:#20304f;">{{1.copy.askAny}}</div>',
+    '<div style="margin-top:12px;">',
+    `<a href="mailto:${ORG_EMAIL}" style="display:inline-block;background:#071a3d;color:#ffffff;`,
+    'font-size:13px;font-weight:700;text-decoration:none;padding:11px 18px;border-radius:999px;',
+    `margin:0 8px 8px 0;">&#9993;&nbsp; ${ORG_EMAIL}</a>`,
+    `<a href="${SITE}/#contact" style="display:inline-block;background:#ffffff;color:#071a3d;`,
+    'border:2px solid #071a3d;font-size:13px;font-weight:700;text-decoration:none;',
+    'padding:9px 18px;border-radius:999px;margin:0 0 8px 0;">{{1.copy.askCta}} &rarr;</a>',
+    '</div></td></tr>',
+
     '<tr><td style="background:#071a3d;padding:20px 32px;font-size:12px;line-height:1.6;color:#8fb0e8;">',
     '{{1.copy.footerNote}}<br>',
     `<a href="mailto:${ORG_EMAIL}" style="color:#ffc928;">${ORG_EMAIL}</a>`,
+    ` &middot; <a href="${SITE}/#contact" style="color:#ffc928;">{{1.copy.askCta}}</a>`,
     '</td></tr></table></td></tr></table></body></html>'
   ].join('');
 }
@@ -945,6 +954,70 @@ const remindersFlow = [
     metadata: at(1500, 0)
   }
 ];
+
+/* ------------------------------------------- e-mail templates for the Worker
+   The bodies used to live in a Make variable — five of them, twenty-four kilobytes
+   of table markup in a tool whose job is sending mail. Every reference inside them
+   was a variable of a variable, which is the whole reason Make drew them differently
+   from ordinary fields and why a missing one was so hard to see.
+
+   They are rendered in the Vercel function now and arrive as one field, {{1.html}}.
+   For that the templates may contain only plain paths, so the five expressions that
+   called a Make function are swapped for fields the function precomputes. The assert
+   below refuses to ship a template with anything left that a five-line renderer
+   cannot handle. */
+const TEMPLATE_SUBSTITUTIONS = [
+  ['{{formatDate(1.birthDate; "DD.MM.YYYY")}}', '{{1.birthDateLabel}}'],
+  ['{{lower(1.email)}}', '{{1.emailLower}}'],
+  ['{{lower(1.guardianEmail)}}', '{{1.guardianEmailLower}}'],
+  ['{{upper(1.category)}}', '{{1.categoryUpper}}'],
+  ['{{upper(1.loc)}}', '{{1.localeUpper}}'],
+  ['{{ifempty(1.teamName; "—")}}', '{{1.teamLabel}}'],
+  ['{{ifempty(1.cartNotes; "—")}}', '{{1.notesLabel}}'],
+  ['{{ifempty(1.motherName; "—")}}', '{{1.motherLabel}}'],
+  ['{{ifempty(1.fatherName; "—")}}', '{{1.fatherLabel}}'],
+  ['{{join(1.copy.regChecklist; "</li><li>")}}', '{{1.checklistHtml}}'],
+  // attachCopy() already formats this one, in Europe/Rome, for the printed footer.
+  ['{{formatDate(now; "DD.MM.YYYY HH:mm"; "Europe/Rome")}}', '{{1.generatedAt}}']
+];
+
+function forWorker(html) {
+  let out = html;
+  for (const [from, to] of TEMPLATE_SUBSTITUTIONS) out = out.split(from).join(to);
+  const leftovers = [...out.matchAll(/\{\{([^}]*)\}\}/g)]
+    .map((m) => m[1].trim())
+    .filter((expression) => !/^1\.[A-Za-z0-9_.]+$/.test(expression));
+  if (leftovers.length) {
+    throw new Error(
+      'e-mail template still contains expressions the Worker cannot render:\n  '
+      + [...new Set(leftovers)].join('\n  ')
+      + '\nEither add a substitution above or precompute the value in attachCopy().'
+    );
+  }
+  return out;
+}
+
+const EMAIL_TEMPLATES = {
+  registration: forWorker(withRaceNumber(REG_HTML)),
+  minor: forWorker(withRaceNumber(MIN_HTML)),
+  reminder: forWorker(reminderOptInHtml()),
+  contact: forWorker(contactHtml()),
+  newsletter: forWorker(newsletterOptInHtml())
+};
+
+writeFileSync(
+  resolve(root, 'worker/email-templates.js'),
+  '/* GENERATED by tools/build-make-blueprints.mjs. Do not edit — change the HTML in\n'
+    + '   emails/make-registration.html or the small builders in the generator. */\n'
+    + '/* eslint-disable */\n'
+    + `export const EMAIL_TEMPLATES = ${JSON.stringify(EMAIL_TEMPLATES, null, 1)};\n`,
+  'utf8'
+);
+console.log(
+  `worker/email-templates.js  ${Object.entries(EMAIL_TEMPLATES)
+    .map(([name, html]) => `${name}=${(html.length / 1024).toFixed(1)}kB`)
+    .join(' ')}`
+);
 
 /* ------------------------------------------------- copy deck for the Worker
    The Vercel function resolves the wording for the submitter's language and sends it
