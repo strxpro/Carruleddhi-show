@@ -2554,7 +2554,14 @@ import { flagSvg } from './flags.js';
       const parts = [];
       for (const [headingKey, url] of sources) {
         try {
-          const response = await fetch(url, { credentials: 'omit' });
+          /* `same-origin`, not `omit`.
+             These are two pages of this same site, and `omit` meant the request went
+             without the cookie the visitor is already holding — so the password gate
+             answered 401 and the dialogue showed "could not load the document, open it
+             in a new tab" for both. Omitting credentials is the right default for the
+             API, which is a public endpoint with its own authentication; it is the
+             wrong one for fetching a page of the site you are standing on. */
+          const response = await fetch(url, { credentials: 'same-origin' });
           if (!response.ok) throw new Error(String(response.status));
           const markup = await response.text();
           const parsed = new DOMParser().parseFromString(markup, 'text/html');
