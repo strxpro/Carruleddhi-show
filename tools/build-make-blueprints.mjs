@@ -33,7 +33,20 @@ const ORG_EMAIL = 'info@carruleddhishow.com';
  * this one number, and CallMeBot ignores anything after "Stop" is sent to the
  * bot — but it is still a live credential, so keep it out of public repos.
  */
-const CALLMEBOT = { phone: '48665626101', apikey: '2990681' };
+/**
+ * Who gets the WhatsApp notice.
+ *
+ * A list, because CallMeBot pairs one key to one number and there is no way to address
+ * two people with a single request — a second phone needs a second call. The generator
+ * makes one HTTP module per entry, so adding an organiser is one line here rather than
+ * a module cloned by hand and then forgotten about the next time the text changes.
+ *
+ * To add somebody: they send "I allow callmebot to send me messages" to +34 621 331 709
+ * on WhatsApp, the bot replies with their personal apikey, and both values go below.
+ */
+const CALLMEBOT = [
+  { label: 'organizator', phone: '48665626101', apikey: '2990681' }
+];
 
 /* ---------------------------------------------------------------- copy deck */
 
@@ -344,6 +357,34 @@ function router(id, x, y, routes) {
   return { id, module: 'builtin:BasicRouter', version: 1, mapper: null, metadata: at(x, y), routes };
 }
 
+/**
+ * Tools > Sleep.
+ *
+ * Seconds, and Make caps it at 300. Long enough for what it is needed for here: the
+ * newsletter confirmation is triggered by the same form submission as the registration
+ * confirmation, so without a pause two letters land in the same inbox in the same
+ * second — which reads as a system that has lost track of itself, and buries the one
+ * with the race number in it.
+ *
+ * A delay is not a queue. If Make is busy the whole route waits, which is fine for a
+ * courtesy note and would not be for the confirmation; that is why the sleep is on this
+ * route and not on the one that matters.
+ */
+function sleep(id, x, y, seconds, filter) {
+  return {
+    id,
+    module: 'builtin:BasicSleep',
+    version: 1,
+    parameters: {},
+    ...(filter ? { filter } : {}),
+    mapper: { duration: String(Math.min(Math.max(seconds, 1), 300)) },
+    metadata: {
+      ...at(x, y),
+      expect: [{ name: 'duration', type: 'uinteger', label: 'Delay', required: true }]
+    }
+  };
+}
+
 const eq = (name, a, b) => ({ name, conditions: [[{ a, b, o: 'text:equal' }]] });
 
 function wrap(name, flow, instant) {
@@ -630,10 +671,16 @@ const instantFlow = [
        third-party host and lands in its logs. A race number and a category are
        enough to know an entry arrived, and mean nothing to anyone else. */
     {
-      flow: [
-        httpRequest(9, 1250, -40, 'https://api.callmebot.com/whatsapp.php', [
-          { name: 'phone', value: CALLMEBOT.phone },
-          { name: 'apikey', value: CALLMEBOT.apikey },
+      flow: CALLMEBOT.map((recipient, index) => httpRequest(
+        // 9 for the first, then 20, 21… so existing module numbers do not shift when
+        // somebody is added and the instructions stop matching the canvas.
+        index === 0 ? 9 : 19 + index,
+        1250,
+        -40 + index * 130,
+        'https://api.callmebot.com/whatsapp.php',
+        [
+          { name: 'phone', value: recipient.phone },
+          { name: 'apikey', value: recipient.apikey },
           {
             /* Full details, at your request.
                Worth knowing what that costs: CallMeBot is not an official WhatsApp
@@ -675,8 +722,12 @@ const instantFlow = [
                 + '\n✍️ Chi firma: " + 1.guardianName + "\n📧 " + lower(1.guardianEmail)'
                 + ' + "\n📱 " + 1.guardianPhone; "")}}'
           }
-        ], eq('any entry', '{{1.type}}', 'registration'))
-      ]
+        ],
+        /* Every recipient carries the filter. A route in Make stops at the first
+           failed filter, so putting it only on the first module would mean a second
+           organiser is notified about reminders and contact messages too. */
+        eq(`whatsapp — ${recipient.label}`, '{{1.type}}', 'registration')
+      ))
     },
 
     /* ---- D: reminder list ----------------------------------------------- */
@@ -711,11 +762,16 @@ const instantFlow = [
        the limit out loud. */
     {
       flow: [
-        sendEmail(18, 1250, 640, {
-          filter: {
-            name: 'newsletter opt-in',
-            conditions: [[{ a: '{{1.newsConsent}}', o: 'boolean:equal', b: 'true' }]]
-          },
+        /* Ninety seconds behind the confirmation.
+           Both letters come from one form submission, so without this they arrive in the
+           same second — and the courtesy note about next year buries the one carrying a
+           race number and a form to sign. The filter is on the sleep rather than the
+           e-mail so an entry without the box ticked does not sit here waiting first. */
+        sleep(21, 1250, 640, 90, {
+          name: 'newsletter opt-in',
+          conditions: [[{ a: '{{1.newsConsent}}', o: 'boolean:equal', b: 'true' }]]
+        }),
+        sendEmail(18, 1580, 640, {
           to: '{{lower(1.email)}}',
           subject: '{{1.newsSubject}}',
           html: '{{1.newsletterHtml}}'

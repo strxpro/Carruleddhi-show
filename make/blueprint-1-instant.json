@@ -329,7 +329,7 @@
                 "useNewZLibDeCompress": true
               },
               "filter": {
-                "name": "any entry",
+                "name": "whatsapp — organizator",
                 "conditions": [
                   [
                     {
@@ -577,13 +577,10 @@
         {
           "flow": [
             {
-              "id": 18,
-              "module": "email:ActionSendEmail",
-              "version": 7,
-              "parameters": {
-                "account": null,
-                "saveAfterSent": false
-              },
+              "id": 21,
+              "module": "builtin:BasicSleep",
+              "version": 1,
+              "parameters": {},
               "filter": {
                 "name": "newsletter opt-in",
                 "conditions": [
@@ -595,6 +592,32 @@
                     }
                   ]
                 ]
+              },
+              "mapper": {
+                "duration": "90"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": 640
+                },
+                "expect": [
+                  {
+                    "name": "duration",
+                    "type": "uinteger",
+                    "label": "Delay",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 18,
+              "module": "email:ActionSendEmail",
+              "version": 7,
+              "parameters": {
+                "account": null,
+                "saveAfterSent": false
               },
               "mapper": {
                 "to": [
@@ -616,7 +639,7 @@
               },
               "metadata": {
                 "designer": {
-                  "x": 1250,
+                  "x": 1580,
                   "y": 640
                 },
                 "restore": {
