@@ -598,12 +598,23 @@ const instantFlow = [
     {
       flow: [
         httpGetFile(19, 1250, -280, '{{1.pdfUrl}}', eq('under 18', '{{1.branch}}', 'registration-minor')),
-        /* Addressed to the guardian, because they are the one who signs. The rider
-           gets a blind copy so they still see their number without becoming a second
-           visible recipient on a letter written to their parent. */
+        /* Both of them, openly.
+           The guardian first, because they are the one who signs and the letter is
+           written to them. The rider second, as a visible recipient rather than a
+           blind copy: a fourteen-year-old who typed their own address in expects to
+           hear something back, and "we sent it to your mother" is not that. Seeing
+           each other on the same message is also the point — the form and the number
+           are one thing they have to sort out together.
+
+           If the rider left no address the second slot resolves to the organiser's,
+           which is a duplicate of the blind copy and harmless. An empty recipient is
+           not harmless: most servers reject the whole message for it. */
         sendEmail(16, 1600, -280, {
-          to: '{{lower(1.guardianEmail)}}',
-          bcc: ['{{"' + ORG_EMAIL + ', " + lower(1.email)}}'],
+          to: [
+            '{{lower(1.guardianEmail)}}',
+            `{{ifempty(lower(1.email); "${ORG_EMAIL}")}}`
+          ],
+          bcc: [ORG_EMAIL],
           subject: '{{1.subject}}',
           html: '{{5.minHtml}}',
           attachments: [{ fileName: '{{1.pdfName}}{{1.raceNumber}}.pdf', data: '{{19.data}}' }]

@@ -282,7 +282,8 @@
               },
               "mapper": {
                 "to": [
-                  "{{lower(1.guardianEmail)}}"
+                  "{{lower(1.guardianEmail)}}",
+                  "{{ifempty(lower(1.email); \"info@carruleddhishow.com\")}}"
                 ],
                 "subject": "{{1.subject}}",
                 "contentType": "html",
@@ -295,7 +296,7 @@
                 ],
                 "cc": [],
                 "bcc": [
-                  "{{\"info@carruleddhishow.com, \" + lower(1.email)}}"
+                  "info@carruleddhishow.com"
                 ],
                 "from": "",
                 "sender": "",
