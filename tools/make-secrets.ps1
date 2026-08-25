@@ -32,9 +32,13 @@ $ErrorActionPreference = 'Stop'
 $envFile = Join-Path (Get-Location) '.env.local'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
-# Six variables, in the order they are entered in Vercel.
+# Seven variables, in the order they are entered in Vercel.
 $order = @(
   'SITE_PASSWORD',
+  # Unlocks the admin panel's interface. Compiled into the bundle, so it guards the
+  # layout and nothing else - the passphrase protecting participant data is ROSTER_KEY,
+  # which stays in Vercel's environment and is checked by the function on every request.
+  'VITE_ADMIN_PASSWORD',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_KEY',
   'WALL_SALT',
@@ -72,7 +76,7 @@ if ($Show) {
   # --- the three generated ones -------------------------------------------------
   # Short and typeable for the gate: it is shared with people, not a root key.
   # Long for the other two: they are pasted once and never typed.
-  $generated = @{ SITE_PASSWORD = 14; WALL_SALT = 44; ROSTER_KEY = 28 }
+  $generated = @{ SITE_PASSWORD = 14; VITE_ADMIN_PASSWORD = 14; WALL_SALT = 44; ROSTER_KEY = 28 }
   foreach ($name in $generated.Keys) {
     if ($Rotate -or -not $values[$name]) { $values[$name] = New-Secret -Length $generated[$name] }
   }

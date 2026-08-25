@@ -2,312 +2,45 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <!-- Opening this file straight from disk breaks absolute asset paths and blocks
-       ES modules. Detect it before first paint so the warning is visible instantly. -->
-  <script>if (location.protocol === 'file:') document.documentElement.classList.add('is-file-protocol');</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="robots" content="noindex,nofollow,noarchive">
-  <meta name="theme-color" content="#071a3d">
-  <title>Panel lokalny — Carruleddhi Show</title>
-  <meta name="description" content="Lokalny panel konfiguracji i podglądu strony Carruleddhi Show.">
-  <link rel="stylesheet" href="assets/css/admin.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Never indexed. The password gate keeps strangers out; this keeps the page out of
+       search results in the first place, which is the cheaper of the two. -->
+  <meta name="robots" content="noindex, nofollow">
+  <title>Panel — Carruleddhi Show 2026</title>
+
+  <!-- Fonts are self-hosted for the public site; the panel reuses the display face for
+       headings only, so a missing file costs nothing but a fallback. -->
+  <link rel="preload" href="/assets/fonts/bungee-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    @font-face {
+      font-family: 'Bungee';
+      src: url('/assets/fonts/bungee-latin-ext.woff2') format('woff2');
+      font-display: swap;
+      unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: 'Bungee';
+      src: url('/assets/fonts/bungee-latin.woff2') format('woff2');
+      font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    /* Shown until React mounts. Without it the first paint is a white flash on a dark
+       page, which reads as a broken load. */
+    #admin-root:empty::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: #071a3d;
+    }
+  </style>
 </head>
 <body>
-  <a class="skip-link" href="#admin-main">Przejdź do ustawień</a>
-  <header class="admin-header">
-    <a class="admin-brand" href="admin.html" aria-label="Panel Carruleddhi Show">
-      <span class="admin-brand__mark">CS</span>
-      <span><strong>Carruleddhi</strong><small>Panel lokalny</small></span>
-    </a>
-    <div class="admin-header__actions">
-      <span class="local-badge"><span aria-hidden="true"></span>Tylko ta przeglądarka</span>
-      <a class="button button--ghost" href="index.html" target="_blank" rel="noopener">Otwórz stronę</a>
-      <a class="button button--primary" href="index.html?configPreview=1&amp;skipIntro=1" target="_blank" rel="noopener">Pełny podgląd</a>
-    </div>
-  </header>
-
-  <main id="admin-main" class="admin-main">
-    <section class="admin-hero" aria-labelledby="admin-title">
-      <div>
-        <span class="kicker">Centrum sterowania · wersja local-first</span>
-        <h1 id="admin-title">Edytuj wydarzenie.<br><span>Bez ukrytych obietnic.</span></h1>
-      </div>
-      <p>Zmiany zapisują się jako lokalny draft i są widoczne na stronie wyłącznie w trybie <code>?configPreview=1</code>. Publikacja dla wszystkich, globalne statystyki i dane uczestników wymagają chronionego backendu.</p>
-    </section>
-
-    <aside class="file-warning" role="alert">
-      <span class="file-warning__icon" aria-hidden="true">!</span>
-      <div>
-        <h2>Otwierasz panel bezpośrednio z dysku — połowa funkcji nie zadziała</h2>
-        <p>Adres w pasku zaczyna się od <code>file:///</code>. W tym trybie przeglądarka nie znajdzie zdjęć ani podglądu strony, a rysowanie trasy jest zablokowane.</p>
-        <p>Zamknij tę kartę, otwórz terminal w katalogu projektu i uruchom:</p>
-        <p><code>npm run dev</code> &nbsp;→&nbsp; potem wejdź na <code>http://localhost:5173/admin.html</code></p>
-      </div>
-    </aside>
-
-    <aside class="security-note" aria-labelledby="security-title">
-      <span class="security-note__icon" aria-hidden="true">i</span>
-      <div><h2 id="security-title">Co ten panel robi — i czego celowo nie robi</h2><p>Edytuje publiczną konfigurację, ale nie przechowuje imion, e-maili, telefonów ani list uczestników. <code>noindex</code> nie jest autoryzacją: produkcyjny dostęp do tego pliku zabezpiecz po stronie hostingu, np. Cloudflare Access.</p></div>
-    </aside>
-
-    <section class="stats" aria-label="Lokalne statystyki techniczne">
-      <article class="stat-card stat-card--accent"><span>Draft</span><strong data-stat-draft>Brak</strong><small data-stat-updated>Nie zapisano zmian</small></article>
-      <article class="stat-card"><span>Lokalne zgłoszenia</span><strong data-stat-registrations>0</strong><small>Tylko licznik, bez PII</small></article>
-      <article class="stat-card"><span>Obecność</span><strong data-stat-attendance>Nie</strong><small>Wybór tej przeglądarki</small></article>
-      <article class="stat-card"><span>Endpointy proxy</span><strong data-stat-endpoints>0/5</strong><small>Publiczne ścieżki /api</small></article>
-    </section>
-
-    <nav class="admin-nav" aria-label="Skocz do sekcji">
-      <span class="admin-nav__label">Skocz do:</span>
-      <a href="#event-settings-title"><b>01</b> Wydarzenie</a>
-      <a href="#route-settings-title"><b>02</b> Trasa i kontakt</a>
-      <a href="#media-settings-title"><b>03</b> Obrazy</a>
-      <a class="admin-nav__hot" href="#route-path-title"><b>04</b> Rysowanie trasy</a>
-      <a href="#features-settings-title"><b>05</b> Funkcje</a>
-      <a href="#endpoint-settings-title"><b>06</b> Integracje</a>
-      <a href="#sponsors-title"><b>07</b> Sponsorzy</a>
-      <a href="#roster-title"><b>08</b> Uczestnicy</a>
-      <a href="#moderation-title"><b>09</b> Moderacja</a>
-    </nav>
-
-    <div class="admin-layout">
-      <form class="settings" data-admin-form novalidate>
-        <section class="panel" aria-labelledby="event-settings-title">
-          <div class="panel__head"><span>01</span><div><h2 id="event-settings-title">Wydarzenie i liczniki</h2><p>Podstawowe dane widoczne na stronie i używane przez odliczanie.</p></div></div>
-          <div class="fields fields--two">
-            <label class="field field--full"><span>Nazwa wydarzenia</span><input name="eventName" type="text" maxlength="80" placeholder="Carruleddhi Show 2026" required><small>Trafia do tytułu strony i do danych wysyłanych do Make.</small></label>
-            <label class="field"><span>Data i czas ISO</span><input name="eventDate" type="text" inputmode="text" placeholder="2026-10-17T14:30:00+02:00" required><small>Format: <code>RRRR-MM-DDTgg:mm:ss+02:00</code>. To napędza odliczanie — literówka zatrzyma licznik.</small></label>
-            <label class="field"><span>Etykieta daty</span><input name="dateLabel" type="text" maxlength="100" placeholder="17 ottobre 2026 · Santa Teresa Gallura" required><small>Tekst pod nagłówkiem. Zostaw bez zmian, żeby użyć tłumaczeń z i18n.</small></label>
-            <label class="field"><span>Startowy licznik zawodników</span><input name="pilotsBase" type="number" min="0" max="1000000" step="1" placeholder="38" required><small>Od tej liczby strona zaczyna liczyć. Realne zapisy się dodają.</small></label>
-            <label class="field"><span>Startowy licznik widzów</span><input name="attendeesBase" type="number" min="0" max="1000000" step="1" placeholder="412" required><small>To samo dla licznika „Będę tam".</small></label>
-            <label class="field field--full"><span>Hasło wydarzenia</span><input name="tagline" type="text" maxlength="150" placeholder="Nessun motore. Solo la discesa." required><small>Duży napis pod tytułem. Krótko, maksymalnie 6–7 słów.</small></label>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="route-settings-title">
-          <div class="panel__head"><span>02</span><div><h2 id="route-settings-title">Trasa i kontakt</h2><p>Teksty mapy, bezpieczny link HTTPS i publiczne dane organizatora.</p></div></div>
-          <div class="fields fields--two">
-            <label class="field"><span>Dystans</span><input name="routeDistance" type="text" maxlength="60" placeholder="circa 650 m" required><small>Długość zjazdu, tak jak ma się wyświetlić.</small></label>
-            <label class="field"><span>Droga</span><input name="routeRoad" type="text" maxlength="100" placeholder="Via Giuseppe Verdi" required><small>Nazwa ulicy pokazywana obok dystansu.</small></label>
-            <label class="field field--full"><span>Link do mapy HTTPS</span><input name="routeMapUrl" type="url" inputmode="url" placeholder="https://maps.app.goo.gl/MZLJyzTH3tC93Pm86" required><small>W Google Maps: <em>Udostępnij → Kopiuj link</em>. Musi być <code>https://</code>.</small></label>
-            <label class="field"><span>Publiczny e-mail</span><input name="contactEmail" type="email" autocomplete="off" placeholder="shardananuragici@gmail.com" required><small>Widoczny na stronie i używany jako Reply-To.</small></label>
-            <label class="field"><span>Publiczny telefon</span><input name="contactPhone" type="text" autocomplete="off" maxlength="60" placeholder="+39 328 498 1574" required><small>Z prefiksem kraju. Strona sama zrobi z tego klikalny numer.</small></label>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="media-settings-title">
-          <div class="panel__head"><span>03</span><div><h2 id="media-settings-title">Obrazy lokalne</h2><p><strong>Tutaj nie wgrywasz plików.</strong> Skopiuj obraz do katalogu <code>public/assets/images/</code> w projekcie, a w polu wpisz tylko jego ścieżkę zaczynającą się od <code>/assets/images/</code>.</p></div></div>
-          <div class="fields">
-            <label class="field"><span>Zdjęcie trasy</span><input name="routeImage" type="text" data-asset-path placeholder="/assets/images/zjazd.png" required><small>To zdjęcie pojawia się w sekcji 04 i po nim rysujesz linię zjazdu.</small></label>
-            <div class="media-fields" data-gallery-fields>
-              <label class="field"><span>Galeria · kadr 1</span><input name="galleryImage0" type="text" data-asset-path placeholder="/assets/images/gallery-start.svg" required></label>
-              <label class="field"><span>Galeria · kadr 2</span><input name="galleryImage1" type="text" data-asset-path placeholder="/assets/images/gallery-race.svg" required></label>
-              <label class="field"><span>Galeria · kadr 3</span><input name="galleryImage2" type="text" data-asset-path placeholder="/assets/images/gallery-craft.svg" required></label>
-              <label class="field"><span>Galeria · kadr 4</span><input name="galleryImage3" type="text" data-asset-path placeholder="/assets/images/gallery-crowd.svg" required></label>
-              <label class="field field--full"><span>Galeria · kadr 5</span><input name="galleryImage4" type="text" data-asset-path placeholder="/assets/images/gallery-finish.svg" required><small>Dozwolone: svg, png, jpg, webp, avif. Czerwona ramka wokół pola = zła ścieżka.</small></label>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel panel--highlight" aria-labelledby="route-path-title">
-          <div class="panel__head"><span>04</span><div><h2 id="route-path-title">Rysowanie trasy na zdjęciu</h2><p><strong>Tu nic nie wpisujesz — klikasz po zdjęciu.</strong> Poniżej jest zdjęcie zjazdu. Klikając na nim stawiasz punkty trasy, a strona sama poprowadzi między nimi gładką linię z perspektywą.</p></div></div>
-
-          <ol class="route-howto">
-            <li><b>1</b><span>Kliknij na zdjęciu tam, gdzie jest <strong>start</strong> zjazdu. Pojawi się żółty punkt z numerem 1.</span></li>
-            <li><b>2</b><span>Klikaj dalej po drodze, aż do <strong>mety</strong>. Ostatni punkt jest czerwony. Wystarczy 5–8 punktów.</span></li>
-            <li><b>3</b><span>Coś nie pasuje? <strong>Przeciągnij punkt</strong> myszą. Prawy przycisk na punkcie go usuwa.</span></li>
-            <li><b>4</b><span>Ustaw <strong>dwa suwaki perspektywy</strong> pod zdjęciem: szerokość blisko widza i przy horyzoncie.</span></li>
-            <li><b>5</b><span>Na dole strony kliknij <strong>Zapisz draft</strong>. Podgląd po prawej pokaże efekt.</span></li>
-          </ol>
-
-          <div class="route-editor">
-            <div class="route-editor__stage" data-route-editor tabindex="-1">
-              <img data-route-editor-image alt="">
-              <svg viewBox="0 0 1000 625" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-route-editor-svg>
-                <path data-route-editor-line fill="none" stroke="none"></path>
-                <path data-route-editor-ribbon="casing" fill="#071a3d" fill-opacity=".6"></path>
-                <path data-route-editor-ribbon="fill" fill="#ffda3d"></path>
-              </svg>
-              <p class="route-editor__empty" data-route-editor-empty hidden>Kliknij tutaj, na początku zjazdu — postawisz pierwszy punkt trasy.</p>
-            </div>
-            <div class="route-editor__bar">
-              <span data-route-editor-count>0 pkt</span>
-              <button class="button button--ghost" type="button" data-route-editor-undo>Cofnij punkt</button>
-              <button class="button button--ghost" type="button" data-route-editor-reset>Domyślna linia</button>
-              <button class="button button--danger" type="button" data-route-editor-clear>Wyczyść</button>
-            </div>
-
-            <div class="route-editor__widths">
-              <label class="field">
-                <span>Szerokość blisko kamery — <b data-route-width-near-value>26</b></span>
-                <input name="routeWidthNear" type="range" min="8" max="60" step="1" data-route-width="near">
-                <small>Dolny koniec trasy, najbliżej widza.</small>
-              </label>
-              <label class="field">
-                <span>Szerokość przy horyzoncie — <b data-route-width-far-value>5</b></span>
-                <input name="routeWidthFar" type="range" min="1" max="24" step="1" data-route-width="far">
-                <small>Górny koniec. Mniejsza wartość = mocniejsza perspektywa.</small>
-              </label>
-            </div>
-            <p class="route-editor__hint">Punkty zapisują się jako współrzędne 0–1, więc linia trzyma się zdjęcia niezależnie od rozdzielczości ekranu. Strona rysuje ją animacją przy przewijaniu do sekcji „Percorso”.</p>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="features-settings-title">
-          <div class="panel__head"><span>05</span><div><h2 id="features-settings-title">Widoczność funkcji</h2><p>Wyłącz sekcję, gdy nie jest jeszcze gotowa do publikacji.</p></div></div>
-          <div class="toggle-grid">
-            <label class="toggle-card"><input name="featureGallery" type="checkbox"><span class="toggle-card__switch" aria-hidden="true"></span><span><strong>Galeria</strong><small>Ilustracje i CTA galerii</small></span></label>
-            <label class="toggle-card"><input name="featureAttendance" type="checkbox"><span class="toggle-card__switch" aria-hidden="true"></span><span><strong>„Będę tam”</strong><small>Licznik i szybka akcja</small></span></label>
-            <label class="toggle-card"><input name="featureRegistration" type="checkbox"><span class="toggle-card__switch" aria-hidden="true"></span><span><strong>Zapisy</strong><small>Formularz i CTA rejestracji</small></span></label>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="endpoint-settings-title">
-          <div class="panel__head"><span>06</span><div><h2 id="endpoint-settings-title">Integracje przez proxy</h2><p>Nie wklejaj tokenów, webhooków Make, Brevo ani Meta. Frontend przyjmuje wyłącznie puste pola lub ścieżki <code>/api/carruleddhi/…</code>.</p></div></div>
-          <div class="endpoint-list">
-            <label class="endpoint"><span><strong>Rejestracja</strong><small data-endpoint-status="registration">Tryb demo</small></span><input name="endpointRegistration" type="text" data-endpoint placeholder="/api/carruleddhi/registration"></label>
-            <label class="endpoint"><span><strong>Przypomnienia</strong><small data-endpoint-status="reminder">Tryb demo</small></span><input name="endpointReminder" type="text" data-endpoint placeholder="/api/carruleddhi/reminder"></label>
-            <label class="endpoint"><span><strong>Obecność</strong><small data-endpoint-status="attendance">Tryb demo</small></span><input name="endpointAttendance" type="text" data-endpoint placeholder="/api/carruleddhi/attendance"></label>
-            <label class="endpoint"><span><strong>Globalne liczniki</strong><small data-endpoint-status="counts">Tryb demo</small></span><input name="endpointCounts" type="text" data-endpoint placeholder="/api/carruleddhi/counts"></label>
-            <label class="endpoint"><span><strong>Kontakt</strong><small data-endpoint-status="contact">Tryb demo</small></span><input name="endpointContact" type="text" data-endpoint placeholder="/api/carruleddhi/contact"></label>
-            <label class="endpoint"><span><strong>Tablica</strong><small data-endpoint-status="wall">Tryb demo</small></span><input name="endpointWall" type="text" data-endpoint placeholder="/api/carruleddhi/wall"></label>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="sponsors-title">
-          <div class="panel__head"><span>07</span><div><h2 id="sponsors-title">Sponsorzy</h2><p>Ruchomy pasek z logotypami na dole sekcji powitalnej. Bez nagłówków i opisów — tylko logo. Puste = pasek się nie pokazuje.</p></div></div>
-
-          <ol class="sponsor-list" data-sponsor-list></ol>
-
-          <div class="sponsor-actions">
-            <button class="button button--primary" type="button" data-sponsor-add>+ Dodaj sponsora</button>
-            <button class="button" type="button" data-sponsor-demo>Wstaw 4 przykładowe logo</button>
-            <span class="sponsor-actions__hint">Pusta lista = paska nie ma na stronie, i dlatego go nie widziałeś. Kliknij „Wstaw 4 przykładowe logo", zapisz i odśwież stronę — pasek pojawi się na dole sekcji powitalnej. Potem podmień pliki na prawdziwe: wrzuć je do <code>public/assets/images/sponsors/</code>, najlepiej PNG z przezroczystym tłem, wysokość około 200 px.</span>
-          </div>
-
-          <div class="sponsor-preview">
-            <span class="sponsor-preview__label">Podgląd paska</span>
-            <div class="sponsor-preview__band"><div class="sponsor-preview__track" data-sponsor-preview></div></div>
-          </div>
-        </section>
-
-        <section class="panel" aria-labelledby="roster-title">
-          <div class="panel__head"><span>08</span><div><h2 id="roster-title">Zapisani uczestnicy</h2><p>Dwa źródła: bezpośrednio z Make (wymaga hasła) albo z pliku CSV wyeksportowanego z Google Sheets. Dane nie są nigdzie zapisywane — żyją tylko w tej karcie przeglądarki.</p></div></div>
-
-          <div class="roster">
-            <div class="roster__sources">
-              <div class="roster__source">
-                <strong>A · Z Make przez proxy</strong>
-                <label class="field">
-                  <span>Hasło dostępu (ROSTER_KEY)</span>
-                  <input type="password" autocomplete="off" data-roster-key placeholder="wpisz hasło z sekretu Workera">
-                  <small>Trzymane tylko w sessionStorage. Zamknięcie karty je usuwa.</small>
-                </label>
-                <button class="button button--primary" type="button" data-roster-load>Wczytaj listę</button>
-              </div>
-              <div class="roster__source">
-                <strong>B · Z pliku CSV</strong>
-                <p>W Google Sheets: <em>Plik → Pobierz → CSV</em>. Działa bez proxy i bez Make.</p>
-                <button class="button button--ghost" type="button" data-roster-csv>Wybierz plik CSV</button>
-                <input type="file" accept=".csv,text/csv" data-roster-csv-file hidden>
-              </div>
-            </div>
-
-            <div class="roster__toolbar">
-              <label class="roster__search">
-                <span class="sr-only">Szukaj uczestnika</span>
-                <input type="search" data-roster-search placeholder="Szukaj: numer, nazwisko, pojazd, e-mail…">
-              </label>
-              <label class="roster__toggle"><input type="checkbox" data-roster-reveal><span>Pokaż dane kontaktowe</span></label>
-              <span class="roster__count" data-roster-count>Brak danych</span>
-              <button class="button button--ghost" type="button" data-roster-print-all disabled>Drukuj wszystkie karty</button>
-            </div>
-
-            <div class="roster__table-wrap">
-              <table class="roster__table">
-                <thead>
-                  <tr>
-                    <th scope="col">Nr</th>
-                    <th scope="col">Uczestnik</th>
-                    <th scope="col">Pojazd</th>
-                    <th scope="col">Kat.</th>
-                    <th scope="col">Jęz.</th>
-                    <th scope="col">Kontakt</th>
-                    <th scope="col">Status</th>
-                    <th scope="col"><span class="sr-only">Akcje</span></th>
-                  </tr>
-                </thead>
-                <tbody data-roster-body>
-                  <tr class="roster__empty"><td colspan="8">Wczytaj listę z Make albo z pliku CSV.</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <p class="roster__note">Karty do wydruku nie mają miejsca na podpis — podpisywany jest wyłącznie włoski PDF, który uczestnik dostaje mailem.</p>
-          </div>
-        </section>
-
-        <!-- Moderacja tablicy. Bez tego panelu jedynym sposobem zatwierdzenia
-             wiadomości byłby Table Editor w Supabase: nowe wpisy trafiają do bazy
-             jako niezatwierdzone i strona ich nie pokazuje, dopóki ktoś tego nie
-             zmieni. Hasło jest to samo co przy uczestnikach. -->
-        <section class="panel" aria-labelledby="moderation-title">
-          <div class="panel__head"><span>09</span><div><h2 id="moderation-title">Moderacja tablicy</h2><p><strong>Nowa wiadomość nie pokazuje się sama.</strong> Każdy wpis czeka tutaj na zatwierdzenie. Hasło jest to samo co w sekcji 08 — wpisz je tam raz i zostanie na czas tej karty.</p></div></div>
-
-          <div class="moderation">
-            <div class="moderation__toolbar">
-              <button class="button button--primary" type="button" data-wall-load>Wczytaj wiadomości</button>
-              <div class="moderation__filters" role="group" aria-label="Filtr wiadomości">
-                <button class="chip is-active" type="button" data-wall-filter="pending">Oczekujące <b data-wall-tally-pending>0</b></button>
-                <button class="chip" type="button" data-wall-filter="approved">Zatwierdzone <b data-wall-tally-approved>0</b></button>
-                <button class="chip" type="button" data-wall-filter="all">Wszystkie <b data-wall-tally-all>0</b></button>
-              </div>
-              <span class="moderation__count" data-wall-count>Brak danych</span>
-            </div>
-
-            <ul class="moderation__list" data-wall-mod-list>
-              <li class="moderation__empty">Kliknij „Wczytaj wiadomości”, żeby zobaczyć, co czeka na zatwierdzenie.</li>
-            </ul>
-
-            <p class="moderation__note">Usunięcie wiadomości usuwa też jej zdjęcie z bucketa i jest nieodwracalne. „Ukryj” tylko zdejmuje ją ze strony — wiadomość zostaje w bazie i można ją zatwierdzić ponownie.</p>
-          </div>
-        </section>
-
-        <div class="save-bar">
-          <div><strong data-save-state>Niezapisane zmiany</strong><small>Draft pozostaje wyłącznie w localStorage tej przeglądarki.</small></div>
-          <div class="save-bar__actions">
-            <button class="button button--ghost" type="button" data-import>Import JSON</button>
-            <button class="button button--ghost" type="button" data-export>Eksport JSON</button>
-            <button class="button button--danger" type="button" data-reset>Reset</button>
-            <button class="button button--primary" type="submit">Zapisz draft</button>
-          </div>
-        </div>
-      </form>
-
-      <aside class="preview-column" aria-label="Podgląd i diagnostyka">
-        <section class="preview-panel">
-          <div class="preview-panel__head"><div><span>Podgląd lokalny</span><strong>390 × 844</strong></div><button class="icon-button" type="button" data-refresh-preview aria-label="Odśwież podgląd">↻</button></div>
-          <div class="device-frame"><iframe data-preview title="Mobilny podgląd strony Carruleddhi Show" loading="lazy"></iframe></div>
-          <p>Podgląd czyta draft tylko dzięki parametrowi <code>configPreview=1</code>. Zwykła strona pozostaje bez zmian.</p>
-        </section>
-        <section class="diagnostics">
-          <h2>Diagnostyka</h2>
-          <ul>
-            <li><span>Język lokalny</span><strong data-stat-language>—</strong></li>
-            <li><span>Zgoda cookies</span><strong data-stat-cookies>Brak</strong></li>
-            <li><span>Przechowywane PII</span><strong class="status-ok">0</strong></li>
-            <li><span>Globalni uczestnicy</span><strong class="status-warn">Wymaga backendu</strong></li>
-          </ul>
-        </section>
-      </aside>
-    </div>
-  </main>
-
-  <input type="file" accept="application/json,.json" data-import-file hidden>
-  <div class="admin-toast" data-admin-toast role="status" aria-live="polite"></div>
-
-  <!-- Print surface: filled in on demand, visible only on paper. -->
-  <div class="print-sheet" data-print-sheet aria-hidden="true"></div>
-
-  <script type="module" src="assets/js/admin.js"></script>
+  <div id="admin-root"></div>
+  <noscript>
+    <p style="padding:24px;font-family:system-ui;color:#fff;background:#071a3d;">
+      Panel wymaga JavaScriptu. — Il pannello richiede JavaScript.
+    </p>
+  </noscript>
+  <script type="module" src="/admin-src/main.tsx"></script>
 </body>
 </html>
