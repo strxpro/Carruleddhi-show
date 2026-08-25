@@ -1500,7 +1500,19 @@ export default {
 
     const text = await upstream.text();
     if (!upstream.ok) {
-      return json({ ok: false, code: 'UPSTREAM_ERROR', status: upstream.status }, 502, cors);
+      /* Make's own words, passed through.
+         This used to answer a bare "UPSTREAM_ERROR" and throw the body away, so a
+         broken branch looked identical to a network fault and the only way to find out
+         which was to go and read the scenario's history by hand. Make says useful
+         things here — a module name, an SMTP refusal, a 404 on an attachment — and
+         none of it was reaching anyone.
+         Truncated, because an SMTP error can quote the whole message it refused. */
+      return json({
+        ok: false,
+        code: 'UPSTREAM_ERROR',
+        status: upstream.status,
+        reason: text.slice(0, 300) || null
+      }, 502, cors);
     }
 
     /* Make often answers "Accepted" in plain text when no Webhook Response module

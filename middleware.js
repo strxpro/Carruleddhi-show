@@ -25,8 +25,18 @@
  */
 
 export const config = {
-  // Everything except the API, Vercel's internals and the favicon.
-  matcher: ['/((?!api/|_vercel/|favicon).*)']
+  /**
+   * Everything except the API, /emails/, Vercel's internals and the favicon.
+   *
+   * `/emails/` is the exclusion that was missing, and it cost a working scenario. The
+   * registration form's PDF is fetched by Make, server-side, with no browser and no
+   * cookie — so the gate answered 401, the HTTP module treated that as a failure, and
+   * the whole branch died before the confirmation could be sent. A file whose entire
+   * purpose is to be attached to an e-mail and handed to a stranger has no business
+   * behind a password anyway: the gate exists to hide an unfinished site, not the form
+   * somebody has to print and sign.
+   */
+  matcher: ['/((?!api/|emails/|_vercel/|favicon).*)']
 };
 
 const COOKIE = 'car_gate';

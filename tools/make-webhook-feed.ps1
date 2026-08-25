@@ -286,6 +286,14 @@ function Send-Payload {
     $code = $null
     if ($_.Exception.Response) { $code = $_.Exception.Response.StatusCode.value__ }
     Write-Host "    FAILED  HTTP $code  $($_.Exception.Message.Split([char]10)[0])" -ForegroundColor Red
+    # The body of a failed response is where the actual reason lives - the API puts
+    # Make's own error text in `reason`, and a bad gateway with no explanation is
+    # what sent us hunting through the scenario history by hand.
+    try {
+      $stream = $_.Exception.Response.GetResponseStream()
+      $body = (New-Object System.IO.StreamReader($stream)).ReadToEnd()
+      if ($body) { Write-Host "            $($body.Substring(0, [Math]::Min(400, $body.Length)))" -ForegroundColor DarkYellow }
+    } catch { }
     return $false
   }
 }
