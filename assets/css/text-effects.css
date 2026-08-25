@@ -37,10 +37,18 @@
   /* Preserves the spaces between words: they are units too, and a collapsed one turns
      "Giù verso il mare" into "Giùversoilmare". */
   white-space: pre;
-  backface-visibility: hidden;
   transform-origin: 50% 60%;
-  will-change: transform, opacity;
 }
+
+/* No `will-change` here, deliberately.
+   Six headings split into characters is a few hundred spans on this page. `will-change`
+   on each one asks the browser for a few hundred compositor layers, all at once, for
+   animations lasting well under a second — which on a phone is how a page starts
+   stuttering and then dies. `transform` and `opacity` are already composited without
+   being asked; `will-change` buys nothing here and costs memory per element.
+
+   The one place it is still used is .fx-jitter, which is a single element per instance
+   and runs forever, so the hint is both cheap and true. */
 
 /* A line-level unit has to be a block or two lines sit side by side. */
 [data-text-effect] .fx-unit--line {

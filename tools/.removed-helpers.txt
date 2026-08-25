@@ -1,0 +1,49 @@
+function setVars(id, x, y, variables, name) {
+  return {
+    id,
+    module: 'util:SetVariables',
+    version: 1,
+    parameters: {},
+    mapper: { variables, scope: 'roundtrip' },
+    metadata: { ...at(x, y), restore: { expect: { variables: { items: [] } } } },
+    ...(name ? { label: name } : {})
+  };
+}
+
+/** Google Sheets "Add a Row". spreadsheetId is left blank on purpose so Make
+ *  makes you pick the file after import — a hard-coded id would silently point
+ *  at nothing. */
+function addRow(id, x, y, sheet, values, filter) {
+  return {
+    id,
+    module: 'google-sheets:addRow',
+    version: 2,
+    parameters: { __IMTCONN__: null },
+    ...(filter ? { filter } : {}),
+    mapper: {
+      from: 'drive',
+      mode: 'select',
+      spreadsheetId: '',
+      sheetId: sheet,
+      includesHeaders: true,
+      insertDataOption: 'INSERT_ROWS',
+      valueInputOption: 'USER_ENTERED',
+      insertUnformatted: false,
+      values
+    },
+    metadata: at(x, y)
+  };
+}
+
+/**
+ * Email > Send an Email.
+ *
+ * The exact shape matters and was guessed wrong the first time: the module is
+ * version 7, not 4, and Make renders an unknown version as a grey "Module Not
+ * Found" circle with no explanation. The connection also lives in `account`, not
+ * the usual `__IMTCONN__`.
+ *
+ * `saveAfterSent` stays false on purpose. Setting it true makes the module want a
+ * second, IMAP connection (`accountImap`) plus a sent-mail folder name, which is
+ * one more thing to configure for no benefit — Zimbra already keeps a copy.
+ */

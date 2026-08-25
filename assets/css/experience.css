@@ -48,17 +48,47 @@
   border-radius: 0;
 }
 
-#main > section:nth-of-type(1) { z-index: 1; }
-#main > section:nth-of-type(2) { z-index: 2; }
-#main > section:nth-of-type(3) { z-index: 3; }
-#main > section:nth-of-type(4) { z-index: 4; }
-#main > section:nth-of-type(5) { z-index: 5; }
-#main > section:nth-of-type(6) { z-index: 6; }
-#main > section:nth-of-type(7) { z-index: 7; }
-#main > section:nth-of-type(8) { z-index: 8; }
-#main > section:nth-of-type(9) { z-index: 9; }
+/* Every panel must paint over the one before it, so each needs a higher z-index than
+   its predecessor. There is no CSS way to say "your position in the list", so this is a
+   written-out ladder — and a written-out ladder can run out.
+
+   IT DID RUN OUT, AND HERE IS WHAT THAT LOOKED LIKE
+     The list stopped at 11. #contact is the twelfth section, so it got no rule, which on
+     a sticky element means `z-index: auto` — below everything with a number. #faq (10)
+     and #wall (11) are sticky and pinned at the top, so they painted straight over it.
+     The section was in the HTML, laid out, in the accessibility tree and reachable by
+     its anchor. It was simply underneath. Reported as "the contact section is missing
+     and there is a second FAQ where it should be", which is exactly what it looked like.
+
+   TWO THINGS KEEP IT FIXED
+     The ladder goes to 24, which is twice what the page has. And app.js sets the same
+     value inline from each section's real position (see setupPanelDepth), so a section
+     added past 24 is still correct — the CSS is the no-JavaScript fallback, not the
+     source of truth. Do not remove one and keep the other. */
+#main > section:nth-of-type(1)  { z-index: 1; }
+#main > section:nth-of-type(2)  { z-index: 2; }
+#main > section:nth-of-type(3)  { z-index: 3; }
+#main > section:nth-of-type(4)  { z-index: 4; }
+#main > section:nth-of-type(5)  { z-index: 5; }
+#main > section:nth-of-type(6)  { z-index: 6; }
+#main > section:nth-of-type(7)  { z-index: 7; }
+#main > section:nth-of-type(8)  { z-index: 8; }
+#main > section:nth-of-type(9)  { z-index: 9; }
 #main > section:nth-of-type(10) { z-index: 10; }
 #main > section:nth-of-type(11) { z-index: 11; }
+#main > section:nth-of-type(12) { z-index: 12; }
+#main > section:nth-of-type(13) { z-index: 13; }
+#main > section:nth-of-type(14) { z-index: 14; }
+#main > section:nth-of-type(15) { z-index: 15; }
+#main > section:nth-of-type(16) { z-index: 16; }
+#main > section:nth-of-type(17) { z-index: 17; }
+#main > section:nth-of-type(18) { z-index: 18; }
+#main > section:nth-of-type(19) { z-index: 19; }
+#main > section:nth-of-type(20) { z-index: 20; }
+#main > section:nth-of-type(21) { z-index: 21; }
+#main > section:nth-of-type(22) { z-index: 22; }
+#main > section:nth-of-type(23) { z-index: 23; }
+#main > section:nth-of-type(24) { z-index: 24; }
 
 #main > section.section-card > .container {
   width: var(--page);
@@ -94,7 +124,11 @@
 
 .site-footer {
   position: relative;
-  z-index: 20;
+  /* Above the whole panel ladder, which now goes to 24. It used to be 20, which was
+     above the eleven rungs that existed then and would have put the footer underneath
+     the last five the moment the ladder was extended. Keep this larger than the highest
+     nth-of-type rule above. */
+  z-index: 40;
   margin-top: 0;
   padding-top: 78px;
   border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;

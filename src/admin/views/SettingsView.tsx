@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import { fetchSettings, saveSettings, uploadSponsorLogo, type SiteSettings, type Sponsor } from '../api';
+import { PurgePanel } from './PurgePanel';
 
 /**
  * Settings, and the two things that used to need a developer.
@@ -467,6 +468,10 @@ export function SettingsView({
           {t('set.forget')}
         </button>
       </section>
+
+      {/* Last on the page, and the only red section. Nothing below it, so nobody scrolls
+          past it on the way to something else. */}
+      <PurgePanel t={t} apiKey={apiKey} />
 
       {/* ------------------------------------------------------ where things live */}
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">

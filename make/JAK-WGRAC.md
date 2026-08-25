@@ -1,259 +1,247 @@
-# Make — dwa pliki, dziesięć minut
+# Make.com — jak wgrać oba scenariusze
 
-Nie budujesz nic ręcznie. Importujesz dwa gotowe scenariusze i podłączasz konta.
+Stan na dziś: **dwa scenariusze**, oba bez Arkuszy Google. Baza to Supabase, teksty
+i szablony maili renderuje funkcja na Vercelu. Make robi jedną rzecz — wysyła.
 
-## 1. Arkusz Google — NIE ruszasz nagłówków
+Pliki do importu:
 
-**Zmiana względem pierwszej wersji.** Blueprint był napisany pod mój wymyślony
-układ kolumn, a Twój arkusz ma własny — dlatego `loc` wylądował w `race_number`
-i wszystko przesunęło się o jedną kolumnę. Teraz blueprint jest dopasowany do
-**Twojego** arkusza. Nagłówków nie zmieniasz.
+| Plik | Nazwa w Make | Moduły | Uruchamiany przez |
+|---|---|---|---|
+| `make/blueprint-1-instant.json` | Carruleddhi — 1 — natychmiastowe (webhook) | 18 | zgłoszenie na stronie |
+| `make/blueprint-2-reminders.json` | Carruleddhi — 2 — przypomnienia (co godzinę) | 3 | zegar |
 
-Odczytane z Twojego pliku:
+Trzeciego scenariusza (ogłoszenie nowej edycji) jeszcze nie ma — patrz koniec pliku.
 
-| Karta | Kolumny |
+---
+
+## Zanim zaczniesz
+
+Trzy rzeczy muszą być gotowe, inaczej import się uda, a scenariusz nie.
+
+1. **Migracje w Supabase.** SQL Editor → wklej → Run, po kolei:
+   `0001` … `0007`. Jeśli któraś już przeszła, uruchom ją ponownie — wszystkie są
+   napisane tak, że drugie uruchomienie nic nie psuje (`if not exists`,
+   `on conflict do nothing`, `create or replace`).
+
+2. **Zmienne w Vercelu** (Settings → Environment Variables), potem **Redeploy**:
+
+   | Nazwa | Do czego |
+   |---|---|
+   | `MAKE_WEBHOOK_URL` | adres webhooka ze scenariusza 1 |
+   | `SUPABASE_URL` | adres projektu |
+   | `SUPABASE_SERVICE_KEY` | klucz service_role |
+   | `ROSTER_KEY` | hasło do panelu admina **i** do endpointu przypomnień |
+   | `SITE_PASSWORD` | brama „Pracujemy nad tym”; usuń, gdy strona ma być publiczna |
+   | `INTAKE_SHARED_KEY` | opcjonalne, nagłówek dodawany do żądań do Make |
+
+3. **Pliki PDF na stronie.** `node tools/build-pdfs.mjs` generuje 12 plików do
+   `public/emails/`. Są w repo, więc po wdrożeniu są pod
+   `https://www.carruleddhishow.com/emails/Carruleddhi-modulo-it.pdf` itd.
+   Sprawdź jeden w przeglądarce **przed** testem — moduł HTTP w Make dostanie 404
+   i zatrzyma trasę, a mail nie wyjdzie.
+
+---
+
+## Scenariusz 1 — natychmiastowe, 18 modułów
+
+### Co robi
+
+Jeden webhook, jeden router, sześć tras.
+
+```
+1 Webhook
+└─ 4 Router
+   ├─ A  registration-adult-it     7 HTTP(PDF it) ────────────────→ 8  Email
+   ├─ B  registration-adult-xx    22 HTTP(it) → 23 HTTP(jego jęz.) → 24 Email
+   ├─ C  registration-minor-it    19 HTTP(it) ────────────────────→ 16 Email
+   ├─ D  registration-minor-xx    25 HTTP(it) → 26 HTTP(jego jęz.) → 27 Email
+   ├─ E  type = registration       9 HTTP WhatsApp, 30 HTTP WhatsApp
+   ├─ F  reminder                 12 Email
+   ├─ G  contact                  14 Email
+   └─ H  newsConsent = true       21 Sleep 90 s → 18 Email
+```
+
+**Dlaczego cztery trasy rejestracji, a nie dwie.** Filtr w Make nie jest „jeżeli” —
+kiedy nie przechodzi, **kończy całą trasę**, a nie pomija moduł. Włoch dostaje jeden
+PDF, obcokrajowiec dwa, więc drugi moduł HTTP musiałby być warunkowy. Nie da się.
+Stąd osobna trasa na każdy przypadek.
+
+Filtr na każdej trasie to **jedno porównanie tekstu** z `{{1.branch}}`. Funkcja na
+Vercelu wylicza to pole z daty urodzenia i wybranego języka, więc w Make nie ma
+żadnego AND, żadnej daty i żadnej logiki.
+
+### Krok po kroku
+
+1. **Wyłącz stary scenariusz** (przełącznik ON/OFF na dole).
+   Jeśli w kolejce coś stoi: trzy kropki → **Show queue** → zaznacz wszystko →
+   usuń. Stare payloady nie mają nowych pól i będą się wywalać.
+
+2. **Nowy scenariusz** → trzy kropki w prawym górnym → **Import Blueprint** →
+   wybierz `make/blueprint-1-instant.json` → **Save**.
+
+3. **Webhook (moduł 1).** Kliknij → **Add** → nazwa dowolna → **Save**.
+   Skopiuj adres i wklej go w Vercelu jako `MAKE_WEBHOOK_URL` → **Redeploy**.
+
+4. **Naucz webhook struktury danych.** To jest krok, który najczęściej się pomija.
+   Otwórz moduł 1, kliknij **Redetermine data structure** — musi pisać
+   *Listening for data*. Potem w terminalu:
+
+   ```
+   powershell -ExecutionPolicy Bypass -File tools\make-webhook-feed.ps1 -All -WorkerBase "https://www.carruleddhishow.com"
+   ```
+
+   `-All` wysyła najpierw jedną wiadomość ze **wszystkimi** polami naraz. To jest
+   ważne: Make **nie sumuje** struktur między wywołaniami, tylko podmienia. Jeśli
+   pierwsze przyjdzie zgłoszenie dorosłego, Make zapamięta strukturę bez pól
+   opiekuna i `guardianName` zostanie na zawsze puste.
+
+   Potem **OK** i **Save** (dyskietka na dolnym pasku).
+
+5. **Podłącz SMTP w siedmiu modułach Email**: 8, 24, 16, 27, 12, 14, 18.
+   W pierwszym utwórz połączenie, w pozostałych wybierz je z listy.
+
+   | Pole | Wartość |
+   |---|---|
+   | Host | `ssl0.ovh.net` |
+   | Port | `465` |
+   | TLS | **Yes** |
+   | Use explicit TLS (STARTTLS) | **No** |
+   | User name | `info@carruleddhishow.com` (pełny adres) |
+   | Password | hasło skrzynki |
+   | From | `info@carruleddhishow.com` |
+
+6. **WhatsApp — nic do konfiguracji.** Moduły 9 i 30 mają już wpisane numery
+   i klucze. 9 → `48665626101`, 30 → `393284981574`.
+   Bez `+` i bez spacji: to trafia do query stringa, gdzie `+` znaczy spację.
+
+7. **Zapisz i włącz.** Dyskietka, potem przełącznik na ON.
+
+### Test
+
+```
+powershell -ExecutionPolicy Bypass -File tools\make-webhook-feed.ps1 -WorkerBase "https://www.carruleddhishow.com"
+```
+
+Skrypt dokleja do adresów testowych godzinę uruchomienia, bo na e-mailu jest
+unikalny indeks w trzech tabelach i drugi test tym samym adresem dostałby `409`.
+
+Co powinno przyjść:
+
+| Test | Maile | Załączniki | WhatsApp |
+|---|---|---|---|
+| dorosły, `locale: it` | 1 na jego adres + Bcc do Ciebie | 1 PDF (włoski) | 2 |
+| dorosły, `locale: pl` | 1 na jego adres + Bcc | 2 PDF (włoski + polski) | 2 |
+| nieletni, `locale: it` | 1 na adres opiekuna, uczestnik w kopii jawnej | 1 PDF | 2, z blokiem `⚠️ MINORENNE` |
+| nieletni, `locale: de` | jak wyżej | 2 PDF | 2, z blokiem |
+| przypomnienie | 1 potwierdzenie zapisu | — | — |
+| kontakt | 1 na Twój adres, Reply-To = nadawca | — | — |
+
+Zaznaczony newsletter → drugi mail **90 sekund później**. To celowo: oba listy
+wychodzą z jednego wysłania formularza, więc bez opóźnienia lądują w tej samej
+sekundzie i grzecznościowa notka o przyszłym roku przykrywa tę z numerem startowym.
+
+### Jak czytać błąd
+
+Funkcja na Vercelu przekazuje treść błędu z Make w polu `reason` w odpowiedzi HTTP,
+więc skrypt testowy pokaże Ci go od razu. Jeśli mimo to trzeba zajrzeć do Make:
+ikona zegara u góry → czerwony przebieg → moduł, który go zatrzymał. Tylko to
+w tym widoku jest warte czytania.
+
+Najczęstsze:
+
+| Komunikat | Co znaczy |
 |---|---|
-| `Registrations` | A `created_at` · B `race_number` · C `first_name` · D `last_name` · E `birth_date` · **F `tax_code`** · G `email` · H `phone` · I `address` · J `cart_name` · K `category` · L `team_name` · M `cart_notes` · N `locale` · O `rules_consent` · P `privacy_consent` · Q `news_consent` · R `status` · S `pdf_it_url` · T `pdf_translated_url` · U `email_status` · V `printed_at` |
-| `Reminders` | A `id` · B `created_at` · C `name` · D `email` · E `locale` · F `race_number` · G `consent_at` · H `unsubscribe_token` · I–K `reminder_*_at` · L–N `sent_*_at` · O `locked_until` · P `status` |
-| `Contacts` | A `created_at` · B `name` · C `email` · D `message` · E `locale` · F `status` |
+| `references inaccessible module [module ID N]` | trasa cytuje moduł z sąsiedniej trasy — nie powinno się zdarzyć, walidator to wyłapuje |
+| `The required followAllRedirects field is missing` | ręcznie dodany moduł HTTP bez tego pola |
+| 404 na module HTTP | PDF nie jest jeszcze wdrożony pod tym adresem |
+| `HTTP 410` ze skryptu testowego | scenariusz jest wyłączony; normalne przy nauce struktury |
+| puste `Bcc` odrzucone przez SMTP | nie dotyczy — blueprint zawsze wstawia adres organizatora |
 
-### Trzy rzeczy do zrobienia w arkuszu
+---
 
-**1. Zmień jedną komórkę.** `Registrations` → **F1** → z `tax_code` na
-`postal_code`. Formularz zbiera teraz kod pocztowy, nie codice fiscale.
+## Scenariusz 2 — przypomnienia, 3 moduły
 
-**2. Dodaj kartę `Newsletter`** (tej nie masz, a czwarta gałąź do niej pisze).
-Wklej w **A1**:
-
-```
-created_at	name	email	locale	source	status
-```
-
-Pola są rozdzielone tabulatorami, więc Google sam rozbije to na sześć kolumn.
-
-**3. Numer startowy liczy arkusz, nie Make.** W `Registrations` w komórkę **B2**
-wklej jedną formułę:
+### Co robi
 
 ```
-=ARRAYFORMULA(IF(C2:C<>""; ROW(C2:C)-1; ""))
+1 HTTP  POST /api/carruleddhi/reminders-due     ← zegar, co godzinę
+2 Iterator  {{1.data.messages}}
+4 Email     to / subject / html z {{2.value.*}}
 ```
 
-Kolumna B wypełni się sama dla każdego wiersza, teraz i w przyszłości, także dla
-wpisów dodanych ręcznie.
+**To wszystko.** Funkcja na Vercelu robi całą robotę: liczy, ile zostało do startu,
+decyduje które przypomnienie jest należne, czyta listę z Supabase, renderuje list
+w języku każdej osoby, dokleja jej numer startowy jeśli startuje, i **zapisuje**
+komu co wysłała. Make dostaje gotowe listy.
 
-> **Dlaczego tak, a nie modułem w Make.** Był tam moduł „Update a Cell", który
-> wpisywał ten numer — i to on świecił na czerwono z `Cell: Value must not be
-> empty`. Nazwa tego pola w blueprincie nie zgadzała się z tym, czego Make
-> oczekuje, a zgadywanie wewnętrznych nazw parametrów Make raz już dało
-> „Module Not Found". Wyleciał. Numer to po prostu pozycja wiersza, więc arkusz
-> policzy go sam, bez modułu, który może się zepsuć. W mailu numer nadal jest
-> liczony z `__ROW_NUMBER__`, więc obie liczby zawsze się zgadzają.
+Poprzednia wersja miała 6 modułów: odczyt 500 wierszy z arkusza, arytmetykę dat
+z `parseDate`, cały 26-kilobajtowy słownik w zmiennej, drugą zmienną do wyboru
+języka, cztery warunki filtra połączone AND i aktualizację wiersza po numerze
+kolumny. Nic z tego nie jest pracą dla narzędzia do wysyłania maili.
 
-> Jeśli kiedyś dodasz albo przestawisz kolumnę, popraw `HEADERS` na górze
-> `tools/build-make-blueprints.mjs` i przebuduj pliki. Make mapuje kolumny **po
-> pozycji**, nie po nazwie, więc te dwie listy muszą się zgadzać.
+**Okna czasowe, nie dokładne godziny.** Stara wersja porównywała pozostałe godziny
+do 168, 24 i 3 na równość. Działa, dopóki żaden przebieg nie zostanie pominięty —
+a potem to przypomnienie przepada, bo liczba już nigdy nie będzie równa 168. Kto
+zapisał się dwa dni przed zjazdem, nie dostawał nic. Teraz: „nie więcej niż 7 dni
+i więcej niż dzień” to przypomnienie 7-dniowe, i każdy dostaje najświeższe, którego
+jeszcze nie miał.
 
-## 2. Import scenariusza 1 (natychmiastowy)
+### Krok po kroku
 
-1. Make → **Create a new scenario** → trzy kropki u dołu → **Import Blueprint**.
-2. Wybierz `make/blueprint-1-instant.json`.
-3. Kliknij moduł **1 Webhook** → wybierz swój hook („ZAPISY NA WYŚCIG"):
-   `https://hook.eu1.make.com/2stphbryuh84wzer92leg7fgub1aikqg`
-   Panel pokaże **„Listening for data"** — zostaw go otwartego i przejdź do
-   sekcji 2A poniżej.
-4. W każdym module **Google Sheets** wskaż swój plik (pole *Spreadsheet* jest
-   puste specjalnie — wpisany na sztywno identyfikator wskazywałby w pustkę).
-5. W każdym module **Email** wybierz połączenie SMTP — dane w sekcji 4.
-6. Moduł **10 (Webhook response)** nic nie wymaga. Odpowiada stronie prawdziwym
-   numerem startowym z arkusza, zamiast pozwolić jej policzyć własny.
-7. Moduł **9** to powiadomienie na WhatsApp. Numer i klucz CallMeBot są już
-   w blueprincie. Nie chcesz tego? Prawy przycisk → *Disable*.
-8. Zapisz i włącz przełącznik **ON**.
+1. **Import** `make/blueprint-2-reminders.json`.
 
-> **Gałąź zapisu ma teraz drugi router (17) i dwa moduły Email.** `8` idzie do
-> dorosłego, `16` do opiekuna osoby niepełnoletniej. W obu wybierasz to samo
-> połączenie SMTP.
->
-> Dlaczego router, a nie dwa filtry pod sobą: w Make niespełniony filtr **kończy
-> całą trasę**, nie przeskakuje modułu. Dwa filtrowane maile w jednej linii
-> znaczyłyby, że zgłoszenie niepełnoletniego umiera na pierwszym filtrze i nie
-> dostaje ani maila, ani powiadomienia.
->
-> Treść maila siedzi teraz w polu **Content** modułu Email, nie w zmiennej modułu 3.
-> Make odrzucał poprzednią wersję z komunikatem `references inaccessible module`:
-> szablon cytował `{{3.t.…}}` z wnętrza modułu 3 i `{{6.minHi}}` z modułu, który
-> jeszcze nie ruszył.
+2. **Moduł 1 (HTTP).** W nagłówku `X-Carruleddhi-Roster-Key` jest napisane
+   `WSTAW_ROSTER_KEY`. Podmień na swój `ROSTER_KEY` z Vercela.
+   Sprawdź też adres w polu URL — musi być Twoja domena.
 
-> Karta `Registrations` ma **32 kolumny** (A–AF): dwadzieścia dwie z tabeli
-> powyżej plus dziesięć dla niepełnoletnich, dopisanych od **W1**. Dokładny wiersz
-> nagłówków do wklejenia jest w `KROKI.md`, krok 5.
+3. **Moduł 4 (Email).** Wybierz to samo połączenie SMTP co w scenariuszu 1.
 
-## 2A. „Listening for data" — co tu wpisać
+4. **Zegar.** Kliknij ikonę zegara na module 1 → **Every hour** → minuta dowolna.
 
-Nic nie wpisujesz. Webhook nie wie, jakich pól się spodziewać, dopóki ich nie
-dostanie. Trzeba mu je raz wysłać.
+5. **Test bez wysyłania.** W module 1 zmień pole *Request content* z `{}` na
+   `{"dryRun": true}`, uruchom **Run once**. Funkcja wyrenderuje listy, ale
+   **nie zapisze**, że poszły — możesz powtarzać do woli. Kliknij bąbelek nad
+   modułem 1: powinno być `due`, `hoursLeft`, `count` i tablica `messages`.
+   Po teście przywróć `{}`.
 
-Przy otwartym panelu uruchom w katalogu projektu:
+6. **Zapisz i włącz.**
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\make-webhook-feed.ps1
-```
+Jeśli `due` jest puste, a `hoursLeft` duże — to nie błąd. Do zjazdu jest więcej niż
+7 dni, więc nie ma czego wysyłać. Pierwsze przypomnienie wyjdzie **10 października
+2026**.
 
-Wysyła **jedną** wiadomość z wszystkimi 24 polami naraz. Panel przeskoczy na
-„Successfully determined", kliknij OK, potem **Save**.
+### Jedna świadoma decyzja
 
-> **Dlaczego jedna, a nie trzy.** Pierwsza wersja skryptu wysyłała trzy osobne
-> wiadomości i dostawałeś `1 / 3 delivered` oraz dwa razy **HTTP 410**. Make
-> zamyka nasłuch w momencie, gdy ustali strukturę z pierwszego żądania — kolejne
-> trafiają do wyłączonego scenariusza i wracają jako 410 Gone. Jedna wiadomość ze
-> sumą wszystkich pól uczy Make wszystkiego w jednym strzale.
+Funkcja zapisuje `last_reminder` **przed** tym, jak Make wyśle. Do wyboru były dwa
+sposoby zawodzenia: „błąd SMTP gubi jedno przypomnienie dla jednej osoby” albo
+„błąd SMTP powoduje, że godzinę później to samo przypomnienie idzie do wszystkich
+jeszcze raz”. Wybrany jest pierwszy. Nieudany przebieg widać w historii Make,
+a kolumnę można wyczyścić w Supabase.
 
-Test każdej gałęzi osobno, **dopiero gdy scenariusz jest ON**:
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\make-webhook-feed.ps1 -All
-```
+## Scenariusz 3 — ogłoszenie nowej edycji
 
-Wtedy pójdą prawdziwe maile na adresy `test.*@example.com` i jeden WhatsApp.
+Nie istnieje. Przycisk w panelu admina jest wyłączony i tak zostanie, dopóki nie
+powstanie. Co ma robić: przycisk → `/api/carruleddhi/announce` → lista z
+`newsletter_subscribers` → mail w sześciu językach → oznaczenie `announced_at`,
+żeby drugie kliknięcie nie wysłało tego samego dwa razy.
 
-Test całej drogi razem z Workerem (dopiero po wdrożeniu Workera):
+Kształt będzie taki sam jak scenariusza 2, bo problem jest ten sam: trzy moduły,
+bo cała decyzja o treści zapada w funkcji.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\make-webhook-feed.ps1 `
-  -WorkerBase "https://twoj-worker.workers.dev"
-```
+---
 
-Skrypt jest w czystym ASCII i buduje polskie znaki z kodów Unicode, bo
-PowerShell 5.1 czyta pliki `.ps1` jako ANSI i literalne „ą" doszłoby do Make
-połamane. Sprawdzone: do odbiorcy trafiają dokładnie U+0105 U+017C U+015B
-U+0142 U+00F3 U+00E8.
-
-Co robi: rozdziela ruch na cztery gałęzie po polu `type` — zapis na wyścig,
-zapis na przypomnienia, formularz kontaktowy, zgoda na informacje o kolejnych
-edycjach. Treść maila jest już w środku, w sześciu językach.
-
-## 3. Import scenariusza 2 (przypomnienia)
-
-Najpierw jedna komórka w arkuszu: karta `Reminders` → **Q1** → wpisz
-`last_reminder`. To tam scenariusz zapisuje, które przypomnienie już poszło, żeby
-nikt nie dostał tego samego dwa razy. Kolumna Q jest wolna, więc nic się nie
-przesuwa.
-
-1. Import pliku `make/blueprint-2-reminders.json`.
-2. Wskaż arkusz w modułach **1** i **6** — karta **`Reminders`** (nie
-   Registrations; ta karta ma kolumny na znaczniki wysyłki).
-3. Wybierz połączenie SMTP w module 5.
-4. **Scheduling** (zegarek przy przełączniku) → *Every hour*.
-5. Włącz **ON**.
-
-## 4. SMTP — Zimbra w OVH
-
-Sprawdzone dla `carruleddhishow.com`: rekordy MX wskazują na `mx0.mail.ovh.net`,
-SPF to `v=spf1 include:mx.ovh.com ~all`. To poczta OVH (Zimbra korzysta z tych
-samych ustawień co MX Plan). Port 465 na `ssl0.ovh.net` odpowiada.
-
-W Make: moduł **Email → Send an Email** → *Add* obok pola **Connection** →
-typ połączenia **Email (SMTP)**. Formularz wypełniasz tak:
-
-| Pole w Make | Co wpisać |
-|---|---|
-| **Email address** | `info@carruleddhishow.com` |
-| **Your full name** | `Carruleddhi Show 2026` |
-| **SMTP server** | `ssl0.ovh.net` |
-| **Port** | `465` |
-| **Use a secure connection (TLS)** | **Yes** |
-| **Use explicit TLS** | **No** |
-| **User name** | `info@carruleddhishow.com` |
-| **Password** | hasło do skrzynki, nie do panelu OVH |
-
-Dwa pola, na których to najczęściej pada:
-
-- **Use explicit TLS = No.** „Explicit" to STARTTLS, który działa na porcie 587.
-  Na 465 połączenie jest szyfrowane od pierwszego bajtu (implicit), więc explicit
-  musi być wyłączony. Jeśli ustawisz Yes przy 465, połączenie zawiesi się i Make
-  zgłosi timeout.
-- **User name to pełny adres**, nie `info`.
-
-Jeśli 465 gdzieś blokuje: port `587`, **Use a secure connection = Yes**,
-**Use explicit TLS = Yes**. Oba porty na `ssl0.ovh.net` są otwarte, sprawdziłem
-połączeniem TCP.
-
-Sprawdzone dla Twojej domeny: MX wskazuje na `mx0.mail.ovh.net`, SPF to
-`v=spf1 include:mx.ovh.com ~all` — to poczta OVH, a Zimbra używa tam tych samych
-ustawień co MX Plan.
-
-### Kopia powiadomienia dla Ciebie
-
-Żeby każde zgłoszenie przychodziło też do Ciebie, w module **8 (Email)** rozwiń
-**Show advanced settings** i w polu **Bcc** dodaj `info@carruleddhishow.com`.
-Jedno pole, zero dodatkowych modułów.
-
-Dwie rzeczy, które psują wysyłkę najczęściej:
-
-- **Pole „From" musi być tym samym adresem co login.** OVH odrzuca próbę wysłania
-  „w imieniu" innego adresu. W blueprincie `from` jest puste, więc Make użyje
-  adresu z połączenia — tak ma być, nie wpisuj tam nic innego.
-- **Nazwa użytkownika to cały adres**, nie `info`.
-
-Nie zaznaczaj *Save message after sending* — wymaga drugiego, oddzielnego
-połączenia IMAP. Zimbra i tak trzyma kopię w Wysłanych.
-
-Limit OVH to około 200 maili na godzinę na skrzynkę. Przy 40 zgłoszeniach
-i trzech przypomnieniach nie zbliżysz się do niego.
-
-Co robi: co godzinę liczy, ile godzin zostało do 17.10.2026 14:30. Przy 168 h
-wysyła mail „za tydzień", przy 24 h „jutro", przy 3 h „za chwilę". Kolumna Q
-zapamiętuje, co już poszło, więc nikt nie dostanie tego samego dwa razy.
-
-Żeby objąć też osoby z karty `Reminders`, zaimportuj ten sam plik drugi raz
-i w modułach 1 i 6 wskaż kartę `Reminders`.
-
-## Dlaczego przypomnienia nie mogą iść ze strony
-
-Strona to kod w przeglądarce. Kiedy ktoś ją zamknie — a zamknie po zapisaniu się
-— nie ma już co odliczać siedmiu dni. Natychmiastowy mail potwierdzający wysyła
-scenariusz 1 w sekundę po zapisie. Przypomnienia musi wysłać zegar na serwerze,
-i to jest scenariusz 2.
-
-## Skąd się bierze język maila
-
-Jeden moduł (**2**) trzyma cały słownik: 6 języków × 32 teksty. Moduł **3**
-wybiera z niego język zgłoszenia i podstawia awaryjnie włoski, jeśli ktoś ma
-przeglądarkę po fińsku. Żadnego routera po języku, żadnych sześciu kopii szablonu.
-
-## Numer startowy i PDF
-
-Numer to numer wiersza w arkuszu minus wiersz nagłówka, zapisywany z powrotem
-do kolumny C. PDF w załączniku pobierany jest z Twojej strony
-(`/emails/Carruleddhi-modulo.pdf`) — dwie strony, włoska do podpisu i tłumaczenie.
-Karty z danymi konkretnych uczestników drukujesz z panelu admina, sekcja 08.
-
-## Szare kółka „Module Not Found"
-
-Jeśli je widzisz — masz starą wersję blueprintu. Moduł `email:ActionSendEmail`
-istnieje w Make w **wersji 7**, a pierwsza wersja plików podawała 4. Make nie
-mówi, na czym polega problem, tylko rysuje szare kółko.
-
-Naprawione. Usuń zaimportowany scenariusz i zaimportuj plik jeszcze raz —
-w miejscu szarych kółek pojawi się **Email · Send an Email**.
-
-Moduły HTTP pokazują się jako **HTTP (legacy)**. To normalne i działa; Make
-trzyma dwie generacje aplikacji HTTP pod tą samą nazwą wewnętrzną.
-
-## Jak przebudować blueprinty po zmianie tekstów
+## Po każdej zmianie w generatorze
 
 ```
-node tools/build-make-blueprints.mjs
+npm run make
 ```
 
-Czyta `emails/copy.json` i oba szablony HTML i składa pliki od nowa. Po zmianie
-tekstów zaimportuj scenariusz jeszcze raz.
+Przebudowuje oba blueprinty, sprawdza odwołania między modułami i uruchamia 92
+asercje na tym, co wyszło. Buduje z błędem, jeśli któryś moduł cytuje moduł,
+którego nie widzi, jeśli szablon zawiera funkcję Make, albo jeśli w którymś z
+sześciu języków brakuje klucza.
 
-## Załącznik PDF — jedna pułapka
-
-Moduł **7 (HTTP – Get a file)** pobiera `/emails/Carruleddhi-modulo.pdf` z Twojej
-strony. Dopóki strona nie jest wdrożona pod `www.carruleddhishow.com`, ten moduł
-zwróci 404 i **zatrzyma całą gałąź zapisu — mail nie wyjdzie**.
-
-Zanim wdrożysz stronę: prawy przycisk na module 7 → *Disable*, a w module 8
-(Email) usuń pozycję z pola *Attachments*. Po wdrożeniu włącz z powrotem.
+Po każdej zmianie w blueprincie trzeba go **ponownie zaimportować** do Make.
+Make nie czyta pliku z repo — import jest kopią.

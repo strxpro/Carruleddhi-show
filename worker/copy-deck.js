@@ -102,7 +102,10 @@ export const COPY_DECK = {
     "regPdfTitleOne": "Il modulo in allegato",
     "regPdfBodyOne": "In allegato trovi il modulo di iscrizione da stampare e firmare.",
     "regPrintBodyOne": "Stampa il modulo, firmalo e portalo con te il giorno della gara. Senza modulo firmato non si parte.",
-    "minPrintBodyOne": "Stampate il modulo, firmatelo e portatelo il giorno della gara. Chi firma deve essere presente alla partenza con un documento d’identità valido."
+    "minPrintBodyOne": "Stampate il modulo, firmatelo e portatelo il giorno della gara. Chi firma deve essere presente alla partenza con un documento d’identità valido.",
+    "remWindow7": "7 giorni",
+    "remWindow1": "1 giorno",
+    "remWindow3": "3 ore"
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -195,7 +198,10 @@ export const COPY_DECK = {
     "regPdfTitleOne": "Formularz w załączniku",
     "regPdfBodyOne": "W załączniku jest formularz zgłoszeniowy do wydrukowania i podpisania.",
     "regPrintBodyOne": "Wydrukuj formularz, podpisz go i weź ze sobą w dniu wyścigu. Bez podpisanego formularza nie ma startu.",
-    "minPrintBodyOne": "Wydrukujcie formularz, podpiszcie go i weźmy ze sobą w dniu zjazdu. Osoba podpisująca musi być na starcie z ważnym dokumentem tożsamości."
+    "minPrintBodyOne": "Wydrukujcie formularz, podpiszcie go i weźmy ze sobą w dniu zjazdu. Osoba podpisująca musi być na starcie z ważnym dokumentem tożsamości.",
+    "remWindow7": "7 dni",
+    "remWindow1": "1 dzie",
+    "remWindow3": "3 godziny"
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -288,7 +294,10 @@ export const COPY_DECK = {
     "regPdfTitleOne": "The form is attached",
     "regPdfBodyOne": "Attached you will find the entry form to print and sign.",
     "regPrintBodyOne": "Print the form, sign it and bring it with you on race day. No signed form, no start.",
-    "minPrintBodyOne": "Print the form, sign it and bring it on race day. Whoever signs has to be at the start with valid photo identification."
+    "minPrintBodyOne": "Print the form, sign it and bring it on race day. Whoever signs has to be at the start with valid photo identification.",
+    "remWindow7": "7 days",
+    "remWindow1": "1 day",
+    "remWindow3": "3 hours"
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -381,7 +390,10 @@ export const COPY_DECK = {
     "regPdfTitleOne": "Das Formular im Anhang",
     "regPdfBodyOne": "Im Anhang findest du das Anmeldeformular zum Ausdrucken und Unterschreiben.",
     "regPrintBodyOne": "Drucke das Formular aus, unterschreibe es und bringe es am Renntag mit. Ohne unterschriebenes Formular kein Start.",
-    "minPrintBodyOne": "Drucken Sie das Formular aus, unterschreiben Sie es und bringen Sie es am Renntag mit. Die unterschreibende Person muss mit einem gültigen Ausweis am Start sein."
+    "minPrintBodyOne": "Drucken Sie das Formular aus, unterschreiben Sie es und bringen Sie es am Renntag mit. Die unterschreibende Person muss mit einem gültigen Ausweis am Start sein.",
+    "remWindow7": "7 Tage",
+    "remWindow1": "1 Tag",
+    "remWindow3": "3 Stunden"
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -474,7 +486,10 @@ export const COPY_DECK = {
     "regPdfTitleOne": "El formulario adjunto",
     "regPdfBodyOne": "Adjuntamos el formulario de inscripción para imprimir y firmar.",
     "regPrintBodyOne": "Imprime el formulario, fírmalo y llévalo el día de la carrera. Sin formulario firmado no se sale.",
-    "minPrintBodyOne": "Imprimid el formulario, firmadlo y llevadlo el día de la carrera. Quien firma debe estar en la salida con un documento de identidad válido."
+    "minPrintBodyOne": "Imprimid el formulario, firmadlo y llevadlo el día de la carrera. Quien firma debe estar en la salida con un documento de identidad válido.",
+    "remWindow7": "7 días",
+    "remWindow1": "1 día",
+    "remWindow3": "3 horas"
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -567,6 +582,9 @@ export const COPY_DECK = {
     "regPdfTitleOne": "Le formulaire en pièce jointe",
     "regPdfBodyOne": "Vous trouverez en pièce jointe le formulaire d’inscription à imprimer et à signer.",
     "regPrintBodyOne": "Imprimez le formulaire, signez-le et apportez-le le jour de la course. Sans formulaire signé, pas de départ.",
-    "minPrintBodyOne": "Imprimez le formulaire, signez-le et apportez-le le jour de la course. Le signataire doit être présent au départ avec une pièce d’identité valide."
+    "minPrintBodyOne": "Imprimez le formulaire, signez-le et apportez-le le jour de la course. Le signataire doit être présent au départ avec une pièce d’identité valide.",
+    "remWindow7": "7 jours",
+    "remWindow1": "1 jour",
+    "remWindow3": "3 heures"
   }
 };

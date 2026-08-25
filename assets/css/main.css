@@ -650,7 +650,23 @@ img, svg { display: block; max-width: 100%; }
 
 .site-footer { position: relative; padding: 78px 0 34px; background: var(--navy-950); color: var(--white); }
 .footer__top { display: grid; grid-template-columns: 1.2fr repeat(2,.6fr); gap: 50px; padding-bottom: 54px; border-bottom: 1px solid rgba(255,255,255,.15); }
-.footer__brand { font-family: var(--font-display); font-size: clamp(34px,5vw,62px); line-height: .95; }
+/* "CARRULEDDHI" was being cut off, and the JavaScript that is supposed to prevent that
+   could not help here.
+   fitOne() in app.js shrinks a heading until it fits, but it will not go below 45% of the
+   stylesheet size — a floor that stops a pathological string turning a heading into
+   unreadable specks. This word is eleven characters of a display face with no break
+   opportunity in it, in the narrowest column of the footer grid, so on some widths it
+   needs less than that floor and stays clipped.
+   Sizing it against its own container removes the need for a measurement: 15cqw is what
+   eleven Bungee characters at this letter-spacing occupy in a full container width, so
+   the word can never be wider than the box it is in. min() keeps the original clamp as
+   the upper limit, so nothing gets bigger than it was. */
+.footer__brandwrap { container-type: inline-size; }
+.footer__brand {
+  font-family: var(--font-display);
+  font-size: min(clamp(34px,5vw,62px), 15cqw);
+  line-height: .95;
+}
 .footer__brand span { color: var(--yellow); }
 .footer__copy { max-width: 38ch; color: var(--blue-200); line-height: 1.6; }
 .footer__group h3 { margin: 0 0 16px; color: var(--blue-200); font-family: var(--font-meta); font-size: 14px; letter-spacing: .18em; text-transform: uppercase; }

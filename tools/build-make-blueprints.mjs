@@ -45,7 +45,10 @@ const ORG_EMAIL = 'info@carruleddhishow.com';
  * on WhatsApp, the bot replies with their personal apikey, and both values go below.
  */
 const CALLMEBOT = [
-  { label: 'organizator', phone: '48665626101', apikey: '2990681' }
+  { label: 'organizator', phone: '48665626101', apikey: '2990681' },
+  // No leading + and no spaces. CallMeBot reads this straight out of a query string,
+  // and a "+" there is a URL-encoded space rather than a country code.
+  { label: 'Santa Teresa', phone: '393284981574', apikey: '3364881' }
 ];
 
 /* ---------------------------------------------------------------- copy deck */
@@ -164,9 +167,34 @@ function minorHtml(adultHtml) {
   );
 }
 
-const REM_HTML = body('emails/make-reminder.html')
-  // Column C is `name` on the Reminders sheet.
-  .replace(/\{\{4\.t\.regHi\}\}/g, '{{replace(4.t.regHi; "%FIRSTNAME%"; 1.`C`)}}');
+/**
+ * The reminder body, pointed at fields the function computes.
+ *
+ * The template was written for a Make scenario that read a Google Sheet, so it is full
+ * of `switch(2.due; …)` — pick the 7-day heading, or the 1-day one, or the 3-hour one —
+ * and one `if(length(race_number) > 0; …)`. Every one of those is a decision, and the
+ * five-line renderer in the function makes no decisions.
+ *
+ * They move to attachCopy(), which already knows which reminder is going out and in
+ * which language, and the template quotes the result. Same swap as the confirmation
+ * bodies went through; the reason it is spelled out separately is that this file is the
+ * only place the old Make expressions still existed.
+ */
+const REM_SWITCHES = [
+  ['{{switch(2.due; "7d"; "7 dni"; "1d"; "1 dzień"; "3 godziny")}}', '{{1.remWindow}}'],
+  ['{{switch(2.due; "7d"; 4.t.remHeading7; "1d"; 4.t.remHeading1; 4.t.remHeading3)}}', '{{1.remHeading}}'],
+  ['{{switch(2.due; "7d"; 4.t.remBody7; "1d"; 4.t.remBody1; 4.t.remBody3)}}', '{{1.remBody}}'],
+  ['{{if(length(1.race_number) > 0; "#" + 1.race_number + " — " + 4.t.remRiderNote; 4.t.footerNote)}}', '{{1.remRiderLine}}'],
+  // Carries %FIRSTNAME%, so it cannot come straight from the deck.
+  ['{{1.copy.regHi}}', '{{1.hi}}']
+];
+
+const REM_DUE_HTML = REM_SWITCHES.reduce((html, [from, to]) => swap(html, from, to), body('emails/make-reminder.html'));
+
+/* There was a second copy of the reminder body here, compiled for Make instead of for the
+   function: it rewrote `{{4.t.regHi}}` to pull the rider's name out of column C of a
+   Google Sheet. Both things it depended on are gone — the sheet, and the Make module
+   numbered 4 that held the copy deck — so it is gone with them. */
 
 /**
  * Swaps the %RACENUMBER% placeholder for the real Make expression.
@@ -184,21 +212,19 @@ const withRaceNumber = (html) => html.split('%RACENUMBER%').join('{{1.raceNumber
 let seq = 0;
 const at = (x, y) => ({ designer: { x, y } });
 
-function setVars(id, x, y, variables, name) {
-  return {
-    id,
-    module: 'util:SetVariables',
-    version: 1,
-    parameters: {},
-    mapper: { variables, scope: 'roundtrip' },
-    metadata: { ...at(x, y), restore: { expect: { variables: { items: [] } } } },
-    ...(name ? { label: name } : {})
-  };
-}
+/* setVars() lived here and is gone.
+   It built a Tools > Set variable module. Nothing needs one any more: the copy deck and
+   every piece of resolved wording arrive as ordinary webhook fields, which is the change
+   that took scenario 1 from 63 kB to 13 and scenario 2 from six modules to three. */
 
 /** Google Sheets "Add a Row". spreadsheetId is left blank on purpose so Make
  *  makes you pick the file after import — a hard-coded id would silently point
- *  at nothing. */
+ *  at nothing.
+ *
+ *  UNUSED. Kept only because the shape is hard-won — module version 2, `from: 'drive'`,
+ *  `mode: 'select'`, values keyed by column index — and if a sheet is ever wanted back
+ *  alongside Supabase, this is the shape that imports without a red field. Nothing calls
+ *  it; Supabase is the store of record. */
 function addRow(id, x, y, sheet, values, filter) {
   return {
     id,
@@ -306,7 +332,17 @@ function httpGetFile(id, x, y, url, filter) {
   };
 }
 
-function httpRequest(id, x, y, url, qs, filter) {
+/**
+ * HTTP > Make a request.
+ *
+ * `options` exists for the one caller that needs more than a GET with a query string:
+ * the reminder scenario POSTs a passphrase header and reads JSON back. Defaults are the
+ * GET shape the notification modules use, so adding the parameter changed nothing for
+ * them.
+ */
+function httpRequest(id, x, y, url, qs, filter, options = {}) {
+  const method = options.method || 'get';
+  const body = options.body ?? '';
   return {
     id,
     module: 'http:ActionSendData',
@@ -315,11 +351,15 @@ function httpRequest(id, x, y, url, qs, filter) {
     ...(filter ? { filter } : {}),
     mapper: {
       url,
-      method: 'get',
-      headers: [],
+      method,
+      headers: options.headers || [],
       qs: qs || [],
-      bodyType: null,
-      parseResponse: false,
+      /* `raw` and a `data` string, not a form. A JSON body in Make is the raw type with
+         the Content-Type header set by hand; picking `application/json` from the body
+         type list makes Make build the JSON itself out of a key/value collection, which
+         is a different thing and not what an empty `{}` needs. */
+      ...(body ? { bodyType: 'raw', contentType: 'application/json', data: body } : { bodyType: null }),
+      parseResponse: Boolean(options.parseResponse),
       serializeUrl: false,
       shareCookies: false,
       ca: null,
@@ -544,17 +584,12 @@ const HEADERS = {
   Newsletter: ['created_at', 'name', 'email', 'locale', 'source', 'status']
 };
 
-/**
- * One extra column on the Reminders sheet, added at the end so nothing shifts:
- * Q `last_reminder`. Scenario 2 writes "7d", "1d" or "3h" there and refuses to
- * send the same one twice.
- *
- * It could have gone into the existing sent_7d_at / sent_1d_at / sent_3h_at
- * columns, but Make's "Update a Row" takes a fixed set of column indexes, so
- * writing only the one that is due means sending blanks to the other two and
- * wiping them. One column with a static index is the honest fit.
- */
-const REMINDER_MARKER_INDEX = 16; // column Q
+/* REMINDER_MARKER_INDEX (column Q on the Reminders sheet) was here.
+   Scenario 2 used it to write "7d", "1d" or "3h" back into a spreadsheet cell by column
+   number. The same fact now lives in `reminder_subscribers.last_reminder`, written by the
+   function in the same call that renders the letters — a named column instead of the
+   sixteenth one, which is the difference that made the guardian columns go missing the
+   first time round. */
 
 /** Builds a Make `values` collection from a header-name → expression object. */
 function row(sheet, map) {
@@ -975,109 +1010,73 @@ function contactHtml() {
    Scheduled. Runs every hour, sends 7 days / 1 day / 3 hours before the start.
    A browser cannot do this: it is closed. Only a clock on a server can. */
 
+/**
+ * Four modules: a clock, one request, a loop, one Email.
+ *
+ * WHAT THIS REPLACED
+ *   Six modules, and every one of them doing work that does not belong in Make: a
+ *   Google Sheets read of 500 rows, date arithmetic with parseDate and dateDifference
+ *   against a hard-coded timestamp, the whole 26 kB copy deck in a variable, a second
+ *   variable module to pick a language out of it, four AND-ed filter conditions, and a
+ *   Sheets row update addressed by column index.
+ *
+ *   All of it now happens in one call to the Vercel function, which already knows the
+ *   event date, already has the deck, already renders the other five letters, and can
+ *   read the reminder list with one indexed query instead of pulling the sheet down.
+ *   What comes back is a list of finished messages: `to`, `subject`, `html`.
+ *
+ * WHY AN ITERATOR AND NOT A SECOND WEBHOOK
+ *   Make sends one e-mail per bundle. One request returning fifty messages is fifty
+ *   bundles, which is exactly what Iterator is for. The alternative — the function
+ *   calling a webhook once per subscriber — would be fifty HTTP round trips and fifty
+ *   chances for one of them to be the one that fails.
+ *
+ * WHY THE CLOCK STILL RUNS HOURLY
+ *   The function decides which reminder is due from how much time is left, in windows
+ *   rather than exact hours: 7 days or less and more than a day away is the 7-day one,
+ *   and so on. A missed run therefore costs nothing — the next one catches up — and
+ *   somebody who signs up two days before the race gets the 1-day reminder rather than
+ *   nothing at all, which the exact-hour version got wrong.
+ */
 const remindersFlow = [
-  /**
-   * Reads the Reminders sheet, not Registrations. It is the one that already has
-   * `sent_7d_at`, `sent_1d_at` and `sent_3h_at` columns, so there is somewhere to
-   * record what went out and no chance of sending the same reminder twice.
-   * Columns: A id, B created_at, C name, D email, E locale, F race_number,
-   * G consent_at, H unsubscribe_token, I-K reminder_*_at, L-N sent_*_at,
-   * O locked_until, P status.
-   */
-  {
-    id: 1,
-    module: 'google-sheets:filterRows',
-    version: 2,
-    parameters: { __IMTCONN__: null },
-    mapper: {
-      from: 'drive',
-      mode: 'select',
-      spreadsheetId: '',
-      sheetId: 'Reminders',
-      includesHeaders: true,
-      filter: [],
-      sortOrder: 'asc',
-      limit: '500',
-      valueRenderOption: 'FORMATTED_VALUE',
-      dateTimeRenderOption: 'FORMATTED_STRING'
-    },
-    metadata: at(0, 0)
-  },
-
-  setVars(2, 300, 0, [
-    {
-      name: 'hoursLeft',
-      value: '{{round(dateDifference(parseDate("2026-10-17 14:30"; "YYYY-MM-DD HH:mm"; "Europe/Rome"); now) / 3600000)}}'
-    },
-    {
-      name: 'due',
-      value:
-        '{{switch(round(dateDifference(parseDate("2026-10-17 14:30"; "YYYY-MM-DD HH:mm"; "Europe/Rome"); now) / 3600000); ' +
-        '168; "7d"; 24; "1d"; 3; "3h"; "")}}'
-    },
-
-    {
-      // Column E is `locale` on the Reminders sheet.
-      name: 'loc',
-      value:
-        '{{switch(lower(substring(ifempty(1.`E`; "it"); 0; 2)); "it"; "it"; "pl"; "pl"; ' +
-        '"en"; "en"; "de"; "de"; "es"; "es"; "fr"; "fr"; "it")}}'
-    }
-  ]),
-
-  setVars(3, 600, 0, [{ name: 'copy', value: COPY }]),
-
-  setVars(4, 900, 0, [
-    { name: 't', value: '{{get(parseJSON(3.copy); 2.loc)}}' },
-    { name: 'ev', value: '{{get(parseJSON(3.copy); "_event")}}' }
-  ]),
-
-  /**
-   * Column D is `email`. The three conditions are AND-ed (each in its own array):
-   * something is due now, this particular reminder has not been sent to this row
-   * yet, the address looks like an address, and the row has not opted out.
-   */
-  sendEmail(5, 1200, 0, {
-    to: '{{lower(1.`D`)}}',
-    subject: '{{switch(2.due; "7d"; 4.t.remSubject7; "1d"; 4.t.remSubject1; 4.t.remSubject3)}}',
-    html: REM_HTML,
-    filter: {
-      name: 'due now and not sent yet',
-      conditions: [
-        [{ a: '{{2.due}}', o: 'text:notequal', b: '' }],
-        // Column Q holds the last reminder sent to this row.
-        [{ a: '{{1.`Q`}}', o: 'text:notequal', b: '{{2.due}}' }],
-        [{ a: '{{1.`D`}}', o: 'text:contain', b: '@' }],
-        [{ a: '{{1.`P`}}', o: 'text:notequal', b: 'unsubscribed' }]
-      ]
-    }
+  /* Asks the function what is due.
+     `reminders-due` both decides and records: it marks each subscriber with the reminder
+     it just handed over, in the same call. That means an SMTP failure in module 4 loses
+     one reminder for one person rather than sending it to everybody again on the next
+     tick, which is the failure mode worth choosing between the two. A run that failed is
+     in Make's history, and the column can be cleared by hand from the admin panel. */
+  httpRequest(1, 0, 0, `${SITE}/api/carruleddhi/reminders-due`, [], null, {
+    method: 'post',
+    headers: [
+      { name: 'Content-Type', value: 'application/json' },
+      // The same passphrase as the roster. Without it this endpoint would let anybody
+      // on the internet burn through the reminder list.
+      { name: 'X-Carruleddhi-Roster-Key', value: 'WSTAW_ROSTER_KEY' }
+    ],
+    body: '{}',
+    parseResponse: true
   }),
 
-  /**
-   * Marks which reminder has gone out to this row.
-   *
-   * This is "Update a Row", not "Update a Cell". The cell version arrived on import
-   * with an empty red `Cell` field — its mapper key is not what this generator
-   * guessed. This shape is copied from a real Make export, so `rowNumber` plus
-   * index-keyed `values` is known to bind correctly.
-   */
+  /* Turns `messages` into one bundle per letter. */
   {
-    id: 6,
-    module: 'google-sheets:updateRow',
-    version: 2,
-    parameters: { __IMTCONN__: null },
-    mapper: {
-      from: 'drive',
-      mode: 'select',
-      spreadsheetId: '',
-      sheetId: 'Reminders',
-      rowNumber: '{{1.`__ROW_NUMBER__`}}',
-      includesHeaders: true,
-      valueInputOption: 'USER_ENTERED',
-      values: { [String(REMINDER_MARKER_INDEX)]: '{{2.due}}' }
-    },
-    metadata: at(1500, 0)
-  }
+    id: 2,
+    module: 'builtin:BasicFeeder',
+    version: 1,
+    parameters: {},
+    mapper: { array: '{{1.data.messages}}' },
+    metadata: { ...at(340, 0), designer: { x: 340, y: 0, messages: [] } }
+  },
+
+  /* One letter, already finished. No switch, no language lookup, no deck. */
+  sendEmail(4, 680, 0, {
+    to: '{{2.value.to}}',
+    subject: '{{2.value.subject}}',
+    html: '{{2.value.html}}',
+    filter: {
+      name: 'ma adres',
+      conditions: [[{ a: '{{2.value.to}}', o: 'text:contain', b: '@' }]]
+    }
+  })
 ];
 
 /* ------------------------------------------- e-mail templates for the Worker
@@ -1126,6 +1125,12 @@ const EMAIL_TEMPLATES = {
   registration: forWorker(withRaceNumber(REG_HTML)),
   minor: forWorker(withRaceNumber(MIN_HTML)),
   reminder: forWorker(reminderOptInHtml()),
+  /* Two different letters, and they were being confused.
+     `reminder` is the "you are on the list" note that goes out the moment somebody ticks
+     the box. `reminderDue` is the actual reminder, sent 7 days / 1 day / 3 hours before
+     the start by the scheduled scenario — which until now rendered it inside Make out of
+     a Google Sheet row. */
+  reminderDue: forWorker(REM_DUE_HTML),
   contact: forWorker(contactHtml()),
   newsletter: forWorker(newsletterOptInHtml())
 };

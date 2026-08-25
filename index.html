@@ -1056,7 +1056,9 @@
   <footer class="site-footer">
     <div class="container">
       <div class="footer__top">
-        <div>
+        <!-- footer__brandwrap is a container query context, so the brand can size itself
+             against this column instead of being measured by JavaScript. See main.css. -->
+        <div class="footer__brandwrap">
           <div class="footer__brand">CARRULEDDHI<br><span>SHOW 2026</span></div>
           <p class="footer__copy" data-i18n="footer.copy">Una discesa, un paese, una storia costruita a mano.</p>
         </div>

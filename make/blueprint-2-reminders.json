@@ -3,22 +3,42 @@
   "flow": [
     {
       "id": 1,
-      "module": "google-sheets:filterRows",
-      "version": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
       "parameters": {
-        "__IMTCONN__": null
+        "handleErrors": false,
+        "useNewZLibDeCompress": true
       },
       "mapper": {
-        "from": "drive",
-        "mode": "select",
-        "spreadsheetId": "",
-        "sheetId": "Reminders",
-        "includesHeaders": true,
-        "filter": [],
-        "sortOrder": "asc",
-        "limit": "500",
-        "valueRenderOption": "FORMATTED_VALUE",
-        "dateTimeRenderOption": "FORMATTED_STRING"
+        "url": "https://www.carruleddhishow.com/api/carruleddhi/reminders-due",
+        "method": "post",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "name": "X-Carruleddhi-Roster-Key",
+            "value": "WSTAW_ROSTER_KEY"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "data": "{}",
+        "parseResponse": true,
+        "serializeUrl": false,
+        "shareCookies": false,
+        "ca": null,
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "followAllRedirects": false,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "authUser": "",
+        "authPass": "",
+        "timeout": null
       },
       "metadata": {
         "designer": {
@@ -29,102 +49,22 @@
     },
     {
       "id": 2,
-      "module": "util:SetVariables",
+      "module": "builtin:BasicFeeder",
       "version": 1,
       "parameters": {},
       "mapper": {
-        "variables": [
-          {
-            "name": "hoursLeft",
-            "value": "{{round(dateDifference(parseDate(\"2026-10-17 14:30\"; \"YYYY-MM-DD HH:mm\"; \"Europe/Rome\"); now) / 3600000)}}"
-          },
-          {
-            "name": "due",
-            "value": "{{switch(round(dateDifference(parseDate(\"2026-10-17 14:30\"; \"YYYY-MM-DD HH:mm\"; \"Europe/Rome\"); now) / 3600000); 168; \"7d\"; 24; \"1d\"; 3; \"3h\"; \"\")}}"
-          },
-          {
-            "name": "loc",
-            "value": "{{switch(lower(substring(ifempty(1.`E`; \"it\"); 0; 2)); \"it\"; \"it\"; \"pl\"; \"pl\"; \"en\"; \"en\"; \"de\"; \"de\"; \"es\"; \"es\"; \"fr\"; \"fr\"; \"it\")}}"
-          }
-        ],
-        "scope": "roundtrip"
+        "array": "{{1.data.messages}}"
       },
       "metadata": {
         "designer": {
-          "x": 300,
-          "y": 0
-        },
-        "restore": {
-          "expect": {
-            "variables": {
-              "items": []
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": 3,
-      "module": "util:SetVariables",
-      "version": 1,
-      "parameters": {},
-      "mapper": {
-        "variables": [
-          {
-            "name": "copy",
-            "value": "{\"_event\":{\"name\":\"Carruleddhi Show 2026\",\"date\":\"17.10.2026\",\"presentation\":\"12:00\",\"start\":\"14:30\",\"place\":\"Discesa Rena Bianca, Via Giuseppe Verdi, Santa Teresa Gallura (SS)\",\"map\":\"https://maps.app.goo.gl/MZLJyzTH3tC93Pm86\",\"email\":\"info@carruleddhishow.com\",\"phone\":\"+39 328 498 1574\"},\"it\":{\"regSubject\":\"Sei in gara — Carruleddhi Show 2026, numero %RACENUMBER%\",\"regPreheader\":\"Iscrizione confermata. Il tuo numero di partenza e i due PDF da firmare sono qui.\",\"regHi\":\"Ciao %FIRSTNAME%,\",\"regLead\":\"la tua iscrizione al Carruleddhi Show 2026 è stata registrata. Questo è il tuo numero di partenza:\",\"regNumberLabel\":\"Numero di partenza\",\"regWhenTitle\":\"Quando e dove\",\"regDetailsTitle\":\"I dati che abbiamo registrato\",\"regDetailsNote\":\"Se qualcosa non è corretto, rispondi a questa e-mail: correggiamo noi.\",\"regPdfTitle\":\"Due PDF in allegato\",\"regPdfBody\":\"In allegato trovi il modulo di iscrizione già compilato in due copie: una in italiano e una nella tua lingua. La copia nella tua lingua serve solo per capire cosa firmi.\",\"regPrintTitle\":\"Importante — quale copia stampare\",\"regPrintBody\":\"Stampa e firma SOLO la copia in ITALIANO. È l'unica versione valida per gli organizzatori. La traduzione non va consegnata.\",\"regChecklistTitle\":\"Cosa portare il giorno della gara\",\"regChecklist\":[\"Il modulo in italiano, stampato e firmato\",\"Un documento d'identità valido\",\"Casco omologato: senza casco non si parte\",\"Per i minori: liberatoria firmata da un genitore o tutore\"],\"regCta\":\"Apri la mappa del percorso\",\"regHelpTitle\":\"Serve aiuto?\",\"regHelp\":\"Scrivi a %ORGEMAIL% oppure chiama %ORGPHONE%.\",\"labels\":{\"fullName\":\"Nome e cognome\",\"birthDate\":\"Data di nascita\",\"postalCode\":\"CAP\",\"email\":\"E-mail\",\"phone\":\"Telefono\",\"address\":\"Indirizzo\",\"cartName\":\"Nome del carruleddhu\",\"category\":\"Categoria\",\"team\":\"Team\",\"notes\":\"Note\",\"raceNumber\":\"Numero\"},\"remSubject7\":\"Tra una settimana si scende — Carruleddhi Show 2026\",\"remSubject1\":\"Domani: Carruleddhi Show 2026\",\"remSubject3\":\"Ci vediamo tra poco alla Rena Bianca\",\"remHeading7\":\"Manca una settimana.\",\"remHeading1\":\"È domani.\",\"remHeading3\":\"Tra poche ore.\",\"remBody7\":\"Sabato 17 ottobre la discesa della Rena Bianca si chiude al traffico e si apre ai carruleddhi. Presentazione dei mezzi alle 12:00, partenza alle 14:30.\",\"remBody1\":\"Domani alle 12:00 la presentazione in piazza, alle 14:30 la partenza. Arriva in anticipo: i parcheggi vicini si riempiono presto.\",\"remBody3\":\"Il ritrovo è aperto. Presentazione alle 12:00, partenza alle 14:30. Portati acqua e un cappello.\",\"remRiderNote\":\"Sei iscritto alla gara: ricordati il modulo in italiano firmato, un documento e il casco.\",\"remCta\":\"Come arrivare\",\"remUnsub\":\"Non voglio più questi promemoria\",\"footerNote\":\"Ricevi questa e-mail perché ti sei iscritto o hai chiesto i promemoria sul sito del Carruleddhi Show 2026.\",\"printFooter\":\"Documento generato automaticamente il %GENERATEDAT%.\",\"minSubject\":\"%FIRSTNAME% è in gara — Carruleddhi Show 2026, numero %RACENUMBER%\",\"minPreheader\":\"Iscrizione registrata. La liberatoria va firmata da voi.\",\"minHi\":\"Buongiorno %GUARDIAN%,\",\"minLead\":\"l’iscrizione di %CHILD% %FIRSTNAME% al Carruleddhi Show 2026 è stata registrata. Questo è il suo numero di partenza:\",\"minAgeNote\":\"Il giorno della gara %FIRSTNAME% avrà %AGE% anni, quindi la partecipazione richiede la vostra autorizzazione scritta.\",\"minPdfTitle\":\"Modulo per minori, in allegato\",\"minPdfBody\":\"In allegato trovate il modulo per piloti minorenni, già compilato con i dati inseriti. Contiene lo spazio per la firma del genitore o del tutore legale.\",\"minPrintTitle\":\"Importante — cosa portare il giorno della gara\",\"minPrintBody\":\"Stampate e firmate SOLO la copia in ITALIANO. Chi firma deve essere presente alla partenza con un documento d’identità valido.\",\"minGuardianTitle\":\"Chi autorizza\",\"minCta\":\"Leggi il regolamento\",\"minLabels\":{\"guardian\":\"Chi firma\",\"relation\":\"In qualità di\",\"guardianEmail\":\"E-mail di chi firma\",\"guardianPhone\":\"Telefono di chi firma\",\"mother\":\"Madre\",\"father\":\"Padre\",\"riderAge\":\"Età alla gara\"},\"minRel\":{\"mother\":\"madre\",\"father\":\"padre\",\"guardian\":\"tutore legale\"},\"minChild\":{\"son\":\"vostro figlio\",\"daughter\":\"vostra figlia\",\"child\":\"vostro figlio/a\"},\"newsSubject\":\"Ti scriviamo per la prossima edizione — Carruleddhi Show\",\"newsHi\":\"Ciao %FIRSTNAME%,\",\"newsLead\":\"insieme all’iscrizione di quest’anno hai chiesto di essere avvisato quando annunceremo la prossima edizione del Carruleddhi Show. Fatto: sei in lista.\",\"newsBody\":\"Non ti scriveremo per altro. Una sola e-mail, quando la data della prossima edizione sarà decisa. Nient’altro, mai.\",\"newsCta\":\"Torna al sito\",\"newsUnsub\":\"Non voglio essere avvisato\",\"askAny\":\"Domande? Rispondi a questa e-mail: la leggiamo noi, non un robot.\",\"askCta\":\"Scrivici dal sito\",\"regPdfTitleOne\":\"Il modulo in allegato\",\"regPdfBodyOne\":\"In allegato trovi il modulo di iscrizione da stampare e firmare.\",\"regPrintBodyOne\":\"Stampa il modulo, firmalo e portalo con te il giorno della gara. Senza modulo firmato non si parte.\",\"minPrintBodyOne\":\"Stampate il modulo, firmatelo e portatelo il giorno della gara. Chi firma deve essere presente alla partenza con un documento d’identità valido.\"},\"pl\":{\"regSubject\":\"Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%\",\"regPreheader\":\"Zgłoszenie przyjęte. W środku Twój numer startowy i dwa PDF-y do podpisu.\",\"regHi\":\"Cześć %FIRSTNAME%,\",\"regLead\":\"Twoje zgłoszenie na Carruleddhi Show 2026 zostało zapisane. To Twój numer startowy:\",\"regNumberLabel\":\"Numer startowy\",\"regWhenTitle\":\"Kiedy i gdzie\",\"regDetailsTitle\":\"Dane, które zapisaliśmy\",\"regDetailsNote\":\"Jeśli coś się nie zgadza, odpowiedz na tego maila — poprawimy.\",\"regPdfTitle\":\"Dwa PDF-y w załączniku\",\"regPdfBody\":\"W załączniku jest wypełniony formularz zgłoszeniowy w dwóch kopiach: po włosku i po polsku. Kopia polska służy tylko do tego, żebyś wiedział, co podpisujesz.\",\"regPrintTitle\":\"Ważne — którą kopię wydrukować\",\"regPrintBody\":\"Wydrukuj i podpisz TYLKO kopię WŁOSKĄ. To jedyna wersja, którą organizator przyjmuje. Tłumaczenia nie oddawaj.\",\"regChecklistTitle\":\"Co zabrać w dniu wyścigu\",\"regChecklist\":[\"Wydrukowany i podpisany formularz po włosku\",\"Ważny dokument tożsamości\",\"Atestowany kask — bez kasku nie ma startu\",\"Osoby niepełnoletnie: zgoda podpisana przez rodzica lub opiekuna\"],\"regCta\":\"Otwórz mapę trasy\",\"regHelpTitle\":\"Potrzebujesz pomocy?\",\"regHelp\":\"Napisz na %ORGEMAIL% albo zadzwoń: %ORGPHONE%.\",\"labels\":{\"fullName\":\"Imię i nazwisko\",\"birthDate\":\"Data urodzenia\",\"postalCode\":\"CAP\",\"email\":\"E-mail\",\"phone\":\"Telefon\",\"address\":\"Adres\",\"cartName\":\"Nazwa carruleddhu\",\"category\":\"Kategoria\",\"team\":\"Zespół\",\"notes\":\"Uwagi\",\"raceNumber\":\"Numer\"},\"remSubject7\":\"Za tydzień zjeżdżamy — Carruleddhi Show 2026\",\"remSubject1\":\"Już jutro: Carruleddhi Show 2026\",\"remSubject3\":\"Do zobaczenia niedługo na Rena Bianca\",\"remHeading7\":\"Został tydzień.\",\"remHeading1\":\"To już jutro.\",\"remHeading3\":\"Za kilka godzin.\",\"remBody7\":\"W sobotę 17 października zjazd Rena Bianca zamyka się dla ruchu i otwiera dla carruleddhi. Prezentacja pojazdów o 12:00, start o 14:30.\",\"remBody1\":\"Jutro o 12:00 prezentacja na placu, o 14:30 start. Przyjedź wcześniej — pobliskie parkingi zapełniają się szybko.\",\"remBody3\":\"Miejsce zbiórki jest już otwarte. Prezentacja o 12:00, start o 14:30. Weź wodę i czapkę.\",\"remRiderNote\":\"Startujesz w wyścigu: pamiętaj o podpisanym formularzu po włosku, dokumencie i kasku.\",\"remCta\":\"Jak dojechać\",\"remUnsub\":\"Nie chcę więcej przypomnień\",\"footerNote\":\"Dostajesz tego maila, bo zapisałeś się na wyścig albo poprosiłeś o przypomnienia na stronie Carruleddhi Show 2026.\",\"printFooter\":\"Dokument wygenerowany automatycznie %GENERATEDAT%.\",\"minSubject\":\"%FIRSTNAME% jedzie — Carruleddhi Show 2026, numer %RACENUMBER%\",\"minPreheader\":\"Zgłoszenie przyjęte. Oświadczenie podpisujecie Państwo.\",\"minHi\":\"Dzień dobry, %GUARDIAN%,\",\"minLead\":\"zgłoszenie %CHILD% %FIRSTNAME% na Carruleddhi Show 2026 zostało przyjęte. To numer startowy:\",\"minAgeNote\":\"W dniu zjazdu %FIRSTNAME% będzie mieć %AGE% lat, więc udział wymaga Państwa pisemnej zgody.\",\"minPdfTitle\":\"Formularz dla niepełnoletnich, w załączniku\",\"minPdfBody\":\"W załączniku jest formularz dla niepełnoletnich zawodników, już uzupełniony podanymi danymi. Zawiera miejsce na podpis rodzica lub opiekuna prawnego.\",\"minPrintTitle\":\"Ważne — co zabrać w dniu zjazdu\",\"minPrintBody\":\"Wydrukujcie i podpiszcie TYLKO wersję WŁOSKĄ. Osoba podpisująca musi być na starcie z ważnym dokumentem tożsamości.\",\"minGuardianTitle\":\"Kto udziela zgody\",\"minCta\":\"Przeczytaj regulamin\",\"minLabels\":{\"guardian\":\"Osoba podpisująca\",\"relation\":\"Jako\",\"guardianEmail\":\"E-mail osoby podpisującej\",\"guardianPhone\":\"Telefon osoby podpisującej\",\"mother\":\"Matka\",\"father\":\"Ojciec\",\"riderAge\":\"Wiek w dniu zjazdu\"},\"minRel\":{\"mother\":\"matka\",\"father\":\"ojciec\",\"guardian\":\"opiekun prawny\"},\"minChild\":{\"son\":\"Państwa syna\",\"daughter\":\"Państwa córki\",\"child\":\"Państwa dziecka\"},\"newsSubject\":\"Napiszemy przy kolejnej edycji — Carruleddhi Show\",\"newsHi\":\"Cześć %FIRSTNAME%,\",\"newsLead\":\"poza zgłoszeniem na ten rok poprosiłeś, żebyśmy dali znać, kiedy ogłosimy kolejną edycję Carruleddhi Show. Gotowe — jesteś na liście.\",\"newsBody\":\"Nie napiszemy w żadnej innej sprawie. Jeden mail, wtedy gdy data kolejnej edycji będzie ustalona. Nic więcej, nigdy.\",\"newsCta\":\"Wróć na stronę\",\"newsUnsub\":\"Nie chcę być powiadamiany\",\"askAny\":\"Pytania? Odpowiedz na tego maila — czyta go człowiek, nie automat.\",\"askCta\":\"Napisz przez stronę\",\"regPdfTitleOne\":\"Formularz w załączniku\",\"regPdfBodyOne\":\"W załączniku jest formularz zgłoszeniowy do wydrukowania i podpisania.\",\"regPrintBodyOne\":\"Wydrukuj formularz, podpisz go i weź ze sobą w dniu wyścigu. Bez podpisanego formularza nie ma startu.\",\"minPrintBodyOne\":\"Wydrukujcie formularz, podpiszcie go i weźmy ze sobą w dniu zjazdu. Osoba podpisująca musi być na starcie z ważnym dokumentem tożsamości.\"},\"en\":{\"regSubject\":\"You are in — Carruleddhi Show 2026, race number %RACENUMBER%\",\"regPreheader\":\"Entry confirmed. Your race number and the two PDFs to sign are inside.\",\"regHi\":\"Hi %FIRSTNAME%,\",\"regLead\":\"your entry for the Carruleddhi Show 2026 is registered. Here is your race number:\",\"regNumberLabel\":\"Race number\",\"regWhenTitle\":\"When and where\",\"regDetailsTitle\":\"The details we recorded\",\"regDetailsNote\":\"If anything is wrong, just reply to this email and we will fix it.\",\"regPdfTitle\":\"Two PDFs attached\",\"regPdfBody\":\"Attached you will find your completed entry form in two copies: one in Italian and one in your language. The translated copy is there so you understand what you are signing.\",\"regPrintTitle\":\"Important — which copy to print\",\"regPrintBody\":\"Print and sign the ITALIAN copy only. It is the only version the organisers accept. Do not hand in the translation.\",\"regChecklistTitle\":\"What to bring on race day\",\"regChecklist\":[\"The Italian form, printed and signed\",\"A valid ID document\",\"An approved helmet — no helmet, no start\",\"Minors: a waiver signed by a parent or guardian\"],\"regCta\":\"Open the route map\",\"regHelpTitle\":\"Need help?\",\"regHelp\":\"Write to %ORGEMAIL% or call %ORGPHONE%.\",\"labels\":{\"fullName\":\"Full name\",\"birthDate\":\"Date of birth\",\"postalCode\":\"Postal code\",\"email\":\"Email\",\"phone\":\"Phone\",\"address\":\"Address\",\"cartName\":\"Cart name\",\"category\":\"Category\",\"team\":\"Team\",\"notes\":\"Notes\",\"raceNumber\":\"Number\"},\"remSubject7\":\"One week to the descent — Carruleddhi Show 2026\",\"remSubject1\":\"Tomorrow: Carruleddhi Show 2026\",\"remSubject3\":\"See you shortly at Rena Bianca\",\"remHeading7\":\"One week to go.\",\"remHeading1\":\"It is tomorrow.\",\"remHeading3\":\"In a few hours.\",\"remBody7\":\"On Saturday 17 October the Rena Bianca descent closes to traffic and opens to the carruleddhi. Carts are presented at 12:00, the race starts at 14:30.\",\"remBody1\":\"Tomorrow at 12:00 the presentation in the square, at 14:30 the start. Come early — nearby parking fills up fast.\",\"remBody3\":\"The meeting point is open. Presentation at 12:00, start at 14:30. Bring water and a hat.\",\"remRiderNote\":\"You are racing: remember the signed Italian form, an ID document and your helmet.\",\"remCta\":\"Get directions\",\"remUnsub\":\"Stop these reminders\",\"footerNote\":\"You are receiving this because you entered the race or asked for reminders on the Carruleddhi Show 2026 website.\",\"printFooter\":\"Document generated automatically on %GENERATEDAT%.\",\"minSubject\":\"%FIRSTNAME% is racing — Carruleddhi Show 2026, number %RACENUMBER%\",\"minPreheader\":\"Entry received. The waiver is signed by you.\",\"minHi\":\"Hello %GUARDIAN%,\",\"minLead\":\"the entry for %CHILD% %FIRSTNAME% in the Carruleddhi Show 2026 has been registered. This is their start number:\",\"minAgeNote\":\"On the day of the race %FIRSTNAME% will be %AGE%, so taking part requires your written authorisation.\",\"minPdfTitle\":\"Form for minors, attached\",\"minPdfBody\":\"Attached you will find the form for riders under 18, already filled in with the details you gave. It has space for the signature of the parent or legal guardian.\",\"minPrintTitle\":\"Important — what to bring on race day\",\"minPrintBody\":\"Print and sign ONLY the ITALIAN copy. Whoever signs has to be at the start with valid photo identification.\",\"minGuardianTitle\":\"Who authorises\",\"minCta\":\"Read the rules\",\"minLabels\":{\"guardian\":\"Signed by\",\"relation\":\"As the\",\"guardianEmail\":\"E-mail of the signatory\",\"guardianPhone\":\"Phone of the signatory\",\"mother\":\"Mother\",\"father\":\"Father\",\"riderAge\":\"Age on race day\"},\"minRel\":{\"mother\":\"mother\",\"father\":\"father\",\"guardian\":\"legal guardian\"},\"minChild\":{\"son\":\"your son\",\"daughter\":\"your daughter\",\"child\":\"your child\"},\"newsSubject\":\"We will write when the next edition is announced — Carruleddhi Show\",\"newsHi\":\"Hi %FIRSTNAME%,\",\"newsLead\":\"along with this year’s entry you asked to hear from us when we announce the next Carruleddhi Show. Done: you are on the list.\",\"newsBody\":\"We will not write about anything else. One e-mail, once the date of the next edition is settled. Nothing more, ever.\",\"newsCta\":\"Back to the site\",\"newsUnsub\":\"Do not notify me\",\"askAny\":\"Questions? Just reply to this e-mail — a person reads it, not a robot.\",\"askCta\":\"Write to us on the site\",\"regPdfTitleOne\":\"The form is attached\",\"regPdfBodyOne\":\"Attached you will find the entry form to print and sign.\",\"regPrintBodyOne\":\"Print the form, sign it and bring it with you on race day. No signed form, no start.\",\"minPrintBodyOne\":\"Print the form, sign it and bring it on race day. Whoever signs has to be at the start with valid photo identification.\"},\"de\":{\"regSubject\":\"Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%\",\"regPreheader\":\"Anmeldung bestätigt. Startnummer und die zwei PDFs zum Signieren sind drin.\",\"regHi\":\"Hallo %FIRSTNAME%,\",\"regLead\":\"deine Anmeldung für die Carruleddhi Show 2026 ist registriert. Das ist deine Startnummer:\",\"regNumberLabel\":\"Startnummer\",\"regWhenTitle\":\"Wann und wo\",\"regDetailsTitle\":\"Diese Daten haben wir gespeichert\",\"regDetailsNote\":\"Stimmt etwas nicht, antworte einfach auf diese E-Mail — wir korrigieren es.\",\"regPdfTitle\":\"Zwei PDFs im Anhang\",\"regPdfBody\":\"Im Anhang findest du das ausgefüllte Anmeldeformular in zwei Fassungen: eine auf Italienisch und eine in deiner Sprache. Die Übersetzung dient nur deinem Verständnis.\",\"regPrintTitle\":\"Wichtig — welche Fassung drucken\",\"regPrintBody\":\"Drucke und unterschreibe ausschließlich die ITALIENISCHE Fassung. Nur sie wird von den Organisatoren akzeptiert. Die Übersetzung nicht abgeben.\",\"regChecklistTitle\":\"Was du am Renntag mitbringst\",\"regChecklist\":[\"Das italienische Formular, gedruckt und unterschrieben\",\"Ein gültiges Ausweisdokument\",\"Einen zugelassenen Helm — ohne Helm kein Start\",\"Minderjährige: Einverständnis eines Elternteils oder Vormunds\"],\"regCta\":\"Streckenkarte öffnen\",\"regHelpTitle\":\"Fragen?\",\"regHelp\":\"Schreib an %ORGEMAIL% oder ruf an: %ORGPHONE%.\",\"labels\":{\"fullName\":\"Vor- und Nachname\",\"birthDate\":\"Geburtsdatum\",\"postalCode\":\"Postleitzahl\",\"email\":\"E-Mail\",\"phone\":\"Telefon\",\"address\":\"Adresse\",\"cartName\":\"Name des Carruleddhu\",\"category\":\"Kategorie\",\"team\":\"Team\",\"notes\":\"Anmerkungen\",\"raceNumber\":\"Nummer\"},\"remSubject7\":\"In einer Woche geht es abwärts — Carruleddhi Show 2026\",\"remSubject1\":\"Morgen: Carruleddhi Show 2026\",\"remSubject3\":\"Bald an der Rena Bianca\",\"remHeading7\":\"Eine Woche noch.\",\"remHeading1\":\"Morgen ist es soweit.\",\"remHeading3\":\"In wenigen Stunden.\",\"remBody7\":\"Am Samstag, 17. Oktober wird die Abfahrt Rena Bianca für den Verkehr gesperrt und für die Carruleddhi geöffnet. Vorstellung der Wagen um 12:00, Start um 14:30.\",\"remBody1\":\"Morgen um 12:00 die Vorstellung auf dem Platz, um 14:30 der Start. Komm früh — die Parkplätze in der Nähe sind schnell voll.\",\"remBody3\":\"Der Treffpunkt ist offen. Vorstellung um 12:00, Start um 14:30. Nimm Wasser und eine Kopfbedeckung mit.\",\"remRiderNote\":\"Du fährst mit: denk an das unterschriebene italienische Formular, einen Ausweis und den Helm.\",\"remCta\":\"Route anzeigen\",\"remUnsub\":\"Keine weiteren Erinnerungen\",\"footerNote\":\"Du erhältst diese E-Mail, weil du dich angemeldet oder Erinnerungen auf der Website der Carruleddhi Show 2026 angefordert hast.\",\"printFooter\":\"Dokument automatisch erstellt am %GENERATEDAT%.\",\"minSubject\":\"%FIRSTNAME% fährt mit — Carruleddhi Show 2026, Nummer %RACENUMBER%\",\"minPreheader\":\"Anmeldung angekommen. Die Erklärung unterschreiben Sie.\",\"minHi\":\"Guten Tag %GUARDIAN%,\",\"minLead\":\"die Anmeldung von %CHILD% %FIRSTNAME% für die Carruleddhi Show 2026 ist eingegangen. Das ist die Startnummer:\",\"minAgeNote\":\"Am Renntag ist %FIRSTNAME% %AGE% Jahre alt, deshalb ist Ihre schriftliche Zustimmung nötig.\",\"minPdfTitle\":\"Formular für Minderjährige, im Anhang\",\"minPdfBody\":\"Im Anhang finden Sie das Formular für minderjährige Fahrer, bereits mit den angegebenen Daten ausgefüllt. Es enthält Platz für die Unterschrift des Elternteils oder der erziehungsberechtigten Person.\",\"minPrintTitle\":\"Wichtig — was Sie am Renntag mitbringen\",\"minPrintBody\":\"Drucken und unterschreiben Sie NUR die ITALIENISCHE Fassung. Die unterschreibende Person muss mit einem gültigen Ausweis am Start sein.\",\"minGuardianTitle\":\"Wer zustimmt\",\"minCta\":\"Regelwerk lesen\",\"minLabels\":{\"guardian\":\"Unterschrift von\",\"relation\":\"Als\",\"guardianEmail\":\"E-Mail der unterschreibenden Person\",\"guardianPhone\":\"Telefon der unterschreibenden Person\",\"mother\":\"Mutter\",\"father\":\"Vater\",\"riderAge\":\"Alter am Renntag\"},\"minRel\":{\"mother\":\"Mutter\",\"father\":\"Vater\",\"guardian\":\"erziehungsberechtigte Person\"},\"minChild\":{\"son\":\"Ihrem Sohn\",\"daughter\":\"Ihrer Tochter\",\"child\":\"Ihrem Kind\"},\"newsSubject\":\"Wir schreiben zur nächsten Ausgabe — Carruleddhi Show\",\"newsHi\":\"Hallo %FIRSTNAME%,\",\"newsLead\":\"zusammen mit deiner Anmeldung hast du gebeten, Bescheid zu bekommen, wenn wir die nächste Carruleddhi Show ankündigen. Erledigt: du stehst auf der Liste.\",\"newsBody\":\"Wir schreiben zu nichts anderem. Eine E-Mail, sobald das Datum der nächsten Ausgabe feststeht. Sonst nie.\",\"newsCta\":\"Zurück zur Website\",\"newsUnsub\":\"Keine Benachrichtigung\",\"askAny\":\"Fragen? Antworte einfach auf diese E-Mail — ein Mensch liest sie, kein Bot.\",\"askCta\":\"Über die Website schreiben\",\"regPdfTitleOne\":\"Das Formular im Anhang\",\"regPdfBodyOne\":\"Im Anhang findest du das Anmeldeformular zum Ausdrucken und Unterschreiben.\",\"regPrintBodyOne\":\"Drucke das Formular aus, unterschreibe es und bringe es am Renntag mit. Ohne unterschriebenes Formular kein Start.\",\"minPrintBodyOne\":\"Drucken Sie das Formular aus, unterschreiben Sie es und bringen Sie es am Renntag mit. Die unterschreibende Person muss mit einem gültigen Ausweis am Start sein.\"},\"es\":{\"regSubject\":\"Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%\",\"regPreheader\":\"Inscripción confirmada. Tu número de salida y los dos PDF para firmar están aquí.\",\"regHi\":\"Hola %FIRSTNAME%:\",\"regLead\":\"tu inscripción al Carruleddhi Show 2026 está registrada. Este es tu número de salida:\",\"regNumberLabel\":\"Número de salida\",\"regWhenTitle\":\"Cuándo y dónde\",\"regDetailsTitle\":\"Los datos que hemos registrado\",\"regDetailsNote\":\"Si algo no es correcto, responde a este correo y lo corregimos.\",\"regPdfTitle\":\"Dos PDF adjuntos\",\"regPdfBody\":\"Adjuntamos el formulario de inscripción ya rellenado en dos copias: una en italiano y otra en tu idioma. La traducción sirve solo para que entiendas lo que firmas.\",\"regPrintTitle\":\"Importante — qué copia imprimir\",\"regPrintBody\":\"Imprime y firma SOLO la copia en ITALIANO. Es la única versión que aceptan los organizadores. No entregues la traducción.\",\"regChecklistTitle\":\"Qué llevar el día de la carrera\",\"regChecklist\":[\"El formulario en italiano, impreso y firmado\",\"Un documento de identidad válido\",\"Casco homologado: sin casco no se sale\",\"Menores: autorización firmada por un padre o tutor\"],\"regCta\":\"Abrir el mapa del recorrido\",\"regHelpTitle\":\"¿Necesitas ayuda?\",\"regHelp\":\"Escribe a %ORGEMAIL% o llama al %ORGPHONE%.\",\"labels\":{\"fullName\":\"Nombre y apellidos\",\"birthDate\":\"Fecha de nacimiento\",\"postalCode\":\"Código postal\",\"email\":\"Correo\",\"phone\":\"Teléfono\",\"address\":\"Dirección\",\"cartName\":\"Nombre del carruleddhu\",\"category\":\"Categoría\",\"team\":\"Equipo\",\"notes\":\"Notas\",\"raceNumber\":\"Número\"},\"remSubject7\":\"En una semana bajamos — Carruleddhi Show 2026\",\"remSubject1\":\"Mañana: Carruleddhi Show 2026\",\"remSubject3\":\"Nos vemos pronto en Rena Bianca\",\"remHeading7\":\"Queda una semana.\",\"remHeading1\":\"Es mañana.\",\"remHeading3\":\"En pocas horas.\",\"remBody7\":\"El sábado 17 de octubre la bajada de Rena Bianca se cierra al tráfico y se abre a los carruleddhi. Presentación de los carros a las 12:00, salida a las 14:30.\",\"remBody1\":\"Mañana a las 12:00 la presentación en la plaza, a las 14:30 la salida. Llega con tiempo: los aparcamientos cercanos se llenan pronto.\",\"remBody3\":\"El punto de encuentro ya está abierto. Presentación a las 12:00, salida a las 14:30. Lleva agua y gorra.\",\"remRiderNote\":\"Compites: recuerda el formulario en italiano firmado, un documento y el casco.\",\"remCta\":\"Cómo llegar\",\"remUnsub\":\"No quiero más recordatorios\",\"footerNote\":\"Recibes este correo porque te inscribiste o pediste recordatorios en la web del Carruleddhi Show 2026.\",\"printFooter\":\"Documento generado automáticamente el %GENERATEDAT%.\",\"minSubject\":\"%FIRSTNAME% compite — Carruleddhi Show 2026, número %RACENUMBER%\",\"minPreheader\":\"Inscripción recibida. La autorización la firmáis vosotros.\",\"minHi\":\"Buenos días %GUARDIAN%,\",\"minLead\":\"la inscripción de %CHILD% %FIRSTNAME% en el Carruleddhi Show 2026 ha quedado registrada. Este es su número de salida:\",\"minAgeNote\":\"El día de la carrera %FIRSTNAME% tendrá %AGE% años, así que la participación necesita vuestra autorización por escrito.\",\"minPdfTitle\":\"Formulario para menores, adjunto\",\"minPdfBody\":\"Adjunto encontraréis el formulario para pilotos menores de edad, ya rellenado con los datos indicados. Incluye espacio para la firma del padre, la madre o el tutor legal.\",\"minPrintTitle\":\"Importante — qué llevar el día de la carrera\",\"minPrintBody\":\"Imprimid y firmad SOLO la copia en ITALIANO. Quien firma debe estar en la salida con un documento de identidad válido.\",\"minGuardianTitle\":\"Quién autoriza\",\"minCta\":\"Leer el reglamento\",\"minLabels\":{\"guardian\":\"Firma\",\"relation\":\"En calidad de\",\"guardianEmail\":\"Correo de quien firma\",\"guardianPhone\":\"Teléfono de quien firma\",\"mother\":\"Madre\",\"father\":\"Padre\",\"riderAge\":\"Edad el día de la carrera\"},\"minRel\":{\"mother\":\"madre\",\"father\":\"padre\",\"guardian\":\"tutor legal\"},\"minChild\":{\"son\":\"vuestro hijo\",\"daughter\":\"vuestra hija\",\"child\":\"vuestro hijo/a\"},\"newsSubject\":\"Te escribiremos en la próxima edición — Carruleddhi Show\",\"newsHi\":\"Hola %FIRSTNAME%:\",\"newsLead\":\"junto con la inscripción de este año pediste que te avisáramos cuando anunciemos la próxima Carruleddhi Show. Hecho: estás en la lista.\",\"newsBody\":\"No escribiremos por nada más. Un solo correo, cuando la fecha de la próxima edición esté decidida. Nada más, nunca.\",\"newsCta\":\"Volver a la web\",\"newsUnsub\":\"No quiero avisos\",\"askAny\":\"¿Dudas? Responde a este correo: lo lee una persona, no un robot.\",\"askCta\":\"Escríbenos desde la web\",\"regPdfTitleOne\":\"El formulario adjunto\",\"regPdfBodyOne\":\"Adjuntamos el formulario de inscripción para imprimir y firmar.\",\"regPrintBodyOne\":\"Imprime el formulario, fírmalo y llévalo el día de la carrera. Sin formulario firmado no se sale.\",\"minPrintBodyOne\":\"Imprimid el formulario, firmadlo y llevadlo el día de la carrera. Quien firma debe estar en la salida con un documento de identidad válido.\"},\"fr\":{\"regSubject\":\"C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%\",\"regPreheader\":\"Inscription confirmée. Votre numéro de départ et les deux PDF à signer sont ici.\",\"regHi\":\"Bonjour %FIRSTNAME%,\",\"regLead\":\"votre inscription au Carruleddhi Show 2026 est enregistrée. Voici votre numéro de départ :\",\"regNumberLabel\":\"Numéro de départ\",\"regWhenTitle\":\"Quand et où\",\"regDetailsTitle\":\"Les informations enregistrées\",\"regDetailsNote\":\"Si quelque chose est inexact, répondez à cet e-mail : nous corrigeons.\",\"regPdfTitle\":\"Deux PDF en pièce jointe\",\"regPdfBody\":\"Vous trouverez le formulaire d'inscription déjà rempli en deux exemplaires : un en italien et un dans votre langue. La traduction sert uniquement à comprendre ce que vous signez.\",\"regPrintTitle\":\"Important — quelle copie imprimer\",\"regPrintBody\":\"Imprimez et signez UNIQUEMENT la copie en ITALIEN. C'est la seule version acceptée par les organisateurs. Ne remettez pas la traduction.\",\"regChecklistTitle\":\"À apporter le jour de la course\",\"regChecklist\":[\"Le formulaire en italien, imprimé et signé\",\"Une pièce d'identité valide\",\"Un casque homologué : pas de casque, pas de départ\",\"Mineurs : autorisation signée par un parent ou tuteur\"],\"regCta\":\"Ouvrir la carte du parcours\",\"regHelpTitle\":\"Besoin d'aide ?\",\"regHelp\":\"Écrivez à %ORGEMAIL% ou appelez le %ORGPHONE%.\",\"labels\":{\"fullName\":\"Nom et prénom\",\"birthDate\":\"Date de naissance\",\"postalCode\":\"Code postal\",\"email\":\"E-mail\",\"phone\":\"Téléphone\",\"address\":\"Adresse\",\"cartName\":\"Nom du carruleddhu\",\"category\":\"Catégorie\",\"team\":\"Équipe\",\"notes\":\"Remarques\",\"raceNumber\":\"Numéro\"},\"remSubject7\":\"Dans une semaine, ça descend — Carruleddhi Show 2026\",\"remSubject1\":\"Demain : Carruleddhi Show 2026\",\"remSubject3\":\"À tout de suite à Rena Bianca\",\"remHeading7\":\"Encore une semaine.\",\"remHeading1\":\"C'est demain.\",\"remHeading3\":\"Dans quelques heures.\",\"remBody7\":\"Le samedi 17 octobre, la descente de Rena Bianca ferme à la circulation et s'ouvre aux carruleddhi. Présentation des engins à 12h00, départ à 14h30.\",\"remBody1\":\"Demain à 12h00 la présentation sur la place, à 14h30 le départ. Venez tôt : les places de stationnement partent vite.\",\"remBody3\":\"Le point de rendez-vous est ouvert. Présentation à 12h00, départ à 14h30. Prenez de l'eau et un chapeau.\",\"remRiderNote\":\"Vous courez : pensez au formulaire italien signé, à une pièce d'identité et au casque.\",\"remCta\":\"Itinéraire\",\"remUnsub\":\"Ne plus recevoir ces rappels\",\"footerNote\":\"Vous recevez cet e-mail car vous vous êtes inscrit ou avez demandé les rappels sur le site du Carruleddhi Show 2026.\",\"printFooter\":\"Document généré automatiquement le %GENERATEDAT%.\",\"minSubject\":\"%FIRSTNAME% est inscrit — Carruleddhi Show 2026, numéro %RACENUMBER%\",\"minPreheader\":\"Inscription reçue. L’autorisation, c’est vous qui la signez.\",\"minHi\":\"Bonjour %GUARDIAN%,\",\"minLead\":\"l’inscription de %CHILD% %FIRSTNAME% au Carruleddhi Show 2026 a été enregistrée. Voici son numéro de départ :\",\"minAgeNote\":\"Le jour de la course, %FIRSTNAME% aura %AGE% ans : la participation nécessite donc votre autorisation écrite.\",\"minPdfTitle\":\"Formulaire pour mineurs, en pièce jointe\",\"minPdfBody\":\"Vous trouverez en pièce jointe le formulaire pour les pilotes mineurs, déjà rempli avec les informations transmises. Il comporte un espace pour la signature du parent ou du représentant légal.\",\"minPrintTitle\":\"Important — quoi apporter le jour de la course\",\"minPrintBody\":\"Imprimez et signez UNIQUEMENT la copie en ITALIEN. Le signataire doit être présent au départ avec une pièce d’identité valide.\",\"minGuardianTitle\":\"Qui autorise\",\"minCta\":\"Lire le règlement\",\"minLabels\":{\"guardian\":\"Signataire\",\"relation\":\"En qualité de\",\"guardianEmail\":\"E-mail du signataire\",\"guardianPhone\":\"Téléphone du signataire\",\"mother\":\"Mère\",\"father\":\"Père\",\"riderAge\":\"Âge le jour de la course\"},\"minRel\":{\"mother\":\"mère\",\"father\":\"père\",\"guardian\":\"représentant légal\"},\"minChild\":{\"son\":\"votre fils\",\"daughter\":\"votre fille\",\"child\":\"votre enfant\"},\"newsSubject\":\"Nous écrirons pour la prochaine édition — Carruleddhi Show\",\"newsHi\":\"Bonjour %FIRSTNAME%,\",\"newsLead\":\"en même temps que votre inscription, vous avez demandé à être prévenu lorsque nous annoncerons la prochaine Carruleddhi Show. C’est fait : vous êtes sur la liste.\",\"newsBody\":\"Nous n’écrirons pour rien d’autre. Un seul e-mail, quand la date de la prochaine édition sera fixée. Rien de plus, jamais.\",\"newsCta\":\"Retour au site\",\"newsUnsub\":\"Ne pas me prévenir\",\"askAny\":\"Des questions ? Répondez à cet e-mail — une personne le lit, pas un robot.\",\"askCta\":\"Nous écrire depuis le site\",\"regPdfTitleOne\":\"Le formulaire en pièce jointe\",\"regPdfBodyOne\":\"Vous trouverez en pièce jointe le formulaire d’inscription à imprimer et à signer.\",\"regPrintBodyOne\":\"Imprimez le formulaire, signez-le et apportez-le le jour de la course. Sans formulaire signé, pas de départ.\",\"minPrintBodyOne\":\"Imprimez le formulaire, signez-le et apportez-le le jour de la course. Le signataire doit être présent au départ avec une pièce d’identité valide.\"}}"
-          }
-        ],
-        "scope": "roundtrip"
-      },
-      "metadata": {
-        "designer": {
-          "x": 600,
-          "y": 0
-        },
-        "restore": {
-          "expect": {
-            "variables": {
-              "items": []
-            }
-          }
+          "x": 340,
+          "y": 0,
+          "messages": []
         }
       }
     },
     {
       "id": 4,
-      "module": "util:SetVariables",
-      "version": 1,
-      "parameters": {},
-      "mapper": {
-        "variables": [
-          {
-            "name": "t",
-            "value": "{{get(parseJSON(3.copy); 2.loc)}}"
-          },
-          {
-            "name": "ev",
-            "value": "{{get(parseJSON(3.copy); \"_event\")}}"
-          }
-        ],
-        "scope": "roundtrip"
-      },
-      "metadata": {
-        "designer": {
-          "x": 900,
-          "y": 0
-        },
-        "restore": {
-          "expect": {
-            "variables": {
-              "items": []
-            }
-          }
-        }
-      }
-    },
-    {
-      "id": 5,
       "module": "email:ActionSendEmail",
       "version": 7,
       "parameters": {
@@ -132,45 +72,24 @@
         "saveAfterSent": false
       },
       "filter": {
-        "name": "due now and not sent yet",
+        "name": "ma adres",
         "conditions": [
           [
             {
-              "a": "{{2.due}}",
-              "o": "text:notequal",
-              "b": ""
-            }
-          ],
-          [
-            {
-              "a": "{{1.`Q`}}",
-              "o": "text:notequal",
-              "b": "{{2.due}}"
-            }
-          ],
-          [
-            {
-              "a": "{{1.`D`}}",
+              "a": "{{2.value.to}}",
               "o": "text:contain",
               "b": "@"
-            }
-          ],
-          [
-            {
-              "a": "{{1.`P`}}",
-              "o": "text:notequal",
-              "b": "unsubscribed"
             }
           ]
         ]
       },
       "mapper": {
         "to": [
-          "{{lower(1.`D`)}}"
+          "{{2.value.to}}"
         ],
-        "subject": "{{switch(2.due; \"7d\"; 4.t.remSubject7; \"1d\"; 4.t.remSubject1; 4.t.remSubject3)}}",
+        "subject": "{{2.value.subject}}",
         "contentType": "html",
-        "html": "<!doctype html>\r\n<html lang=\"it\">\r\n<head>\r\n<meta charset=\"utf-8\">\r\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\r\n<meta name=\"x-apple-disable-message-reformatting\">\r\n<style>\r\n  @media only screen and (max-width:620px){\r\n    .wrap{width:100% !important}\r\n    .pad{padding-left:20px !important;padding-right:20px !important}\r\n    .h1{font-size:30px !important}\r\n    .stack{display:block !important;width:100% !important;border-right:0 !important}\r\n  }\r\n</style>\r\n</head>\r\n<body style=\"margin:0;padding:0;background:#e9f1ff;\">\r\n\r\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#e9f1ff;\">\r\n<tr><td align=\"center\" style=\"padding:24px 12px;\">\r\n<table role=\"presentation\" class=\"wrap\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;font-family:'Segoe UI',Helvetica,Arial,sans-serif;\">\r\n\r\n  <tr><td class=\"pad\" style=\"background:#071a3d;padding:26px 34px;\">\r\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>\r\n      <td style=\"font-size:19px;font-weight:800;color:#ffffff;\">CARRULEDDHI <span style=\"color:#ffc928;\">SHOW 2026</span></td>\r\n      <td align=\"right\" style=\"font-size:11px;color:#bcd6ff;letter-spacing:1.6px;text-transform:uppercase;\">{{switch(2.due; \"7d\"; \"7 dni\"; \"1d\"; \"1 dzień\"; \"3 godziny\")}}</td>\r\n    </tr></table>\r\n  </td></tr>\r\n\r\n  <tr><td style=\"background:#ffc928;padding:14px 34px;text-align:center;font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#071a3d;\">\r\n    17 &middot; 10 &middot; 2026 &nbsp;&mdash;&nbsp; {{1.ev.place}}\r\n  </td></tr>\r\n\r\n  <tr><td class=\"pad\" style=\"padding:32px 34px 6px;\">\r\n    <p style=\"margin:0 0 8px;font-size:15px;color:#5f709a;\">{{1.copy.regHi}}</p>\r\n    <h1 class=\"h1\" style=\"margin:0 0 16px;font-size:36px;line-height:1.05;color:#071a3d;font-weight:800;letter-spacing:-1.2px;\">{{switch(2.due; \"7d\"; 4.t.remHeading7; \"1d\"; 4.t.remHeading1; 4.t.remHeading3)}}</h1>\r\n    <div style=\"font-size:15px;line-height:1.7;color:#43516f;\">{{switch(2.due; \"7d\"; 4.t.remBody7; \"1d\"; 4.t.remBody1; 4.t.remBody3)}}</div>\r\n  </td></tr>\r\n\r\n  <tr><td class=\"pad\" style=\"padding:24px 34px 0;\">\r\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border:1px solid #dbe5f5;border-radius:14px;\">\r\n      <tr>\r\n        <td class=\"stack\" width=\"34%\" style=\"padding:16px 18px;border-right:1px solid #dbe5f5;\">\r\n          <div style=\"font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#5f709a;\">Data</div>\r\n          <div style=\"font-size:20px;font-weight:800;color:#071a3d;padding-top:3px;\">{{1.ev.date}}</div>\r\n        </td>\r\n        <td class=\"stack\" width=\"30%\" style=\"padding:16px 18px;border-right:1px solid #dbe5f5;\">\r\n          <div style=\"font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#5f709a;\">Start</div>\r\n          <div style=\"font-size:20px;font-weight:800;color:#f6494f;padding-top:3px;\">{{1.ev.start}}</div>\r\n        </td>\r\n        <td class=\"stack\" width=\"36%\" style=\"padding:16px 18px;font-size:13px;line-height:1.5;color:#5f709a;\">{{1.ev.place}}</td>\r\n      </tr>\r\n    </table>\r\n  </td></tr>\r\n\r\n  <!-- Widoczne tylko dla zapisanych zawodników. Make nie ma {% if %}, więc pusty\r\n       numer startowy daje pusty tekst i blok wygląda naturalnie. -->\r\n  <tr><td class=\"pad\" style=\"padding:20px 34px 0;\">\r\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#f4f8ff;border-left:4px solid #2469d8;border-radius:0 12px 12px 0;\">\r\n      <tr><td style=\"padding:14px 18px;font-size:14px;line-height:1.6;color:#2f3f5e;\">\r\n        {{if(length(1.race_number) > 0; \"#\" + 1.race_number + \" — \" + 4.t.remRiderNote; 4.t.footerNote)}}\r\n      </td></tr>\r\n    </table>\r\n  </td></tr>\r\n\r\n  <tr><td class=\"pad\" align=\"center\" style=\"padding:26px 34px 32px;\">\r\n    <a href=\"{{1.ev.map}}\" style=\"display:inline-block;background:#f6494f;color:#ffffff;font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;text-decoration:none;padding:14px 28px;border-radius:999px;\">{{1.copy.remCta}} &rarr;</a>\r\n  </td></tr>\r\n\r\n  <tr><td class=\"pad\" style=\"background:#071a3d;padding:22px 34px;\">\r\n    <div style=\"font-size:12px;line-height:1.6;color:#8fb0e8;\">{{1.copy.footerNote}}</div>\r\n    <div style=\"font-size:12px;padding-top:10px;\">\r\n      <a href=\"mailto:{{1.ev.email}}?subject=STOP%20promemoria\" style=\"color:#ffc928;text-decoration:underline;\">{{1.copy.remUnsub}}</a>\r\n      &nbsp;&middot;&nbsp;\r\n      <a href=\"mailto:{{1.ev.email}}\" style=\"color:#ffffff;text-decoration:none;\">{{1.ev.email}}</a>\r\n    </div>\r\n  </td></tr>\r\n\r\n</table>\r\n</td></tr>\r\n</table>\r\n</body>\r\n</html>",
+        "html": "{{2.value.html}}",
         "attachments": [],
         "cc": [],
         "bcc": [],
@@ -184,7 +103,7 @@
       },
       "metadata": {
         "designer": {
-          "x": 1200,
+          "x": 680,
           "y": 0
         },
         "restore": {
@@ -234,32 +153,6 @@
             "required": true
           }
         ]
-      }
-    },
-    {
-      "id": 6,
-      "module": "google-sheets:updateRow",
-      "version": 2,
-      "parameters": {
-        "__IMTCONN__": null
-      },
-      "mapper": {
-        "from": "drive",
-        "mode": "select",
-        "spreadsheetId": "",
-        "sheetId": "Reminders",
-        "rowNumber": "{{1.`__ROW_NUMBER__`}}",
-        "includesHeaders": true,
-        "valueInputOption": "USER_ENTERED",
-        "values": {
-          "16": "{{2.due}}"
-        }
-      },
-      "metadata": {
-        "designer": {
-          "x": 1500,
-          "y": 0
-        }
       }
     }
   ],

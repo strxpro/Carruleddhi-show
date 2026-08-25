@@ -178,3 +178,28 @@ export const saveSettings = (key: string, settings: Partial<SiteSettings>) =>
 /** Uploads a logo and returns its bucket path plus a signed URL to preview it with. */
 export const uploadSponsorLogo = (key: string, photo: string) =>
   call<{ ok: true; logo: string; url: string }>('settings-admin', key, { action: 'logo', photo });
+
+/* ------------------------------------------------------------------- purge */
+
+export type PurgeScope =
+  | 'registrations'
+  | 'attendance'
+  | 'subscribers'
+  | 'messages'
+  | 'chat'
+  | 'wall'
+  | 'everything';
+
+/**
+ * Deletes test data. There is no undo.
+ *
+ * The `confirm` string is built here rather than typed by the user twice: the guard it
+ * provides is against a stray retry or a mis-wired button reaching the server, not
+ * against a person who has already typed the scope into a confirmation box. The panel
+ * asks for that separately, in words, before calling this.
+ */
+export const purgeData = (key: string, scope: PurgeScope) =>
+  call<{ ok: true; scope: string; cleared: string[]; sequenceReset: boolean }>('purge', key, {
+    scope,
+    confirm: `USUN ${scope}`
+  });

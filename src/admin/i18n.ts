@@ -149,6 +149,25 @@ export const pl = {
   'set.sponsorNoLogo': 'bez logo',
   'set.sponsorsEmpty': 'Nie ma jeszcze żadnego sponsora.',
 
+  'set.purge': 'Wyczyść dane testowe',
+  'set.purgeLead':
+    'Do użycia raz, kiedy skończysz testować. Kasuje wiersze z bazy na zawsze — nie ma cofnięcia i nie ma kosza.',
+  'set.purgeWarn':
+    'Numery startowe wracają do 001 tylko wtedy, gdy czyścisz zgłoszenia. Sponsorzy i ustawienia strony zostają.',
+  'set.purgeRegistrations': 'Zgłoszenia zawodników',
+  'set.purgeAttendance': 'Kliknięcia „będę tam”',
+  'set.purgeSubscribers': 'Przypomnienia i newsletter',
+  'set.purgeMessages': 'Wiadomości z formularza',
+  'set.purgeChat': 'Rozmowy na czacie',
+  'set.purgeWall': 'Wpisy na tablicy',
+  'set.purgeEverything': 'Wszystko naraz',
+  'set.purgeAsk': 'Wpisz USUN, żeby potwierdzić',
+  'set.purgeGo': 'Usuń teraz',
+  'set.purgeCancel': 'Anuluj',
+  'set.purgeDone': 'Wyczyszczone.',
+  'set.purgeFailed': 'Nie udało się wyczyścić.',
+  'set.purgeNumbersReset': 'Numery startowe zaczynają się od 001.',
+
   'set.save': 'Zapisz',
   'set.saving': 'Zapisuję…',
   'set.saved': 'Zapisane.',
@@ -302,6 +321,25 @@ export const it: Dict = {
   'set.sponsorDown': 'Giù',
   'set.sponsorNoLogo': 'senza logo',
   'set.sponsorsEmpty': 'Nessuno sponsor per ora.',
+
+  'set.purge': 'Cancella i dati di prova',
+  'set.purgeLead':
+    'Da usare una volta, quando hai finito di provare. Elimina le righe dal database per sempre: non c’è annullamento e non c’è cestino.',
+  'set.purgeWarn':
+    'I numeri di partenza ripartono da 001 solo se cancelli le iscrizioni. Sponsor e impostazioni del sito restano.',
+  'set.purgeRegistrations': 'Iscrizioni dei piloti',
+  'set.purgeAttendance': 'Click su «ci sarò»',
+  'set.purgeSubscribers': 'Promemoria e newsletter',
+  'set.purgeMessages': 'Messaggi dal modulo',
+  'set.purgeChat': 'Conversazioni in chat',
+  'set.purgeWall': 'Messaggi in bacheca',
+  'set.purgeEverything': 'Tutto insieme',
+  'set.purgeAsk': 'Scrivi USUN per confermare',
+  'set.purgeGo': 'Elimina adesso',
+  'set.purgeCancel': 'Annulla',
+  'set.purgeDone': 'Cancellato.',
+  'set.purgeFailed': 'Cancellazione non riuscita.',
+  'set.purgeNumbersReset': 'I numeri di partenza ripartono da 001.',
 
   'set.save': 'Salva',
   'set.saving': 'Salvo…',

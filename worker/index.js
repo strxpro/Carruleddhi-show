@@ -22,6 +22,11 @@ const ALLOWED_TYPES = new Set([
   // Public wall. `wall` reads approved messages, `wall-post` adds one,
   // `wall-translate` translates one on demand, `wall-admin` moderates.
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
+  /* Called hourly by the scheduled Make scenario. Decides which reminder is due, renders
+     one finished letter per subscriber, and records what it handed over. Behind the same
+     passphrase as the roster — without one, anybody could burn through the list. */
+  'reminders-due',
+
   /* Settings the organiser changes from the panel. `settings` is a public read — the
      page needs the sponsor list and the section switches before it can render — and
      `settings-admin` writes, behind the passphrase. Two types rather than one with an
@@ -38,7 +43,7 @@ const ALLOWED_TYPES = new Set([
 /** These never reach Make; they are served from Supabase by the Worker itself. */
 const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
-  'settings', 'settings-admin',
+  'settings', 'settings-admin', 'reminders-due', 'purge',
   'chat', 'chat-admin', 'inbox'
 ]);
 
@@ -71,7 +76,9 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * A shared passphrase is the minimum bar; put Cloudflare Access in front of
  * admin.html as well before using this on a public hostname.
  */
-const PROTECTED_TYPES = new Set(['roster', 'wall-admin', 'chat-admin', 'inbox', 'settings-admin']);
+const PROTECTED_TYPES = new Set([
+  'roster', 'wall-admin', 'chat-admin', 'inbox', 'settings-admin', 'reminders-due', 'purge'
+]);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
 /** Only these keys are forwarded. Anything else is dropped, not rejected. */
@@ -109,7 +116,13 @@ const FIELD_WHITELIST = {
   // "what can a visitor ask this endpoint to do".
   settings: [],
   // `photo` is a data URL, downscaled in the browser, only used by action 'logo'.
-  'settings-admin': ['settings', 'action', 'photo']
+  'settings-admin': ['settings', 'action', 'photo'],
+  // The clock supplies nothing: the function works out what is due from the date it
+  // already knows. `dryRun` renders the letters without recording that they went out,
+  // so the scenario can be tested without spending the list.
+  'reminders-due': ['dryRun'],
+  // Wiping test data. `scope` names what to wipe, `confirm` has to spell it out.
+  purge: ['scope', 'confirm']
 };
 
 const MAX_FIELD_LENGTH = 3000;
@@ -516,6 +529,253 @@ async function inbox(env, payload, cors) {
     counts: { registrations, contacts, reminders, newsletter, wall, chats },
     total: registrations + contacts + reminders + newsletter + wall + chats
   }, 200, cors);
+}
+
+/* ============================================================================
+   Reminders
+   ============================================================================
+   Called once an hour by the scheduled Make scenario, which does nothing else: this
+   decides what is due, renders the letters and records what it handed over. Make
+   receives a list of `{ to, subject, html }` and sends them.
+
+   WHAT THIS TOOK OUT OF MAKE
+     A 500-row Google Sheets read, two variable modules (one of them holding the entire
+     copy deck), date arithmetic against a hard-coded timestamp, four AND-ed filter
+     conditions and a row update addressed by column index. Six modules down to three,
+     and none of the remaining ones knows anything about languages or dates.
+   ========================================================================== */
+
+/**
+ * Which reminder is due, as a window rather than an exact hour.
+ *
+ * The old version compared the hours remaining to 168, 24 and 3 exactly. Run hourly that
+ * works right up until a run is missed — and then that reminder is gone, because the
+ * number never equals 168 again. It also sent nothing at all to somebody who signed up
+ * two days before the race: their first tick was already past the 7-day mark and the
+ * 24-hour one had not arrived.
+ *
+ * Windows fix both. "Within seven days and more than a day away" is the 7-day reminder,
+ * and a subscriber gets the most advanced one they have not had yet, whenever the clock
+ * happens to fire.
+ */
+const REMINDER_WINDOWS = [
+  { code: '7d', upTo: 168, over: 24 },
+  { code: '1d', upTo: 24, over: 3 },
+  { code: '3h', upTo: 3, over: 0 }
+];
+
+/** How many letters one run will render. The next tick picks up the rest. */
+const REMINDER_BATCH = 250;
+
+function reminderWindow(hoursLeft) {
+  for (const window of REMINDER_WINDOWS) {
+    if (hoursLeft <= window.upTo && hoursLeft > window.over) return window.code;
+  }
+  return '';
+}
+
+/** The start of the race, from the one place that already knew it. */
+function eventStartAt(env) {
+  const parsed = new Date(env.EVENT_DATE || '2026-10-17T14:30:00+02:00');
+  return Number.isNaN(parsed.getTime()) ? new Date('2026-10-17T14:30:00+02:00') : parsed;
+}
+
+async function remindersDue(env, payload, cors) {
+  const hoursLeft = (eventStartAt(env).getTime() - Date.now()) / 3_600_000;
+  const due = reminderWindow(hoursLeft);
+  const hours = Math.round(hoursLeft);
+
+  // Too early, or the race has been and gone. Answered plainly so a run that sent
+  // nothing is distinguishable from a run that broke.
+  if (!due) return json({ ok: true, due: '', hoursLeft: hours, messages: [] }, 200, cors);
+
+  /* Active subscribers who have not had this particular reminder.
+     `last_reminder is null` has to be spelled out: in SQL, NULL <> '7d' is not true, so
+     a `neq` filter on its own would silently skip everybody who has never been written
+     to — which is everybody, on the first run. */
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/reminder_subscribers`);
+  url.searchParams.set('select', 'id,name,email,locale');
+  url.searchParams.set('status', 'eq.active');
+  url.searchParams.set('or', `(last_reminder.is.null,last_reminder.neq.${due})`);
+  url.searchParams.set('order', 'created_at.asc');
+  url.searchParams.set('limit', String(REMINDER_BATCH));
+
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!response.ok) {
+    return json({ ok: false, code: 'REMINDERS_READ_FAILED', detail: await response.text() }, 502, cors);
+  }
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return json({ ok: true, due, hoursLeft: hours, messages: [] }, 200, cors);
+  }
+
+  /* Race numbers, so a subscriber who is also racing sees their own number in the
+     letter. One read of two columns rather than a lookup per subscriber; a few hundred
+     rows is nothing and the alternative is N queries inside a loop. */
+  const numbers = new Map();
+  try {
+    const regUrl = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
+    regUrl.searchParams.set('select', 'email,race_number');
+    regUrl.searchParams.set('limit', '2000');
+    const regResponse = await fetch(regUrl, { headers: supabaseHeaders(env) });
+    if (regResponse.ok) {
+      for (const row of await regResponse.json()) {
+        if (row.email && row.race_number) {
+          numbers.set(String(row.email).trim().toLowerCase(), String(row.race_number).padStart(3, '0'));
+        }
+      }
+    }
+  } catch (_) {
+    // A missing race number costs one line of the letter. It is not worth failing over.
+  }
+
+  const event = COPY_DECK._event || {};
+  const messages = [];
+  for (const row of rows) {
+    const locale = localeOf(row.locale);
+    const deck = COPY_DECK[locale] || COPY_DECK.it;
+    const firstName = String(row.name || '').trim().split(/\s+/)[0] || '';
+    const raceNumber = numbers.get(String(row.email || '').trim().toLowerCase()) || '';
+    const suffix = due === '7d' ? '7' : due === '1d' ? '1' : '3';
+
+    /* Everything the template needs, already decided. The renderer substitutes plain
+       paths and nothing else, so the three-way choice between the 7-day, 1-day and
+       3-hour wording happens here rather than in a switch() inside the markup. */
+    const letter = {
+      copy: deck,
+      ev: event,
+      loc: locale,
+      hi: fill(deck.regHi, { FIRSTNAME: firstName }),
+      remWindow: deck[`remWindow${suffix}`] || '',
+      remHeading: deck[`remHeading${suffix}`] || '',
+      remBody: deck[`remBody${suffix}`] || '',
+      // A subscriber who is not racing gets the ordinary footer line instead of an
+      // empty "#" followed by nothing.
+      remRiderLine: raceNumber ? `#${raceNumber} — ${deck.remRiderNote}` : deck.footerNote
+    };
+
+    messages.push({
+      to: String(row.email || '').trim().toLowerCase(),
+      subject: deck[`remSubject${suffix}`] || '',
+      html: renderTemplate(EMAIL_TEMPLATES.reminderDue, letter)
+    });
+  }
+
+  /* Recorded before Make sends, on purpose.
+     The two failure modes are "an SMTP error loses one reminder" and "an SMTP error
+     makes the next tick send the same reminder to everybody again". The first is the one
+     to choose. `dryRun` skips this entirely, so the scenario can be tested end to end
+     without spending the list. */
+  if (!payload.dryRun) {
+    const ids = rows.map((row) => row.id).filter(Boolean);
+    const patch = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/reminder_subscribers?id=in.(${ids.join(',')})`,
+      {
+        method: 'PATCH',
+        headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ last_reminder: due })
+      }
+    );
+    if (!patch.ok) {
+      // Nothing is returned in this case. Sending letters that were not recorded would
+      // mean sending them again in an hour.
+      return json({ ok: false, code: 'REMINDERS_MARK_FAILED', detail: await patch.text() }, 502, cors);
+    }
+  }
+
+  return json({
+    ok: true,
+    due,
+    hoursLeft: hours,
+    dryRun: Boolean(payload.dryRun),
+    count: messages.length,
+    messages
+  }, 200, cors);
+}
+
+/* ============================================================================
+   Wiping test data
+   ============================================================================
+   Everything on this site is meant to show real numbers, so the rows left behind by a
+   fortnight of testing have to go before it opens — and there is no reason for that to
+   mean opening the Supabase table editor and deleting by hand while trying to remember
+   which of six tables you have already done.
+
+   TWO GUARDS, AND WHY BOTH ARE NEEDED
+     The passphrase, like every other admin route. And a `confirm` string that has to
+     spell out the scope: an endpoint whose whole job is deleting every registration is
+     one mis-click away from being used by accident, and "are you sure" in a dialog is
+     not a guard the server can see.
+
+   WHAT IT WILL NOT TOUCH
+     site_settings, because wiping the sponsor list and re-locking the site is not what
+     anybody means by "clear the test data". And the race number sequence is reset only
+     when registrations are wiped, which is the one case where starting again from 001 is
+     the point.
+   ========================================================================== */
+
+/**
+ * What each scope clears. Ordered so a child row never outlives its parent: chat messages
+ * before threads, because the messages reference the thread.
+ */
+const PURGE_SCOPES = {
+  registrations: ['registrations'],
+  attendance: ['attendance'],
+  subscribers: ['reminder_subscribers', 'newsletter_subscribers'],
+  messages: ['contact_messages'],
+  chat: ['chat_messages', 'chat_threads'],
+  wall: ['wall_comments'],
+  everything: [
+    'registrations', 'attendance', 'reminder_subscribers', 'newsletter_subscribers',
+    'contact_messages', 'chat_messages', 'chat_threads', 'wall_comments'
+  ]
+};
+
+async function purge(env, payload, cors) {
+  const scope = String(payload.scope || '');
+  const tables = PURGE_SCOPES[scope];
+  if (!tables) return json({ ok: false, code: 'PURGE_UNKNOWN_SCOPE' }, 422, cors);
+
+  /* The scope has to be typed out. Not a boolean: a boolean is what a stray retry sends
+     twice, and this is the one endpoint where a stray retry is unrecoverable. */
+  if (String(payload.confirm || '') !== `USUN ${scope}`) {
+    return json({ ok: false, code: 'PURGE_NOT_CONFIRMED', expected: `USUN ${scope}` }, 428, cors);
+  }
+
+  const cleared = {};
+  for (const table of tables) {
+    /* PostgREST refuses an unfiltered DELETE, which is a good default and the reason for
+       this filter: `id` is a uuid on every one of these tables, and every uuid is
+       different from the all-zero one. So it matches every row, on purpose, and states
+       that it means to. */
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/${table}?id=neq.00000000-0000-0000-0000-000000000000`,
+      { method: 'DELETE', headers: supabaseHeaders(env, { Prefer: 'return=minimal' }) }
+    );
+    if (!response.ok) {
+      return json({
+        ok: false, code: 'PURGE_FAILED', table, detail: await response.text(), cleared
+      }, 502, cors);
+    }
+    cleared[table] = true;
+  }
+
+  /* Race numbers start again at 001, but only when the registrations went with them.
+     A sequence reset with rows still in the table would hand out numbers that already
+     exist, and the unique index would then reject a real entry on the day.
+     Needs the helper from 0004; if it is missing the wipe still counts as done, because
+     the rows are gone either way. */
+  let sequenceReset = false;
+  if (tables.includes('registrations')) {
+    const reset = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/reset_race_numbers`, {
+      method: 'POST',
+      headers: supabaseHeaders(env),
+      body: '{}'
+    }).catch(() => null);
+    sequenceReset = Boolean(reset && reset.ok);
+  }
+
+  return json({ ok: true, scope, cleared: Object.keys(cleared), sequenceReset }, 200, cors);
 }
 
 /* ============================================================================
@@ -1725,6 +1985,8 @@ export default {
       if (type === 'inbox') return inbox(env, payload, cors);
       if (type === 'settings') return settingsRead(env, cors);
       if (type === 'settings-admin') return settingsAdmin(env, payload, cors);
+      if (type === 'reminders-due') return remindersDue(env, payload, cors);
+      if (type === 'purge') return purge(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 

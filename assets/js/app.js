@@ -3220,9 +3220,35 @@ import { flagSvg } from './flags.js';
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(measure);
     };
+
+    /**
+     * Re-measure on resize, but not on a phone's address bar.
+     *
+     * Scrolling on a mobile browser hides and shows the URL bar, and every one of those
+     * fires `resize` with a viewport 60 to 100 px shorter or taller. That re-ran the
+     * measurement mid-scroll, and a section sitting near the boundary flipped between
+     * `pinned` (position: sticky) and `flow` (position: relative) — which changes its
+     * layout, moves everything below it, and yanks the page under your thumb. That is the
+     * "scrolling jumps and goes backwards" this section is responsible for.
+     *
+     * Width is the honest trigger: it changes when the window is actually resized or the
+     * phone is turned, and not when the browser chrome slides. Orientation is listened
+     * for separately because on some devices it lands before the new width is readable.
+     */
+    let lastWidth = window.innerWidth;
+    const onResize = () => {
+      const width = window.innerWidth;
+      if (width === lastWidth) return;
+      lastWidth = width;
+      schedule();
+    };
+
     measure();
-    window.addEventListener('resize', schedule, { passive: true });
-    window.addEventListener('orientationchange', schedule, { passive: true });
+    window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('orientationchange', () => {
+      lastWidth = window.innerWidth;
+      schedule();
+    }, { passive: true });
     window.addEventListener('carruleddhi:language', schedule);
     if (document.fonts?.ready) document.fonts.ready.then(schedule).catch(() => {});
   }
@@ -3749,10 +3775,40 @@ import { flagSvg } from './flags.js';
     }
   });
 
+  /**
+   * Gives every panel a z-index from its real position in the page.
+   *
+   * The sections are sticky and pinned at the top, so each one has to paint over the one
+   * before it. That is a written-out ladder in experience.css, and a written-out ladder
+   * can run out — it did, at eleven, and #contact is the twelfth section. It got
+   * `z-index: auto`, which on a sticky element puts it below anything with a number, so
+   * #faq and #wall painted over it. The section was there: laid out, announced, reachable
+   * by its anchor, and completely invisible.
+   *
+   * This makes the position the source of the number, so adding a section is adding a
+   * section and not also remembering to add a line of CSS. The CSS ladder stays as the
+   * no-JavaScript fallback.
+   *
+   * Runs before everything else, because a panel in the wrong layer is not a detail that
+   * can wait for the rest of the page to finish.
+   */
+  function setupPanelDepth() {
+    const panels = $$('#main > section');
+    panels.forEach((section, index) => {
+      section.style.zIndex = String(index + 1);
+    });
+    /* And the footer above all of them. Its stylesheet value has to be a fixed number,
+       so it can only ever be above a fixed number of panels; derived from the real count
+       it cannot be wrong. */
+    const footer = $('.site-footer');
+    if (footer) footer.style.zIndex = String(panels.length + 10);
+  }
+
   function initialize() {
     // The intro overlay goes first and is released independently, so a failure
     // further down can never leave the page hidden behind it.
     const steps = [
+      ['panelDepth', setupPanelDepth],
       ['language', setupLanguage],
       ['preloader', setupPreloader],
       ['reveal', setupReveal],

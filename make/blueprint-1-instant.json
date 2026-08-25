@@ -718,6 +718,66 @@
                   "y": 60
                 }
               }
+            },
+            {
+              "id": 30,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "parameters": {
+                "handleErrors": false,
+                "useNewZLibDeCompress": true
+              },
+              "filter": {
+                "name": "whatsapp — Santa Teresa",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.type}}",
+                      "b": "registration",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "url": "https://api.callmebot.com/whatsapp.php",
+                "method": "get",
+                "headers": [],
+                "qs": [
+                  {
+                    "name": "phone",
+                    "value": "393284981574"
+                  },
+                  {
+                    "name": "apikey",
+                    "value": "3364881"
+                  },
+                  {
+                    "name": "text",
+                    "value": "🏁 *CARRULEDDHI SHOW 2026*\nNuova iscrizione ricevuta\n\n🔢 Numero di partenza: *{{1.raceNumber}}*\n👤 {{1.firstName}} {{1.lastName}}\n🛞 Carruleddhu: {{1.cartName}}\n🏷️ Categoria: {{upper(1.category)}}\n🌍 Lingua: {{upper(1.loc)}}\n📞 {{1.phone}}\n✉️ {{lower(1.email)}}{{if(1.isMinor; \"\n\n⚠️ *MINORENNE* — \" + 1.riderAge + \" anni\n✍️ Chi firma: \" + 1.guardianName + \"\n📧 \" + lower(1.guardianEmail) + \"\n📱 \" + 1.guardianPhone; \"\")}}"
+                  }
+                ],
+                "bodyType": null,
+                "parseResponse": false,
+                "serializeUrl": false,
+                "shareCookies": false,
+                "ca": null,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "followAllRedirects": false,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "authUser": "",
+                "authPass": "",
+                "timeout": null
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": 190
+                }
+              }
             }
           ]
         },

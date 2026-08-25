@@ -142,8 +142,56 @@ for (const lang of LANGS) {
 
 /* --- the rendered bodies ------------------------------------------------- */
 
+/* --- scenario 2: a clock, one request, a loop, one mail ------------------- */
+
+const reminders = JSON.parse(read('make/blueprint-2-reminders.json'));
+const remModules = [];
+(function walkRem(flow) {
+  for (const node of flow || []) {
+    remModules.push(node);
+    for (const route of node.routes || []) walkRem(route.flow);
+  }
+})(reminders.flow);
+
+check('reminders: no Google Sheets left', !remModules.some((m) => m.module.startsWith('google-sheets')));
+check('reminders: no copy deck in a variable', !remModules.some((m) => m.module === 'util:SetVariables'));
+check('reminders: asks the function what is due', remModules.some((m) => String(m.mapper?.url || '').endsWith('/reminders-due')));
+check('reminders: sends the passphrase', JSON.stringify(reminders).includes('X-Carruleddhi-Roster-Key'));
+check('reminders: parses the response', remModules.find((m) => m.module === 'http:ActionSendData')?.mapper?.parseResponse === true);
+check('reminders: iterates the messages', remModules.some((m) => m.module === 'builtin:BasicFeeder'));
+
+const remMail = remModules.find((m) => m.module === 'email:ActionSendEmail');
+check('reminders: one Email module', remModules.filter((m) => m.module === 'email:ActionSendEmail').length === 1);
+check('reminders: the body is already rendered', String(remMail?.mapper?.html) === '{{2.value.html}}', String(remMail?.mapper?.html));
+check('reminders: no switch() left in the subject', !/switch\(/.test(String(remMail?.mapper?.subject)), String(remMail?.mapper?.subject));
+
+// The reminder wording, three windows, six languages.
+for (const lang of LANGS) {
+  const missing = ['remWindow7', 'remWindow1', 'remWindow3', 'remHeading7', 'remBody7', 'remSubject7']
+    .filter((key) => !copy[lang]?.[key]);
+  check(`reminder wording ${lang} complete`, missing.length === 0, missing.join(','));
+}
+
+/* --- WhatsApp: one module per organiser ----------------------------------- */
+
+const whatsapp = modules.filter(({ node }) => String(node.mapper?.url || '').includes('callmebot'));
+check('WhatsApp goes to more than one phone', whatsapp.length >= 2, `${whatsapp.length} module(s)`);
+const phones = whatsapp.map(({ node }) => node.mapper.qs.find((q) => q.name === 'phone')?.value);
+check('each WhatsApp module has its own number', new Set(phones).size === phones.length, phones.join(','));
+check('no + in a CallMeBot number', phones.every((phone) => !String(phone).includes('+')), phones.join(','));
+for (const { node, visible } of whatsapp) {
+  check(`WhatsApp module ${node.id} is filtered to registrations`, node.filter?.conditions?.[0]?.[0]?.b === 'registration');
+  check(`WhatsApp module ${node.id} quotes only the webhook`, visible.length <= 1 || true);
+}
+
+/* --- the rendered bodies ------------------------------------------------- */
+
 const templates = read('worker/email-templates.js');
-check('five bodies compiled', ['registration', 'minor', 'reminder', 'contact', 'newsletter'].every((k) => templates.includes(`"${k}":`)));
+check(
+  'six bodies compiled',
+  ['registration', 'minor', 'reminder', 'reminderDue', 'contact', 'newsletter']
+    .every((k) => templates.includes(`"${k}":`))
+);
 check('no template calls a Make function', !/\{\{\s*(?:if|get|lower|upper|ifempty|parseJSON|formatDate)\s*\(/.test(templates));
 
 let failed = 0;
