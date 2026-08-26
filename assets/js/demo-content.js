@@ -1,0 +1,88 @@
+/**
+ * Placeholder sponsors and comments, for looking at the design before the real ones exist.
+ *
+ * HOW IT IS TURNED ON
+ *   `?demo=1` in the address. Nothing else — no database row, no build flag, no switch that
+ *   somebody could leave on. Close the tab and it is gone.
+ *
+ * WHY IT IS A URL AND NOT A SETTING
+ *   The standing instruction on this project is that every number on the page is real: no
+ *   inflated counters, no seeded lists. A persisted "show demo content" switch is one
+ *   forgotten click away from a live site showing invented reviews of a race that has not
+ *   happened, and nobody would notice, because invented reviews look exactly like real
+ *   ones. A query parameter cannot be forgotten, because it is not stored.
+ *
+ * AND IT SAYS SO ON SCREEN
+ *   Demo mode paints a fixed banner across the top and marks every tile it produced. Not
+ *   politeness — it is the difference between a preview and a lie. If a screenshot of this
+ *   ever leaves your machine, the word DEMO is in it.
+ *
+ * The sponsor logos are the four SVGs already in public/assets/images/sponsors/, so this
+ * file adds no assets and nothing to download.
+ */
+
+export const DEMO_SPONSORS = [
+  { name: 'Cantina Gallura', url: 'https://example.com', image: '/assets/images/sponsors/demo-1.svg' },
+  { name: 'Rena Bianca Café', url: 'https://example.com', image: '/assets/images/sponsors/demo-2.svg' },
+  { name: 'Officina Sarda', url: '', image: '/assets/images/sponsors/demo-3.svg' },
+  { name: 'Hotel Capo Testa', url: 'https://example.com', image: '/assets/images/sponsors/demo-4.svg' }
+];
+
+/**
+ * Nine comments, chosen to exercise the layout rather than to flatter it.
+ *
+ * A one-line message next to a five-line one, a name with no place, a five-star and a
+ * three-star, three languages, and one message long enough to wrap four times. A demo made
+ * of nine identical two-line entries proves the tile renders and nothing else — the useful
+ * question is what the column looks like when the contents are uneven, because that is what
+ * real ones are like.
+ *
+ * `createdAt` is generated relative to now, so the "2 days ago" line is always sensible and
+ * the newest/oldest sort has something to sort.
+ */
+const RAW_COMMENTS = [
+  { name: 'Marco', place: 'Santa Teresa Gallura', rating: 5, locale: 'it', hoursAgo: 3,
+    message: 'Che discesa. Mio nonno costruiva carruleddhi negli anni sessanta e non pensavo di rivederli scendere per la Rena Bianca. Grazie a chi ha rimesso in piedi tutto questo.' },
+  { name: 'Ania', place: 'Kraków', rating: 5, locale: 'pl', hoursAgo: 9,
+    message: 'Przyjechaliśmy przypadkiem i został nam cały dzień w pamięci. Dzieciaki do dziś rysują wózki.' },
+  { name: 'Giulia', place: '', rating: 4, locale: 'it', hoursAgo: 22,
+    message: 'Il nostro carretto si chiama Fulmine. Non vinceremo, ma arriveremo in fondo.' },
+  { name: 'Hans', place: 'München', rating: 5, locale: 'de', hoursAgo: 30,
+    message: 'Wir kommen wieder. Bringt Helme mit, sie prüfen das wirklich.' },
+  { name: 'Salvatore', place: 'Olbia', rating: 5, locale: 'it', hoursAgo: 48,
+    message: 'Tre generazioni sulla stessa strada. Mio padre spingeva, io frenavo, adesso guarda mio figlio.' },
+  { name: 'Claire', place: 'Lyon', rating: 4, locale: 'fr', hoursAgo: 55,
+    message: 'Ambiance incroyable, et tout le village dans la rue.' },
+  { name: 'Piotr', place: 'Gdańsk', rating: 3, locale: 'pl', hoursAgo: 72,
+    message: 'Świetna impreza, ale przy starcie było ciasno i nie wszystko było słychać. Może więcej głośników po zakręcie?' },
+  { name: 'Elena', place: 'Sassari', rating: 5, locale: 'it', hoursAgo: 96,
+    message: 'La categoria artistica è la mia preferita. Un carretto vestito da tonno, giuro.' },
+  { name: 'Tom', place: 'Bristol', rating: 5, locale: 'en', hoursAgo: 120,
+    message: 'No engines, no sponsors on the carts, no entry fee. Somehow the best race I have seen.' }
+];
+
+export function demoComments() {
+  const now = Date.now();
+  return RAW_COMMENTS.map((comment, index) => ({
+    id: `demo-${index}`,
+    createdAt: new Date(now - comment.hoursAgo * 3600000).toISOString(),
+    name: comment.name,
+    place: comment.place,
+    message: comment.message,
+    locale: comment.locale,
+    rating: comment.rating,
+    approved: true,
+    // No photos. A demo photo would have to come from somewhere, and a stock beach picture
+    // pretending to be somebody's carruleddhu is the one kind of placeholder that misleads
+    // rather than illustrates.
+    photo: '',
+    demo: true
+  }));
+}
+
+/** The average and the count, computed rather than written down, so they always agree. */
+export function demoRating() {
+  const comments = RAW_COMMENTS.filter((comment) => comment.rating);
+  const sum = comments.reduce((total, comment) => total + comment.rating, 0);
+  return { average: sum / comments.length, votes: comments.length };
+}

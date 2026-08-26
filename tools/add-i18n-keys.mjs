@@ -24,8 +24,18 @@ let source = readFileSync(file, 'utf8');
    so the new "too late" line reads next to them in the file as well as on the page. */
 const ANCHOR = 'modal.time3';
 
+const WALL_SORT = {
+  it: { 'wall.sortNew': 'Più recenti', 'wall.sortBest': 'Meglio votati', 'wall.sortOld': 'Più vecchi' },
+  pl: { 'wall.sortNew': 'Najnowsze', 'wall.sortBest': 'Najlepiej ocenione', 'wall.sortOld': 'Najstarsze' },
+  en: { 'wall.sortNew': 'Newest', 'wall.sortBest': 'Best rated', 'wall.sortOld': 'Oldest' },
+  de: { 'wall.sortNew': 'Neueste', 'wall.sortBest': 'Beste Bewertung', 'wall.sortOld': 'Älteste' },
+  es: { 'wall.sortNew': 'Más recientes', 'wall.sortBest': 'Mejor valorados', 'wall.sortOld': 'Más antiguos' },
+  fr: { 'wall.sortNew': 'Plus récents', 'wall.sortBest': 'Mieux notés', 'wall.sortOld': 'Plus anciens' }
+};
+
 const CHAT_UI = {
   it: {
+    ...WALL_SORT.it,
     'contact.tabForm': 'Messaggio veloce',
     'contact.tabChat': 'Chat dal vivo',
     'chat.greeting': 'Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori.',
@@ -46,6 +56,7 @@ const CHAT_UI = {
     'chat.askCancel': 'Voglio ritirarmi dalla gara'
   },
   pl: {
+    ...WALL_SORT.pl,
     'contact.tabForm': 'Szybka wiadomość',
     'contact.tabChat': 'Czat na żywo',
     'chat.greeting': 'Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom.',
@@ -66,6 +77,7 @@ const CHAT_UI = {
     'chat.askCancel': 'Chcę zrezygnować z wyścigu'
   },
   en: {
+    ...WALL_SORT.en,
     'contact.tabForm': 'Quick message',
     'contact.tabChat': 'Live chat',
     'chat.greeting': 'Hello! Ask me anything about the race. What I do not know, I pass to the organisers.',
@@ -86,6 +98,7 @@ const CHAT_UI = {
     'chat.askCancel': 'I want to withdraw from the race'
   },
   de: {
+    ...WALL_SORT.de,
     'contact.tabForm': 'Kurze Nachricht',
     'contact.tabChat': 'Live-Chat',
     'chat.greeting': 'Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter.',
@@ -106,6 +119,7 @@ const CHAT_UI = {
     'chat.askCancel': 'Ich möchte vom Rennen zurücktreten'
   },
   es: {
+    ...WALL_SORT.es,
     'contact.tabForm': 'Mensaje rápido',
     'contact.tabChat': 'Chat en directo',
     'chat.greeting': '¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores.',
@@ -126,6 +140,7 @@ const CHAT_UI = {
     'chat.askCancel': 'Quiero retirarme de la carrera'
   },
   fr: {
+    ...WALL_SORT.fr,
     'contact.tabForm': 'Message rapide',
     'contact.tabChat': 'Chat en direct',
     'chat.greeting': 'Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs.',

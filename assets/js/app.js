@@ -1,4 +1,5 @@
 import { DEFAULT_SITE_CONFIG, getPublicSiteConfig } from './site-config.js';
+import { DEMO_SPONSORS, demoComments, demoRating } from './demo-content.js';
 import { ROUTE_VIEWBOX, buildDashPathData, buildRoutePathData } from './route-path.js';
 import { flagSvg } from './flags.js';
 
@@ -11,6 +12,31 @@ import { flagSvg } from './flags.js';
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const finePointer = window.matchMedia('(pointer: fine)').matches;
   const config = getPublicSiteConfig();
+
+  /**
+   * Demo mode: `?demo=1`.
+   *
+   * Fills the sponsor band and the comment wall with placeholders so the design can be
+   * judged before the real ones exist. Read from the address and stored nowhere, because the
+   * standing rule here is that every number on the page is real — and a persisted "show
+   * demo content" switch is one forgotten click away from a live site showing invented
+   * reviews of a race that has not happened yet. See assets/js/demo-content.js.
+   */
+  const demoMode = new URLSearchParams(window.location.search).get('demo') === '1';
+
+  /* Said on screen, not just in a comment.
+     If a screenshot of a preview ever leaves this machine, the word DEMO is in it. Built in
+     JavaScript rather than written into index.html so it cannot possibly appear without the
+     query parameter that put it there. */
+  if (demoMode) {
+    document.documentElement.classList.add('is-demo');
+    const banner = document.createElement('div');
+    banner.className = 'demo-banner';
+    banner.setAttribute('role', 'status');
+    banner.textContent = 'DEMO — sponsorzy i komentarze są przykładowe / sponsor e commenti sono di esempio';
+    document.addEventListener('DOMContentLoaded', () => document.body.prepend(banner), { once: true });
+    if (document.readyState !== 'loading') document.body?.prepend(banner);
+  }
   window.CARRULEDDHI_ACTIVE_CONFIG = config;
 
   const storage = {
@@ -1444,7 +1470,9 @@ import { flagSvg } from './flags.js';
     const messageField = form?.elements.namedItem('message');
     const endpoint = config.endpoints.wall || '';
 
-    if (!endpoint) {
+    /* Demo mode keeps the section on the page even with no endpoint configured — the whole
+       point is to look at it before anything is wired up. */
+    if (!endpoint && !demoMode) {
       section.hidden = true;
       section.dataset.wallState = 'no-endpoint';
       return;
@@ -1797,8 +1825,58 @@ import { flagSvg } from './flags.js';
       list.setAttribute('aria-busy', 'false');
     }
 
+    /* --- sorting -------------------------------------------------------------
+       Done here rather than in the query. The endpoint returns the newest twelve and
+       paginates by timestamp, so "highest rated first" cannot be a server sort without
+       either fetching everything or a second index and a second code path. Sorting what is
+       already on screen is honest about what it does — it reorders the loaded comments, and
+       "load more" keeps adding older ones underneath. */
+    let sortMode = 'new';
+    let loaded = [];
+
+    const sorters = {
+      new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)),
+      old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)),
+      best: (a, b) => (b.rating || 0) - (a.rating || 0)
+        // A tie on stars falls back to newest, so the order is stable and not accidental.
+        || String(b.createdAt).localeCompare(String(a.createdAt))
+    };
+
+    function repaint() {
+      render([...loaded].sort(sorters[sortMode] || sorters.new), false);
+      /* The sort controls only earn their space once there is something to sort. Revealed
+         here rather than after the fetch, so demo mode — which never fetches — gets them
+         too, and there is one place that decides it instead of two. */
+      const bar = $('[data-wall-sortbar]', section);
+      if (bar) bar.hidden = loaded.length < 3;
+    }
+
+    $$('[data-wall-sort]', section).forEach((button) => {
+      button.addEventListener('click', () => {
+        sortMode = button.dataset.wallSort;
+        $$('[data-wall-sort]', section).forEach((other) => {
+          const active = other === button;
+          other.classList.toggle('is-active', active);
+          other.setAttribute('aria-pressed', String(active));
+        });
+        repaint();
+      });
+    });
+
     async function load(append = false) {
       if (loading) return;
+
+      /* Demo mode answers locally. Not a mock of the endpoint — the same render() and the
+         same score bar, given a fixed list, so what you are looking at is the real layout
+         with placeholder words in it. */
+      if (demoMode) {
+        loaded = demoComments();
+        repaint();
+        paintScore(demoRating());
+        if (more) more.hidden = true;
+        return;
+      }
+
       loading = true;
       const result = await ask({
         type: 'wall',
@@ -1815,7 +1893,9 @@ import { flagSvg } from './flags.js';
         }
         return;
       }
-      render(result.comments, append);
+      // Kept so the sort buttons have something to reorder without asking again.
+      loaded = append ? [...loaded, ...result.comments] : result.comments;
+      repaint();
       paintScore(result.rating);
       if (result.comments.length) oldest = result.comments[result.comments.length - 1].createdAt;
       if (more) more.hidden = !result.hasMore;
@@ -1875,17 +1955,31 @@ import { flagSvg } from './flags.js';
       }
     });
 
-    // Loaded when the section gets close, not at startup: nobody needs a database
-    // round trip to read the hero.
+    /* Loaded when the section gets close, not at startup: nobody needs a database round
+       trip to read the hero.
+       The timer is not padding. The same pattern in the text effects turned out to leave
+       six headings invisible because the observer callback never ran, and here the failure
+       is a comment wall that is permanently empty while the endpoint is fine. Whichever
+       comes first wins, and `once` makes sure only one of them loads. */
+    let started = false;
+    const once = () => {
+      if (started) return;
+      started = true;
+      load(false);
+    };
+
     if ('IntersectionObserver' in window) {
       const observer = new IntersectionObserver((entries) => {
         if (!entries.some((entry) => entry.isIntersecting)) return;
         observer.disconnect();
-        load(false);
+        once();
       }, { rootMargin: '600px 0px' });
       observer.observe(section);
+      // Six seconds is longer than any scroll down to this section and short enough that a
+      // starved observer costs a late list rather than no list.
+      window.setTimeout(once, 6000);
     } else {
-      load(false);
+      once();
     }
   }
 
@@ -3371,7 +3465,10 @@ import { flagSvg } from './flags.js';
     const hero = $('.section-card--hero');
     if (!band || !track) return;
 
-    const sponsors = Array.isArray(config.sponsors) ? config.sponsors : [];
+    /* Demo placeholders only when there is nothing real to show. A demo that hides the
+       sponsor you actually added would be worse than no demo. */
+    const configured = Array.isArray(config.sponsors) ? config.sponsors : [];
+    const sponsors = demoMode && configured.length === 0 ? DEMO_SPONSORS : configured;
     track.replaceChildren();
 
     if (!sponsors.length) {

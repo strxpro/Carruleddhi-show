@@ -1,0 +1,84 @@
+/* ============================================================================
+   Demo mode and the comment sort bar
+   ============================================================================
+   Two things that only exist for looking at: the banner that says the content is
+   placeholder, and the three buttons above the comment column.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------ banner */
+.demo-banner {
+  position: fixed;
+  z-index: 2000;
+  top: 0;
+  right: 0;
+  left: 0;
+  padding: 7px 14px;
+  /* Hazard stripes. Unmistakable, and unmistakably not part of the design — which is the
+     job: this must never read as a decorative ribbon somebody put there on purpose. */
+  background: repeating-linear-gradient(135deg, #ffc928 0 14px, #071a3d 14px 28px);
+  color: #fff;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.85);
+  pointer-events: none;
+}
+
+/* The banner covers the top of the viewport, and the header is sticky under it. */
+html.is-demo .site-header { top: 30px; }
+
+/* Every tile the demo produced carries a corner mark, so a cropped screenshot of one
+   comment still says what it is. */
+html.is-demo .wall-note::after {
+  content: 'DEMO';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgb(7 26 61 / 0.28);
+}
+
+html.is-demo .wall-note { position: relative; }
+
+/* ---------------------------------------------------------------- sort bar */
+.wall-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.wall-sort__btn {
+  padding: 7px 14px;
+  border: 1.5px solid rgb(255 255 255 / 0.22);
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.72);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.wall-sort__btn:hover { border-color: #fff; color: #fff; }
+
+.wall-sort__btn.is-active {
+  border-color: #ffc928;
+  background: #ffc928;
+  color: #071a3d;
+}
+
+.wall-sort__btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-sort__btn { transition: none; }
+}

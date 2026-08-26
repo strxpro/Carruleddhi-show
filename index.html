@@ -986,6 +986,17 @@
         </div>
 
         <div class="wall-board reveal" data-delay="1">
+          <!-- Hidden until there are at least three comments: three buttons above two
+               messages is furniture with nothing to do. app.js reveals it. -->
+          <div class="wall-sort" data-wall-sortbar hidden>
+            <button class="wall-sort__btn is-active" type="button" aria-pressed="true"
+                    data-wall-sort="new" data-i18n="wall.sortNew">Più recenti</button>
+            <button class="wall-sort__btn" type="button" aria-pressed="false"
+                    data-wall-sort="best" data-i18n="wall.sortBest">Meglio votati</button>
+            <button class="wall-sort__btn" type="button" aria-pressed="false"
+                    data-wall-sort="old" data-i18n="wall.sortOld">Più vecchi</button>
+          </div>
+
           <div class="wall-score" data-wall-score hidden>
             <b data-wall-score-value>0,0</b>
             <span class="wall-score__stars" data-wall-score-stars aria-hidden="true"></span>
