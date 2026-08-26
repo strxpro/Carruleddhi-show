@@ -111,7 +111,15 @@ export const COPY_DECK = {
     "unsubCodeTitle": "Ecco il codice",
     "unsubCodeLead": "Inseriscilo sul sito per disattivare gli avvisi. Vale 15 minuti.",
     "unsubCodeNote": "Se non hai chiesto tu questo codice, ignora il messaggio: non cambia nulla.",
-    "unsubDone": "Fatto. Non ti scriveremo più."
+    "unsubDone": "Fatto. Non ti scriveremo più.",
+    "faqWho": "Può partecipare chi ha compiuto 18 anni, con modulo firmato e documento. I minorenni corrono con la liberatoria di un genitore o tutore.",
+    "faqCost": "Niente: l’iscrizione è completamente gratuita.",
+    "faqEngine": "No. Nessun motore e nessuna propulsione: si scende soltanto per gravità.",
+    "faqHelmet": "Sì, il casco omologato è obbligatorio. Senza casco non si parte.",
+    "faqNumber": "Il numero di partenza compare subito dopo l’iscrizione e arriva anche per e-mail, insieme al modulo in PDF.",
+    "faqWhen": "17 ottobre 2026, Discesa Rena Bianca a Santa Teresa Gallura. Presentazione alle 12:00, partenza alle 14:30.",
+    "chatHandover": "Questa la passo agli organizzatori: ti rispondono qui, in questa chat. Se preferisci, lascia la tua e-mail.",
+    "chatGreeting": "Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -213,7 +221,15 @@ export const COPY_DECK = {
     "unsubCodeTitle": "Oto kod",
     "unsubCodeLead": "Wpisz go na stronie, żeby wyłączyć powiadomienia. Jest ważny 15 minut.",
     "unsubCodeNote": "Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — nic się nie zmieni.",
-    "unsubDone": "Gotowe. Nie będziemy już pisać."
+    "unsubDone": "Gotowe. Nie będziemy już pisać.",
+    "faqWho": "Startować może każdy, kto ma ukończone 18 lat, z podpisanym formularzem i dokumentem. Osoby niepełnoletnie — za pisemną zgodą rodzica lub opiekuna.",
+    "faqCost": "Nic. Zapisy są całkowicie bezpłatne.",
+    "faqEngine": "Nie. Żadnego silnika ani napędu — zjeżdża się wyłącznie siłą grawitacji.",
+    "faqHelmet": "Tak, atestowany kask jest obowiązkowy. Bez kasku nie ma startu.",
+    "faqNumber": "Numer startowy pokazuje się od razu po zapisaniu i przychodzi też mailem, razem z formularzem w PDF.",
+    "faqWhen": "17 października 2026, zjazd Rena Bianca w Santa Teresa Gallura. Prezentacja o 12:00, start o 14:30.",
+    "chatHandover": "Przekazuję to organizatorom — odpiszą tutaj, w tym czacie. Jeśli chcesz, zostaw swój e-mail.",
+    "chatGreeting": "Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -315,7 +331,15 @@ export const COPY_DECK = {
     "unsubCodeTitle": "Here is the code",
     "unsubCodeLead": "Enter it on the website to switch the reminders off. It lasts 15 minutes.",
     "unsubCodeNote": "If you did not ask for this code, ignore this message — nothing changes.",
-    "unsubDone": "Done. We will not write again."
+    "unsubDone": "Done. We will not write again.",
+    "faqWho": "Anyone aged 18 or over, with a signed form and an ID document. Riders under 18 take part with a waiver signed by a parent or guardian.",
+    "faqCost": "Nothing. Entry is completely free.",
+    "faqEngine": "No. No engine and no propulsion of any kind — the descent is gravity only.",
+    "faqHelmet": "Yes, an approved helmet is compulsory. No helmet, no start.",
+    "faqNumber": "Your start number appears as soon as you have entered, and arrives by e-mail too, with the form as a PDF.",
+    "faqWhen": "17 October 2026, the Rena Bianca descent in Santa Teresa Gallura. Presentation at 12:00, start at 14:30.",
+    "chatHandover": "I am passing this to the organisers — they will answer here, in this chat. Leave your e-mail if you prefer.",
+    "chatGreeting": "Hello! Ask me anything about the race. What I do not know, I pass to the organisers."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -417,7 +441,15 @@ export const COPY_DECK = {
     "unsubCodeTitle": "Hier ist der Code",
     "unsubCodeLead": "Gib ihn auf der Website ein, um die Erinnerungen abzuschalten. Er gilt 15 Minuten.",
     "unsubCodeNote": "Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — es ändert sich nichts.",
-    "unsubDone": "Erledigt. Wir schreiben nicht mehr."
+    "unsubDone": "Erledigt. Wir schreiben nicht mehr.",
+    "faqWho": "Teilnehmen kann, wer 18 Jahre alt ist, mit unterschriebenem Formular und Ausweis. Minderjährige fahren mit der Einverständniserklärung eines Elternteils oder Vormunds.",
+    "faqCost": "Nichts. Die Anmeldung ist völlig kostenlos.",
+    "faqEngine": "Nein. Kein Motor und kein Antrieb — es geht ausschließlich mit der Schwerkraft bergab.",
+    "faqHelmet": "Ja, ein zugelassener Helm ist Pflicht. Ohne Helm kein Start.",
+    "faqNumber": "Die Startnummer erscheint direkt nach der Anmeldung und kommt zusätzlich per E-Mail, mit dem Formular als PDF.",
+    "faqWhen": "17. Oktober 2026, Abfahrt Rena Bianca in Santa Teresa Gallura. Vorstellung um 12:00, Start um 14:30.",
+    "chatHandover": "Ich gebe das an die Organisatoren weiter — sie antworten hier im Chat. Wenn du magst, lass deine E-Mail da.",
+    "chatGreeting": "Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -519,7 +551,15 @@ export const COPY_DECK = {
     "unsubCodeTitle": "Aquí tienes el código",
     "unsubCodeLead": "Escríbelo en la web para desactivar los avisos. Vale 15 minutos.",
     "unsubCodeNote": "Si no has pedido este código, ignora el mensaje: no cambia nada.",
-    "unsubDone": "Hecho. No volveremos a escribir."
+    "unsubDone": "Hecho. No volveremos a escribir.",
+    "faqWho": "Puede participar quien tenga 18 años cumplidos, con el formulario firmado y un documento. Los menores corren con la autorización de un padre, madre o tutor.",
+    "faqCost": "Nada. La inscripción es completamente gratuita.",
+    "faqEngine": "No. Ningún motor ni propulsión: se baja solo por gravedad.",
+    "faqHelmet": "Sí, el casco homologado es obligatorio. Sin casco no se sale.",
+    "faqNumber": "El número de salida aparece justo después de inscribirse y llega también por correo, con el formulario en PDF.",
+    "faqWhen": "17 de octubre de 2026, bajada Rena Bianca en Santa Teresa Gallura. Presentación a las 12:00, salida a las 14:30.",
+    "chatHandover": "Paso esto a los organizadores: te responden aquí, en este chat. Si quieres, deja tu correo.",
+    "chatGreeting": "¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -621,6 +661,14 @@ export const COPY_DECK = {
     "unsubCodeTitle": "Voici le code",
     "unsubCodeLead": "Saisissez-le sur le site pour désactiver les rappels. Il est valable 15 minutes.",
     "unsubCodeNote": "Si vous n’avez pas demandé ce code, ignorez ce message : rien ne change.",
-    "unsubDone": "C’est fait. Nous n’écrirons plus."
+    "unsubDone": "C’est fait. Nous n’écrirons plus.",
+    "faqWho": "Peut participer toute personne de 18 ans révolus, avec le formulaire signé et une pièce d’identité. Les mineurs courent avec l’autorisation d’un parent ou d’un tuteur.",
+    "faqCost": "Rien. L’inscription est entièrement gratuite.",
+    "faqEngine": "Non. Aucun moteur ni propulsion : la descente se fait uniquement par gravité.",
+    "faqHelmet": "Oui, le casque homologué est obligatoire. Sans casque, pas de départ.",
+    "faqNumber": "Le numéro de départ apparaît juste après l’inscription et arrive aussi par e-mail, avec le formulaire en PDF.",
+    "faqWhen": "17 octobre 2026, descente Rena Bianca à Santa Teresa Gallura. Présentation à 12:00, départ à 14:30.",
+    "chatHandover": "Je transmets cela aux organisateurs — ils répondront ici, dans ce chat. Laissez votre e-mail si vous préférez.",
+    "chatGreeting": "Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs."
   }
 };

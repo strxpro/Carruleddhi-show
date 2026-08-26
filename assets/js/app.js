@@ -4032,6 +4032,249 @@ import { flagSvg } from './flags.js';
     });
   }
 
+  /* ==========================================================================
+     Live chat, visitor side
+     ==========================================================================
+     The backend has been finished for a while — threads, messages, the six automatic
+     answers, the handover to a person, and the organiser's half in the admin panel. This
+     is the part that was missing, so none of it could be reached.
+
+     WHAT ANSWERS WHAT
+       Six questions get asked constantly: who can enter, what it costs, whether an engine
+       is allowed, whether a helmet is needed, when and where, and how the start number
+       arrives. Those are answered from the copy deck without anybody being involved.
+       Everything else switches the thread to `human`, tells the visitor so, and lights the
+       bell in the admin panel. There is no guessing in between.
+
+     THE TOKEN IS THE BROWSER'S, NOT THE SERVER'S
+       Generated here and kept in localStorage. The server never mints one, because a
+       token handed back on request is a token anybody who omits theirs can be given —
+       and that is somebody else's conversation.
+
+     POLLING, NOT REALTIME
+       One request every four seconds while the panel is open and the tab is in front, and
+       nothing at all otherwise. Supabase Realtime would be fewer requests and one more
+       moving part with its own connection state; for a conversation where the other side
+       is a person typing on a phone, four seconds is indistinguishable from instant.
+     ======================================================================== */
+
+  const CHAT_TOKEN_KEY = 'carruleddhi.chatToken';
+  const CHAT_POLL_MS = 4000;
+
+  function chatToken() {
+    let token = storage.get(CHAT_TOKEN_KEY);
+    if (token && /^[A-Za-z0-9_-]{16,64}$/.test(token)) return token;
+    // 32 hex characters: inside the server's accepted range and generated where the
+    // randomness is real rather than from Math.random.
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    token = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+    storage.set(CHAT_TOKEN_KEY, token);
+    return token;
+  }
+
+  function setupChat() {
+    const panel = $('[data-chat]');
+    const tabs = $$('[data-contact-tab]');
+    if (!panel || !tabs.length) return;
+
+    const formPanel = $('[data-contact-panel="form"]');
+    const log = $('[data-chat-log]', panel);
+    const form = $('[data-chat-form]', panel);
+    const input = $('[data-chat-input]', panel);
+    const sendButton = $('[data-chat-send]', panel);
+    const endpoint = config.endpoints.chat || '/api/carruleddhi/chat';
+
+    const token = chatToken();
+    let opened = false;
+    let polling = 0;
+    let lastAt = '';
+    let mode = 'ai';
+    const seen = new Set();
+
+    /* ---------------------------------------------------------------- tabs */
+    const selectTab = (name) => {
+      tabs.forEach((tab) => {
+        const active = tab.dataset.contactTab === name;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      panel.hidden = name !== 'chat';
+      if (formPanel) formPanel.hidden = name !== 'form';
+      if (name === 'chat') {
+        openThread();
+        startPolling();
+        input?.focus();
+      } else {
+        stopPolling();
+      }
+    };
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => selectTab(tab.dataset.contactTab));
+    });
+
+    /* -------------------------------------------------------------- render */
+    const bubble = (author, body, pending) => {
+      const row = document.createElement('div');
+      row.className = `chat-msg chat-msg--${author}${pending ? ' is-pending' : ''}`;
+      const who = document.createElement('span');
+      who.className = 'chat-msg__who';
+      who.textContent = author === 'visitor'
+        ? (text('chat.you') || 'Ty')
+        : author === 'organiser'
+          ? (text('chat.them') || 'Organizator')
+          : (text('chat.bot') || 'Automat');
+      const said = document.createElement('p');
+      said.className = 'chat-msg__body';
+      // textContent, not innerHTML: this string came from a stranger, and the organiser's
+      // half came out of a database that a stranger can write to.
+      said.textContent = body;
+      row.append(who, said);
+      return row;
+    };
+
+    /* Scrolled to the bottom only when the reader was already there. Yanking somebody back
+       down while they are reading further up is the thing every chat gets wrong. */
+    const atBottom = () => !log || log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+    const toBottom = () => { if (log) log.scrollTop = log.scrollHeight; };
+
+    const append = (message, pending) => {
+      if (!log) return null;
+      if (message.id && seen.has(message.id)) return null;
+      if (message.id) seen.add(message.id);
+      const stick = atBottom();
+      const node = bubble(message.author, message.body, pending);
+      log.appendChild(node);
+      if (stick) toBottom();
+      if (message.at && message.at > lastAt) lastAt = message.at;
+      return node;
+    };
+
+    const note = (key) => {
+      if (!log) return;
+      const line = document.createElement('p');
+      line.className = 'chat__system';
+      line.textContent = text(key) || '';
+      log.appendChild(line);
+      toBottom();
+    };
+
+    /* ---------------------------------------------------------------- open */
+    async function openThread() {
+      if (opened) return;
+      opened = true;
+      try {
+        const result = await postJSON(endpoint, eventPayload('chat', { action: 'open', token }));
+        if (!result || result.ok === false) throw new Error(result?.code || 'chat');
+        mode = result.mode || 'ai';
+        (result.messages || []).forEach((message) => append(message, false));
+        // A thread with no history opens with a greeting rather than a blank box: an empty
+        // chat looks broken, and nobody types the first message into a void.
+        if (!(result.messages || []).length) {
+          append({ author: 'ai', body: text('chat.greeting') || '', at: '' }, false);
+        }
+        toBottom();
+      } catch (_) {
+        opened = false;
+        note('chat.offline');
+      }
+    }
+
+    /* ---------------------------------------------------------------- send */
+    async function send(body) {
+      const message = String(body || '').trim();
+      if (!message) return;
+
+      // Shown before the round trip, greyed until it lands. A chat that waits for the
+      // server before showing what you typed feels broken on a slow connection.
+      const pending = append({ author: 'visitor', body: message, at: '' }, true);
+      if (input) input.value = '';
+      sizeInput();
+      if (sendButton) sendButton.disabled = true;
+
+      try {
+        const result = await postJSON(endpoint, eventPayload('chat', {
+          action: 'send',
+          token,
+          message
+        }));
+        pending?.classList.remove('is-pending');
+        if (!result || result.ok === false) throw new Error(result?.code || 'chat');
+        mode = result.mode || mode;
+        if (result.reply) append({ author: mode === 'human' ? 'ai' : 'ai', body: result.reply, at: '' }, false);
+        if (mode === 'human') panel.dataset.chatMode = 'human';
+      } catch (_) {
+        pending?.classList.add('is-failed');
+        note('chat.sendFailed');
+      } finally {
+        if (sendButton) sendButton.disabled = false;
+      }
+    }
+
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      send(input?.value);
+    });
+
+    // Enter sends, Shift+Enter makes a new line. The other way round is how people end up
+    // sending half a sentence.
+    input?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        send(input.value);
+      }
+    });
+
+    /* The composer grows with the text instead of scrolling inside three lines. */
+    function sizeInput() {
+      if (!input) return;
+      input.style.height = 'auto';
+      input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    }
+    input?.addEventListener('input', sizeInput);
+
+    /* --------------------------------------------------------------- chips */
+    $$('[data-chat-ask]', panel).forEach((chip) => {
+      chip.addEventListener('click', () => {
+        /* Sent as if it had been typed. The label on the chip is the question, so the
+           answer arrives through the same path as any other message and there is no
+           second code path to keep in step with faqAnswer(). */
+        send(chip.textContent.trim());
+      });
+    });
+
+    /* --------------------------------------------------------------- poll */
+    function startPolling() {
+      if (polling) return;
+      polling = window.setInterval(async () => {
+        // Nothing to poll for behind a hidden tab or a closed panel.
+        if (document.hidden || panel.hidden) return;
+        try {
+          const result = await postJSON(endpoint, eventPayload('chat', {
+            action: 'poll',
+            token,
+            since: lastAt
+          }));
+          if (!result || result.ok === false) return;
+          mode = result.mode || mode;
+          (result.messages || []).forEach((message) => append(message, false));
+        } catch (_) {
+          /* A dropped poll is not worth telling anybody about; the next one retries. */
+        }
+      }, CHAT_POLL_MS);
+    }
+
+    function stopPolling() {
+      window.clearInterval(polling);
+      polling = 0;
+    }
+
+    /* Somebody arriving at #contact from the chat link in an e-mail wants the chat, not the
+       form. Also how the unsubscribe card hands over once that flow moves in here. */
+    if (/(?:^|[#&])chat\b/.test(window.location.hash)) selectTab('chat');
+  }
+
   function setupPanelDepth() {
     const panels = $$('#main > section');
     panels.forEach((section, index) => {
@@ -4080,6 +4323,7 @@ import { flagSvg } from './flags.js';
       ['footerYear', setupFooterYear],
       ['reminderWindows', setupReminderWindows],
       ['unsubscribe', setupUnsubscribe],
+      ['chat', setupChat],
       ['textEffects', setupTextEffects]
     ];
 

@@ -11,6 +11,7 @@
 @import './experience.css';
 @import './gallery-3d.css';
 @import './carnival.css';
+@import './chat.css';
 /* Last, so the effect rules win over a section's own heading styles. They only ever
    touch elements carrying a data-text-* attribute, so nothing else is affected. */
 @import './text-effects.css';

@@ -61,6 +61,10 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
     // Public wall. Both reading and writing go through this one path; the request
     // body carries `type: 'wall'` or `type: 'wall-post'`.
     wall: '',
+    /* Live chat, visitor side. Defaulted like `settings` rather than left blank: the
+       endpoint takes no configuration, and a blank one would mean the chat tab exists on
+       the page and answers nothing. */
+    chat: '/api/carruleddhi/chat',
     /* Read-only, and read once on load. Carries the sponsor list and the section
        switches the organiser set in the admin panel. Defaulted rather than left blank
        because unlike the others it takes no input and returns nothing private, so

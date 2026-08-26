@@ -7,7 +7,14 @@
  *
  *     node tools/add-copy-keys.mjs
  *
- * Idempotent: a key already present in a language is left alone.
+ * Idempotent: a key already present in a language is left alone, so it is safe to run
+ * after adding a new group below.
+ *
+ * STRUCTURE
+ *   One object per group of related strings, keyed by language, and GROUPS lists them.
+ *   Not one big table per language: a group is what gets added at a time, and keeping the
+ *   six translations of the same sentence next to each other is the only way to notice
+ *   that one of them says something different.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -17,10 +24,82 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const file = join(root, 'emails', 'copy.json');
 const deck = JSON.parse(readFileSync(file, 'utf8'));
 
-/* The unsubscribe flow: the small link at the foot of every letter, and the wording of the
-   e-mail carrying the code. %CODE% is substituted by the function, the same way %FIRSTNAME%
-   already is — the renderer does no substitution of its own. */
-const ADDITIONS = {
+/* ------------------------------------------------------------- the chat's answers
+   faqAnswer() in worker/index.js matches an unmistakable word — "casco", "helmet",
+   "kask" — and returns one of these. Without them it returned null for everything, so
+   every question went straight to a person: the automatic half of the chat existed in
+   code and had nothing to say.
+
+   Deliberately short and final. An answer that needs a second paragraph is an answer that
+   should have been a person. */
+const FAQ = {
+  it: {
+    faqWho: 'Può partecipare chi ha compiuto 18 anni, con modulo firmato e documento. I minorenni corrono con la liberatoria di un genitore o tutore.',
+    faqCost: 'Niente: l’iscrizione è completamente gratuita.',
+    faqEngine: 'No. Nessun motore e nessuna propulsione: si scende soltanto per gravità.',
+    faqHelmet: 'Sì, il casco omologato è obbligatorio. Senza casco non si parte.',
+    faqNumber: 'Il numero di partenza compare subito dopo l’iscrizione e arriva anche per e-mail, insieme al modulo in PDF.',
+    faqWhen: '17 ottobre 2026, Discesa Rena Bianca a Santa Teresa Gallura. Presentazione alle 12:00, partenza alle 14:30.',
+    chatHandover: 'Questa la passo agli organizzatori: ti rispondono qui, in questa chat. Se preferisci, lascia la tua e-mail.',
+    chatGreeting: 'Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori.'
+  },
+  pl: {
+    faqWho: 'Startować może każdy, kto ma ukończone 18 lat, z podpisanym formularzem i dokumentem. Osoby niepełnoletnie — za pisemną zgodą rodzica lub opiekuna.',
+    faqCost: 'Nic. Zapisy są całkowicie bezpłatne.',
+    faqEngine: 'Nie. Żadnego silnika ani napędu — zjeżdża się wyłącznie siłą grawitacji.',
+    faqHelmet: 'Tak, atestowany kask jest obowiązkowy. Bez kasku nie ma startu.',
+    faqNumber: 'Numer startowy pokazuje się od razu po zapisaniu i przychodzi też mailem, razem z formularzem w PDF.',
+    faqWhen: '17 października 2026, zjazd Rena Bianca w Santa Teresa Gallura. Prezentacja o 12:00, start o 14:30.',
+    chatHandover: 'Przekazuję to organizatorom — odpiszą tutaj, w tym czacie. Jeśli chcesz, zostaw swój e-mail.',
+    chatGreeting: 'Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom.'
+  },
+  en: {
+    faqWho: 'Anyone aged 18 or over, with a signed form and an ID document. Riders under 18 take part with a waiver signed by a parent or guardian.',
+    faqCost: 'Nothing. Entry is completely free.',
+    faqEngine: 'No. No engine and no propulsion of any kind — the descent is gravity only.',
+    faqHelmet: 'Yes, an approved helmet is compulsory. No helmet, no start.',
+    faqNumber: 'Your start number appears as soon as you have entered, and arrives by e-mail too, with the form as a PDF.',
+    faqWhen: '17 October 2026, the Rena Bianca descent in Santa Teresa Gallura. Presentation at 12:00, start at 14:30.',
+    chatHandover: 'I am passing this to the organisers — they will answer here, in this chat. Leave your e-mail if you prefer.',
+    chatGreeting: 'Hello! Ask me anything about the race. What I do not know, I pass to the organisers.'
+  },
+  de: {
+    faqWho: 'Teilnehmen kann, wer 18 Jahre alt ist, mit unterschriebenem Formular und Ausweis. Minderjährige fahren mit der Einverständniserklärung eines Elternteils oder Vormunds.',
+    faqCost: 'Nichts. Die Anmeldung ist völlig kostenlos.',
+    faqEngine: 'Nein. Kein Motor und kein Antrieb — es geht ausschließlich mit der Schwerkraft bergab.',
+    faqHelmet: 'Ja, ein zugelassener Helm ist Pflicht. Ohne Helm kein Start.',
+    faqNumber: 'Die Startnummer erscheint direkt nach der Anmeldung und kommt zusätzlich per E-Mail, mit dem Formular als PDF.',
+    faqWhen: '17. Oktober 2026, Abfahrt Rena Bianca in Santa Teresa Gallura. Vorstellung um 12:00, Start um 14:30.',
+    chatHandover: 'Ich gebe das an die Organisatoren weiter — sie antworten hier im Chat. Wenn du magst, lass deine E-Mail da.',
+    chatGreeting: 'Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter.'
+  },
+  es: {
+    faqWho: 'Puede participar quien tenga 18 años cumplidos, con el formulario firmado y un documento. Los menores corren con la autorización de un padre, madre o tutor.',
+    faqCost: 'Nada. La inscripción es completamente gratuita.',
+    faqEngine: 'No. Ningún motor ni propulsión: se baja solo por gravedad.',
+    faqHelmet: 'Sí, el casco homologado es obligatorio. Sin casco no se sale.',
+    faqNumber: 'El número de salida aparece justo después de inscribirse y llega también por correo, con el formulario en PDF.',
+    faqWhen: '17 de octubre de 2026, bajada Rena Bianca en Santa Teresa Gallura. Presentación a las 12:00, salida a las 14:30.',
+    chatHandover: 'Paso esto a los organizadores: te responden aquí, en este chat. Si quieres, deja tu correo.',
+    chatGreeting: '¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores.'
+  },
+  fr: {
+    faqWho: 'Peut participer toute personne de 18 ans révolus, avec le formulaire signé et une pièce d’identité. Les mineurs courent avec l’autorisation d’un parent ou d’un tuteur.',
+    faqCost: 'Rien. L’inscription est entièrement gratuite.',
+    faqEngine: 'Non. Aucun moteur ni propulsion : la descente se fait uniquement par gravité.',
+    faqHelmet: 'Oui, le casque homologué est obligatoire. Sans casque, pas de départ.',
+    faqNumber: 'Le numéro de départ apparaît juste après l’inscription et arrive aussi par e-mail, avec le formulaire en PDF.',
+    faqWhen: '17 octobre 2026, descente Rena Bianca à Santa Teresa Gallura. Présentation à 12:00, départ à 14:30.',
+    chatHandover: 'Je transmets cela aux organisateurs — ils répondront ici, dans ce chat. Laissez votre e-mail si vous préférez.',
+    chatGreeting: 'Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs.'
+  }
+};
+
+/* -------------------------------------------------- turning the reminders off
+   The small grey link at the foot of every subscription letter, and the wording of the
+   e-mail carrying the code. %CODE% is substituted by the function, the same way
+   %FIRSTNAME% already is — the renderer does no substitution of its own. */
+const UNSUB = {
   it: {
     unsubFooter: 'Non voglio più questi avvisi',
     unsubSubject: 'Il tuo codice: %CODE%',
@@ -71,13 +150,19 @@ const ADDITIONS = {
   }
 };
 
+const GROUPS = [FAQ, UNSUB];
+const LANGS = ['it', 'pl', 'en', 'de', 'es', 'fr'];
+
 let added = 0;
-for (const [code, keys] of Object.entries(ADDITIONS)) {
-  if (!deck[code]) throw new Error(`no language block "${code}" in emails/copy.json`);
-  for (const [key, value] of Object.entries(keys)) {
-    if (deck[code][key] !== undefined) continue;
-    deck[code][key] = value;
-    added += 1;
+for (const group of GROUPS) {
+  for (const lang of LANGS) {
+    if (!deck[lang]) throw new Error(`no language block "${lang}" in emails/copy.json`);
+    if (!group[lang]) throw new Error(`a group is missing its "${lang}" translations`);
+    for (const [key, value] of Object.entries(group[lang])) {
+      if (deck[lang][key] !== undefined) continue;
+      deck[lang][key] = value;
+      added += 1;
+    }
   }
 }
 
@@ -88,11 +173,11 @@ writeFileSync(file, `${JSON.stringify(deck, null, 2)}\n`, 'utf8');
 const written = JSON.parse(readFileSync(file, 'utf8'));
 const reference = Object.keys(written.it);
 let problems = 0;
-for (const code of Object.keys(written).filter((key) => !key.startsWith('_'))) {
-  const missing = reference.filter((key) => written[code][key] === undefined);
+for (const lang of Object.keys(written).filter((key) => !key.startsWith('_'))) {
+  const missing = reference.filter((key) => written[lang][key] === undefined);
   if (missing.length) {
     problems += 1;
-    console.log(`FAIL  ${code} missing: ${missing.join(', ')}`);
+    console.log(`FAIL  ${lang} missing: ${missing.join(', ')}`);
   }
 }
 

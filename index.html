@@ -1069,7 +1069,54 @@
           <div class="contact__links"><a data-contact-email href="mailto:info@carruleddhishow.com">info@carruleddhishow.com</a><a data-contact-phone href="tel:+393284981574">+39 328 498 1574</a></div>
         </div>
         <div class="contact-card reveal" data-delay="1">
-          <h3 data-i18n="contact.formTitle">Messaggio veloce</h3>
+          <!-- Two ways to reach a person, as tabs rather than as two cards.
+               The form leaves a message and waits for a reply by e-mail; the chat answers
+               the six things that get asked constantly without anybody being involved, and
+               hands over the moment it does not know. Tabs because they are alternatives —
+               nobody needs both — and because stacking two forms in one card on a phone is
+               a wall of inputs. -->
+          <div class="contact-tabs" role="tablist" data-contact-tabs>
+            <button class="contact-tab is-active" type="button" role="tab" aria-selected="true"
+                    id="tab-form" aria-controls="panel-form" data-contact-tab="form">
+              <span data-i18n="contact.tabForm">Messaggio veloce</span>
+            </button>
+            <button class="contact-tab" type="button" role="tab" aria-selected="false"
+                    id="tab-chat" aria-controls="panel-chat" data-contact-tab="chat">
+              <span class="contact-tab__dot" aria-hidden="true"></span>
+              <span data-i18n="contact.tabChat">Chat dal vivo</span>
+            </button>
+          </div>
+
+          <!-- ============================================================ chat -->
+          <div class="chat" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" data-chat hidden>
+            <div class="chat__log" data-chat-log aria-live="polite" aria-atomic="false"></div>
+
+            <!-- The six questions that get asked constantly. Pressing one sends it as if
+                 it had been typed, so the answer arrives through exactly the same path and
+                 there is no second code path to keep in step. -->
+            <div class="chat__chips" data-chat-chips>
+              <button class="chat__chip" type="button" data-chat-ask="faqWho" data-i18n="chat.askWho">Chi può partecipare?</button>
+              <button class="chat__chip" type="button" data-chat-ask="faqCost" data-i18n="chat.askCost">Quanto costa?</button>
+              <button class="chat__chip" type="button" data-chat-ask="faqHelmet" data-i18n="chat.askHelmet">Serve il casco?</button>
+              <button class="chat__chip" type="button" data-chat-ask="faqWhen" data-i18n="chat.askWhen">Quando e dove?</button>
+              <button class="chat__chip" type="button" data-chat-ask="faqNumber" data-i18n="chat.askNumber">Il numero di partenza?</button>
+              <button class="chat__chip chat__chip--warn" type="button" data-chat-ask="cancel" data-i18n="chat.askCancel">Voglio ritirarmi dalla gara</button>
+            </div>
+
+            <form class="chat__composer" data-chat-form novalidate>
+              <label class="sr-only" for="chat-input" data-i18n="chat.inputLabel">Il tuo messaggio</label>
+              <textarea id="chat-input" data-chat-input rows="1" maxlength="2000"
+                        placeholder="…" data-i18n-placeholder="chat.placeholder"></textarea>
+              <button class="chat__send" type="submit" data-chat-send aria-label="Invia" data-i18n-aria-label="chat.send">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h13M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </form>
+
+            <p class="chat__note" data-chat-note data-i18n="chat.note">Le risposte automatiche coprono le domande frequenti. Tutto il resto arriva agli organizzatori.</p>
+          </div>
+
+          <!-- ============================================================ form -->
+          <div id="panel-form" role="tabpanel" aria-labelledby="tab-form" data-contact-panel="form">
           <form data-contact-form novalidate>
             <div class="form-grid">
               <div class="field" data-field><input id="contact-name" name="name" type="text" autocomplete="name" placeholder=" " required><label for="contact-name" data-i18n="contact.name">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
@@ -1079,6 +1126,7 @@
             <button class="btn" type="submit" style="margin-top:22px" data-i18n="contact.send">Invia messaggio</button>
             <div class="form-status" data-contact-status aria-live="polite"></div>
           </form>
+          </div>
         </div>
       </div>
     </section>

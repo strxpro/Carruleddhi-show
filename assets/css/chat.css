@@ -1,0 +1,261 @@
+/* ============================================================================
+   Live chat, visitor side
+   ============================================================================
+   Sits inside the contact card, behind a tab, next to the "quick message" form. Tabs
+   because the two are alternatives — nobody needs both — and because stacking two forms
+   in one card on a phone is a wall of inputs with no visible end.
+
+   Everything here is scoped under .chat or .contact-tab, so nothing in this file can
+   reach the rest of the page.
+   ========================================================================== */
+
+/* ------------------------------------------------------------------- tabs */
+.contact-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 18px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgb(7 26 61 / 0.06);
+}
+
+.contact-tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #45577a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.22s, color 0.22s, box-shadow 0.22s;
+}
+
+.contact-tab > span:not(.contact-tab__dot) {
+  /* The Italian and German labels are long, and a tab that wraps to two lines makes the
+     pair different heights. Clipped rather than wrapped. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-tab:hover { color: #071a3d; }
+
+.contact-tab.is-active {
+  background: #071a3d;
+  color: #fff;
+  box-shadow: 0 6px 16px rgb(7 26 61 / 0.22);
+}
+
+.contact-tab:focus-visible { outline: 3px solid #ffc928; outline-offset: 2px; }
+
+/* A live dot on the chat tab. Decoration, and honest decoration: the chat really does
+   answer immediately. */
+.contact-tab__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2fbf71;
+  box-shadow: 0 0 0 0 rgb(47 191 113 / 0.55);
+  animation: chat-pulse 2.4s ease-out infinite;
+}
+
+@keyframes chat-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(47 191 113 / 0.5); }
+  70% { box-shadow: 0 0 0 8px rgb(47 191 113 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(47 191 113 / 0); }
+}
+
+/* ------------------------------------------------------------------- shell */
+.chat { display: flex; flex-direction: column; gap: 12px; }
+
+.chat__log {
+  /* A fixed range rather than a fixed height: short conversations do not leave a void, and
+     long ones do not push the page down forever. */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+  max-height: 42svh;
+  padding: 4px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* ---------------------------------------------------------------- messages */
+.chat-msg { display: flex; flex-direction: column; gap: 3px; max-width: 86%; }
+
+.chat-msg--visitor { align-self: flex-end; align-items: flex-end; }
+
+.chat-msg__who {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8496b8;
+}
+
+.chat-msg__body {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  /* The one thing that matters in a chat bubble: newlines the sender typed have to survive,
+     and a pasted URL must not push the bubble past the edge of the card. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-msg--visitor .chat-msg__body {
+  border-bottom-right-radius: 5px;
+  background: #071a3d;
+  color: #fff;
+}
+
+.chat-msg--ai .chat-msg__body {
+  border-bottom-left-radius: 5px;
+  background: rgb(7 26 61 / 0.06);
+  color: #20304f;
+}
+
+/* A person, and it has to look different from the automatic answers — otherwise nobody
+   can tell whether they are talking to anybody. */
+.chat-msg--organiser .chat-msg__body {
+  border-bottom-left-radius: 5px;
+  border-left: 3px solid #ffc928;
+  background: #fff8e1;
+  color: #4a3a05;
+}
+
+/* Sent, not yet acknowledged. Shown immediately because a chat that waits for the server
+   before displaying what you typed feels broken on a slow connection. */
+.chat-msg.is-pending .chat-msg__body { opacity: 0.55; }
+
+.chat-msg.is-failed .chat-msg__body {
+  background: #fff1f1;
+  color: #8a2026;
+  box-shadow: inset 0 0 0 1.5px #f6494f;
+}
+
+.chat__system {
+  margin: 2px 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #8a2026;
+}
+
+/* ------------------------------------------------------------------- chips */
+.chat__chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.chat__chip {
+  padding: 8px 13px;
+  border: 1.5px solid rgb(7 26 61 / 0.16);
+  border-radius: 999px;
+  background: #fff;
+  color: #2f3f5e;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.chat__chip:hover { border-color: #071a3d; background: #f4f8ff; }
+.chat__chip:focus-visible { outline: 3px solid #ffc928; outline-offset: 2px; }
+
+/* Withdrawing from the race is not the same kind of question as "does it cost anything",
+   so it does not look like one. */
+.chat__chip--warn { border-color: rgb(246 73 79 / 0.4); color: #8a2026; }
+.chat__chip--warn:hover { border-color: #f6494f; background: #fff4f4; }
+
+/* ---------------------------------------------------------------- composer */
+.chat__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.chat__composer textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Grown by JavaScript up to a cap, so a long message is visible while it is written
+     instead of scrolling inside three lines. */
+  height: 46px;
+  max-height: 140px;
+  padding: 12px 14px;
+  border: 2px solid rgb(7 26 61 / 0.16);
+  border-radius: 16px;
+  background: #fff;
+  color: #071a3d;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  resize: none;
+}
+
+.chat__composer textarea:focus-visible {
+  outline: none;
+  border-color: #071a3d;
+  box-shadow: 0 0 0 3px rgb(255 201 40 / 0.55);
+}
+
+.chat__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 50%;
+  background: #f6494f;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.chat__send svg { width: 21px; height: 21px; }
+.chat__send:hover { background: #071a3d; transform: translateY(-1px); }
+.chat__send:focus-visible { outline: 3px solid #ffc928; outline-offset: 3px; }
+.chat__send:disabled { background: #b6c2d8; cursor: default; transform: none; }
+
+.chat__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7c9c;
+}
+
+/* Once a person is on the other end, say so where the automatic note used to be. */
+.chat[data-chat-mode='human'] .chat__note::before {
+  content: '● ';
+  color: #2fbf71;
+}
+
+@media (max-width: 560px) {
+  .chat__log { max-height: 38svh; }
+  .chat-msg { max-width: 94%; }
+  .contact-tab { padding: 10px 10px; font-size: 12px; letter-spacing: 0.02em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-tab__dot { animation: none; }
+  .contact-tab,
+  .chat__chip,
+  .chat__send { transition: none; }
+  .chat__send:hover { transform: none; }
+}

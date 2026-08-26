@@ -24,8 +24,132 @@ let source = readFileSync(file, 'utf8');
    so the new "too late" line reads next to them in the file as well as on the page. */
 const ANCHOR = 'modal.time3';
 
+const CHAT_UI = {
+  it: {
+    'contact.tabForm': 'Messaggio veloce',
+    'contact.tabChat': 'Chat dal vivo',
+    'chat.greeting': 'Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori.',
+    'chat.placeholder': 'Scrivi qui…',
+    'chat.inputLabel': 'Il tuo messaggio',
+    'chat.send': 'Invia',
+    'chat.you': 'Tu',
+    'chat.bot': 'Automatico',
+    'chat.them': 'Organizzatori',
+    'chat.note': 'Le risposte automatiche coprono le domande frequenti. Tutto il resto arriva agli organizzatori.',
+    'chat.offline': 'Chat non raggiungibile. Usa il modulo qui accanto.',
+    'chat.sendFailed': 'Messaggio non inviato. Riprova.',
+    'chat.askWho': 'Chi può partecipare?',
+    'chat.askCost': 'Quanto costa?',
+    'chat.askHelmet': 'Serve il casco?',
+    'chat.askWhen': 'Quando e dove?',
+    'chat.askNumber': 'Come ricevo il numero?',
+    'chat.askCancel': 'Voglio ritirarmi dalla gara'
+  },
+  pl: {
+    'contact.tabForm': 'Szybka wiadomość',
+    'contact.tabChat': 'Czat na żywo',
+    'chat.greeting': 'Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom.',
+    'chat.placeholder': 'Napisz tutaj…',
+    'chat.inputLabel': 'Twoja wiadomość',
+    'chat.send': 'Wyślij',
+    'chat.you': 'Ty',
+    'chat.bot': 'Automat',
+    'chat.them': 'Organizator',
+    'chat.note': 'Automat odpowiada na częste pytania. Wszystko inne trafia do organizatorów.',
+    'chat.offline': 'Czat niedostępny. Skorzystaj z formularza obok.',
+    'chat.sendFailed': 'Wiadomość nie wyszła. Spróbuj ponownie.',
+    'chat.askWho': 'Kto może startować?',
+    'chat.askCost': 'Ile to kosztuje?',
+    'chat.askHelmet': 'Czy kask jest obowiązkowy?',
+    'chat.askWhen': 'Kiedy i gdzie?',
+    'chat.askNumber': 'Jak dostanę numer startowy?',
+    'chat.askCancel': 'Chcę zrezygnować z wyścigu'
+  },
+  en: {
+    'contact.tabForm': 'Quick message',
+    'contact.tabChat': 'Live chat',
+    'chat.greeting': 'Hello! Ask me anything about the race. What I do not know, I pass to the organisers.',
+    'chat.placeholder': 'Write here…',
+    'chat.inputLabel': 'Your message',
+    'chat.send': 'Send',
+    'chat.you': 'You',
+    'chat.bot': 'Automatic',
+    'chat.them': 'Organisers',
+    'chat.note': 'The automatic answers cover the frequent questions. Everything else reaches the organisers.',
+    'chat.offline': 'Chat unreachable. Use the form beside it.',
+    'chat.sendFailed': 'Message not sent. Try again.',
+    'chat.askWho': 'Who can take part?',
+    'chat.askCost': 'What does it cost?',
+    'chat.askHelmet': 'Is a helmet required?',
+    'chat.askWhen': 'When and where?',
+    'chat.askNumber': 'How do I get my number?',
+    'chat.askCancel': 'I want to withdraw from the race'
+  },
+  de: {
+    'contact.tabForm': 'Kurze Nachricht',
+    'contact.tabChat': 'Live-Chat',
+    'chat.greeting': 'Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter.',
+    'chat.placeholder': 'Schreib hier…',
+    'chat.inputLabel': 'Deine Nachricht',
+    'chat.send': 'Senden',
+    'chat.you': 'Du',
+    'chat.bot': 'Automatisch',
+    'chat.them': 'Organisatoren',
+    'chat.note': 'Die automatischen Antworten decken die häufigen Fragen ab. Alles andere geht an die Organisatoren.',
+    'chat.offline': 'Chat nicht erreichbar. Nutze das Formular daneben.',
+    'chat.sendFailed': 'Nachricht nicht gesendet. Versuch es erneut.',
+    'chat.askWho': 'Wer darf teilnehmen?',
+    'chat.askCost': 'Was kostet es?',
+    'chat.askHelmet': 'Ist ein Helm Pflicht?',
+    'chat.askWhen': 'Wann und wo?',
+    'chat.askNumber': 'Wie bekomme ich die Startnummer?',
+    'chat.askCancel': 'Ich möchte vom Rennen zurücktreten'
+  },
+  es: {
+    'contact.tabForm': 'Mensaje rápido',
+    'contact.tabChat': 'Chat en directo',
+    'chat.greeting': '¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores.',
+    'chat.placeholder': 'Escribe aquí…',
+    'chat.inputLabel': 'Tu mensaje',
+    'chat.send': 'Enviar',
+    'chat.you': 'Tú',
+    'chat.bot': 'Automático',
+    'chat.them': 'Organizadores',
+    'chat.note': 'Las respuestas automáticas cubren las preguntas frecuentes. Todo lo demás llega a los organizadores.',
+    'chat.offline': 'Chat no disponible. Usa el formulario de al lado.',
+    'chat.sendFailed': 'El mensaje no se ha enviado. Inténtalo otra vez.',
+    'chat.askWho': '¿Quién puede participar?',
+    'chat.askCost': '¿Cuánto cuesta?',
+    'chat.askHelmet': '¿El casco es obligatorio?',
+    'chat.askWhen': '¿Cuándo y dónde?',
+    'chat.askNumber': '¿Cómo recibo el dorsal?',
+    'chat.askCancel': 'Quiero retirarme de la carrera'
+  },
+  fr: {
+    'contact.tabForm': 'Message rapide',
+    'contact.tabChat': 'Chat en direct',
+    'chat.greeting': 'Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs.',
+    'chat.placeholder': 'Écrivez ici…',
+    'chat.inputLabel': 'Votre message',
+    'chat.send': 'Envoyer',
+    'chat.you': 'Vous',
+    'chat.bot': 'Automatique',
+    'chat.them': 'Organisateurs',
+    'chat.note': 'Les réponses automatiques couvrent les questions fréquentes. Tout le reste arrive aux organisateurs.',
+    'chat.offline': 'Chat indisponible. Utilisez le formulaire à côté.',
+    'chat.sendFailed': 'Message non envoyé. Réessayez.',
+    'chat.askWho': 'Qui peut participer ?',
+    'chat.askCost': 'Combien ça coûte ?',
+    'chat.askHelmet': 'Le casque est-il obligatoire ?',
+    'chat.askWhen': 'Quand et où ?',
+    'chat.askNumber': 'Comment je reçois mon numéro ?',
+    'chat.askCancel': 'Je veux me retirer de la course'
+  }
+};
+
 const ADDITIONS = {
   it: {
+    ...CHAT_UI.it,
     'unsub.title': 'Disattivare gli avvisi?',
     'unsub.leadStart': 'Mandiamo un codice a questo indirizzo:',
     'unsub.send': 'Manda il codice',
@@ -46,6 +170,7 @@ const ADDITIONS = {
     'unsub.offline': 'Nessuna connessione. Riprova.'
   },
   pl: {
+    ...CHAT_UI.pl,
     'unsub.title': 'Wyłączyć powiadomienia?',
     'unsub.leadStart': 'Wyślemy kod na ten adres:',
     'unsub.send': 'Wyślij kod',
@@ -66,6 +191,7 @@ const ADDITIONS = {
     'unsub.offline': 'Brak połączenia. Spróbuj ponownie.'
   },
   en: {
+    ...CHAT_UI.en,
     'unsub.title': 'Switch the reminders off?',
     'unsub.leadStart': 'We will send a code to this address:',
     'unsub.send': 'Send the code',
@@ -86,6 +212,7 @@ const ADDITIONS = {
     'unsub.offline': 'No connection. Try again.'
   },
   de: {
+    ...CHAT_UI.de,
     'unsub.title': 'Erinnerungen abschalten?',
     'unsub.leadStart': 'Wir senden einen Code an diese Adresse:',
     'unsub.send': 'Code senden',
@@ -106,6 +233,7 @@ const ADDITIONS = {
     'unsub.offline': 'Keine Verbindung. Versuch es erneut.'
   },
   es: {
+    ...CHAT_UI.es,
     'unsub.title': '¿Desactivar los avisos?',
     'unsub.leadStart': 'Enviaremos un código a esta dirección:',
     'unsub.send': 'Enviar el código',
@@ -126,6 +254,7 @@ const ADDITIONS = {
     'unsub.offline': 'Sin conexión. Inténtalo otra vez.'
   },
   fr: {
+    ...CHAT_UI.fr,
     'unsub.title': 'Désactiver les rappels ?',
     'unsub.leadStart': 'Nous envoyons un code à cette adresse :',
     'unsub.send': 'Envoyer le code',
