@@ -166,7 +166,7 @@
             <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
           </div>
           <h1 class="hero__title reveal" id="hero-title" data-delay="1">
-            CARRULEDDHI<br><span class="accent">SHOW</span> <span class="hero__year">2026</span>
+            CARRULEDDHI<br><span class="accent">SHOW</span> <span class="hero__year" data-text-jitter>2026</span>
           </h1>
           <p class="hero__tagline reveal" data-delay="2" data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</p>
           <div class="hero__actions reveal" data-delay="3">
@@ -200,10 +200,6 @@
         </div>
       </div>
 
-      <!-- Logos only, no headings: filled from the config by app.js. -->
-      <aside class="sponsor-band" data-sponsor-band data-i18n-aria-label="sponsors.label" aria-label="Sponsor" hidden>
-        <div class="sponsor-band__track" data-sponsor-track></div>
-      </aside>
     </section>
 
     <section class="section section-card story" id="story" aria-labelledby="story-title">
@@ -308,6 +304,20 @@
     </section>
 
     <section class="section section-card route" id="route" aria-labelledby="route-title">
+      <!-- Sponsors, above the route heading.
+           They were at the foot of the hero, which is the first screen and the busiest: a
+           logo strip competing with the title, the date, two buttons and two counters, on a
+           panel that is already the tallest thing on the page. Here they are the first thing
+           after the categories and before "Giù verso il mare", which is a natural pause and
+           the place they were asked for.
+
+           Logos only, no heading. Filled by app.js from the settings the admin panel writes,
+           and hidden until there is at least one — see setupSponsors(). -->
+      <aside class="sponsor-band sponsor-band--route" data-sponsor-band
+             data-i18n-aria-label="sponsors.label" aria-label="Sponsor" hidden>
+        <div class="sponsor-band__track" data-sponsor-track></div>
+      </aside>
+
       <div class="container route__grid">
         <div class="route__copy reveal">
           <span class="eyebrow" data-i18n="route.kicker">Il percorso</span>
@@ -915,6 +925,20 @@
           <h2 class="section-title section-title--medium" id="wall-title" data-i18n="wall.title" data-text-effect="jump">Lasciate un segno.</h2>
           <p class="lead" data-i18n="wall.body">Un ricordo, un incoraggiamento, il nome del vostro carruleddhu. I messaggi appaiono dopo una lettura veloce da parte nostra.</p>
 
+          <!-- The form is folded away behind this button.
+               It used to be open all the time, above the messages: three fields, a star
+               picker and a photo upload, so the first thing on a section about reading what
+               other people wrote was a form. Most visitors are here to read. The one who
+               wants to write presses the button, and the panel unfolds underneath it. -->
+          <button class="wall-open" type="button" data-wall-open aria-expanded="false"
+                  aria-controls="wall-form-panel">
+            <span class="wall-open__icon" aria-hidden="true">✎</span>
+            <span data-i18n="wall.openForm">Lascia un messaggio</span>
+            <span class="wall-open__chevron" aria-hidden="true">⌄</span>
+          </button>
+
+          <div class="wall-fold" id="wall-form-panel" data-wall-fold>
+            <div class="wall-fold__inner">
           <form class="wall-form" data-wall-form novalidate>
             <div class="form-grid">
               <div class="field" data-field>
@@ -983,6 +1007,8 @@
             </div>
             <div class="form-status" data-wall-status aria-live="polite"></div>
           </form>
+            </div>
+          </div>
         </div>
 
         <div class="wall-board reveal" data-delay="1">
@@ -1165,11 +1191,11 @@
         </div>
         <div class="footer__group">
           <h3 data-i18n="footer.explore">Esplora</h3>
-          <div class="footer__links"><a href="#story" data-i18n="nav.race">La gara</a><a href="#categories" data-i18n="nav.categories">Categorie</a><a href="#route" data-i18n="nav.route">Percorso</a><a href="#gallery" data-i18n="nav.gallery" data-feature-link="gallery">Galleria</a><a href="#signup" data-i18n="nav.signup" data-feature-link="registration">Iscriviti</a><a href="#contact" data-i18n="nav.contact">Contatti</a></div>
+          <div class="footer__links"><a href="#story" data-i18n="nav.race" data-text-roll>La gara</a><a href="#categories" data-i18n="nav.categories" data-text-roll>Categorie</a><a href="#route" data-i18n="nav.route" data-text-roll>Percorso</a><a href="#gallery" data-i18n="nav.gallery" data-feature-link="gallery" data-text-roll>Galleria</a><a href="#signup" data-i18n="nav.signup" data-feature-link="registration" data-text-roll>Iscriviti</a><a href="#contact" data-i18n="nav.contact" data-text-roll>Contatti</a></div>
         </div>
         <div class="footer__group">
           <h3 data-i18n="footer.legal">Informazioni legali</h3>
-          <div class="footer__links"><a href="privacy.html" data-i18n="footer.privacy">Privacy policy</a><a href="cookies.html" data-i18n="footer.cookies">Cookie policy</a><a href="regolamento.html" data-i18n="footer.rules">Regolamento evento</a><button type="button" data-cookie-settings data-i18n="footer.cookieSettings">Impostazioni cookie</button></div>
+          <div class="footer__links"><a href="privacy.html" data-i18n="footer.privacy" data-text-roll>Privacy policy</a><a href="cookies.html" data-i18n="footer.cookies" data-text-roll>Cookie policy</a><a href="regolamento.html" data-i18n="footer.rules" data-text-roll>Regolamento evento</a><button type="button" data-cookie-settings data-i18n="footer.cookieSettings">Impostazioni cookie</button></div>
         </div>
       </div>
       <!-- Organiser's way in. Deliberately last, small and unlabelled beyond the
@@ -1286,7 +1312,7 @@
 
   <aside class="cookie-banner" data-cookie-banner aria-labelledby="cookie-title">
     <h2 id="cookie-title" data-i18n="cookies.title">Cookie, ma solo quelli utili.</h2>
-    <p><span data-i18n="cookies.text">Usiamo cookie tecnici per ricordare lingua, presenza e preferenze. Gli analitici partono solo dopo il tuo consenso.</span> <a href="cookies.html" data-i18n="footer.cookies">Cookie policy</a></p>
+    <p><span data-i18n="cookies.text">Usiamo cookie tecnici per ricordare lingua, presenza e preferenze. Gli analitici partono solo dopo il tuo consenso.</span> <a href="cookies.html" data-i18n="footer.cookies" data-text-roll>Cookie policy</a></p>
     <div class="cookie-settings" data-cookie-panel>
       <div class="cookie-option"><div><strong data-i18n="cookies.necessary">Necessari</strong><small data-i18n="cookies.necessaryDesc">Sempre attivi: fanno funzionare il sito.</small></div><label class="switch"><input type="checkbox" checked disabled><span></span></label></div>
       <div class="cookie-option"><div><strong data-i18n="cookies.analytics">Analitici</strong><small data-i18n="cookies.analyticsDesc">Statistiche anonime sulle visite.</small></div><label class="switch"><input type="checkbox" data-cookie-analytics><span></span></label></div>

@@ -82,3 +82,121 @@ html.is-demo .wall-note { position: relative; }
 @media (prefers-reduced-motion: reduce) {
   .wall-sort__btn { transition: none; }
 }
+
+/* ============================================================================
+   Sponsors, above the route heading
+   ============================================================================
+   The band moved out of the hero. It was competing there with the title, the date, two
+   buttons and two counters on the tallest panel of the page; here it is the first thing in
+   the route section and reads as a breath between two sections rather than as clutter on the
+   first screen.
+
+   `--route` because the band's own base styles still assume the hero's dark background and
+   its absolute placement at the foot of it.
+   ========================================================================== */
+.sponsor-band--route {
+  position: static;
+  inset: auto;
+  width: min(var(--page, 1180px), 100%);
+  margin: 0 auto clamp(26px, 4vw, 48px);
+  padding: 14px 0 18px;
+  /* One hairline above, none below: the route heading sits directly under this and a second
+     rule would box the strip in like a table. */
+  border-top: 1px solid rgb(7 26 61 / 0.1);
+  background: transparent;
+}
+
+.sponsor-band--route .sponsor-band__track {
+  /* Greyed until hovered. A sponsor's logo at full saturation next to a section heading pulls
+     harder than the heading does, and these are thank-yous rather than advertising. */
+  filter: grayscale(1);
+  opacity: 0.62;
+  transition: filter 0.3s, opacity 0.3s;
+}
+
+@media (hover: hover) {
+  .sponsor-band--route:hover .sponsor-band__track { filter: grayscale(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-band--route .sponsor-band__track { transition: none; }
+}
+
+/* ============================================================================
+   "Leave a message" — the folded form
+   ============================================================================
+   The wall's form used to be open above the messages. Most people arrive to read, so it is
+   behind a button now and unfolds underneath it.
+   ========================================================================== */
+.wall-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: clamp(18px, 3svh, 30px) 0 0;
+  padding: 13px 20px;
+  border: 2px solid #ffc928;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s, border-radius 0.25s;
+}
+
+.wall-open:hover { background: #ffc928; color: #071a3d; }
+.wall-open:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+.wall-open__icon { font-size: 15px; }
+
+.wall-open__chevron {
+  margin-left: 2px;
+  font-size: 17px;
+  line-height: 1;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wall-open.is-open {
+  background: #ffc928;
+  color: #071a3d;
+  /* Square at the bottom while the panel below it is open, so the two read as one object
+     rather than a pill floating above a box. */
+  border-radius: 22px 22px 6px 6px;
+}
+
+.wall-open.is-open .wall-open__chevron { transform: rotate(180deg); }
+
+/* ------------------------------------------------------------------- fold */
+.wall-fold {
+  /* max-height and not height: `height: auto` cannot be animated, and a panel that snaps
+     open reads as a fault on a page where everything else eases. The generous open value is
+     a ceiling, not a size — the inner element decides the real height. */
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease 0.04s;
+}
+
+.wall-fold.is-open { max-height: 1400px; opacity: 1; }
+
+.wall-fold__inner {
+  /* All the padding lives here so the outer box can close to exactly zero without leaving a
+     sliver of border or background behind. */
+  margin-top: -2px;
+  padding: 22px 20px 6px;
+  border: 2px solid rgb(255 201 40 / 0.45);
+  border-top-color: transparent;
+  border-radius: 0 18px 18px 18px;
+  background: rgb(255 255 255 / 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wall-open,
+  .wall-open__chevron,
+  .wall-fold { transition: none; }
+}

@@ -1,0 +1,61 @@
+/* ============================================================================
+   The route photograph, scroll-driven
+   ============================================================================
+   app.js writes one number onto the frame — `--route-progress`, 0 to 1, from how far the
+   section has travelled up the viewport — and everything here reads it. The stylesheet owns
+   what the number means, so changing the look never means editing JavaScript.
+
+   It reaches 1 when the section is centred and stays there. Holding still is the point: a
+   photograph that is still growing while the next panel starts sliding over it reads as two
+   animations arguing.
+   ========================================================================== */
+
+.route__frame {
+  /* The fallback matters. Without JavaScript the property is never set, and every calc()
+     below would be invalid — which in CSS means the whole declaration is dropped and the
+     frame renders unstyled. `1` means "already arrived", which is the right resting state
+     for a page with no script. */
+  --route-progress: 1;
+
+  /* Grown from the centre, so the frame expands into its own box in both directions rather
+     than pushing away from one corner. */
+  transform-origin: 50% 50%;
+
+  /* 0.90 to 1, and it stops at 1 rather than overshooting.
+     Ten per cent is enough to read as growth on a phone; the first attempt was six and was
+     reported as "it does not zoom". Going past 1 was considered and rejected: the frame would
+     then be wider than its grid column and would start covering the copy beside it. */
+  transform:
+    translateY(calc((1 - var(--route-progress)) * 34px))
+    scale(calc(0.9 + var(--route-progress) * 0.1));
+
+  /* The shadow deepens with the scale so the frame appears to lift off the section rather
+     than merely get bigger. */
+  box-shadow:
+    0 calc(10px + var(--route-progress) * 26px)
+    calc(24px + var(--route-progress) * 42px)
+    rgb(7 26 61 / calc(0.10 + var(--route-progress) * 0.16));
+
+  /* Not a transition. The property changes once per frame from a scroll position, so a
+     transition on top of it would add lag between the finger and the picture — the exact
+     "it feels like it is catching up" complaint. `will-change` is honest here: this element
+     really does transform on most frames while the section is on screen, and there is one
+     of it. */
+  will-change: transform;
+}
+
+/* The start and finish pins are positioned as percentages of the frame, so they scale with
+   it and stay on the road. Their text grows by the same six per cent, which at this size is
+   under a pixel — not worth counter-scaling, and counter-scaling would mean overriding the
+   translate() that carnival.css uses to lift each label clear of its dot. Left alone on
+   purpose rather than by omission. */
+
+@media (prefers-reduced-motion: reduce) {
+  .route__frame {
+    /* Belt and braces: app.js already pins the property to 1 in this case, but a stylesheet
+       that only behaves when a script agrees with it is not accessible, it is lucky. */
+    --route-progress: 1;
+    transform: none;
+    will-change: auto;
+  }
+}

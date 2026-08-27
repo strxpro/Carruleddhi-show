@@ -192,6 +192,9 @@
   white-space: pre;
 }
 
+/* The sizer is the only thing allowed to set the height of the box.
+   Hidden but laid out, so the clipped frame keeps the text's own width, height and
+   baseline. */
 .fx-roll__sizer {
   visibility: hidden;
   pointer-events: none;
@@ -199,6 +202,14 @@
 }
 
 .fx-roll__stack {
+  /* Absolute, and this is load-bearing.
+     Without it the stack is a second grid item in the same cell, so the row grows to fit
+     the taller of the two — and the stack holds two copies of the label, making every
+     rolled element exactly twice as tall as its text. Measured: a 14px uppercase kicker
+     came out 71px tall and pushed the heading below it down the page. */
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
   display: flex;
   flex-direction: column;
   transform: translateY(0);

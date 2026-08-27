@@ -206,7 +206,17 @@
   font-size: 15px;
   line-height: 1.45;
   resize: none;
+
+  /* No scrollbar in the composer.
+     The box grows with the text up to 140px (sizeInput() in app.js), so for anything short of
+     an essay there is nothing to scroll — and a scrollbar inside a 46px-tall rounded field is
+     a grey stripe that looks like a rendering fault. Past the cap it still scrolls with a
+     wheel, a finger and the caret; only the visible track is gone. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+
+.chat__composer textarea::-webkit-scrollbar { width: 0; height: 0; }
 
 .chat__composer textarea:focus-visible {
   outline: none;

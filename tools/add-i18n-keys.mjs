@@ -25,12 +25,30 @@ let source = readFileSync(file, 'utf8');
 const ANCHOR = 'modal.time3';
 
 const WALL_SORT = {
-  it: { 'wall.sortNew': 'Più recenti', 'wall.sortBest': 'Meglio votati', 'wall.sortOld': 'Più vecchi' },
-  pl: { 'wall.sortNew': 'Najnowsze', 'wall.sortBest': 'Najlepiej ocenione', 'wall.sortOld': 'Najstarsze' },
-  en: { 'wall.sortNew': 'Newest', 'wall.sortBest': 'Best rated', 'wall.sortOld': 'Oldest' },
-  de: { 'wall.sortNew': 'Neueste', 'wall.sortBest': 'Beste Bewertung', 'wall.sortOld': 'Älteste' },
-  es: { 'wall.sortNew': 'Más recientes', 'wall.sortBest': 'Mejor valorados', 'wall.sortOld': 'Más antiguos' },
-  fr: { 'wall.sortNew': 'Plus récents', 'wall.sortBest': 'Mieux notés', 'wall.sortOld': 'Plus anciens' }
+  it: {
+    'wall.sortNew': 'Più recenti', 'wall.sortBest': 'Meglio votati', 'wall.sortOld': 'Più vecchi',
+    'wall.sortLabel': 'Ordina', 'wall.openForm': 'Lascia un messaggio'
+  },
+  pl: {
+    'wall.sortNew': 'Najnowsze', 'wall.sortBest': 'Najlepiej ocenione', 'wall.sortOld': 'Najstarsze',
+    'wall.sortLabel': 'Sortuj', 'wall.openForm': 'Zostaw wiadomość'
+  },
+  en: {
+    'wall.sortNew': 'Newest', 'wall.sortBest': 'Best rated', 'wall.sortOld': 'Oldest',
+    'wall.sortLabel': 'Sort', 'wall.openForm': 'Leave a message'
+  },
+  de: {
+    'wall.sortNew': 'Neueste', 'wall.sortBest': 'Beste Bewertung', 'wall.sortOld': 'Älteste',
+    'wall.sortLabel': 'Sortieren', 'wall.openForm': 'Nachricht hinterlassen'
+  },
+  es: {
+    'wall.sortNew': 'Más recientes', 'wall.sortBest': 'Mejor valorados', 'wall.sortOld': 'Más antiguos',
+    'wall.sortLabel': 'Ordenar', 'wall.openForm': 'Deja un mensaje'
+  },
+  fr: {
+    'wall.sortNew': 'Plus récents', 'wall.sortBest': 'Mieux notés', 'wall.sortOld': 'Plus anciens',
+    'wall.sortLabel': 'Trier', 'wall.openForm': 'Laissez un message'
+  }
 };
 
 const CHAT_UI = {

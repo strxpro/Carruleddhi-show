@@ -1162,20 +1162,38 @@ html {
 /* Shorter than it was. 62svh of scroller under a form that is itself a screen tall
    made the section the longest on the page for content that is three lines per
    message. The list scrolls, so height costs nothing but page length. */
-.wall-board {
-  max-height: min(340px, 42svh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 6px;
-}
-.wall-board:not(:has(.wall-note)) { max-height: none; overflow: visible; }
+/* No inner scrollbar.
+   The board used to be `max-height: 42svh; overflow-y: auto` — a scrolling box inside a
+   scrolling page, which on a phone means the wrong thing moves depending on where your thumb
+   lands, and on a laptop means a second scrollbar next to the page's own. The list is capped
+   by how many notes are rendered instead, and "show more" adds the next batch. */
+.wall-board { padding-right: 0; }
+
+/* Masonry, by columns.
+   A grid gives every note in a row the height of the tallest one, so a one-line message next
+   to a five-line one leaves a gap the size of four lines. CSS columns pack them by height
+   with no gaps, which is what a pinboard actually looks like.
+
+   The trade is real and worth stating: columns flow top-to-bottom then left-to-right, so the
+   newest note is at the top of the first column rather than the top-left of a row. For a
+   pinboard that is fine. For anything where reading order matters it would not be. */
 .wall-list {
-  display: grid;
   margin: 0;
   padding: 0;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   list-style: none;
+  columns: 260px 3;
+  column-gap: 14px;
+}
+
+.wall-list > .wall-note {
+  /* A note split across a column break would be unreadable. */
+  break-inside: avoid;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 700px) {
+  /* One column on a phone. Two 130px columns is not a pinboard, it is a newspaper. */
+  .wall-list { columns: 1; }
 }
 
 /* Each note is a scrap of paper pinned to a board, tilted by a per-item variable

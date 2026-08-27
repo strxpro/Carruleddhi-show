@@ -13,6 +13,9 @@
 @import './carnival.css';
 @import './chat.css';
 @import './demo.css';
+/* After carnival.css, which is where the frame's own box-shadow and the pin transforms
+   live — the scroll-driven shadow has to win over the static one. */
+@import './route-zoom.css';
 /* Last, so the effect rules win over a section's own heading styles. They only ever
    touch elements carrying a data-text-* attribute, so nothing else is affected. */
 @import './text-effects.css';

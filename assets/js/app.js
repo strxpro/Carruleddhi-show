@@ -663,15 +663,41 @@ import { flagSvg } from './flags.js';
     // Hard stop: whatever happens, the overlay is gone by this point.
     const watchdog = window.setTimeout(dismiss, duration + 1400);
 
+    /**
+     * The bar and the number, from one clock.
+     *
+     * WHY THIS IS HERE AT ALL
+     *   The bar was not moving. Three stylesheets had an opinion about it and none of them
+     *   won cleanly: main.css sets `width: 0` and a width transition, expecting JavaScript
+     *   to drive it; experience.css declares a `preloader-fill` keyframe animation instead;
+     *   carnival.css repaints the background. Nothing in JavaScript ever touched the width,
+     *   so whether anything moved depended on which rule survived the cascade — and the
+     *   number counted up beside a bar that sat still.
+     *
+     *   One writer now. The keyframe animation is gone from experience.css and this loop
+     *   sets both values from the same elapsed time, so they cannot disagree.
+     *
+     * rAF, not setInterval
+     *   A 40 ms interval paints at whatever moment it fires, which is not when the browser
+     *   is about to draw — on a busy first load that shows as a bar that jumps in steps.
+     *   requestAnimationFrame is one write per frame, in the frame.
+     */
     const number = $('[data-preloader-number]', preloader);
-    if (number) {
-      const started = Date.now();
-      const tick = window.setInterval(() => {
-        const linear = clamp((Date.now() - started) / duration, 0, 1);
-        number.textContent = String(Math.round((1 - Math.pow(1 - linear, 3)) * 100)).padStart(2, '0');
-        if (linear >= 1) window.clearInterval(tick);
-      }, 40);
-      window.setTimeout(() => window.clearInterval(tick), duration + 400);
+    const bar = $('[data-preloader-bar]', preloader);
+    if (number || bar) {
+      const started = performance.now();
+      // Eased, so it moves fast at first and settles — a linear bar reads as slower than it
+      // is, because the last third looks the same as the first.
+      const ease = (value) => 1 - Math.pow(1 - value, 3);
+
+      const step = (now) => {
+        const linear = clamp((now - started) / duration, 0, 1);
+        const eased = ease(linear);
+        if (bar) bar.style.width = `${(eased * 100).toFixed(1)}%`;
+        if (number) number.textContent = String(Math.round(eased * 100)).padStart(2, '0');
+        if (linear < 1 && !dismissed) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
     }
 
     window.setTimeout(() => {
@@ -1470,6 +1496,33 @@ import { flagSvg } from './flags.js';
     const messageField = form?.elements.namedItem('message');
     const endpoint = config.endpoints.wall || '';
 
+    /**
+     * The form, folded away behind a button.
+     *
+     * Most visitors are here to read what other people wrote, and the form is three fields, a
+     * star picker and a photo upload. Open by default it was the first thing in a section
+     * about reading.
+     *
+     * Animated by max-height on a wrapper rather than by `hidden`, because `height: auto` is
+     * not animatable and a panel that snaps open reads as a bug on a page where everything
+     * else eases. The inner div is what holds the padding, so the outer one can go to exactly
+     * zero without leaving a sliver.
+     */
+    const openButton = $('[data-wall-open]', section);
+    const fold = $('[data-wall-fold]', section);
+    if (openButton && fold) {
+      openButton.addEventListener('click', () => {
+        const open = fold.classList.toggle('is-open');
+        openButton.setAttribute('aria-expanded', String(open));
+        openButton.classList.toggle('is-open', open);
+        if (open) {
+          // Focus the first field, but only after the panel has somewhere to put it —
+          // focusing inside a zero-height box scrolls the page to the wrong place.
+          window.setTimeout(() => $('#wall-name', section)?.focus(), 260);
+        }
+      });
+    }
+
     /* Demo mode keeps the section on the page even with no endpoint configured — the whole
        point is to look at it before anything is wired up. */
     if (!endpoint && !demoMode) {
@@ -1834,6 +1887,20 @@ import { flagSvg } from './flags.js';
     let sortMode = 'new';
     let loaded = [];
 
+    /**
+     * How many notes are on screen.
+     *
+     * The board used to be a fixed-height box with its own scrollbar — a scrolling box inside
+     * a scrolling page, which on a phone means the wrong thing moves depending on where your
+     * thumb lands. The cap is on the number rendered instead, and "show more" raises it.
+     *
+     * Four to start: enough to see that there are messages and what they look like, few enough
+     * that the section is not a wall of text before you have decided to read any of it.
+     */
+    const FIRST_BATCH = 4;
+    const NEXT_BATCH = 6;
+    let shown = FIRST_BATCH;
+
     const sorters = {
       new: (a, b) => String(b.createdAt).localeCompare(String(a.createdAt)),
       old: (a, b) => String(a.createdAt).localeCompare(String(b.createdAt)),
@@ -1843,13 +1910,23 @@ import { flagSvg } from './flags.js';
     };
 
     function repaint() {
-      render([...loaded].sort(sorters[sortMode] || sorters.new), false);
-      /* The sort controls only earn their space once there is something to sort. Revealed
-         here rather than after the fetch, so demo mode — which never fetches — gets them
-         too, and there is one place that decides it instead of two. */
+      const ordered = [...loaded].sort(sorters[sortMode] || sorters.new);
+      render(ordered.slice(0, shown), false);
+
+      /* The sort controls only earn their space once there is something to sort. Decided here
+         rather than after the fetch, so demo mode — which never fetches — gets them too, and
+         there is one place that knows instead of two. */
       const bar = $('[data-wall-sortbar]', section);
       if (bar) bar.hidden = loaded.length < 3;
+
+      /* "Show more" now means two different things and has to tell them apart: there may be
+         notes already loaded but not yet rendered, and there may be older ones still on the
+         server. Local first, because it costs nothing. */
+      if (more) more.hidden = shown >= ordered.length && !serverHasMore;
     }
+
+    /** Whether the server said there are older notes past what has been fetched. */
+    let serverHasMore = false;
 
     $$('[data-wall-sort]', section).forEach((button) => {
       button.addEventListener('click', () => {
@@ -1871,9 +1948,9 @@ import { flagSvg } from './flags.js';
          with placeholder words in it. */
       if (demoMode) {
         loaded = demoComments();
+        serverHasMore = false;
         repaint();
         paintScore(demoRating());
-        if (more) more.hidden = true;
         return;
       }
 
@@ -1895,17 +1972,28 @@ import { flagSvg } from './flags.js';
       }
       // Kept so the sort buttons have something to reorder without asking again.
       loaded = append ? [...loaded, ...result.comments] : result.comments;
+      serverHasMore = Boolean(result.hasMore);
+      if (result.comments.length) oldest = result.comments[result.comments.length - 1].createdAt;
       repaint();
       paintScore(result.rating);
-      if (result.comments.length) oldest = result.comments[result.comments.length - 1].createdAt;
-      if (more) more.hidden = !result.hasMore;
     }
 
     messageField?.addEventListener('input', () => {
       if (counter) counter.textContent = String(messageField.value.length);
     });
 
-    more?.addEventListener('click', () => load(true));
+    /* Reveal what is already here first, and only ask the server once there is nothing left to
+       reveal. Pressing this should never cost a request it did not need to make. */
+    more?.addEventListener('click', () => {
+      const ordered = loaded.length;
+      if (shown < ordered) {
+        shown += NEXT_BATCH;
+        repaint();
+        return;
+      }
+      shown += NEXT_BATCH;
+      load(true);
+    });
 
     form?.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -3473,7 +3561,6 @@ import { flagSvg } from './flags.js';
 
     if (!sponsors.length) {
       band.hidden = true;
-      hero?.style.removeProperty('--hero-bottom-strips');
       return;
     }
 
@@ -3506,15 +3593,12 @@ import { flagSvg } from './flags.js';
     band.hidden = false;
     band.style.setProperty('--sponsor-speed', `${Math.max(18, sponsors.length * 6)}s`);
 
-    const syncHeight = () => {
-      const height = band.getBoundingClientRect().height;
-      if (!height) return;
-      hero?.style.setProperty('--hero-bottom-strips', `${Math.round(height)}px`);
-      $('.hero__marquee')?.style.setProperty('--sponsor-band-h', `${Math.round(height)}px`);
-    };
-    syncHeight();
-    window.addEventListener('resize', syncHeight, { passive: true });
-    if ('ResizeObserver' in window) new ResizeObserver(syncHeight).observe(band);
+    /* The band used to sit at the foot of the hero, so its height had to be pushed back into
+       the hero's bottom padding and into the marquee — otherwise the strip covered the
+       headline. It is above the route heading now, in ordinary flow, so it takes its own
+       space and there is nothing to compensate for. Both of those variables are gone rather
+       than left writing values nothing reads. */
+    void hero;
   }
 
   /**
@@ -4372,6 +4456,115 @@ import { flagSvg } from './flags.js';
     if (/(?:^|[#&])chat\b/.test(window.location.hash)) selectTab('chat');
   }
 
+  /**
+   * The route photograph grows as you scroll into it, then holds still.
+   *
+   * WHAT IT IS FOR
+   *   #route is one of the pinned panels: it sticks to the top of the viewport and the next
+   *   section slides over it. That already happens. What was missing is any sense that the
+   *   photograph is the reason to stop there — it arrived at its final size before it was
+   *   fully on screen and then sat there while the page moved around it.
+   *
+   *   So the frame starts slightly small and low, reaches full size around the point where
+   *   the section is centred, and then stops. Stopping matters more than moving: a photo
+   *   that is still growing while the next card starts covering it reads as two animations
+   *   fighting, which is what the earlier attempt looked like.
+   *
+   * WRITTEN AS A CUSTOM PROPERTY, NOT A TRANSFORM
+   *   `--route-progress` goes on the frame and the stylesheet decides what to do with it.
+   *   That keeps the scale, the lift and the shadow in the file with the rest of the section
+   *   styling, and it means a change to the look needs no JavaScript.
+   *
+   * COST
+   *   One passive scroll listener, throttled to one write per frame, doing two rect reads.
+   *   It unhooks itself if the section is not on the page.
+   */
+  function setupRouteZoom() {
+    const frame = $('[data-route-frame]');
+    const section = $('#route');
+    if (!frame || !section) return;
+
+    // Motion turned down: the photograph is simply at its final size. There is nothing here
+    // that carries information, so there is nothing to preserve by animating it slowly.
+    if (reducedMotion) {
+      frame.style.setProperty('--route-progress', '1');
+      return;
+    }
+
+    /**
+     * The section's position in the document, not on the screen.
+     *
+     * getBoundingClientRect() was the obvious thing to use and it is the wrong thing here.
+     * #route is one of the sticky panels: once it pins, `rect.top` stops at 0 and stays
+     * there for the whole time the section is on screen. Progress computed from it jumped
+     * straight to 1 before the photograph was even fully visible — which is exactly the
+     * "it does not zoom, there is no animation" that came back.
+     *
+     * The offsetTop chain is the layout position, and `position: sticky` does not change
+     * layout — it only shifts where the box is painted. So this keeps increasing while the
+     * panel is pinned, which is the whole window the animation needs.
+     */
+    const documentTop = (element) => {
+      let top = 0;
+      let node = element;
+      while (node) {
+        top += node.offsetTop;
+        node = node.offsetParent;
+      }
+      return top;
+    };
+
+    let queued = false;
+
+    const measure = () => {
+      queued = false;
+      const viewport = window.innerHeight || 1;
+      const top = documentTop(section);
+      const height = section.offsetHeight;
+      const y = window.scrollY || window.pageYOffset || 0;
+
+      /* Two thirds of the travel happens while the section is arriving, the rest while it is
+         pinned. `end` stops short of the point where the next panel begins covering this
+         one, so the photograph has finished growing before anything slides over it —
+         a picture still expanding under an incoming card reads as two animations arguing. */
+      /* Measured: with this layout the section is exactly one viewport tall, so `height -
+         viewport` is zero and the whole animation has to happen on the way in. Starting a
+         screen and a tenth early gives it enough scroll to be seen; finishing as the panel
+         pins means the photograph is already at rest when the next card begins sliding over
+         it, which is the order asked for. */
+      const start = top - viewport * 1.1;
+      const end = top + Math.max(height - viewport, 0) * 0.55;
+      const span = Math.max(end - start, 1);
+
+      frame.style.setProperty('--route-progress', clamp((y - start) / span, 0, 1).toFixed(3));
+    };
+
+    /**
+     * Throttled to one measurement per frame, with a way out if the frame never comes.
+     *
+     * The obvious version — set a flag, clear it inside requestAnimationFrame — has a failure
+     * mode that is worse than the thing it optimises. If the callback is starved, the flag
+     * stays raised and every later scroll is discarded: not a dropped frame, a permanently
+     * frozen animation. That is the third time on this page that a rendering callback turned
+     * out not to be a guarantee (the text effects and the comment wall were the other two),
+     * so the pattern is now written with the escape included rather than added after somebody
+     * reports it.
+     */
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(measure);
+      // Only does anything if the frame above never arrived; measure() clears the flag.
+      window.setTimeout(() => { if (queued) measure(); }, 120);
+    };
+
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    // The section is a sticky panel whose own height changes when app.js decides between
+    // `pinned` and `flow`, so a resize needs a fresh measurement rather than the old one.
+    window.addEventListener('resize', onScroll, { passive: true });
+  }
+
   function setupPanelDepth() {
     const panels = $$('#main > section');
     panels.forEach((section, index) => {
@@ -4419,6 +4612,7 @@ import { flagSvg } from './flags.js';
       ['gallery3d', setupGalleryCarousel],
       ['footerYear', setupFooterYear],
       ['reminderWindows', setupReminderWindows],
+      ['routeZoom', setupRouteZoom],
       ['unsubscribe', setupUnsubscribe],
       ['chat', setupChat],
       ['textEffects', setupTextEffects]

@@ -56,6 +56,56 @@ const probe = `
   out.sortBarVisible = bar ? !bar.hidden : null;
   out.sortButtons = [...document.querySelectorAll('[data-wall-sort]')].map((b) => b.textContent.trim());
 
+  /* The board must not have a scrollbar of its own — a scrolling box inside a scrolling page
+     means the wrong thing moves depending on where a thumb lands. */
+  const board = document.querySelector('.wall-board');
+  const list = document.querySelector('[data-wall-list]');
+  out.boardOverflowY = board ? getComputedStyle(board).overflowY : '';
+  out.boardScrolls = board ? board.scrollHeight > board.clientHeight + 2 : null;
+  out.listColumns = list ? getComputedStyle(list).columnCount : '';
+
+  // "Show more" should reveal what is already loaded before asking the server for anything.
+  const showMore = document.querySelector('[data-wall-more]');
+  out.moreVisible = showMore ? !showMore.hidden : null;
+  if (showMore && !showMore.hidden) {
+    showMore.click();
+    await sleep(400);
+    out.commentsAfterMore = document.querySelectorAll('.wall-note').length;
+    out.moreVisibleAfter = !showMore.hidden;
+  }
+
+  // The form is folded away behind a button.
+  const openBtn = document.querySelector('[data-wall-open]');
+  const fold = document.querySelector('[data-wall-fold]');
+  out.foldClosedHeight = fold ? Math.round(fold.getBoundingClientRect().height) : null;
+  if (openBtn) {
+    openBtn.click();
+    await sleep(600);
+    out.foldOpenHeight = fold ? Math.round(fold.getBoundingClientRect().height) : null;
+    out.foldAria = openBtn.getAttribute('aria-expanded');
+    out.foldHasClass = fold ? fold.classList.contains('is-open') : null;
+    out.foldMaxHeight = fold ? getComputedStyle(fold).maxHeight : '';
+    /* The inner element carries no transition, so its height is the content's real height
+       whatever the animation clock is doing. If this is large while the outer box reads 0,
+       the panel is fine and the transition simply has not advanced — which is what a headless
+       virtual clock does. If this is 0 too, the panel is genuinely empty. */
+    const inner = fold ? fold.querySelector('.wall-fold__inner') : null;
+    out.foldInnerHeight = inner ? Math.round(inner.getBoundingClientRect().height) : null;
+    out.formFieldsInside = inner ? inner.querySelectorAll('input, textarea').length : 0;
+
+    /* Settles "frozen transition" against "broken rule".
+       A transition that has not advanced reports its start value from getComputedStyle, which
+       is indistinguishable from a rule that never applied. Turning the transition off forces
+       the final value: if max-height becomes 1400px here, the CSS is right and the headless
+       animation clock was the only thing standing still. */
+    if (fold) {
+      fold.style.transition = 'none';
+      await sleep(120);
+      out.foldMaxHeightNoTransition = getComputedStyle(fold).maxHeight;
+      out.foldHeightNoTransition = Math.round(fold.getBoundingClientRect().height);
+    }
+  }
+
   // Press "best rated" and see whether the first tile changes to a five-star one.
   const best = document.querySelector('[data-wall-sort="best"]');
   if (best) {

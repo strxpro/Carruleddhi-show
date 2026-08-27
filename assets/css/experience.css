@@ -1760,7 +1760,16 @@ html.no-js .preloader { display: none !important; }
   /* JavaScript finished first: cancel the fallback and use the scripted exit. */
   animation: none;
 }
-.preloader__bar {
+/* The bar is driven by JavaScript, and only by JavaScript.
+   There used to be a `preloader-fill` keyframe animation here as well as `width: 0` and a
+   width transition in main.css and a background repaint in carnival.css — three stylesheets
+   with an opinion, none of them winning cleanly, and nothing in app.js touching the width.
+   The result was a number counting up beside a bar that sat still.
+
+   setupPreloader() now writes both from one elapsed time on one requestAnimationFrame loop,
+   so they cannot disagree. The keyframe is kept only for the no-JavaScript case below: if
+   the script never runs the bar should still look like a bar rather than an empty groove. */
+.no-js .preloader__bar {
   animation: preloader-fill 1.25s cubic-bezier(.16, 1, .3, 1) forwards;
 }
 

@@ -88,10 +88,37 @@ const probe = `
       io: seen.hit + '/' + seen.ratio
     });
   }
+  /* The three effects that do not animate on entry, so they cannot be checked the same way.
+     What matters for each is that the wrapper elements were built and that the visible text
+     is still exactly the original — a roll that renders three copies into the accessible
+     tree, or a jitter that lost its word, would look fine and read as gibberish. */
+  const jitter = [...document.querySelectorAll('[data-text-jitter]')].map((el) => ({
+    text: el.textContent.trim(),
+    inner: Boolean(el.querySelector('.fx-jitter')),
+    animation: el.querySelector('.fx-jitter')
+      ? getComputedStyle(el.querySelector('.fx-jitter')).animationName
+      : null
+  }));
+
+  const rollNodes = [...document.querySelectorAll('[data-text-roll]')];
+  const roll = {
+    count: rollNodes.length,
+    // The label is announced once, from the sr-only child; the two visible copies are
+    // aria-hidden. Three readings of the same word would be the bug.
+    allHaveOneLabel: rollNodes.every((el) => el.querySelectorAll('.fx-sr').length === 1),
+    allHaveTwoLines: rollNodes.every((el) => el.querySelectorAll('.fx-roll__line').length === 2),
+    sample: rollNodes.length ? rollNodes[0].querySelector('.fx-sr').textContent : '',
+    // A clipped box with no height is an invisible label.
+    height: rollNodes.length ? Math.round(rollNodes[0].getBoundingClientRect().height) : 0
+  };
+
   const marker = document.createElement('pre');
   marker.id = 'probe-result';
   marker.textContent = JSON.stringify({
     reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    jitter,
+    roll,
+    ghostAssigned: document.querySelectorAll('[data-text-ghost]').length,
     cssLoaded: [...document.styleSheets].some((sheet) => {
       try { return [...sheet.cssRules].some((rule) => String(rule.cssText).includes('fx-rise')); }
       catch (_) { return false; }
@@ -136,7 +163,10 @@ try {
   const result = JSON.parse(decoded);
 
   console.log(`reduced motion: ${result.reducedMotion}`);
-  console.log(`text-effects.css loaded: ${result.cssLoaded}\n`);
+  console.log(`text-effects.css loaded: ${result.cssLoaded}`);
+  console.log(`jitter: ${JSON.stringify(result.jitter)}`);
+  console.log(`roll:   ${JSON.stringify(result.roll)}`);
+  console.log(`ghost:  ${result.ghostAssigned} elements (0 is expected — see apply-text-effects.mjs)\n`);
   for (const heading of result.headings) {
     console.log(
       `${heading.id.padEnd(16)} ${String(heading.effect).padEnd(5)} `
