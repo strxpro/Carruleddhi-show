@@ -1,5 +1,25 @@
 # Kiro ↔ MCP ↔ Make.com — konfiguracja
 
+> ## ⚠️ TEN PLIK JEST NIEAKTUALNY. NIE IDŹ ZA NIM.
+>
+> Opisuje architekturę, której już nie ma: Cloudflare Workers (jest Vercel), Arkusze Google
+> (jest Supabase), Brevo (jest SMTP OVH), pole `taxCode` (jest `postalCode`), pięć endpointów
+> (jest kilkanaście), dwa scenariusze w Make (jest jeden).
+>
+> **Aktualne instrukcje:**
+> - `START-TUTAJ.md` — cała konfiguracja od zera, osiem kroków
+> - `make/JAK-WGRAC.md` — scenariusz w Make, krok po kroku
+> - `make/PROMPT-DLA-AI.md` — to samo jako prompt dla asystenta
+>
+> Zostaje tylko dla jednej rzeczy: sekcja 1 poniżej nadal poprawnie opisuje, jak podłączyć
+> serwer MCP Make. Reszty nie czytaj.
+>
+> **I jedna rzecz, którą warto z tego wiedzieć:** serwer MCP Make daje zakresy
+> `scenarios:read` i `scenarios:run` — czyta i uruchamia. **Nie tworzy scenariuszy i nie
+> ustawia połączeń.** Pokazuje też tylko scenariusze w trybie *On demand*, a nasz jest na
+> webhooku, więc na liście narzędzi się nie pojawi. Żadne AI nie zbuduje tego scenariusza
+> przez MCP — import blueprintu jest jedyną drogą i jest szybszy.
+
 Ten dokument opisuje, co jest już w repo i co musisz jeszcze uzupełnić, żeby łańcuch
 **strona → proxy → Make → Sheets/Brevo** działał, a ja mógł uruchamiać Twoje scenariusze
 przez MCP.
