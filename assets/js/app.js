@@ -3660,6 +3660,23 @@ import { flagSvg } from './flags.js';
        accurate one taken repeatedly. */
     const alwaysFlow = new Set(['categories', 'prizes', 'signup', 'contact']);
 
+    /* On a phone the route section gets its own scroll length.
+       ---------------------------------------------------------------------------
+       The photograph's zoom, the copy sliding away and the cart running down the road all
+       happen across `--route-progress`, and on a phone that whole sequence had barely half a
+       screen of scrolling to happen in — because the section is one screen tall and the next
+       panel starts covering it as soon as it is scrolled past. So it was over before it read
+       as anything, and the next card arrived on top of a picture still growing.
+
+       As a flow section it can be two screens tall with its contents pinned inside (the same
+       arrangement the categories and prizes sections already use), which gives the sequence a
+       screen of travel and puts the next panel after it rather than during it. The height and
+       the inner sticky wrapper are in route-zoom.css, scoped to the same 760px.
+
+       Not applied on a desktop, where the section is wide, the copy sits beside the picture
+       rather than above it, and one screen is enough. */
+    const routeFlowsBelow = 760;
+
     // The gallery is the one section with a hard `height: 100svh` and
     // `overflow: hidden` in CSS, so it can never need more than one screen no
     // matter what the copy does. Measuring it is not just unnecessary, it is
@@ -3677,8 +3694,9 @@ import { flagSvg } from './flags.js';
     function measure() {
       selfInflicted = true;
       const viewport = window.innerHeight;
+      const routeFlows = window.innerWidth <= routeFlowsBelow;
       panels.forEach((panel) => {
-        if (alwaysFlow.has(panel.id)) {
+        if (alwaysFlow.has(panel.id) || (panel.id === 'route' && routeFlows)) {
           panel.dataset.panel = 'flow';
           return;
         }
@@ -5150,6 +5168,12 @@ import { flagSvg } from './flags.js';
          picture that is still visibly growing reads as two things moving at once. From 0.35
          onwards it covers the whole descent, which is the part worth watching. */
       if (routeCartPlacer) routeCartPlacer(clamp((progress - 0.35) / 0.65, 0, 1));
+
+      /* On a phone the copy fades almost completely away over the photograph, and an invisible
+         link is still a link — the "open in Google Maps" button would sit on top of the picture
+         waiting to be tapped by accident. A threshold rather than a smooth value because
+         `pointer-events` has nothing between `auto` and `none`. */
+      section.classList.toggle('is-route-copy-gone', progress > 0.8);
     };
 
     /**

@@ -132,3 +132,101 @@
   .route__copy { opacity: 1; transform: none; will-change: auto; }
   .route__cart { opacity: 1; transform: translate(-50%, -50%); }
 }
+
+/* ============================================================================
+   The route on a phone: the copy leaves, the photograph takes over
+   ============================================================================
+   On a wide screen the copy is beside the picture, so it steps back sideways and everything
+   is visible at once. On a phone it is above the picture, stacked, and there is no room for
+   both — so the sequence is: you arrive and read, and as you carry on the words lift away
+   upwards and the photograph grows into the space they leave.
+
+   The section is a flow panel below 760px (setupPanels in app.js) and two screens tall, with
+   its contents pinned inside. That is what buys the sequence enough scrolling to be seen, and
+   it is what puts the next card *after* the photograph has finished rather than on top of it
+   mid-zoom. Scrolling back up runs the whole thing in reverse for free: every value is a
+   function of the scroll position, not of a played animation.
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* Selector written to out-specify `#main > section.section-card[data-panel='flow']`, which
+     is where the `min-height: 100svh` for flow panels lives. A plain `#route` loses to it —
+     measured, the section stayed 869px tall and this rule did nothing at all, which is the
+     worst kind of CSS: present, commented, and inert. */
+  #main > section#route.section-card {
+    /* Two screens: one for the sequence, one for the picture to sit still at the end of it.
+       Any less and the photograph is still moving when the next panel starts to arrive. */
+    min-height: 200svh;
+    align-content: start;
+  }
+
+  /* The contents pin inside the tall section. `100svh` and not `100vh`: on a phone the
+     address bar makes vh taller than what you can actually see, and the difference is exactly
+     enough to push the picture's bottom edge off screen. */
+  #route .route__grid {
+    position: sticky;
+    top: 0;
+    display: grid;
+    min-height: 100svh;
+    align-content: center;
+  }
+
+  /* The words lift and go, rather than sliding sideways.
+     Up, because that is the direction the page is travelling — the copy leaves the way the
+     scroll is taking it, so it reads as being carried off rather than pushed aside. It goes
+     nearly all the way: at this width there is no room for a half-faded paragraph over a
+     photograph, and the same three facts are in the picture itself. */
+  .route__copy {
+    opacity: calc(1 - var(--route-progress) * 0.94);
+    transform: translateY(calc(var(--route-progress) * -70px));
+  }
+  /* Untappable once it has faded out. The class is set by setupRouteZoom past 0.8, because
+     `pointer-events` cannot be interpolated — there is no value between `auto` and `none`, so
+     it has to be a threshold and the threshold has to live somewhere that can compare numbers.
+     Without it there is an invisible "open in Google Maps" link lying over the photograph. */
+  #route.is-route-copy-gone .route__copy { pointer-events: none; }
+
+  /* Bigger, straighter, centred.
+     0.72 to 1 is a touch under 40% of growth — more than the desktop's 30, because the phone
+     frame is smaller to begin with and the copy has cleared out of its way. The rotation
+     unwinds as it arrives: it comes in tilted along the fall of the road and settles level,
+     which is the "it turns to match the line" part. No sideways drift, because in a single
+     column it is already centred. */
+  .route__frame {
+    transform:
+      translateY(calc((1 - var(--route-progress)) * 40px))
+      rotate(calc((1 - var(--route-progress)) * -2.6deg))
+      scale(calc(0.72 + var(--route-progress) * 0.28));
+  }
+
+  /* Start and finish pop in as the picture settles.
+     ---------------------------------------------------------------------------
+     Done with the `scale` property, not with `transform`, and that is the whole trick here.
+     Each pin already carries a transform that lifts its label clear of its own dot —
+     `translate(-50%, calc(-100% - 20px))` for the start, `translate(-50%, 24px)` for the
+     finish, both written in experience.css because app.js positions them with left/top from
+     the real road geometry. A `transform` here would replace those and drop both labels on top
+     of the dots they are meant to label.
+
+     `scale` is a separate property that composes with whatever `transform` is already there,
+     so the pop-in costs nothing and breaks nothing.
+
+     Whether they are visible at all stays with `is-route-drawn`, which is the existing gate
+     tied to the road finishing drawing. Two owners for opacity would be one too many.
+
+     `--route-pin-in` runs 0 to 1 across the second half of the sequence, so the arithmetic
+     lives in one place instead of being repeated in each declaration. */
+  .route__frame {
+    --route-pin-in: clamp(0, calc((var(--route-progress) - 0.45) * 3.2), 1);
+  }
+  .route__frame .route__pin { scale: calc(0.55 + var(--route-pin-in) * 0.45); }
+  .route__frame .route__node { scale: calc(0.4 + var(--route-pin-in) * 0.6); }
+}
+
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  /* Everything at its resting state: the section is still two screens tall so the layout does
+     not change, but nothing moves as a function of scrolling. */
+  #route .route__copy { opacity: 1; transform: none; }
+  #route .route__frame { transform: none; }
+  #route .route__frame .route__pin,
+  #route .route__frame .route__node { scale: 1; }
+}
