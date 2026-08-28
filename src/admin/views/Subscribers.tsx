@@ -3,6 +3,7 @@ import { BellOff, BellRing, Search, Trash2 } from 'lucide-react';
 import { cn, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import { fetchSubscribers, setSubscriberStatus, type Subscriber } from '../api';
+import { SkeletonTable } from './Skeleton';
 
 /**
  * Reminders and the newsletter.
@@ -129,8 +130,10 @@ export function Subscribers({
         </div>
       ) : null}
 
+      {/* Shapes the size of the rows that are coming, so nothing jumps when they arrive.
+          Four columns to match the table below: who, when, extra, actions. */}
       {rows === null && !error ? (
-        <p className="mt-6 text-sm text-muted-foreground">{t('common.loading')}</p>
+        <SkeletonTable rows={5} cols={['w-1/3', 'w-1/5', 'w-1/6', 'w-16']} />
       ) : null}
 
       {rows && rows.length === 0 ? (
@@ -140,8 +143,14 @@ export function Subscribers({
       ) : null}
 
       {rows && rows.length > 0 ? (
-        <div className="mt-5 overflow-hidden rounded-2xl border border-border">
-          <table className="w-full text-left text-sm">
+        /* `overflow-x-auto` and a minimum width on the table, not `overflow-hidden`.
+           This was hidden, so on a phone the four columns were squeezed into 360px and the last
+           one — the two action buttons — was simply not reachable: no sideways scroll, nothing
+           to swipe. A table that cannot be scrolled sideways is a table with columns nobody can
+           use. `overscroll-x-contain` keeps the swipe inside the table instead of it turning
+           into a back-navigation gesture. */
+        <div className="mt-5 overflow-x-auto overscroll-x-contain rounded-2xl border border-border">
+          <table className="w-full min-w-[560px] text-left text-sm">
             <thead className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-semibold">{pl ? 'Kto' : 'Chi'}</th>

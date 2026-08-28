@@ -148,3 +148,31 @@ body {
     -webkit-text-fill-color: currentColor;
   }
 }
+
+/* ============================================================================
+   Skeleton loading
+   ============================================================================
+   Used by src/admin/views/Skeleton.tsx. A separate keyframe from `shimmer-sweep` above,
+   which sweeps a text gradient for the chat's typing marker — this one pulses opacity on a
+   solid block, and reusing the text one here would mean one animation serving two shapes and
+   getting adjusted for whichever broke last.
+
+   Opacity and not a moving gradient: a placeholder screen may hold twenty of these, and a
+   background-position animation on twenty boxes is twenty repaints per frame for a screen
+   where nothing has happened yet. Opacity composites.
+   ========================================================================== */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.animate-skeleton {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* A skeleton exists to say "something is coming". Somebody who has asked for less motion has
+   already said they do not want to be told that by movement — the grey shapes still do the
+   job of holding the space, which is the part that matters. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton { animation: none; opacity: 0.7; }
+}

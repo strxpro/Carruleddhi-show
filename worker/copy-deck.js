@@ -125,7 +125,15 @@ export const COPY_DECK = {
     "entrySubject": "Il tuo codice: %CODE%",
     "entryCodeTitle": "Ecco il codice",
     "entryCodeLead": "Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 15 minuti.",
-    "entryCodeNote": "Se non hai chiesto tu questo codice, ignora il messaggio: la tua iscrizione non cambia."
+    "entryCodeNote": "Se non hai chiesto tu questo codice, ignora il messaggio: la tua iscrizione non cambia.",
+    "quitSubject": "Codice per ritirarti: %CODE%",
+    "quitCodeTitle": "Vuoi ritirarti dalla gara?",
+    "quitCodeLead": "Inserisci questo codice sul sito per confermare il ritiro. Vale 15 minuti. Non serve per altro.",
+    "quitCodeNote": "Se non hai chiesto tu questo codice, ignoralo: la tua iscrizione resta come è.",
+    "quitDoneSubject": "Ritiro confermato — Carruleddhi Show 2026",
+    "quitDoneTitle": "Ti abbiamo ritirato dalla gara",
+    "quitDoneLead": "Il numero %RACENUMBER% torna disponibile e non ti mandiamo più promemoria.",
+    "quitDoneNote": "Se non sei stato tu, scrivici subito a %ORGEMAIL% — si può rimettere a posto."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -241,7 +249,15 @@ export const COPY_DECK = {
     "entrySubject": "Twój kod: %CODE%",
     "entryCodeTitle": "Oto kod",
     "entryCodeLead": "Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 15 minut.",
-    "entryCodeNote": "Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — Twoje zgłoszenie się nie zmienia."
+    "entryCodeNote": "Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — Twoje zgłoszenie się nie zmienia.",
+    "quitSubject": "Kod do rezygnacji: %CODE%",
+    "quitCodeTitle": "Chcesz zrezygnować z wyścigu?",
+    "quitCodeLead": "Wpisz ten kod na stronie, żeby potwierdzić rezygnację. Jest ważny 15 minut. Do niczego innego nie służy.",
+    "quitCodeNote": "Jeśli to nie Ty prosiłeś o ten kod, zignoruj go — Twoje zgłoszenie zostaje bez zmian.",
+    "quitDoneSubject": "Rezygnacja przyjęta — Carruleddhi Show 2026",
+    "quitDoneTitle": "Wycofaliśmy Cię z wyścigu",
+    "quitDoneLead": "Numer %RACENUMBER% wraca do puli, a przypomnień już nie wysyłamy.",
+    "quitDoneNote": "Jeśli to nie Ty, napisz do nas od razu na %ORGEMAIL% — da się to odkręcić."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -357,7 +373,15 @@ export const COPY_DECK = {
     "entrySubject": "Your code: %CODE%",
     "entryCodeTitle": "Here is the code",
     "entryCodeLead": "Enter it on the website to see your entry, correct it or withdraw. It lasts 15 minutes.",
-    "entryCodeNote": "If you did not ask for this code, ignore this message — your entry does not change."
+    "entryCodeNote": "If you did not ask for this code, ignore this message — your entry does not change.",
+    "quitSubject": "Code to withdraw: %CODE%",
+    "quitCodeTitle": "Withdrawing from the race?",
+    "quitCodeLead": "Enter this code on the website to confirm the withdrawal. It lasts 15 minutes and does nothing else.",
+    "quitCodeNote": "If you did not ask for this code, ignore it — your entry stays as it is.",
+    "quitDoneSubject": "Withdrawal confirmed — Carruleddhi Show 2026",
+    "quitDoneTitle": "You are withdrawn from the race",
+    "quitDoneLead": "Number %RACENUMBER% goes back into the pool and no more reminders are coming.",
+    "quitDoneNote": "If this was not you, write to us straight away at %ORGEMAIL% — it can be put back."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -473,7 +497,15 @@ export const COPY_DECK = {
     "entrySubject": "Dein Code: %CODE%",
     "entryCodeTitle": "Hier ist der Code",
     "entryCodeLead": "Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 15 Minuten.",
-    "entryCodeNote": "Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — an deiner Anmeldung ändert sich nichts."
+    "entryCodeNote": "Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — an deiner Anmeldung ändert sich nichts.",
+    "quitSubject": "Code zum Rücktritt: %CODE%",
+    "quitCodeTitle": "Vom Rennen zurücktreten?",
+    "quitCodeLead": "Gib diesen Code auf der Website ein, um den Rücktritt zu bestätigen. Er gilt 15 Minuten und tut nichts anderes.",
+    "quitCodeNote": "Wenn du diesen Code nicht angefordert hast, ignoriere ihn — deine Anmeldung bleibt.",
+    "quitDoneSubject": "Rücktritt bestätigt — Carruleddhi Show 2026",
+    "quitDoneTitle": "Du bist vom Rennen zurückgetreten",
+    "quitDoneLead": "Die Nummer %RACENUMBER% geht zurück in den Pool, und Erinnerungen kommen keine mehr.",
+    "quitDoneNote": "Wenn das nicht du warst, schreib uns sofort an %ORGEMAIL% — das lässt sich zurücknehmen."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -589,7 +621,15 @@ export const COPY_DECK = {
     "entrySubject": "Tu código: %CODE%",
     "entryCodeTitle": "Aquí tienes el código",
     "entryCodeLead": "Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 15 minutos.",
-    "entryCodeNote": "Si no has pedido este código, ignora el mensaje: tu inscripción no cambia."
+    "entryCodeNote": "Si no has pedido este código, ignora el mensaje: tu inscripción no cambia.",
+    "quitSubject": "Código para retirarte: %CODE%",
+    "quitCodeTitle": "¿Te retiras de la carrera?",
+    "quitCodeLead": "Escribe este código en la web para confirmar la retirada. Vale 15 minutos y no sirve para nada más.",
+    "quitCodeNote": "Si no has pedido este código, ignóralo: tu inscripción se queda como está.",
+    "quitDoneSubject": "Retirada confirmada — Carruleddhi Show 2026",
+    "quitDoneTitle": "Te hemos retirado de la carrera",
+    "quitDoneLead": "El dorsal %RACENUMBER% vuelve a estar disponible y no te enviamos más avisos.",
+    "quitDoneNote": "Si no has sido tú, escríbenos enseguida a %ORGEMAIL%: se puede deshacer."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -705,6 +745,14 @@ export const COPY_DECK = {
     "entrySubject": "Votre code : %CODE%",
     "entryCodeTitle": "Voici le code",
     "entryCodeLead": "Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 15 minutes.",
-    "entryCodeNote": "Si vous n’avez pas demandé ce code, ignorez ce message : votre inscription ne change pas."
+    "entryCodeNote": "Si vous n’avez pas demandé ce code, ignorez ce message : votre inscription ne change pas.",
+    "quitSubject": "Code pour vous retirer : %CODE%",
+    "quitCodeTitle": "Vous vous retirez de la course ?",
+    "quitCodeLead": "Saisissez ce code sur le site pour confirmer le retrait. Il est valable 15 minutes et ne sert à rien d’autre.",
+    "quitCodeNote": "Si vous n’avez pas demandé ce code, ignorez-le : votre inscription reste telle quelle.",
+    "quitDoneSubject": "Retrait confirmé — Carruleddhi Show 2026",
+    "quitDoneTitle": "Vous êtes retiré de la course",
+    "quitDoneLead": "Le numéro %RACENUMBER% retourne dans la réserve et nous ne vous enverrons plus de rappels.",
+    "quitDoneNote": "Si ce n’était pas vous, écrivez-nous tout de suite à %ORGEMAIL% — cela peut être rétabli."
   }
 };

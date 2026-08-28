@@ -142,6 +142,22 @@ const probe = `
     avatars: document.querySelectorAll('.wall-note__avatar').length,
     tones: [...new Set([...document.querySelectorAll('.wall-note__avatar')].map((a) => a.dataset.tone))].sort(),
     askButtonPresent: Boolean(document.querySelector('.wall-ask')),
+    /* Czy sekcja komentarzy jest przewijalna do konca.
+       Byla panelem pinned: overflow hidden i wysokosc jednego ekranu, wiec przy liscie
+       dluzszej niz ekran reszta wpisow byla obcieta i nie bylo do czego przewinac. Trzy
+       liczby mowia, czy to juz nie tak: tryb panelu, czy tresc wystaje ponad pudelko, i ile
+       wolnego miejsca jest pod ostatnim kafelkiem. */
+    panel: document.getElementById('wall')?.dataset.panel || '',
+    clipped: (() => {
+      const s = document.getElementById('wall');
+      return s ? s.scrollHeight > s.offsetHeight + 4 : null;
+    })(),
+    spaceUnderLast: (() => {
+      const s = document.getElementById('wall');
+      const last = notes[notes.length - 1];
+      if (!s || !last) return null;
+      return Math.round(s.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom);
+    })(),
     firstNoteWidth: notes[0] ? Math.round(notes[0].getBoundingClientRect().width) : null,
     firstNoteHeight: notes[0] ? Math.round(notes[0].getBoundingClientRect().height) : null,
     moreVisible: (() => {
@@ -246,6 +262,10 @@ try {
     check(r.wall.avatars === r.wall.notes && r.wall.notes > 0,
       `awatar na każdym komentarzu: ${r.wall.avatars} z ${r.wall.notes}`);
     check(r.wall.tones.length >= 3, `awatary w różnych kolorach: odcienie ${r.wall.tones.join(', ')}`);
+    check(r.wall.panel === 'flow', `sekcja komentarzy przewija się normalnie (panel="${r.wall.panel}")`);
+    check(r.wall.clipped === false, 'nic nie jest obcięte na dole listy');
+    check((r.wall.spaceUnderLast ?? 0) >= 30,
+      `jest oddech pod ostatnim komentarzem: ${r.wall.spaceUnderLast} px`);
     console.log(`      kafelek ${r.wall.firstNoteWidth}x${r.wall.firstNoteHeight} px, „pokaż więcej": ${r.wall.moreVisible}`);
   }
 

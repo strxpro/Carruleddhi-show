@@ -3174,7 +3174,14 @@ import { flagSvg } from './flags.js';
       button.disabled = true;
       say('entry.sending');
       try {
-        const result = await postJSON(config.endpoints.entryCode, eventPayload('entry-code', { email }));
+        /* `intent` decides which of the two codes goes out, and what the letter says it is
+           for. Since migration 0018 they are separate purposes: a code sent to correct a phone
+           number cannot withdraw anybody from the race, and the e-mail names which one it is —
+           so nobody types six digits without knowing what they are confirming. */
+        const result = await postJSON(config.endpoints.entryCode, eventPayload('entry-code', {
+          email,
+          intent
+        }));
         if (!result?.ok) throw Object.assign(new Error('code'), { payload: result });
         const sent = $('[data-entry-sent]', panel);
         // The masked address comes from the server, so it is the address the letter went to
@@ -3948,8 +3955,15 @@ import { flagSvg } from './flags.js';
        disappears when it is filled in. Measuring that meant the panel could flip between
        `pinned` (sticky) and `flow` (relative) mid-sentence, which changes its position and
        moves the page under the cursor. One verdict, taken once, is worth more here than an
-       accurate one taken repeatedly. */
-    const alwaysFlow = new Set(['categories', 'prizes', 'signup', 'contact']);
+       accurate one taken repeatedly.
+
+       `wall` is here for the same reason and it was a visible fault: a pinned section is
+       `overflow: hidden` and one screen tall, so once the comments were longer than the
+       viewport — which one comment with a photograph in it already is — the rest of them were
+       clipped and there was nothing to scroll to. The list grows with every message, grows
+       again when somebody attaches a picture, and grows a third time when "show more" is
+       pressed, so measuring it once was never going to hold. */
+    const alwaysFlow = new Set(['categories', 'prizes', 'signup', 'contact', 'wall']);
 
     /* On a phone the route section gets its own scroll length.
        ---------------------------------------------------------------------------

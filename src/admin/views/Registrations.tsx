@@ -130,11 +130,18 @@ export function Registrations({
           </thead>
           <tbody>
             {rows === null ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  {t('common.loading')}
-                </td>
-              </tr>
+              /* Six skeleton rows inside the real table, rather than a "loading" line in one
+                 merged cell. The table keeps its column widths, so when the entries land the
+                 header does not shift and nothing moves under the cursor. */
+              Array.from({ length: 6 }).map((_, row) => (
+                <tr key={`skeleton-${row}`} className="border-t border-border/70">
+                  {['w-10', 'w-32', 'w-24', 'w-16', 'w-36', 'w-14'].map((width, cell) => (
+                    <td key={cell} className="px-4 py-4">
+                      <span className={`block ${width} h-4 animate-skeleton rounded bg-muted`} />
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : visible.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">

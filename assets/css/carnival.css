@@ -1224,6 +1224,18 @@ html {
   .wall-list { columns: 1; }
 }
 
+/* Room to breathe under the last note.
+   ---------------------------------------------------------------------------
+   The section is a flow panel now (see alwaysFlow in app.js), so it is as tall as its
+   contents — and its contents ended exactly at the last comment, with the next panel's edge
+   starting on the following pixel. The last note read as cut off rather than as the end of a
+   list, which is what "it looks stuck on, there is no space" was about.
+
+   The gap is generous on purpose. This is the bottom of a long scroll through other people's
+   messages, and a pause before the next section is the thing that says the list has finished
+   rather than that the page has broken. */
+#wall .wall__grid { padding-bottom: clamp(40px, 9svh, 96px); }
+
 /* Each note is a scrap of paper pinned to a board, tilted by a per-item variable
    set in JS so no two sit at the same angle. */
 /* Smaller and lighter than it was: 12px of padding instead of 16, a 1.5px rule instead of
@@ -1378,10 +1390,18 @@ html {
   .wall-ask .btn { width: 100%; justify-content: center; }
 }
 
-@media (max-width: 900px) {
-  .wall-board { max-height: 38svh; }
-  .wall-list { grid-template-columns: minmax(0, 1fr); }
-}
+/* `@media (max-width: 900px) { .wall-board { max-height: 38svh } }` used to be here, and it is
+   the reason the comments could not be scrolled to the end.
+   ---------------------------------------------------------------------------
+   It came from the version where the board was a fixed-height box with its own scrollbar. That
+   scrollbar was removed and `overflow-y: auto` went with it — but this cap stayed, in a media
+   query forty lines away from the rule it belonged to. So on a phone the list was still limited
+   to 38% of the screen, only now with nothing to scroll it: everything past the first note or
+   two simply extended past the bottom of a box that was not allowed to grow. Measured: the last
+   comment sat 626px below the section's own lower edge.
+
+   `grid-template-columns` went too. The list has been `columns: 1` on a phone since the masonry
+   change, so a grid template on it was styling a layout mode it no longer uses. */
 
 /* The gallery call-to-action repeated the two buttons that are already fixed to
    the bottom of every screen. Kept in the markup for the no-JS build, hidden

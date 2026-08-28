@@ -187,7 +187,8 @@ const FIELD_WHITELIST = {
      `entry-lookup` bierze wyłącznie adres — świadomie, bo im mniej wchodzi, tym mniej da
      się z tego endpointu wyciągnąć. */
   'entry-lookup': ['email'],
-  'entry-code': ['email'],
+  // `intent` is 'edit' or 'withdraw' and picks which code is issued. See ENTRY_PURPOSE.
+  'entry-code': ['email', 'intent'],
   /* Pola do poprawienia są wymienione po imieniu i nie ma tu `firstName`, `lastName` ani
      `birthDate`. To nie przeoczenie: te trzy są wydrukowane na liberatorii, którą człowiek
      ma już w skrzynce, a cicha zmiana w bazie robi rozjazd między papierem a listą startową,
@@ -2156,9 +2157,22 @@ async function entryLookup(env, payload, cors) {
   }, 200, cors);
 }
 
+/* One purpose per thing the code lets somebody do.
+   ---------------------------------------------------------------------------
+   `manage-entry` used to cover both, which read as a simplification and was a mistake: a code
+   sent to correct a phone number had no business withdrawing anybody from the race. Asking for
+   a code and being told what it is for are the same sentence, and those two sentences are
+   different. See migration 0018. */
+const ENTRY_PURPOSE = { edit: 'edit-entry', withdraw: 'cancel-entry' };
+
 async function entryCode(env, payload, cors) {
   const email = String(payload.email || '').trim().toLowerCase();
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
+
+  /* Which of the two, decided here and named in the letter. Defaults to editing rather than to
+     withdrawing: if the field is ever missing, the harmless one is the one to fall back to. */
+  const intent = payload.intent === 'withdraw' ? 'withdraw' : 'edit';
+  const purpose = ENTRY_PURPOSE[intent];
 
   const row = await findEntry(env, email);
   /* The same answer whether the address is unknown or known-but-withdrawn. An endpoint
@@ -2171,28 +2185,32 @@ async function entryCode(env, payload, cors) {
   const code = newVerificationCode();
 
   const stored = await insertRow(env, 'verification_codes', {
-    purpose: 'manage-entry',
+    purpose,
     email,
     code_hash: await hashCode(env, email, code)
   });
   if (!stored.ok) return json({ ok: false, code: 'ENTRY_CODE_FAILED' }, 502, cors);
 
+  /* The letter says which of the two this code is for.
+     A code that arrives saying only "here is your code" is a code somebody types without
+     knowing what they are about to confirm — and one of the two takes them out of the race. */
+  const withdrawing = intent === 'withdraw';
   const delivered = await sendThroughOutbox(env, {
     to: email,
-    subject: fill(deck.entrySubject, { CODE: code }),
+    subject: fill(withdrawing ? deck.quitSubject : deck.entrySubject, { CODE: code }),
     html: renderTemplate(EMAIL_TEMPLATES.code, {
       copy: deck,
       ev: COPY_DECK._event || {},
       loc: locale,
-      codeTitle: deck.entryCodeTitle,
-      codeLead: deck.entryCodeLead,
+      codeTitle: withdrawing ? deck.quitCodeTitle : deck.entryCodeTitle,
+      codeLead: withdrawing ? deck.quitCodeLead : deck.entryCodeLead,
       code,
-      codeNote: deck.entryCodeNote
+      codeNote: withdrawing ? deck.quitCodeNote : deck.entryCodeNote
     })
   });
   if (!delivered) return json({ ok: false, code: 'ENTRY_MAIL_FAILED' }, 502, cors);
 
-  return json({ ok: true, email: maskEmail(email) }, 200, cors);
+  return json({ ok: true, email: maskEmail(email), intent }, 200, cors);
 }
 
 /**
@@ -2262,7 +2280,15 @@ async function entryManage(env, payload, cors) {
   const row = await findEntry(env, email);
   if (!row) return json({ ok: false, code: 'ENTRY_NOT_FOUND' }, 404, cors);
 
-  const checked = await consumeCode(env, email, 'manage-entry', code);
+  /* The code has to have been issued for what is being asked.
+     `view` accepts either, because looking at your own entry is what both letters invite you
+     to do first — and refusing to show somebody their data while holding a valid code from
+     them would be caution with no benefit. `update` and `withdraw` each want their own. */
+  const purpose = action === 'withdraw' ? 'cancel-entry' : 'edit-entry';
+  let checked = await consumeCode(env, email, purpose, code);
+  if (!checked.ok && action === 'view') {
+    checked = await consumeCode(env, email, 'cancel-entry', code);
+  }
   if (!checked.ok) {
     return json(
       { ok: false, code: checked.code, ...(checked.left === undefined ? {} : { left: checked.left }) },
@@ -2320,6 +2346,38 @@ async function entryManage(env, payload, cors) {
         body: JSON.stringify({ status: 'unsubscribed' })
       }
     ).catch(() => {});
+
+    /* A letter confirming it happened.
+       Not a formality. Withdrawing is the one action here that cannot be undone from the
+       website, and the only trace of it otherwise is a sentence on a page somebody is about to
+       close. If it was not them who did it, this is how they find out while there is still time
+       to write back — and if it was, it is the receipt that says the race number is released
+       and no more reminders are coming.
+
+       Sent after the row is written, so it can never confirm something that did not happen, and
+       awaited rather than fired and forgotten: on Vercel a dropped promise dies with the
+       function. A failure here does not fail the withdrawal — that is already done and telling
+       somebody otherwise would be worse than a missing letter. */
+    const locale = localeOf(row.locale);
+    const deck = COPY_DECK[locale] || COPY_DECK.it;
+    const ev = COPY_DECK._event || {};
+    await sendThroughOutbox(env, {
+      to: email,
+      subject: deck.quitDoneSubject,
+      html: renderTemplate(EMAIL_TEMPLATES.code, {
+        copy: deck,
+        ev,
+        loc: locale,
+        codeTitle: deck.quitDoneTitle,
+        codeLead: fill(deck.quitDoneLead, {
+          RACENUMBER: row.race_number ? String(row.race_number).padStart(3, '0') : '—'
+        }),
+        // The template's big centred slot holds a code; here it holds nothing, because there is
+        // nothing to type. A dash rather than an empty string so the box does not collapse.
+        code: '—',
+        codeNote: fill(deck.quitDoneNote, { ORGEMAIL: ev.email })
+      })
+    });
 
     return json({ ok: true, withdrawn: true }, 200, cors);
   }

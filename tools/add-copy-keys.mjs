@@ -230,7 +230,78 @@ const ENTRY = {
   }
 };
 
-const GROUPS = [FAQ, UNSUB, HOURS, ENTRY];
+/* ------------------------------------------------- rezygnacja: własny kod i pokwitowanie
+   Od migracji 0018 kod do poprawiania danych i kod do rezygnacji to dwie różne rzeczy, więc
+   listy też muszą być dwie. List mówiący tylko „oto kod" jest listem, po którym ktoś wpisuje
+   sześć cyfr, nie wiedząc, że właśnie wypada z wyścigu.
+
+   `quitDone*` to pokwitowanie po fakcie. Rezygnacji nie da się odkręcić ze strony, a jedynym
+   jej śladem byłoby zdanie na stronie, którą człowiek zaraz zamknie — więc jeśli to nie on ją
+   zgłosił, ten list jest sposobem, żeby się dowiedział, póki jest czas napisać. */
+const QUIT = {
+  it: {
+    quitSubject: 'Codice per ritirarti: %CODE%',
+    quitCodeTitle: 'Vuoi ritirarti dalla gara?',
+    quitCodeLead: 'Inserisci questo codice sul sito per confermare il ritiro. Vale 15 minuti. Non serve per altro.',
+    quitCodeNote: 'Se non hai chiesto tu questo codice, ignoralo: la tua iscrizione resta come è.',
+    quitDoneSubject: 'Ritiro confermato — Carruleddhi Show 2026',
+    quitDoneTitle: 'Ti abbiamo ritirato dalla gara',
+    quitDoneLead: 'Il numero %RACENUMBER% torna disponibile e non ti mandiamo più promemoria.',
+    quitDoneNote: 'Se non sei stato tu, scrivici subito a %ORGEMAIL% — si può rimettere a posto.'
+  },
+  pl: {
+    quitSubject: 'Kod do rezygnacji: %CODE%',
+    quitCodeTitle: 'Chcesz zrezygnować z wyścigu?',
+    quitCodeLead: 'Wpisz ten kod na stronie, żeby potwierdzić rezygnację. Jest ważny 15 minut. Do niczego innego nie służy.',
+    quitCodeNote: 'Jeśli to nie Ty prosiłeś o ten kod, zignoruj go — Twoje zgłoszenie zostaje bez zmian.',
+    quitDoneSubject: 'Rezygnacja przyjęta — Carruleddhi Show 2026',
+    quitDoneTitle: 'Wycofaliśmy Cię z wyścigu',
+    quitDoneLead: 'Numer %RACENUMBER% wraca do puli, a przypomnień już nie wysyłamy.',
+    quitDoneNote: 'Jeśli to nie Ty, napisz do nas od razu na %ORGEMAIL% — da się to odkręcić.'
+  },
+  en: {
+    quitSubject: 'Code to withdraw: %CODE%',
+    quitCodeTitle: 'Withdrawing from the race?',
+    quitCodeLead: 'Enter this code on the website to confirm the withdrawal. It lasts 15 minutes and does nothing else.',
+    quitCodeNote: 'If you did not ask for this code, ignore it — your entry stays as it is.',
+    quitDoneSubject: 'Withdrawal confirmed — Carruleddhi Show 2026',
+    quitDoneTitle: 'You are withdrawn from the race',
+    quitDoneLead: 'Number %RACENUMBER% goes back into the pool and no more reminders are coming.',
+    quitDoneNote: 'If this was not you, write to us straight away at %ORGEMAIL% — it can be put back.'
+  },
+  de: {
+    quitSubject: 'Code zum Rücktritt: %CODE%',
+    quitCodeTitle: 'Vom Rennen zurücktreten?',
+    quitCodeLead: 'Gib diesen Code auf der Website ein, um den Rücktritt zu bestätigen. Er gilt 15 Minuten und tut nichts anderes.',
+    quitCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere ihn — deine Anmeldung bleibt.',
+    quitDoneSubject: 'Rücktritt bestätigt — Carruleddhi Show 2026',
+    quitDoneTitle: 'Du bist vom Rennen zurückgetreten',
+    quitDoneLead: 'Die Nummer %RACENUMBER% geht zurück in den Pool, und Erinnerungen kommen keine mehr.',
+    quitDoneNote: 'Wenn das nicht du warst, schreib uns sofort an %ORGEMAIL% — das lässt sich zurücknehmen.'
+  },
+  es: {
+    quitSubject: 'Código para retirarte: %CODE%',
+    quitCodeTitle: '¿Te retiras de la carrera?',
+    quitCodeLead: 'Escribe este código en la web para confirmar la retirada. Vale 15 minutos y no sirve para nada más.',
+    quitCodeNote: 'Si no has pedido este código, ignóralo: tu inscripción se queda como está.',
+    quitDoneSubject: 'Retirada confirmada — Carruleddhi Show 2026',
+    quitDoneTitle: 'Te hemos retirado de la carrera',
+    quitDoneLead: 'El dorsal %RACENUMBER% vuelve a estar disponible y no te enviamos más avisos.',
+    quitDoneNote: 'Si no has sido tú, escríbenos enseguida a %ORGEMAIL%: se puede deshacer.'
+  },
+  fr: {
+    quitSubject: 'Code pour vous retirer : %CODE%',
+    quitCodeTitle: 'Vous vous retirez de la course ?',
+    quitCodeLead: 'Saisissez ce code sur le site pour confirmer le retrait. Il est valable 15 minutes et ne sert à rien d’autre.',
+    quitCodeNote: 'Si vous n’avez pas demandé ce code, ignorez-le : votre inscription reste telle quelle.',
+    quitDoneSubject: 'Retrait confirmé — Carruleddhi Show 2026',
+    quitDoneTitle: 'Vous êtes retiré de la course',
+    quitDoneLead: 'Le numéro %RACENUMBER% retourne dans la réserve et nous ne vous enverrons plus de rappels.',
+    quitDoneNote: 'Si ce n’était pas vous, écrivez-nous tout de suite à %ORGEMAIL% — cela peut être rétabli.'
+  }
+};
+
+const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT];
 // (Ten plik obsługuje emails/copy.json. Klucze interfejsu strony idą przez
 //  tools/add-i18n-keys.mjs — to dwa różne słowniki i mieszanie ich kończy się kluczem,
 //  którego szuka przeglądarka, a jest tylko w mailach.)
