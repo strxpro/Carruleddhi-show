@@ -21,13 +21,24 @@
      than pushing away from one corner. */
   transform-origin: 50% 50%;
 
-  /* 0.90 to 1, and it stops at 1 rather than overshooting.
-     Ten per cent is enough to read as growth on a phone; the first attempt was six and was
-     reported as "it does not zoom". Going past 1 was considered and rejected: the frame would
-     then be wider than its grid column and would start covering the copy beside it. */
+  /* 0.77 to 1 — the photograph ends up about 30% bigger than it starts.
+     ---------------------------------------------------------------------------
+     It was 0.90 to 1. Ten per cent was already the second attempt (the first was six, and
+     came back as "it does not zoom"), and ten was still small enough to be mistaken for the
+     page settling. 1 / 0.77 = 1.30, so the growth is the thirty per cent asked for, and it
+     still stops at 1: going past it would make the frame wider than its grid column and it
+     would start covering the copy.
+
+     Sideways travel as well as vertical. The frame drifts left towards the middle of the
+     section as it arrives, which together with the copy fading back is the "the photo takes
+     the centre" part. Eight per cent, not more: the frame is in the right-hand column of a
+     grid, and past that it starts to overlap the text it is displacing. */
   transform:
-    translateY(calc((1 - var(--route-progress)) * 34px))
-    scale(calc(0.9 + var(--route-progress) * 0.1));
+    translate(
+      calc(var(--route-progress) * -8%),
+      calc((1 - var(--route-progress)) * 34px)
+    )
+    scale(calc(0.77 + var(--route-progress) * 0.23));
 
   /* The shadow deepens with the scale so the frame appears to lift off the section rather
      than merely get bigger. */
@@ -50,6 +61,65 @@
    translate() that carnival.css uses to lift each label clear of its dot. Left alone on
    purpose rather than by omission. */
 
+/* The copy steps back as the photograph comes forward.
+   ---------------------------------------------------------------------------
+   app.js writes the same `--route-progress` onto :root, so this reads the one number the
+   photograph reads and the two cannot fall out of step. On :root rather than on #route
+   because an inherited change did not invalidate these calc() values in Chrome — the note in
+   setupRouteZoom has the measurement.
+
+   0.42 is the floor, not 0. The column holds the heading, the three facts and two buttons
+   including "open in Google Maps" — text nobody can read and a link nobody can see is not a
+   nicer animation, it is a broken section. Faded far enough to hand over attention, not far
+   enough to stop working. Nothing here touches pointer-events for the same reason. */
+/* The no-script resting value, same reasoning as on the frame: without it every calc() below
+   is invalid, and an invalid declaration is a dropped declaration. */
+:root {
+  --route-progress: 1;
+}
+.route__copy {
+  opacity: calc(1 - var(--route-progress) * 0.58);
+  transform: translateX(calc(var(--route-progress) * -46px));
+  /* No `will-change` here, and that is a measured decision rather than an omission.
+     ---------------------------------------------------------------------------
+     With `will-change: opacity, transform` on this element Chrome promoted it to its own
+     composited layer and then stopped re-resolving the two calc() values when the inherited
+     `--route-progress` changed: the probe read the variable on this element as 0.091 while
+     its opacity stayed pinned at the value for 1. The variable was arriving; the properties
+     that depend on it were not being recomputed.
+
+     Without the hint both values track the scroll, which is the whole point. The frame keeps
+     its `will-change` because it declares the variable it uses rather than inheriting it, and
+     there the promotion costs nothing.
+
+     No transition either, for the same reason as the frame: the value already changes once
+     per frame from the scroll position, and easing on top of that is lag.
+
+     `transition: none` is spelled out rather than left unset. The `reveal` class used to be on
+     this element and brought an 850 ms transition on exactly these two properties; the class is
+     gone from the markup, and this makes sure re-adding it cannot quietly reintroduce a value
+     that lags a step behind the scroll. */
+  transition: none;
+}
+
+/* The cart. Placed on the road by app.js, which writes left/top as percentages of the frame;
+   everything here is about what it looks like once it is there.
+   Scaled with the photograph so it does not balloon relative to the road, and faded in over
+   the first slice of its travel so it arrives rather than appears. */
+.route__cart {
+  position: absolute;
+  z-index: 5;
+  /* left/top come from app.js. The translate centres the emoji on the point it was given. */
+  transform: translate(-50%, -50%) scale(calc(0.7 + var(--route-progress) * 0.55));
+  font-size: clamp(20px, 3.4vw, 34px);
+  line-height: 1;
+  pointer-events: none;
+  /* Invisible until the zoom is most of the way done — matches the 0.35 gate in app.js, so
+     the cart does not sit parked at the start line while the picture is still growing. */
+  opacity: calc((var(--route-progress) - 0.34) * 6);
+  filter: drop-shadow(0 3px 5px rgb(7 26 61 / 0.45));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .route__frame {
     /* Belt and braces: app.js already pins the property to 1 in this case, but a stylesheet
@@ -58,4 +128,7 @@
     transform: none;
     will-change: auto;
   }
+  /* Copy at full strength and the cart simply parked at the finish. */
+  .route__copy { opacity: 1; transform: none; will-change: auto; }
+  .route__cart { opacity: 1; transform: translate(-50%, -50%); }
 }

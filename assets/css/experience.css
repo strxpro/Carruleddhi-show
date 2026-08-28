@@ -276,6 +276,37 @@
   box-shadow: 0 10px 32px rgba(2, 10, 28, .2);
 }
 
+/* Opening the menu un-collapses the bar.
+   ---------------------------------------------------------------------------
+   `is-compact` hides the flag, the "I'll be there" button and the section label so the bar
+   can shrink to a pill while you read. `is-menu-open` then widens the bar back to full — but
+   nothing put the contents back, so the expanded header was a wide empty strip with a brand
+   on the left and a round button on the right. That is what "there is nothing in the header"
+   was.
+
+   Both classes are on the element at the same time (the header stays compact underneath the
+   open menu, so closing it does not flash the full bar), so this is the state that needs the
+   contents restored, and it has to out-specify the compact rules — hence the doubled class. */
+.site-header.is-compact.is-menu-open .nav-current,
+.site-header.is-compact.is-menu-open .nav-attend,
+.site-header.is-compact.is-menu-open .language-picker {
+  overflow: visible;
+  max-width: 260px;
+  min-width: auto;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+}
+.site-header.is-compact.is-menu-open .nav-actions { gap: 10px; }
+.site-header.is-compact.is-menu-open .menu-toggle {
+  width: auto;
+  min-width: 0;
+  padding: 0 18px;
+  border-radius: 999px;
+}
+.site-header.is-compact.is-menu-open .menu-toggle__label { display: inline; }
+
 /* Flag language listbox. */
 .language-picker {
   position: relative;
@@ -452,6 +483,24 @@ body.is-language-transitioning .nav-current__copy {
   .site-header.is-compact .nav-shell { min-height: 60px; padding: 5px 6px 5px 15px; }
   .site-header.is-menu-open { width: calc(100vw - 20px); }
   .site-header.is-menu-open .nav-shell { border-radius: 25px 25px 14px 14px; }
+
+  /* The open bar on a phone carries the flag and the button, and keeps the label hidden.
+     ---------------------------------------------------------------------------
+     Desktop restores all three. Here the label is the one that cannot come back: on a 360 px
+     screen the brand, the flag, "BĘDĘ TAM" and "MENU" already use the full width, and adding
+     "60% CARRULEDDHI" between them either wraps the bar onto two lines or squeezes the button
+     until its text breaks. The two that can be pressed win over the one that only reports.
+
+     The label is not lost — the open menu panel underneath shows the current section. */
+  .site-header.is-compact.is-menu-open .nav-current { display: none; }
+  .site-header.is-compact.is-menu-open .nav-actions { gap: 6px; }
+  .site-header.is-compact.is-menu-open .menu-toggle {
+    width: 50px;
+    min-width: 50px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .site-header.is-compact.is-menu-open .menu-toggle__label { display: none; }
   .language-picker__menu {
     position: fixed;
     top: 81px;

@@ -3358,9 +3358,46 @@ import { flagSvg } from './flags.js';
       dot.style.opacity = '1';
       ring.style.opacity = '1';
     }, { passive: true });
+    /* What the ring says about what is under it.
+       ---------------------------------------------------------------------------
+       It had one state: over-something-clickable or not. Everything from a text field to a
+       prize card to the big red button got the same ring, which meant the ring was decoration
+       rather than information — it moved, but it never told you anything.
+
+       Four states now, and each one is a different kind of thing you can do:
+         is-hover  something to press or type in
+         is-drag   the prize deck, which responds to being thrown sideways
+         is-text   a field that takes typing, so the ring narrows to a caret
+         is-press  the pointer is down, on anything
+       The label is set from a data attribute so a card can say "przeciągnij" without this
+       function knowing the word — the copy stays in the markup and the translations. */
+    const MODES = [
+      ['is-drag', '[data-prize-card], [data-gallery-track]'],
+      ['is-text', 'input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea'],
+      ['is-hover', 'a, button, select, label, [role="button"], summary, [data-wall-open]']
+    ];
     document.addEventListener('pointerover', (event) => {
-      ring.classList.toggle('is-hover', Boolean(event.target.closest('a, button, input, textarea, select, [data-prize-card]')));
+      const target = event.target;
+      // First match wins, so the more specific kinds are listed before the general one.
+      const mode = MODES.find(([, selector]) => target.closest?.(selector));
+      ring.classList.toggle('is-drag', mode?.[0] === 'is-drag');
+      ring.classList.toggle('is-text', mode?.[0] === 'is-text');
+      ring.classList.toggle('is-hover', mode?.[0] === 'is-hover');
     });
+
+    // Pressed state on the ring itself, so a click is acknowledged even on something that
+    // does not move — a card mid-throw, or an area with no hover style of its own.
+    window.addEventListener('pointerdown', () => ring.classList.add('is-press'), { passive: true });
+    window.addEventListener('pointerup', () => ring.classList.remove('is-press'), { passive: true });
+    // A pointer that leaves the window never gets its `pointerup`, and the ring would stay
+    // shrunk for the rest of the visit.
+    window.addEventListener('pointercancel', () => ring.classList.remove('is-press'), { passive: true });
+    document.addEventListener('mouseleave', () => {
+      dot.style.opacity = '0';
+      ring.style.opacity = '0';
+      ring.classList.remove('is-press');
+    });
+
     function animate() {
       ringX += (pointerX - ringX) * 0.16;
       ringY += (pointerY - ringY) * 0.16;
@@ -3397,6 +3434,13 @@ import { flagSvg } from './flags.js';
     hero.addEventListener('pointerleave', () => { content.style.transform = 'translate(0, 0)'; });
   }
 
+  /* Set by setupRouteDraw once the road geometry is known, called by setupRouteZoom on every
+     frame the section is on screen. Null until then, and null for good if the route has no
+     path configured — the zoom checks before calling, so a missing road costs a missing cart
+     and nothing else. */
+  let routeCartPlacer = null;
+  let routeCart = null;
+
   function setupRouteDraw() {
     const frame = $('[data-route-frame]');
     const svg = $('[data-route-svg]');
@@ -3416,6 +3460,7 @@ import { flagSvg } from './flags.js';
 
     const startPin = $('.route__pin--start', frame);
     const finishPin = $('.route__pin--end', frame);
+    routeCart = $('[data-route-cart]', frame);
     let viewHeight = ROUTE_VIEWBOX;
     let total = 0;
 
@@ -3464,6 +3509,23 @@ import { flagSvg } from './flags.js';
       place(startPin, 0, 22);
       place(finishPin, total, 22);
     }
+
+    /* Hand the cart placer to setupRouteZoom.
+       ---------------------------------------------------------------------------
+       The scroll position is known there; the shape of the road is known here. Rather than
+       have the zoom re-derive the geometry — a second copy of the path maths that could
+       disagree with the pins — this exposes the one thing it needs: "put the cart at
+       fraction t along the route".
+
+       A shared closure variable rather than an event per frame. The zoom runs on every frame
+       the section is visible, and dispatching a DOM event that often to move one emoji is
+       paying for a message bus we do not need; both functions already live in the same
+       closure. */
+    routeCartPlacer = (t) => {
+      if (!routeCart) return;
+      place(routeCart, clamp(t, 0, 1) * total);
+    };
+    routeCartPlacer(0);
 
     if (!layout()) {
       frame.classList.add('is-route-hidden');
@@ -4740,6 +4802,10 @@ import { flagSvg } from './flags.js';
     // that carries information, so there is nothing to preserve by animating it slowly.
     if (reducedMotion) {
       frame.style.setProperty('--route-progress', '1');
+      document.documentElement.style.setProperty('--route-progress', '1');
+      // Parked at the finish rather than hidden: it is a marker for where the descent ends,
+      // and that is information whether or not it is allowed to move.
+      if (routeCartPlacer) routeCartPlacer(1);
       return;
     }
 
@@ -4788,7 +4854,27 @@ import { flagSvg } from './flags.js';
       const end = top + Math.max(height - viewport, 0) * 0.55;
       const span = Math.max(end - start, 1);
 
-      frame.style.setProperty('--route-progress', clamp((y - start) / span, 0, 1).toFixed(3));
+      const progress = clamp((y - start) / span, 0, 1);
+      frame.style.setProperty('--route-progress', progress.toFixed(3));
+      /* And on the root, for everything outside the frame that follows the same number — the
+         heading and the facts beside the photograph.
+         ---------------------------------------------------------------------------
+         Setting it on `#route` and letting it inherit down to `.route__copy` was the obvious
+         thing and it does not work. Measured: the copy read `--route-progress` as 0.091 while
+         its own `opacity: calc(1 - var(--route-progress) * .58)` stayed pinned at the value
+         for 1. The variable inherited; the properties that depend on it were never recomputed.
+         Removing `will-change` from the element did not change it either.
+
+         On the root it invalidates reliably, which is the whole reason `:root` is where custom
+         properties usually live. The frame keeps its own copy because it already had one and a
+         self-declared property was never the part that misbehaved. */
+      document.documentElement.style.setProperty('--route-progress', progress.toFixed(3));
+
+      /* The cart rides the road.
+         Held back until the photograph has most of its size, because a cart crossing a
+         picture that is still visibly growing reads as two things moving at once. From 0.35
+         onwards it covers the whole descent, which is the part worth watching. */
+      if (routeCartPlacer) routeCartPlacer(clamp((progress - 0.35) / 0.65, 0, 1));
     };
 
     /**

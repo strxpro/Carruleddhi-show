@@ -176,8 +176,51 @@ img, svg { display: block; max-width: 100%; }
   transform: translate(-50%, -50%);
 }
 .cursor-dot { width: 8px; height: 8px; background: var(--yellow); }
-.cursor-ring { width: 42px; height: 42px; border: 2px solid rgba(255, 201, 40, .9); transition: width .2s, height .2s, background .2s; }
+/* The ring reports what is under it.
+   ---------------------------------------------------------------------------
+   It had one state — bigger over anything clickable — which made it decoration: it moved, but
+   it never said anything you could not already see. Each state below answers a different
+   question about the thing under the pointer, and the shapes are chosen so they are
+   distinguishable out of the corner of your eye rather than only side by side.
+
+   `border-radius` and `border-width` join the transition list, because two of the states are
+   changes of shape rather than of size. */
+.cursor-ring {
+  width: 42px;
+  height: 42px;
+  border: 2px solid rgba(255, 201, 40, .9);
+  transition:
+    width .2s, height .2s, background .2s,
+    border-radius .2s, border-width .15s, opacity .2s;
+}
+/* Something to press: grows and fills faintly. */
 .cursor-ring.is-hover { width: 64px; height: 64px; background: rgba(255, 201, 40, .14); }
+/* Something to throw sideways — the prize deck, the gallery. Wide and flat, so the shape
+   itself suggests the axis it moves on. */
+.cursor-ring.is-drag {
+  width: 76px;
+  height: 44px;
+  border-radius: 999px;
+  border-width: 3px;
+  background: rgba(255, 201, 40, .1);
+}
+/* A field that takes typing: narrows to something caret-shaped. */
+.cursor-ring.is-text {
+  width: 4px;
+  height: 34px;
+  border-radius: 2px;
+  border-width: 0;
+  background: rgba(255, 201, 40, .95);
+}
+/* Pointer down, on anything. Collapses inwards and brightens, so a click is acknowledged even
+   on a target with no hover style of its own. Listed last so it wins over the states above. */
+.cursor-ring.is-press {
+  width: 30px;
+  height: 30px;
+  border-width: 3px;
+  background: rgba(255, 201, 40, .3);
+}
+.cursor-ring.is-press.is-text { width: 4px; height: 26px; }
 
 .preloader {
   position: fixed;

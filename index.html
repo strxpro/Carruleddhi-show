@@ -328,7 +328,17 @@
       </aside>
 
       <div class="container route__grid">
-        <div class="route__copy reveal">
+        <!-- No `reveal` on this block, deliberately.
+             The reveal system owns `opacity` and `transform` on whatever carries the class:
+             `.reveal.is-visible` sets them with two classes' worth of specificity and puts an
+             850 ms transition on both. The scroll-driven fade in route-zoom.css writes the same
+             two properties from the scroll position, so with `reveal` here the reveal simply
+             won — and where it did not, its transition held the value a step behind, which
+             measured as a column that never moved.
+
+             One owner per property. The entrance is not missed: this block starts fully
+             visible and steps back as the photograph grows, which is motion in itself. -->
+        <div class="route__copy">
           <span class="eyebrow" data-i18n="route.kicker">Il percorso</span>
           <h2 class="section-title section-title--medium" id="route-title" data-i18n="route.title" data-text-effect="rise">Giù verso il mare.</h2>
           <p class="lead" data-i18n="route.body">Partenza dalla discesa della Rena Bianca, lungo via Giuseppe Verdi. Presentazione in piazza, salita a piedi e poi tutti giù — con il blu del mare davanti.</p>
@@ -368,6 +378,14 @@
             <span class="route__node route__node--finish" data-route-node="finish" aria-hidden="true"></span>
             <span class="route__pin route__pin--start" data-i18n="route.startShort">Partenza</span>
             <span class="route__pin route__pin--end" data-i18n="route.finishShort">Arrivo</span>
+
+            <!-- The cart, riding the road as the page scrolls.
+                 An earlier version of this was an SVG on its own animation loop and was
+                 removed for competing with the finish badge for the same corner. This one is
+                 driven by the same scroll position as the zoom, so it only moves while you
+                 are moving, and it is placed on the real path geometry rather than along a
+                 guessed diagonal — setupRouteDraw hands setupRouteZoom the placer. -->
+            <span class="route__cart" data-route-cart aria-hidden="true">🚗</span>
 
             <!-- Nothing is written on the photograph.
                  There was a rotated strip along the right edge on desktop and a full-width
