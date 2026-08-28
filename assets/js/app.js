@@ -1894,10 +1894,12 @@ import { flagSvg } from './flags.js';
      * a scrolling page, which on a phone means the wrong thing moves depending on where your
      * thumb lands. The cap is on the number rendered instead, and "show more" raises it.
      *
-     * Four to start: enough to see that there are messages and what they look like, few enough
-     * that the section is not a wall of text before you have decided to read any of it.
+     * Six to start, because the list is three masonry columns on a wide screen: four notes
+     * leaves the third column holding one, which looks like something failed to load rather
+     * than like a choice. Six fills every column at least twice and is still short enough that
+     * the section is not a wall of text before you have decided to read any of it.
      */
-    const FIRST_BATCH = 4;
+    const FIRST_BATCH = 6;
     const NEXT_BATCH = 6;
     let shown = FIRST_BATCH;
 
