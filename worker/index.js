@@ -558,8 +558,41 @@ function chatSystemPrompt(deck) {
   ].join('\n');
 }
 
+/**
+ * Ostatni powód, dla którego model nie odpowiedział.
+ *
+ * PO CO
+ *   askModel() połyka każdą awarię i zwraca `null`, a `null` znaczy „niech odpisze
+ *   człowiek". To jest właściwe zachowanie dla gościa — ale dla organizatora zły klucz,
+ *   nieistniejąca nazwa modelu, timeout i celowa eskalacja modelu wyglądają identycznie:
+ *   jedno zdanie „przekazuję organizatorom". Cztery różne przyczyny, jeden objaw, zero
+ *   sposobu, żeby je rozróżnić bez zaglądania do logów Vercela.
+ *
+ *   Konfiguracja potrafi być przy tym w komplecie i wyglądać poprawnie — klucz ustawiony,
+ *   adres Groqa, nazwa modelu — a mimo to nic nie działa, bo klucz został unieważniony
+ *   albo Groq wycofał ten model. Wtedy panel mówi „skonfigurowane", czat milczy i nie ma
+ *   z czego wyciągnąć wniosku.
+ *
+ * DLACZEGO W PAMIĘCI, A NIE W BAZIE
+ *   To jest wskazówka diagnostyczna, nie dane. Funkcja na Vercelu żyje krótko, więc wpis
+ *   dotyczy ostatniego wywołania w tej instancji — i to wystarcza, bo pytanie brzmi
+ *   „dlaczego czat właśnie teraz nie odpowiada". Zapis do bazy kosztowałby zapytanie przy
+ *   każdej wiadomości, żeby odpowiedzieć na pytanie zadawane raz na miesiąc.
+ *
+ * CZEGO TU NIGDY NIE MA
+ *   Klucza ani żadnego jego fragmentu. Treść odpowiedzi dostawcy jest ucinana, bo przy
+ *   401 potrafi zawierać echo nagłówka Authorization.
+ */
+let lastModelFailure = '';
+function noteModelFailure(reason) {
+  lastModelFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
+}
+
 async function askModel(env, deck, history, question) {
-  if (!env.AI_API_KEY) return null;
+  if (!env.AI_API_KEY) {
+    noteModelFailure('brak AI_API_KEY');
+    return null;
+  }
   const system = chatSystemPrompt(deck);
   try {
     /* AI_API_URL is the name in START-TUTAJ.md and in make/PROMPT-PELNY.md, so it is the
@@ -588,12 +621,24 @@ async function askModel(env, deck, history, question) {
       }),
       signal: AbortSignal.timeout(12000)
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      noteModelFailure(`HTTP ${response.status} — ${detail.slice(0, 200)}`);
+      return null;
+    }
     const body = await response.json();
     const answer = String(body?.choices?.[0]?.message?.content || '').trim();
-    if (!answer || answer.includes('ESCALATE')) return null;
-    return answer;
-  } catch (_) {
+    if (!answer) {
+      noteModelFailure('model oddal pusta odpowiedz');
+      return null;
+    }
+    // ESCALATE to nie awaria, tylko model robiacy dokladnie to, o co go poproszono.
+    noteModelFailure('');
+    return answer.includes('ESCALATE') ? null : answer;
+  } catch (error) {
+    /* AbortSignal.timeout rzuca TimeoutError, reszta to zwykle DNS albo zerwane
+       polaczenie — sama nazwa bledu wystarczy, zeby je rozroznic. */
+    noteModelFailure(`${error?.name || 'Error'} — ${String(error?.message || '').slice(0, 140)}`);
     return null;
   }
 }
@@ -1168,7 +1213,15 @@ async function inbox(env, payload, cors) {
       model: env.AI_MODEL || 'gpt-4o-mini',
       // Nazwa, pod którą klucz został znaleziony — albo pusta. Rozstrzyga literówkę w nazwie
       // zmiennej, która jest najczęstszą przyczyną „mam klucz i nie działa".
-      keyFrom: env.AI_API_KEY ? 'AI_API_KEY' : ''
+      keyFrom: env.AI_API_KEY ? 'AI_API_KEY' : '',
+      /* Powód ostatniej nieudanej odpowiedzi modelu — puste znaczy „ostatnie wywołanie
+         się udało albo jeszcze żadnego nie było".
+
+         To jest jedyne miejsce, które odróżnia „klucz unieważniony" (HTTP 401) od
+         „Groq wycofał ten model" (HTTP 404 albo 400 z nazwą modelu w treści) od
+         „za wolno" (TimeoutError). Bez tego wszystkie trzy wyglądają jak
+         „przekazuję organizatorom", a konfiguracja wygląda na kompletną. */
+      lastFailure: lastModelFailure
     }
   }, 200, cors);
 }
