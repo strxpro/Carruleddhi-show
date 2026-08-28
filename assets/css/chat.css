@@ -269,3 +269,137 @@
   .chat__send { transition: none; }
   .chat__send:hover { transform: none; }
 }
+
+/* ============================================================================
+   Name and e-mail before the first message
+   ============================================================================
+   Most of what the chat cannot answer ends up with a person, and a person answering two
+   hours later needs an address. Asked once, kept in the browser, and the log and composer
+   are hidden until it is done — so nobody writes a paragraph and only then finds out there
+   is nowhere to send the reply.
+   ========================================================================== */
+.chat-gate {
+  display: grid;
+  gap: 14px;
+  padding: 18px 18px 16px;
+  border: 2px solid rgb(255 201 40 / 0.5);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.05);
+}
+.chat-gate[hidden] { display: none; }
+
+.chat-gate__lead {
+  margin: 0;
+  color: #071a3d;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.chat-gate__form { display: grid; gap: 12px; }
+
+/* One column on a phone, two on anything wider — the two fields are short and a full-width
+   name box above a full-width e-mail box wastes the height the log needs. */
+@media (min-width: 560px) {
+  .chat-gate__form {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+  .chat-gate__form > button { grid-column: 1 / -1; justify-self: start; }
+  .chat-gate__note { grid-column: 1 / -1; }
+}
+
+.chat-gate__note {
+  margin: 0;
+  color: rgb(7 26 61 / 0.6);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* ============================================================================
+   Suggestions: folded, three at a time
+   ============================================================================
+   Six chips open all the time filled the panel on a phone and pushed the composer off the
+   bottom of the card. Behind a toggle they cost one line until somebody wants them.
+   ========================================================================== */
+.chat__chips {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.chat__chips[hidden] { display: none; }
+
+.chat__chips-toggle {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1.5px dashed rgb(7 26 61 / 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: #071a3d;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.chat__chips-toggle:hover { border-color: #ffc928; background: rgb(255 201 40 / 0.16); }
+.chat__chips-toggle:focus-visible { outline: 3px solid #071a3d; outline-offset: 3px; }
+
+.chat__chips-caret { font-size: 15px; line-height: 1; transition: transform 0.25s; }
+.chat__chips.is-open .chat__chips-caret { transform: rotate(180deg); }
+
+.chat__chips-list {
+  /* Same max-height mechanism as the comment wall's form, and for the same reason:
+     `height: auto` is not animatable. The generous open value is a ceiling — three chips,
+     each of which may wrap to two lines on a narrow phone, never reach it. */
+  display: flex;
+  max-height: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s;
+}
+.chat__chips.is-open .chat__chips-list { max-height: 220px; opacity: 1; }
+
+/* Chips wrap instead of being cut off. They were on one row with the text clipped, which is
+   how a suggested question ends up unreadable. */
+.chat__chip {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+/* ============================================================================
+   "Typing…"
+   ============================================================================
+   Between pressing send and the answer landing there is a model call — up to a couple of
+   seconds with nothing on screen to say so, which read as the chat having swallowed the
+   question. One row, added and removed by app.js; it never enters the seen set, so a poll
+   cannot mistake it for a message.
+   ========================================================================== */
+.chat-typing { padding-block: 4px; }
+.chat-typing__dots { display: inline-flex; gap: 5px; align-items: center; }
+.chat-typing__dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(7 26 61 / 0.45);
+  animation: chat-typing 1.1s ease-in-out infinite;
+}
+.chat-typing__dots i:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing__dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes chat-typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat__chips-list,
+  .chat__chips-caret { transition: none; }
+  .chat-typing__dots i { animation: none; opacity: 0.6; }
+}

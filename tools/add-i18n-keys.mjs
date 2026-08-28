@@ -180,9 +180,124 @@ const CHAT_UI = {
   }
 };
 
+/* ---------------------------------------------------------- chat: gate and suggestions
+   The gate is the name and address asked for before the first message. It is not
+   gatekeeping for its own sake: most of what the chat cannot answer ends up with a person,
+   and a person answering two hours later needs somewhere to send it.
+
+   The suggestion chips are folded behind a toggle and three at a time. Six of them open all
+   the time filled the panel on a phone and pushed the composer off the bottom of the card;
+   worse, they never changed, so after the first answer they were six openers to a
+   conversation that had already started. */
+const CHAT_GATE = {
+  it: {
+    'chat.gateLead': 'Prima di iniziare: come ti chiami e a quale indirizzo possiamo risponderti?',
+    'chat.gateName': 'Come ti chiami *',
+    'chat.gateEmail': 'E-mail *',
+    'chat.gateStart': 'Inizia la chat',
+    'chat.gateNote': 'Serve solo per risponderti. Niente newsletter.',
+    'chat.gateBadEmail': 'Controlla l’indirizzo e-mail.',
+    'chat.gateBadName': 'Scrivi il tuo nome.',
+    'chat.chipsShow': 'Suggerimenti',
+    'chat.chipsHide': 'Nascondi',
+    'chat.askRules': 'Dove trovo il regolamento?',
+    'chat.askCategories': 'Che categorie ci sono?',
+    'chat.askMinor': 'Mio figlio può partecipare?',
+    'chat.askBuild': 'Come si costruisce il carretto?',
+    'chat.askArrive': 'A che ora devo arrivare?',
+    'chat.askChange': 'Voglio cambiare i miei dati'
+  },
+  pl: {
+    'chat.gateLead': 'Zanim zaczniemy: jak się nazywasz i na jaki adres możemy odpisać?',
+    'chat.gateName': 'Jak się nazywasz *',
+    'chat.gateEmail': 'E-mail *',
+    'chat.gateStart': 'Rozpocznij czat',
+    'chat.gateNote': 'Tylko do odpisania. Bez newslettera.',
+    'chat.gateBadEmail': 'Sprawdź adres e-mail.',
+    'chat.gateBadName': 'Wpisz swoje imię.',
+    'chat.chipsShow': 'Podpowiedzi',
+    'chat.chipsHide': 'Ukryj',
+    'chat.askRules': 'Gdzie jest regulamin?',
+    'chat.askCategories': 'Jakie są kategorie?',
+    'chat.askMinor': 'Czy moje dziecko może startować?',
+    'chat.askBuild': 'Jak zbudować wózek?',
+    'chat.askArrive': 'O której mam przyjechać?',
+    'chat.askChange': 'Chcę zmienić swoje dane'
+  },
+  en: {
+    'chat.gateLead': 'Before we start: what is your name, and where can we reply?',
+    'chat.gateName': 'Your name *',
+    'chat.gateEmail': 'E-mail *',
+    'chat.gateStart': 'Start the chat',
+    'chat.gateNote': 'Only so we can reply. No newsletter.',
+    'chat.gateBadEmail': 'Check the e-mail address.',
+    'chat.gateBadName': 'Write your name.',
+    'chat.chipsShow': 'Suggestions',
+    'chat.chipsHide': 'Hide',
+    'chat.askRules': 'Where are the rules?',
+    'chat.askCategories': 'What categories are there?',
+    'chat.askMinor': 'Can my child take part?',
+    'chat.askBuild': 'How do I build the cart?',
+    'chat.askArrive': 'What time should I arrive?',
+    'chat.askChange': 'I want to change my details'
+  },
+  de: {
+    'chat.gateLead': 'Bevor wir anfangen: wie heißt du, und an welche Adresse können wir antworten?',
+    'chat.gateName': 'Dein Name *',
+    'chat.gateEmail': 'E-Mail *',
+    'chat.gateStart': 'Chat starten',
+    'chat.gateNote': 'Nur damit wir antworten können. Kein Newsletter.',
+    'chat.gateBadEmail': 'Prüfe die E-Mail-Adresse.',
+    'chat.gateBadName': 'Schreib deinen Namen.',
+    'chat.chipsShow': 'Vorschläge',
+    'chat.chipsHide': 'Ausblenden',
+    'chat.askRules': 'Wo finde ich die Regeln?',
+    'chat.askCategories': 'Welche Kategorien gibt es?',
+    'chat.askMinor': 'Darf mein Kind mitfahren?',
+    'chat.askBuild': 'Wie baue ich den Wagen?',
+    'chat.askArrive': 'Wann soll ich da sein?',
+    'chat.askChange': 'Ich möchte meine Daten ändern'
+  },
+  es: {
+    'chat.gateLead': 'Antes de empezar: ¿cómo te llamas y a qué dirección podemos responderte?',
+    'chat.gateName': 'Tu nombre *',
+    'chat.gateEmail': 'E-mail *',
+    'chat.gateStart': 'Empezar el chat',
+    'chat.gateNote': 'Solo para poder responderte. Sin newsletter.',
+    'chat.gateBadEmail': 'Revisa la dirección de correo.',
+    'chat.gateBadName': 'Escribe tu nombre.',
+    'chat.chipsShow': 'Sugerencias',
+    'chat.chipsHide': 'Ocultar',
+    'chat.askRules': '¿Dónde está el reglamento?',
+    'chat.askCategories': '¿Qué categorías hay?',
+    'chat.askMinor': '¿Puede participar mi hijo?',
+    'chat.askBuild': '¿Cómo se construye el carro?',
+    'chat.askArrive': '¿A qué hora tengo que llegar?',
+    'chat.askChange': 'Quiero cambiar mis datos'
+  },
+  fr: {
+    'chat.gateLead': 'Avant de commencer : comment vous appelez-vous, et à quelle adresse pouvons-nous répondre ?',
+    'chat.gateName': 'Votre nom *',
+    'chat.gateEmail': 'E-mail *',
+    'chat.gateStart': 'Démarrer le chat',
+    'chat.gateNote': 'Uniquement pour vous répondre. Pas de newsletter.',
+    'chat.gateBadEmail': 'Vérifiez l’adresse e-mail.',
+    'chat.gateBadName': 'Écrivez votre nom.',
+    'chat.chipsShow': 'Suggestions',
+    'chat.chipsHide': 'Masquer',
+    'chat.askRules': 'Où est le règlement ?',
+    'chat.askCategories': 'Quelles catégories existent ?',
+    'chat.askMinor': 'Mon enfant peut-il participer ?',
+    'chat.askBuild': 'Comment construire le chariot ?',
+    'chat.askArrive': 'À quelle heure dois-je arriver ?',
+    'chat.askChange': 'Je veux modifier mes données'
+  }
+};
+
 const ADDITIONS = {
   it: {
     ...CHAT_UI.it,
+    ...CHAT_GATE.it,
     'unsub.title': 'Disattivare gli avvisi?',
     'unsub.leadStart': 'Mandiamo un codice a questo indirizzo:',
     'unsub.send': 'Manda il codice',
@@ -204,6 +319,7 @@ const ADDITIONS = {
   },
   pl: {
     ...CHAT_UI.pl,
+    ...CHAT_GATE.pl,
     'unsub.title': 'Wyłączyć powiadomienia?',
     'unsub.leadStart': 'Wyślemy kod na ten adres:',
     'unsub.send': 'Wyślij kod',
@@ -225,6 +341,7 @@ const ADDITIONS = {
   },
   en: {
     ...CHAT_UI.en,
+    ...CHAT_GATE.en,
     'unsub.title': 'Switch the reminders off?',
     'unsub.leadStart': 'We will send a code to this address:',
     'unsub.send': 'Send the code',
@@ -246,6 +363,7 @@ const ADDITIONS = {
   },
   de: {
     ...CHAT_UI.de,
+    ...CHAT_GATE.de,
     'unsub.title': 'Erinnerungen abschalten?',
     'unsub.leadStart': 'Wir senden einen Code an diese Adresse:',
     'unsub.send': 'Code senden',
@@ -267,6 +385,7 @@ const ADDITIONS = {
   },
   es: {
     ...CHAT_UI.es,
+    ...CHAT_GATE.es,
     'unsub.title': '¿Desactivar los avisos?',
     'unsub.leadStart': 'Enviaremos un código a esta dirección:',
     'unsub.send': 'Enviar el código',
@@ -288,6 +407,7 @@ const ADDITIONS = {
   },
   fr: {
     ...CHAT_UI.fr,
+    ...CHAT_GATE.fr,
     'unsub.title': 'Désactiver les rappels ?',
     'unsub.leadStart': 'Nous envoyons un code à cette adresse :',
     'unsub.send': 'Envoyer le code',

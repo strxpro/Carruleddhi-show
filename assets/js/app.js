@@ -3589,8 +3589,15 @@ import { flagSvg } from './flags.js';
   function setupPanels() {
     const panels = $$('#main > section.section-card');
     if (!panels.length) return;
-    // Sections whose own sticky children need more than one screen of scroll.
-    const alwaysFlow = new Set(['categories', 'prizes', 'signup']);
+    /* Sections whose own sticky children need more than one screen of scroll.
+       `contact` is declared here rather than measured because its height is not a property of
+       the page, it is a property of what somebody is doing: the chat log grows with the
+       conversation, the composer grows with the message being typed, and the name/e-mail card
+       disappears when it is filled in. Measuring that meant the panel could flip between
+       `pinned` (sticky) and `flow` (relative) mid-sentence, which changes its position and
+       moves the page under the cursor. One verdict, taken once, is worth more here than an
+       accurate one taken repeatedly. */
+    const alwaysFlow = new Set(['categories', 'prizes', 'signup', 'contact']);
 
     // The gallery is the one section with a hard `height: 100svh` and
     // `overflow: hidden` in CSS, so it can never need more than one screen no
@@ -4580,12 +4587,30 @@ import { flagSvg } from './flags.js';
     const sendButton = $('[data-chat-send]', panel);
     const endpoint = config.endpoints.chat || '/api/carruleddhi/chat';
 
+    const gate = $('[data-chat-gate]', panel);
+    const gateForm = $('[data-chat-gate-form]', panel);
+    const chips = $('[data-chat-chips]', panel);
+    const chipsList = $('[data-chat-chips-list]', panel);
+    const chipsToggle = $('[data-chat-chips-toggle]', panel);
+    const chipsLabel = $('[data-chat-chips-label]', panel);
+
     const token = chatToken();
     let opened = false;
     let polling = 0;
     let lastAt = '';
     let mode = 'ai';
     const seen = new Set();
+
+    /* Who we are talking to.
+       Kept in this browser next to the thread token, because the two only make sense
+       together: the token names the conversation, this names the person in it. Nothing here
+       is trusted — the server stores it against the thread and never reads it back as
+       identity. */
+    const visitor = {
+      name: storage.get('carruleddhi.chat.name', '') || '',
+      email: storage.get('carruleddhi.chat.email', '') || ''
+    };
+    const identified = () => Boolean(visitor.name && visitor.email);
 
     /* ---------------------------------------------------------------- tabs */
     const selectTab = (name) => {
@@ -4597,13 +4622,72 @@ import { flagSvg } from './flags.js';
       panel.hidden = name !== 'chat';
       if (formPanel) formPanel.hidden = name !== 'form';
       if (name === 'chat') {
-        openThread();
-        startPolling();
-        input?.focus();
+        applyGate();
+        // The thread is only opened once we know who is in it, so a conversation never
+        // exists in the database with nobody to answer.
+        if (identified()) {
+          openThread();
+          startPolling();
+          input?.focus();
+        } else {
+          $('#chat-gate-name', panel)?.focus();
+        }
       } else {
         stopPolling();
       }
     };
+
+    /* ---------------------------------------------------------------- gate */
+    /** Shows either the two fields or the conversation, never both. */
+    function applyGate() {
+      const done = identified();
+      if (gate) gate.hidden = done;
+      if (log) log.hidden = !done;
+      if (form) form.hidden = !done;
+      if (chips) chips.hidden = !done;
+      panel.dataset.chatReady = done ? 'yes' : 'no';
+    }
+
+    gateForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const nameField = $('#chat-gate-name', panel);
+      const emailField = $('#chat-gate-email', panel);
+      const name = String(nameField?.value || '').trim();
+      const email = String(emailField?.value || '').trim().toLowerCase();
+
+      /* Checked here as well as by the browser, because `novalidate` is on the form — the
+         page does its own validation everywhere else and two different error styles in one
+         card is worse than one that is slightly more work. */
+      const showError = (field, key) => {
+        const holder = field?.closest('[data-field]');
+        const slot = holder ? $('[data-error]', holder) : null;
+        if (slot) slot.textContent = text(key) || '';
+        holder?.classList.add('is-invalid');
+        field?.focus();
+      };
+      $$('[data-field]', gate).forEach((holder) => {
+        holder.classList.remove('is-invalid');
+        const slot = $('[data-error]', holder);
+        if (slot) slot.textContent = '';
+      });
+
+      if (name.length < 2) { showError(nameField, 'chat.gateBadName'); return; }
+      // The same pattern the registration form uses, and for the same reason: an address that
+      // cannot receive a reply makes the whole conversation pointless.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { showError(emailField, 'chat.gateBadEmail'); return; }
+
+      visitor.name = name;
+      visitor.email = email;
+      storage.set('carruleddhi.chat.name', name);
+      storage.set('carruleddhi.chat.email', email);
+      applyGate();
+      openThread();
+      startPolling();
+      input?.focus();
+      // The card disappearing changes the section's height, and #contact is a sticky panel
+      // that decides whether to pin from its own height.
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+    });
 
     tabs.forEach((tab) => {
       tab.addEventListener('click', () => selectTab(tab.dataset.contactTab));
@@ -4676,10 +4760,47 @@ import { flagSvg } from './flags.js';
       }
     }
 
+    /* ------------------------------------------------------------- typing */
+    /**
+     * Three dots while the other side is composing.
+     *
+     * Between pressing send and the answer landing there is a model call — up to a couple of
+     * seconds. Nothing marked that time, so the chat looked like it had swallowed the
+     * question. This is one row that is added and removed; it never enters `seen`, so a poll
+     * cannot mistake it for a message.
+     */
+    let typingRow = null;
+    const showTyping = () => {
+      if (!log || typingRow) return;
+      typingRow = document.createElement('div');
+      typingRow.className = 'chat-msg chat-msg--ai chat-typing';
+      typingRow.setAttribute('aria-hidden', 'true');
+      const dots = document.createElement('span');
+      dots.className = 'chat-typing__dots';
+      dots.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
+      typingRow.appendChild(dots);
+      const stick = atBottom();
+      log.appendChild(typingRow);
+      if (stick) toBottom();
+    };
+    const hideTyping = () => {
+      typingRow?.remove();
+      typingRow = null;
+    };
+
     /* ---------------------------------------------------------------- send */
+    let sending = false;
+
     async function send(body) {
       const message = String(body || '').trim();
       if (!message) return;
+      /* One in flight at a time.
+         The submit handler and the Enter handler both call this, and a fast double press —
+         or a click on the button while Enter is still being processed — used to start two
+         requests with the same text. The button being disabled is not enough on its own,
+         because Enter does not go through the button. */
+      if (sending) return;
+      sending = true;
 
       // Shown before the round trip, greyed until it lands. A chat that waits for the
       // server before showing what you typed feels broken on a slow connection.
@@ -4687,22 +4808,47 @@ import { flagSvg } from './flags.js';
       if (input) input.value = '';
       sizeInput();
       if (sendButton) sendButton.disabled = true;
+      showTyping();
 
       try {
         const result = await postJSON(endpoint, eventPayload('chat', {
           action: 'send',
           token,
-          message
+          message,
+          // Sent every time, ignored by the server once the thread already has them.
+          name: visitor.name,
+          email: visitor.email
         }));
         pending?.classList.remove('is-pending');
         if (!result || result.ok === false) throw new Error(result?.code || 'chat');
+
+        /* Claim the ids the server just assigned.
+           ---------------------------------------------------------------------------
+           This is the fix for "sending one message posts several". The optimistic bubble and
+           the answer are already on screen but have no ids, so the next poll fetched both
+           back, found ids it had not seen, and appended a second copy of each.
+
+           Registering them here — and moving `lastAt` past them — means the poll recognises
+           them as already shown. `lastAt` matters as much as `seen`: without it every poll
+           re-requested the whole thread from the beginning. */
+        if (result.messageId) seen.add(result.messageId);
+        if (result.replyId) seen.add(result.replyId);
+        for (const at of [result.messageAt, result.replyAt]) {
+          if (at && at > lastAt) lastAt = at;
+        }
+
         mode = result.mode || mode;
-        if (result.reply) append({ author: mode === 'human' ? 'ai' : 'ai', body: result.reply, at: '' }, false);
+        if (result.reply) append({ author: 'ai', body: result.reply, at: '' }, false);
         if (mode === 'human') panel.dataset.chatMode = 'human';
+        // Fresh suggestions after every answer, so the chips follow the conversation instead
+        // of offering the same six openers for ever.
+        paintChips();
       } catch (_) {
         pending?.classList.add('is-failed');
         note('chat.sendFailed');
       } finally {
+        hideTyping();
+        sending = false;
         if (sendButton) sendButton.disabled = false;
       }
     }
@@ -4722,21 +4868,86 @@ import { flagSvg } from './flags.js';
     });
 
     /* The composer grows with the text instead of scrolling inside three lines. */
+    let lastInputHeight = 0;
     function sizeInput() {
       if (!input) return;
-      input.style.height = 'auto';
-      input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+      /* Measured before anything is written, and written only when it changed.
+         ---------------------------------------------------------------------------
+         This used to set `height: auto` and then a pixel value on every keystroke. Two
+         forced reflows per character is bad enough, but the real damage was downstream:
+         #contact is a sticky panel whose height decides whether it pins, so a box that
+         resized on every character kept asking the panel layout to reconsider — and the
+         page moved under the cursor while somebody was typing. That is the "it jumps when
+         I write" report.
+
+         `auto` is still needed to let the box shrink when text is deleted; it just is not
+         committed unless the answer differs from what is already there. */
+        input.style.height = 'auto';
+      const next = Math.min(input.scrollHeight, 140);
+      if (next !== lastInputHeight) {
+        lastInputHeight = next;
+        input.style.height = `${next}px`;
+      } else {
+        input.style.height = `${lastInputHeight}px`;
+      }
     }
     input?.addEventListener('input', sizeInput);
 
     /* --------------------------------------------------------------- chips */
-    $$('[data-chat-ask]', panel).forEach((chip) => {
-      chip.addEventListener('click', () => {
-        /* Sent as if it had been typed. The label on the chip is the question, so the
-           answer arrives through the same path as any other message and there is no
-           second code path to keep in step with faqAnswer(). */
-        send(chip.textContent.trim());
+    /* Every question the chips can offer, as i18n keys. The first six are the ones the FAQ
+       dictionary answers instantly; the rest go to the model, and `askChange` and `askCancel`
+       are the two that deliberately end up with a person. */
+    const CHIP_KEYS = [
+      'chat.askWho', 'chat.askCost', 'chat.askHelmet', 'chat.askWhen', 'chat.askNumber',
+      'chat.askRules', 'chat.askCategories', 'chat.askMinor', 'chat.askBuild', 'chat.askArrive',
+      'chat.askChange', 'chat.askCancel'
+    ];
+    const CHIPS_AT_ONCE = 3;
+    const askedKeys = new Set();
+
+    /**
+     * Three suggestions, none of them already used.
+     *
+     * Called after every answer. The point is that the chips follow the conversation: asking
+     * about helmets should not be followed by three chips one of which is about helmets.
+     * Once everything has been asked the row empties and the toggle hides itself rather than
+     * offering repeats.
+     */
+    function paintChips() {
+      if (!chipsList) return;
+      const fresh = CHIP_KEYS.filter((key) => !askedKeys.has(key)).slice(0, CHIPS_AT_ONCE);
+      chipsList.replaceChildren();
+      fresh.forEach((key) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = key === 'chat.askCancel' || key === 'chat.askChange'
+          ? 'chat__chip chat__chip--warn'
+          : 'chat__chip';
+        chip.dataset.chatAsk = key;
+        chip.textContent = text(key) || '';
+        chip.addEventListener('click', () => {
+          askedKeys.add(key);
+          // Sent as the question it reads as, so it takes the same path as anything typed.
+          send(chip.textContent.trim());
+          setChipsOpen(false);
+        });
+        chipsList.appendChild(chip);
       });
+      if (chips) chips.hidden = !identified() || fresh.length === 0;
+    }
+
+    function setChipsOpen(open) {
+      chips?.classList.toggle('is-open', open);
+      chipsToggle?.setAttribute('aria-expanded', String(open));
+      if (chipsLabel) chipsLabel.textContent = text(open ? 'chat.chipsHide' : 'chat.chipsShow') || '';
+    }
+    chipsToggle?.addEventListener('click', () => {
+      setChipsOpen(!chips?.classList.contains('is-open'));
+    });
+    // Repainted on a language change, because the labels are the questions themselves.
+    window.addEventListener('carruleddhi:language', () => {
+      paintChips();
+      setChipsOpen(chips?.classList.contains('is-open') || false);
     });
 
     /* --------------------------------------------------------------- poll */
@@ -4764,6 +4975,9 @@ import { flagSvg } from './flags.js';
       window.clearInterval(polling);
       polling = 0;
     }
+
+    applyGate();
+    paintChips();
 
     /* Somebody arriving at #contact from the chat link in an e-mail wants the chat, not the
        form. Also how the unsubscribe card hands over once that flow moves in here. */

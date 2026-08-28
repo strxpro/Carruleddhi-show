@@ -807,12 +807,23 @@ async function chatVisitor(env, request, payload, cors) {
   const { thread, error, status } = await chatThread(env, request, payload, true);
   if (error) return json({ ok: false, code: error }, status, cors);
 
+  /* `id,created_at` asked for explicitly, and the reason is a bug this caused.
+     ---------------------------------------------------------------------------
+     The page shows what you typed straight away, before the round trip, so a slow
+     connection does not look like a broken chat. That optimistic bubble had no id,
+     because the response never carried one — and the poll that runs every few seconds
+     then fetched the same message back from the database, saw an id it had not seen
+     before, and appended it. Every message the visitor sent appeared twice.
+
+     Returning the id and the timestamp lets the browser mark the bubble it already
+     drew as accounted for, and move its `since` watermark past it. */
   const stored = await insertRow(env, 'chat_messages', {
     thread_id: thread.id,
     author: 'visitor',
     body
-  });
+  }, 'id,created_at');
   if (!stored.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+  const echo = { messageId: stored.row?.id || null, messageAt: stored.row?.created_at || null };
 
   // A name or an address given mid-conversation is worth keeping, so the organiser
   // knows who they are talking to without asking twice.
@@ -829,7 +840,7 @@ async function chatVisitor(env, request, payload, cors) {
        „wyślemy w tle" znaczyłoby „czasem wyślemy". Ta gałąź nie woła modelu, więc nie ma
        tu żadnego budżetu na opóźnienie do przekroczenia, a każdy kanał ma swój timeout. */
     await alertOrganisers(env, thread, body, false);
-    return json({ ok: true, mode: 'human', reply: null }, 200, cors);
+    return json({ ok: true, mode: 'human', reply: null, ...echo }, 200, cors);
   }
 
   const deck = COPY_DECK[localeOf(thread.locale)] || COPY_DECK.it;
@@ -849,15 +860,42 @@ async function chatVisitor(env, request, payload, cors) {
       deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.',
       open ? deck.chatHoursNow : deck.chatHoursLater
     ].filter(Boolean).join(' ');
-    await insertRow(env, 'chat_messages', { thread_id: thread.id, author: 'ai', body: handover });
+    const saved = await insertRow(
+      env,
+      'chat_messages',
+      { thread_id: thread.id, author: 'ai', body: handover },
+      'id,created_at'
+    );
     /* Ten sygnał jest ważniejszy od poprzedniego: gość właśnie przeczytał „przekazuję to
        organizatorom", więc od tej chwili czeka na człowieka i wie o tym. */
     await alertOrganisers(env, thread, body, true);
-    return json({ ok: true, mode: 'human', reply: handover, chatOpen: open }, 200, cors);
+    return json({
+      ok: true,
+      mode: 'human',
+      reply: handover,
+      chatOpen: open,
+      ...echo,
+      // Same reason as the visitor's own message: without the id the poll would fetch this
+      // answer back and show it a second time.
+      replyId: saved.row?.id || null,
+      replyAt: saved.row?.created_at || null
+    }, 200, cors);
   }
 
-  await insertRow(env, 'chat_messages', { thread_id: thread.id, author: 'ai', body: reply });
-  return json({ ok: true, mode: 'ai', reply }, 200, cors);
+  const saved = await insertRow(
+    env,
+    'chat_messages',
+    { thread_id: thread.id, author: 'ai', body: reply },
+    'id,created_at'
+  );
+  return json({
+    ok: true,
+    mode: 'ai',
+    reply,
+    ...echo,
+    replyId: saved.row?.id || null,
+    replyAt: saved.row?.created_at || null
+  }, 200, cors);
 }
 
 /** Organiser side. Behind the same passphrase as the participant list. */

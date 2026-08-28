@@ -1166,18 +1166,53 @@
 
           <!-- ============================================================ chat -->
           <div class="chat" id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" data-chat hidden>
+            <!-- Name and e-mail before the first message.
+                 Not gatekeeping for its own sake: most of what the chat cannot answer ends up
+                 with a person, and a person answering hours later needs somewhere to send it.
+                 Asked once, kept in this browser, and the chat is unusable until it is filled
+                 — which is honest, rather than letting somebody write a paragraph and only
+                 then discovering nobody can reply to them.
+
+                 The whole card is removed from the flow once it is done, so the log gets the
+                 height back rather than sitting under a collapsed strip. -->
+            <div class="chat-gate" data-chat-gate>
+              <p class="chat-gate__lead" data-i18n="chat.gateLead">Prima di iniziare: come ti chiami e a quale indirizzo possiamo risponderti?</p>
+              <form class="chat-gate__form" data-chat-gate-form novalidate>
+                <div class="field" data-field>
+                  <input id="chat-gate-name" name="name" type="text" autocomplete="given-name" maxlength="40" placeholder=" " required>
+                  <label for="chat-gate-name" data-i18n="chat.gateName">Come ti chiami *</label>
+                  <span class="field__error" data-error></span>
+                </div>
+                <div class="field" data-field>
+                  <input id="chat-gate-email" name="email" type="email" autocomplete="email" maxlength="120" placeholder=" " required>
+                  <label for="chat-gate-email" data-i18n="chat.gateEmail">E-mail *</label>
+                  <span class="field__error" data-error></span>
+                </div>
+                <button class="btn btn--yellow btn--small" type="submit" data-i18n="chat.gateStart">Inizia la chat</button>
+                <p class="chat-gate__note" data-i18n="chat.gateNote">Serve solo per risponderti. Niente newsletter.</p>
+              </form>
+            </div>
+
             <div class="chat__log" data-chat-log aria-live="polite" aria-atomic="false"></div>
 
-            <!-- The six questions that get asked constantly. Pressing one sends it as if
-                 it had been typed, so the answer arrives through exactly the same path and
-                 there is no second code path to keep in step. -->
+            <!-- Suggestions, folded away and three at a time.
+                 They used to be six buttons open all the time. On a phone that filled the
+                 panel and pushed the composer off the bottom of the card, and because the set
+                 never changed they were six openers to a conversation that had already
+                 started — offering "Who can take part?" as a follow-up to an answer about
+                 helmets.
+
+                 The list is built by paintChips() in app.js from data-chat-ask keys, rotating
+                 so a question already asked does not come back. Pressing one sends it as if it
+                 had been typed, so the answer arrives through the same path as any message and
+                 there is no second code path to keep in step with faqAnswer(). -->
             <div class="chat__chips" data-chat-chips>
-              <button class="chat__chip" type="button" data-chat-ask="faqWho" data-i18n="chat.askWho">Chi può partecipare?</button>
-              <button class="chat__chip" type="button" data-chat-ask="faqCost" data-i18n="chat.askCost">Quanto costa?</button>
-              <button class="chat__chip" type="button" data-chat-ask="faqHelmet" data-i18n="chat.askHelmet">Serve il casco?</button>
-              <button class="chat__chip" type="button" data-chat-ask="faqWhen" data-i18n="chat.askWhen">Quando e dove?</button>
-              <button class="chat__chip" type="button" data-chat-ask="faqNumber" data-i18n="chat.askNumber">Il numero di partenza?</button>
-              <button class="chat__chip chat__chip--warn" type="button" data-chat-ask="cancel" data-i18n="chat.askCancel">Voglio ritirarmi dalla gara</button>
+              <button class="chat__chips-toggle" type="button" data-chat-chips-toggle aria-expanded="false"
+                      aria-controls="chat-chips-list">
+                <span data-chat-chips-label data-i18n="chat.chipsShow">Suggerimenti</span>
+                <span class="chat__chips-caret" aria-hidden="true">⌄</span>
+              </button>
+              <div class="chat__chips-list" id="chat-chips-list" data-chat-chips-list></div>
             </div>
 
             <form class="chat__composer" data-chat-form novalidate>
