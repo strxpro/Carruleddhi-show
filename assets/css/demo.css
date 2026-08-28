@@ -240,3 +240,63 @@ html.is-demo .wall-note { position: relative; }
   .wall-open__chevron,
   .wall-fold { transition: none; }
 }
+
+/* ============================================================================
+   „Ten adres jest już zapisany" — panel w kroku 1 formularza
+   ============================================================================
+   Otwiera się w miejscu, pod polami, a nie jako dialog. Dialog zasłania to, co człowiek
+   właśnie wpisał, i po zamknięciu nie wiadomo, czy formularz coś zapamiętał. Tu wszystko
+   zostaje na ekranie i widać, że to ten sam krok.
+   ========================================================================== */
+.entry-found {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0 4px;
+  padding: 18px 18px 16px;
+  /* Żółty, nie czerwony. To nie błąd — to rozpoznanie kogoś, kto już się zapisał, i trzy
+     wyjścia do wyboru. Czerwona ramka mówiłaby „zrobiłeś coś źle", a nikt nic złego nie
+     zrobił. */
+  border: 2px solid rgb(255 201 40 / 0.65);
+  border-radius: 18px;
+  background: rgb(255 201 40 / 0.08);
+}
+.entry-found[hidden] { display: none; }
+
+.entry-found__lead { display: grid; gap: 5px; margin: 0; font-size: 14px; line-height: 1.5; }
+.entry-found__lead strong { font-size: 15px; }
+
+.entry-found__who,
+.entry-found__sent,
+.entry-found__status {
+  margin: 0;
+  font-family: var(--font-meta);
+  font-size: 12.5px;
+  letter-spacing: 0.03em;
+}
+.entry-found__who { font-weight: 800; }
+.entry-found__status:empty { display: none; }
+
+.entry-found__choices { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Pełna szerokość na telefonie: trzy przyciski obok siebie na 360 px to trzy przyciski
+   z tekstem złamanym na trzy linie. */
+@media (max-width: 560px) {
+  .entry-found__choices { display: grid; }
+  .entry-found__choices .btn { width: 100%; }
+}
+
+/* Rezygnacja wygląda inaczej niż dwie pozostałe drogi — jest nieodwracalna z tej strony
+   (powrót wymaga rozmowy z organizatorem), więc nie ma być pierwszym, co się kliknie. */
+.entry-found__quit {
+  --btn-bg: transparent;
+  --btn-fg: var(--coral);
+  border: 2px solid var(--coral);
+  box-shadow: none;
+}
+.entry-found__quit:hover { --btn-bg: var(--coral); --btn-fg: var(--white); }
+
+.entry-found__code,
+.entry-found__edit { display: grid; gap: 12px; }
+.entry-found__code[hidden],
+.entry-found__edit[hidden] { display: none; }
+
+.entry-found__edit .form-grid { gap: 12px; }

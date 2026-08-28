@@ -186,7 +186,54 @@ const HOURS = {
   }
 };
 
-const GROUPS = [FAQ, UNSUB, HOURS];
+/* ----------------------------------------------- kod do zmiany własnego zgłoszenia
+   Ten sam szablon maila co przy rezygnacji z powiadomień (EMAIL_TEMPLATES.code), inna
+   treść. Osobne klucze, a nie te same z unsub, bo list mówi, po co jest kod: „wyłączamy
+   powiadomienia" w mailu do kogoś, kto chce poprawić telefon, to zdanie, po którym człowiek
+   przestaje ufać całej reszcie. */
+const ENTRY = {
+  it: {
+    entrySubject: 'Il tuo codice: %CODE%',
+    entryCodeTitle: 'Ecco il codice',
+    entryCodeLead: 'Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 15 minuti.',
+    entryCodeNote: 'Se non hai chiesto tu questo codice, ignora il messaggio: la tua iscrizione non cambia.'
+  },
+  pl: {
+    entrySubject: 'Twój kod: %CODE%',
+    entryCodeTitle: 'Oto kod',
+    entryCodeLead: 'Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 15 minut.',
+    entryCodeNote: 'Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — Twoje zgłoszenie się nie zmienia.'
+  },
+  en: {
+    entrySubject: 'Your code: %CODE%',
+    entryCodeTitle: 'Here is the code',
+    entryCodeLead: 'Enter it on the website to see your entry, correct it or withdraw. It lasts 15 minutes.',
+    entryCodeNote: 'If you did not ask for this code, ignore this message — your entry does not change.'
+  },
+  de: {
+    entrySubject: 'Dein Code: %CODE%',
+    entryCodeTitle: 'Hier ist der Code',
+    entryCodeLead: 'Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 15 Minuten.',
+    entryCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — an deiner Anmeldung ändert sich nichts.'
+  },
+  es: {
+    entrySubject: 'Tu código: %CODE%',
+    entryCodeTitle: 'Aquí tienes el código',
+    entryCodeLead: 'Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 15 minutos.',
+    entryCodeNote: 'Si no has pedido este código, ignora el mensaje: tu inscripción no cambia.'
+  },
+  fr: {
+    entrySubject: 'Votre code : %CODE%',
+    entryCodeTitle: 'Voici le code',
+    entryCodeLead: 'Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 15 minutes.',
+    entryCodeNote: 'Si vous n’avez pas demandé ce code, ignorez ce message : votre inscription ne change pas.'
+  }
+};
+
+const GROUPS = [FAQ, UNSUB, HOURS, ENTRY];
+// (Ten plik obsługuje emails/copy.json. Klucze interfejsu strony idą przez
+//  tools/add-i18n-keys.mjs — to dwa różne słowniki i mieszanie ich kończy się kluczem,
+//  którego szuka przeglądarka, a jest tylko w mailach.)
 const LANGS = ['it', 'pl', 'en', 'de', 'es', 'fr'];
 
 let added = 0;

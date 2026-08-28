@@ -121,7 +121,11 @@ export const COPY_DECK = {
     "chatHandover": "Questa la passo agli organizzatori: ti rispondono qui, in questa chat. Se preferisci, lascia la tua e-mail.",
     "chatGreeting": "Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori.",
     "chatHoursNow": "Siamo in chat adesso (10:00–18:00), quindi la risposta arriva a breve.",
-    "chatHoursLater": "Adesso è fuori orario: rispondiamo dalle 10:00 alle 18:00, ora italiana. Ti scriviamo qui appena rientriamo."
+    "chatHoursLater": "Adesso è fuori orario: rispondiamo dalle 10:00 alle 18:00, ora italiana. Ti scriviamo qui appena rientriamo.",
+    "entrySubject": "Il tuo codice: %CODE%",
+    "entryCodeTitle": "Ecco il codice",
+    "entryCodeLead": "Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 15 minuti.",
+    "entryCodeNote": "Se non hai chiesto tu questo codice, ignora il messaggio: la tua iscrizione non cambia."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -233,7 +237,11 @@ export const COPY_DECK = {
     "chatHandover": "Przekazuję to organizatorom — odpiszą tutaj, w tym czacie. Jeśli chcesz, zostaw swój e-mail.",
     "chatGreeting": "Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom.",
     "chatHoursNow": "Jesteśmy teraz na czacie (10:00–18:00), więc odpowiedź przyjdzie niedługo.",
-    "chatHoursLater": "Teraz jest po godzinach — odpowiadamy od 10:00 do 18:00 czasu włoskiego. Odpiszemy tutaj, jak tylko wrócimy."
+    "chatHoursLater": "Teraz jest po godzinach — odpowiadamy od 10:00 do 18:00 czasu włoskiego. Odpiszemy tutaj, jak tylko wrócimy.",
+    "entrySubject": "Twój kod: %CODE%",
+    "entryCodeTitle": "Oto kod",
+    "entryCodeLead": "Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 15 minut.",
+    "entryCodeNote": "Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — Twoje zgłoszenie się nie zmienia."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -345,7 +353,11 @@ export const COPY_DECK = {
     "chatHandover": "I am passing this to the organisers — they will answer here, in this chat. Leave your e-mail if you prefer.",
     "chatGreeting": "Hello! Ask me anything about the race. What I do not know, I pass to the organisers.",
     "chatHoursNow": "We are in the chat right now (10:00–18:00), so the answer will come shortly.",
-    "chatHoursLater": "It is outside our hours now — we answer between 10:00 and 18:00 Italian time. We will write here as soon as we are back."
+    "chatHoursLater": "It is outside our hours now — we answer between 10:00 and 18:00 Italian time. We will write here as soon as we are back.",
+    "entrySubject": "Your code: %CODE%",
+    "entryCodeTitle": "Here is the code",
+    "entryCodeLead": "Enter it on the website to see your entry, correct it or withdraw. It lasts 15 minutes.",
+    "entryCodeNote": "If you did not ask for this code, ignore this message — your entry does not change."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -457,7 +469,11 @@ export const COPY_DECK = {
     "chatHandover": "Ich gebe das an die Organisatoren weiter — sie antworten hier im Chat. Wenn du magst, lass deine E-Mail da.",
     "chatGreeting": "Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter.",
     "chatHoursNow": "Wir sind gerade im Chat (10:00–18:00), die Antwort kommt also bald.",
-    "chatHoursLater": "Gerade ist außerhalb der Zeiten — wir antworten von 10:00 bis 18:00 italienischer Zeit. Wir schreiben hier, sobald wir zurück sind."
+    "chatHoursLater": "Gerade ist außerhalb der Zeiten — wir antworten von 10:00 bis 18:00 italienischer Zeit. Wir schreiben hier, sobald wir zurück sind.",
+    "entrySubject": "Dein Code: %CODE%",
+    "entryCodeTitle": "Hier ist der Code",
+    "entryCodeLead": "Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 15 Minuten.",
+    "entryCodeNote": "Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — an deiner Anmeldung ändert sich nichts."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -569,7 +585,11 @@ export const COPY_DECK = {
     "chatHandover": "Paso esto a los organizadores: te responden aquí, en este chat. Si quieres, deja tu correo.",
     "chatGreeting": "¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores.",
     "chatHoursNow": "Estamos en el chat ahora mismo (10:00–18:00), así que la respuesta llegará pronto.",
-    "chatHoursLater": "Ahora estamos fuera de horario: respondemos de 10:00 a 18:00, hora italiana. Te escribimos aquí en cuanto volvamos."
+    "chatHoursLater": "Ahora estamos fuera de horario: respondemos de 10:00 a 18:00, hora italiana. Te escribimos aquí en cuanto volvamos.",
+    "entrySubject": "Tu código: %CODE%",
+    "entryCodeTitle": "Aquí tienes el código",
+    "entryCodeLead": "Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 15 minutos.",
+    "entryCodeNote": "Si no has pedido este código, ignora el mensaje: tu inscripción no cambia."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -681,6 +701,10 @@ export const COPY_DECK = {
     "chatHandover": "Je transmets cela aux organisateurs — ils répondront ici, dans ce chat. Laissez votre e-mail si vous préférez.",
     "chatGreeting": "Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs.",
     "chatHoursNow": "Nous sommes sur le chat en ce moment (10:00–18:00), la réponse arrivera donc bientôt.",
-    "chatHoursLater": "Nous sommes hors horaires : nous répondons de 10:00 à 18:00, heure italienne. Nous vous écrirons ici dès notre retour."
+    "chatHoursLater": "Nous sommes hors horaires : nous répondons de 10:00 à 18:00, heure italienne. Nous vous écrirons ici dès notre retour.",
+    "entrySubject": "Votre code : %CODE%",
+    "entryCodeTitle": "Voici le code",
+    "entryCodeLead": "Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 15 minutes.",
+    "entryCodeNote": "Si vous n’avez pas demandé ce code, ignorez ce message : votre inscription ne change pas."
   }
 };

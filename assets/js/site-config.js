@@ -69,7 +69,19 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
        switches the organiser set in the admin panel. Defaulted rather than left blank
        because unlike the others it takes no input and returns nothing private, so
        there is no configuration step for it to wait on. */
-    settings: '/api/carruleddhi/settings'
+    settings: '/api/carruleddhi/settings',
+
+    /* Somebody who is already on the list, typing their address into the form again.
+       Defaulted for the same reason as `chat` and `settings`: there is nothing to
+       configure, and a blank value would mean the form silently loses the ability to
+       recognise a returning rider — which looks exactly like the old behaviour and so
+       would never be reported as broken.
+         entryLookup   is this address entered? (nothing is sent)
+         entryCode     e-mail a six-digit code to it
+         entryManage   with the code: show, correct, or withdraw */
+    entryLookup: '/api/carruleddhi/entry-lookup',
+    entryCode: '/api/carruleddhi/entry-code',
+    entryManage: '/api/carruleddhi/entry-manage'
   }
 });
 

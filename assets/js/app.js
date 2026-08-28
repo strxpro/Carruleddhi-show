@@ -2252,9 +2252,20 @@ import { flagSvg } from './flags.js';
         dropPhoto();
         paintStarState();
         if (counter) counter.textContent = '0';
-        // Says "waiting for approval", not "published". It is not on the wall yet.
-        if (status) status.textContent = text('wall.pending');
+        /* "It is on the wall", not "it is waiting to be read".
+           The server approves on insert since migration 0015, and the old wording promised a
+           review that no longer happens — so somebody would look for their message, not find
+           the notice they had been told to expect, and write it again. `pending` is still
+           read from the response rather than assumed, so a return to moderation needs no
+           change here. */
+        if (status) status.textContent = text(result.pending ? 'wall.pending' : 'wall.published');
         burstConfetti(submit, 18);
+        /* And it appears without reloading the page. Posting into a list that does not change
+           is the other half of the same problem: the confirmation says it is up, and the wall
+           right underneath still does not show it.
+           `load(false)` and not `load(true)`: the new message is the newest, so the first page
+           has to be fetched again rather than an older page appended. */
+        if (!result.pending) load(false);
       } else if (result?.code === 'WALL_RATE_LIMITED') {
         if (status) status.textContent = text('wall.tooMany');
       } else if (result?.code === 'WALL_PHOTO_TOO_LARGE' || result?.code === 'PAYLOAD_TOO_LARGE') {
@@ -3092,6 +3103,266 @@ import { flagSvg } from './flags.js';
     paintGate();
   }
 
+  /* ==========================================================================
+     An address that is already entered
+     ==========================================================================
+     Wired up by setupExistingEntry(), opened by existingEntryGate() from the "Continue"
+     button on step 1. Three ways out; two of them need a code from the inbox first.
+
+     The state that has to survive between the button presses lives in this closure rather
+     than in the DOM: which of the two things they chose, and the code they typed. Reading it
+     back off the panel each time would mean the panel's markup is the source of truth for a
+     security decision, which is a worse place for it than a variable nobody else can reach.
+     ======================================================================== */
+  let entryIntent = '';
+
+  function setupExistingEntry(form) {
+    const panel = $('[data-entry-found]', form);
+    if (!panel) return;
+
+    const choices = $('[data-entry-choices]', panel);
+    const codeStep = $('[data-entry-code-step]', panel);
+    const editStep = $('[data-entry-edit-step]', panel);
+    const status = $('[data-entry-status]', panel);
+    const codeField = $('#entry-code', panel);
+    const codeError = $('[data-entry-code-error]', panel);
+    const emailOf = () => String(form.elements.namedItem('email')?.value || '').trim().toLowerCase();
+
+    const show = (which) => {
+      if (choices) choices.hidden = which !== 'choices';
+      if (codeStep) codeStep.hidden = which !== 'code';
+      if (editStep) editStep.hidden = which !== 'edit';
+      // The panel changes height every time, and #signup is a sticky panel that sizes itself.
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+    };
+
+    const say = (key, extra = '') => {
+      if (status) status.textContent = `${text(key) || ''}${extra}`;
+    };
+
+    /** Turns a server code into something a person can act on. */
+    const explain = (result) => {
+      const map = {
+        ENTRY_CODE_WRONG: 'entry.codeWrong',
+        ENTRY_CODE_EXPIRED: 'entry.codeExpired',
+        ENTRY_TOO_MANY_TRIES: 'entry.codeBlocked',
+        ENTRY_NO_CODE: 'entry.codeExpired',
+        ENTRY_BAD_CODE: 'entry.codeShort',
+        ENTRY_NOT_FOUND: 'entry.gone',
+        ENTRY_MAIL_FAILED: 'entry.mailFailed'
+      };
+      return map[result?.code] || 'entry.failed';
+    };
+
+    /* ---------------------------------------------------------------- other address */
+    $('[data-entry-action="other"]', panel)?.addEventListener('click', () => {
+      panel.hidden = true;
+      show('choices');
+      say('');
+      const field = form.elements.namedItem('email');
+      field.value = '';
+      markField(field, true);
+      field.focus();
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+    });
+
+    /* ------------------------------------------------------- edit / withdraw: send code */
+    const askForCode = async (intent, button) => {
+      entryIntent = intent;
+      const email = emailOf();
+      const original = button.textContent;
+      button.disabled = true;
+      say('entry.sending');
+      try {
+        const result = await postJSON(config.endpoints.entryCode, eventPayload('entry-code', { email }));
+        if (!result?.ok) throw Object.assign(new Error('code'), { payload: result });
+        const sent = $('[data-entry-sent]', panel);
+        // The masked address comes from the server, so it is the address the letter went to
+        // rather than the one on screen — which is the same thing right up until it is not.
+        if (sent) sent.textContent = `${text('entry.codeSent') || ''} ${result.email || ''}`.trim();
+        say('');
+        show('code');
+        codeField?.focus();
+      } catch (error) {
+        say(explain(error.payload));
+      } finally {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    };
+
+    $('[data-entry-action="edit"]', panel)?.addEventListener('click', (event) => {
+      askForCode('edit', event.currentTarget);
+    });
+    $('[data-entry-action="withdraw"]', panel)?.addEventListener('click', (event) => {
+      askForCode('withdraw', event.currentTarget);
+    });
+
+    $$('[data-entry-cancel]', panel).forEach((button) => button.addEventListener('click', () => {
+      entryIntent = '';
+      if (codeField) codeField.value = '';
+      if (codeError) codeError.textContent = '';
+      say('');
+      show('choices');
+    }));
+
+    /* ------------------------------------------------------------- code confirmed */
+    $('[data-entry-confirm]', panel)?.addEventListener('click', async (event) => {
+      const code = String(codeField?.value || '').replace(/\D/g, '');
+      if (codeError) codeError.textContent = '';
+      if (code.length !== 6) {
+        if (codeError) codeError.textContent = text('entry.codeShort') || '';
+        codeField?.focus();
+        return;
+      }
+
+      const button = event.currentTarget;
+      button.disabled = true;
+      say('entry.checking');
+      try {
+        if (entryIntent === 'withdraw') {
+          const result = await postJSON(config.endpoints.entryManage, eventPayload('entry-manage', {
+            email: emailOf(),
+            code,
+            action: 'withdraw'
+          }));
+          if (!result?.ok) throw Object.assign(new Error('withdraw'), { payload: result });
+          show('choices');
+          if (choices) choices.hidden = true;
+          say('entry.withdrawn');
+          return;
+        }
+
+        /* Edit: fetch first, then show the fields filled in.
+           An empty form would be a form that silently blanks everything somebody does not
+           re-type — `view` returns the current values and they go straight into the inputs,
+           so leaving a field alone leaves the data alone. */
+        const result = await postJSON(config.endpoints.entryManage, eventPayload('entry-manage', {
+          email: emailOf(),
+          code,
+          action: 'view'
+        }));
+        if (!result?.ok) throw Object.assign(new Error('view'), { payload: result });
+        const entry = result.entry || {};
+        const put = (id, value) => {
+          const field = $(id, panel);
+          if (field) field.value = value || '';
+        };
+        put('#entry-phone', entry.phone);
+        put('#entry-postal', entry.postalCode);
+        put('#entry-address', entry.address);
+        put('#entry-cart', entry.cartName);
+        put('#entry-team', entry.teamName);
+        put('#entry-notes', entry.cartNotes);
+        say('entry.showing', entry.raceNumber ? ` ${entry.raceNumber}` : '');
+        show('edit');
+      } catch (error) {
+        const key = explain(error.payload);
+        if (codeError && key.startsWith('entry.code')) codeError.textContent = text(key) || '';
+        else say(key);
+        if (error.payload?.left !== undefined && codeError) {
+          codeError.textContent = `${text('entry.codeWrong') || ''} ${error.payload.left}`;
+        }
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    /* ------------------------------------------------------------------- save edits */
+    $('[data-entry-save]', panel)?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      say('entry.saving');
+      try {
+        const result = await postJSON(config.endpoints.entryManage, eventPayload('entry-manage', {
+          email: emailOf(),
+          code: String(codeField?.value || '').replace(/\D/g, ''),
+          action: 'update',
+          phone: $('#entry-phone', panel)?.value || '',
+          postalCode: $('#entry-postal', panel)?.value || '',
+          address: $('#entry-address', panel)?.value || '',
+          cartName: $('#entry-cart', panel)?.value || '',
+          teamName: $('#entry-team', panel)?.value || '',
+          cartNotes: $('#entry-notes', panel)?.value || ''
+        }));
+        if (!result?.ok) throw Object.assign(new Error('update'), { payload: result });
+        show('choices');
+        if (choices) choices.hidden = true;
+        say('entry.saved');
+      } catch (error) {
+        say(explain(error.payload));
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  /**
+   * Asks whether the typed address is already entered, and shows the panel if it is.
+   *
+   * @returns {Promise<boolean>} true when the form must not advance.
+   */
+  async function existingEntryGate(form, button) {
+    const panel = $('[data-entry-found]', form);
+    const endpoint = config.endpoints.entryLookup;
+    if (!panel || !endpoint) return false;
+
+    const email = String(form.elements.namedItem('email')?.value || '').trim().toLowerCase();
+    if (!email) return false;
+
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = text('form.checking') || original;
+    try {
+      const result = await postJSON(endpoint, eventPayload('entry-lookup', { email }));
+      if (!result?.ok || !result.exists) return false;
+
+      const initials = $('[data-entry-initials]', panel);
+      if (initials) {
+        // Two letters, not the name. Enough to tell "that is mine" from "somebody else uses
+        // this address"; not enough to be worth harvesting.
+        initials.textContent = result.initials
+          ? `${text('entry.initials') || ''} ${result.initials}`.trim()
+          : '';
+        initials.hidden = !result.initials;
+      }
+
+      /* An entry that is already withdrawn, or a minor's.
+         Both are dead ends for self-service and for different reasons: there is nothing to
+         withdraw from, and a minor's entry rests on a signed guardian authorisation that a
+         six-digit code cannot stand in for. Saying so and offering the other address is more
+         use than three buttons of which two will fail. */
+      const blocked = result.withdrawn || result.minor;
+      const choices = $('[data-entry-choices]', panel);
+      $$('[data-entry-action]', panel).forEach((choice) => {
+        choice.hidden = blocked && choice.dataset.entryAction !== 'other';
+      });
+      if (choices) choices.hidden = false;
+      $('[data-entry-code-step]', panel).hidden = true;
+      $('[data-entry-edit-step]', panel).hidden = true;
+      const status = $('[data-entry-status]', panel);
+      if (status) {
+        status.textContent = result.withdrawn
+          ? text('entry.alreadyOut') || ''
+          : (result.minor ? text('entry.minorHelp') || '' : '');
+      }
+
+      panel.hidden = false;
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+      panel.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+      return true;
+    } catch (_) {
+      /* A failed lookup lets the form through. The duplicate is still caught on submit with
+         a 409, so nothing can be entered twice — the cost of a failure here is a returning
+         rider filling in three steps for nothing, and the cost of the opposite choice would
+         be a new rider unable to enter at all. */
+      return false;
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  }
+
   function setupRegistrationForm() {
     /** Interval id for the thank-you screen countdown. 0 when nothing is pending. */
     let successTimer = 0;
@@ -3136,9 +3407,29 @@ import { flagSvg } from './flags.js';
     // The age sentence carries a translated string, so it is repainted on switch.
     window.addEventListener('carruleddhi:language', () => paintMinorState(form));
     paintMinorState(form);
-    $$('[data-form-next]', form).forEach((button) => button.addEventListener('click', () => {
+    setupExistingEntry(form);
+
+    $$('[data-form-next]', form).forEach((button) => button.addEventListener('click', async () => {
       const current = $(`[data-form-step="${state.formStep}"]`, form);
-      if (validateContainer(current)) setFormStep(state.formStep + 1);
+      if (!validateContainer(current)) return;
+
+      /* On the way out of step 1, ask whether this address is already entered.
+         ---------------------------------------------------------------------------
+         It used to be discovered at the very end: fill in three steps, press send, get a
+         409 and a toast saying "already registered". Everything typed after the address was
+         wasted, and the two things somebody in that position actually wants — correct it, or
+         withdraw — were not offered at all.
+
+         One request, on one button press, on the step where the address lives. `await` is
+         fine here: the button is the only thing waiting, and it says so. If the lookup fails
+         for any reason the form carries on exactly as before, because a returning rider being
+         sent through the form is a nuisance and a new rider being blocked by a failed lookup
+         would be a broken page. */
+      if (state.formStep === 1) {
+        const held = await existingEntryGate(form, button);
+        if (held) return;
+      }
+      setFormStep(state.formStep + 1);
     }));
     $$('[data-form-back]', form).forEach((button) => button.addEventListener('click', () => setFormStep(state.formStep - 1)));
 

@@ -750,6 +750,82 @@
                   <p class="field__error" data-minor-consent-error data-i18n="minor.consentError">Serve l’autorizzazione di chi ha la responsabilità legale.</p>
                 </fieldset>
 
+                <!-- Already on the list.
+                     Shown when "Continue" finds this address in the database, instead of
+                     letting somebody fill in the rest of the form and hit a 409 at the end.
+                     Three ways out, and the two that touch an existing entry ask for a code
+                     e-mailed to that address first — the address is the only thing typed so
+                     far, so without that step anybody could withdraw a stranger.
+
+                     Everything here is hidden until it is needed; the panel is built into the
+                     step rather than being a dialog so nobody loses what they have typed. -->
+                <div class="entry-found" data-entry-found hidden>
+                  <p class="entry-found__lead">
+                    <strong data-i18n="entry.foundTitle">Questo indirizzo è già iscritto.</strong>
+                    <span data-i18n="entry.foundLead">Puoi usare un altro indirizzo, correggere l’iscrizione che hai già, o ritirarti dalla gara.</span>
+                  </p>
+                  <p class="entry-found__who" data-entry-initials hidden></p>
+
+                  <div class="entry-found__choices" data-entry-choices>
+                    <button class="btn btn--small btn--outline" type="button" data-entry-action="other">
+                      <span data-i18n="entry.useOther">Uso un altro indirizzo</span>
+                    </button>
+                    <button class="btn btn--small btn--blue" type="button" data-entry-action="edit">
+                      <span data-i18n="entry.editMine">Correggi la mia iscrizione</span>
+                    </button>
+                    <button class="btn btn--small entry-found__quit" type="button" data-entry-action="withdraw">
+                      <span data-i18n="entry.withdraw">Ritirami dalla gara</span>
+                    </button>
+                  </div>
+
+                  <!-- Step two: the code. One field, because at this point the address is
+                       already known and re-typing it would only be a chance to mistype it. -->
+                  <div class="entry-found__code" data-entry-code-step hidden>
+                    <p class="entry-found__sent" data-entry-sent></p>
+                    <div class="field" data-field>
+                      <input id="entry-code" name="entryCode" type="text" inputmode="numeric"
+                             autocomplete="one-time-code" maxlength="6" placeholder=" ">
+                      <label for="entry-code" data-i18n="entry.codeLabel">Codice a sei cifre</label>
+                      <span class="field__error" data-entry-code-error></span>
+                    </div>
+                    <div class="entry-found__choices">
+                      <button class="btn btn--small btn--yellow" type="button" data-entry-confirm>
+                        <span data-i18n="entry.confirm">Conferma</span>
+                      </button>
+                      <button class="btn btn--small btn--outline" type="button" data-entry-cancel>
+                        <span data-i18n="entry.back">Annulla</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Step three, edit only: the fields somebody may change themselves.
+                       Name, surname and date of birth are not here on purpose — they are
+                       printed on the authorisation already sitting in their inbox, and a
+                       quiet change here would put the paper and the start list out of step.
+                       Those go through the organiser. -->
+                  <div class="entry-found__edit" data-entry-edit-step hidden>
+                    <p class="entry-found__sent" data-entry-edit-note data-i18n="entry.editNote">Nome, cognome e data di nascita sono sul modulo firmato: per quelli scrivici in chat.</p>
+                    <div class="form-grid">
+                      <div class="field" data-field><input id="entry-phone" name="entryPhone" type="tel" placeholder=" "><label for="entry-phone" data-i18n="form.phone">Telefono</label></div>
+                      <div class="field" data-field><input id="entry-postal" name="entryPostal" type="text" maxlength="12" placeholder=" "><label for="entry-postal" data-i18n="form.postalCode">CAP</label></div>
+                    </div>
+                    <div class="field" data-field><input id="entry-address" name="entryAddress" type="text" placeholder=" "><label for="entry-address" data-i18n="form.address">Indirizzo</label></div>
+                    <div class="field" data-field><input id="entry-cart" name="entryCart" type="text" placeholder=" "><label for="entry-cart" data-i18n="form.cartName">Nome del carruleddhu</label></div>
+                    <div class="field" data-field><input id="entry-team" name="entryTeam" type="text" placeholder=" "><label for="entry-team" data-i18n="form.teamName">Squadra</label></div>
+                    <div class="field" data-field><textarea id="entry-notes" name="entryNotes" rows="2" placeholder=" "></textarea><label for="entry-notes" data-i18n="form.cartNotes">Note sul mezzo</label></div>
+                    <div class="entry-found__choices">
+                      <button class="btn btn--small btn--yellow" type="button" data-entry-save>
+                        <span data-i18n="entry.save">Salva le modifiche</span>
+                      </button>
+                      <button class="btn btn--small btn--outline" type="button" data-entry-cancel>
+                        <span data-i18n="entry.back">Annulla</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <p class="entry-found__status" data-entry-status role="status" aria-live="polite"></p>
+                </div>
+
                 <div class="form-nav"><span></span><button class="btn btn--blue" type="button" data-form-next><span data-i18n="form.next">Continua</span><span aria-hidden="true">→</span></button></div>
               </section>
 

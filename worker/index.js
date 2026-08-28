@@ -50,7 +50,16 @@ const ALLOWED_TYPES = new Set([
      odpowiadały UNKNOWN_TYPE i nigdy do handlera nie docierały. Były w
      SUPABASE_TYPES i w PROTECTED_TYPES, co wyglądało jak komplet i dlatego brak
      nie rzucał się w oczy. */
-  'unsub-start', 'unsub-confirm', 'purge'
+  'unsub-start', 'unsub-confirm', 'purge',
+
+  /* Zawodnik, który już jest na liście i wpisuje swój adres w formularzu.
+       entry-lookup   „czy ten adres jest zapisany" — tyle, ile trzeba, żeby zaproponować
+                      wyjście, i nic więcej
+       entry-code     wysyła szcześciocyfrowy kod na ten adres
+       entry-manage   z kodem: pokaż moje zgłoszenie, popraw je, albo wycofaj
+     Bez passphrase, bo używa ich zawodnik, a nie organizator. Zabezpieczeniem jest kod
+     w skrzynce — ta sama konstrukcja co przy rezygnacji z powiadomień. */
+  'entry-lookup', 'entry-code', 'entry-manage'
 ]);
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
@@ -58,7 +67,8 @@ const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
   'unsub-start', 'unsub-confirm',
-  'chat', 'chat-admin', 'chat-inbound', 'inbox'
+  'chat', 'chat-admin', 'chat-inbound', 'inbox',
+  'entry-lookup', 'entry-code', 'entry-manage'
 ]);
 
 /**
@@ -154,7 +164,21 @@ const FIELD_WHITELIST = {
      which address this is about, in case it is not theirs — and doing that with the same
      call that sends would mean a code goes out before any button is pressed. */
   'unsub-start': ['token', 'peek'],
-  'unsub-confirm': ['token', 'code']
+  'unsub-confirm': ['token', 'code'],
+
+  /* Zgłoszenie widziane oczami zawodnika.
+     `entry-lookup` bierze wyłącznie adres — świadomie, bo im mniej wchodzi, tym mniej da
+     się z tego endpointu wyciągnąć. */
+  'entry-lookup': ['email'],
+  'entry-code': ['email'],
+  /* Pola do poprawienia są wymienione po imieniu i nie ma tu `firstName`, `lastName` ani
+     `birthDate`. To nie przeoczenie: te trzy są wydrukowane na liberatorii, którą człowiek
+     ma już w skrzynce, a cicha zmiana w bazie robi rozjazd między papierem a listą startową,
+     którego nikt nie zauważy do dnia zawodów. Zmienia je organizator, po rozmowie. */
+  'entry-manage': [
+    'email', 'code', 'action',
+    'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes'
+  ]
 };
 
 const MAX_FIELD_LENGTH = 3000;
@@ -1649,6 +1673,283 @@ async function unsubConfirm(env, payload, cors) {
   return json({ ok: true, email: maskEmail(email), cleared }, 200, cors);
 }
 
+/* ============================================================================
+   Your own entry: recognise it, change it, withdraw it
+   ============================================================================
+   The form refuses a second entry on one address, and it should — one rider, one number.
+   But the person hitting that wall is almost never trying to game anything: they entered
+   three weeks ago and want to correct a phone number, or they have broken an ankle and
+   want out. The old answer was "that address is already registered" and no way forward.
+
+   THREE STEPS, AND WHY IT IS THREE
+     1. lookup   the form asks, as soon as the address is typed, whether it is on the list.
+                 Answered without sending anything, so a typo costs nothing.
+     2. code     only once somebody presses "this is me" does a letter go out.
+     3. manage   the code proves they read that inbox; then they can look, edit or withdraw.
+
+     Collapsing 1 and 2 would mean an e-mail leaving on every keystroke that happened to
+     form a registered address. Collapsing 2 and 3 is impossible: the code has to travel.
+
+   WHAT LOOKUP GIVES AWAY, AND WHAT IT DOES NOT
+     It confirms that an address is entered. There is no way to offer this feature without
+     that, and pretending otherwise would be worse than saying it plainly. What it does not
+     give away: no name, no number, no phone. The most it returns is initials, which is the
+     same thing the public counters already publish, and it is there so somebody can tell
+     "yes, that is my entry" apart from "somebody else uses this address".
+
+     Scanning is limited by the same rate limit and Turnstile check as every other public
+     type — see the top of fetch().
+   ========================================================================== */
+
+/** Two initials from a name, for "is this you". Never the name itself. */
+function initialsOf(first, last) {
+  const one = String(first || '').trim()[0] || '';
+  const two = String(last || '').trim()[0] || '';
+  return `${one}${two}`.toUpperCase();
+}
+
+/** The row for an address, or null. One indexed lookup on lower(email). */
+async function findEntry(env, email) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
+  url.searchParams.set(
+    'select',
+    'id,race_number,first_name,last_name,email,phone,address,postal_code,'
+    + 'cart_name,category,team_name,cart_notes,locale,status,is_minor,created_at,self_updated_at'
+  );
+  url.searchParams.set('email', `eq.${email}`);
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!response.ok) return null;
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function entryLookup(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
+
+  const row = await findEntry(env, email);
+  // Not 404. "No entry on this address" is the normal answer and the form acts on it by
+  // carrying on, so it is a successful lookup with `exists: false`.
+  if (!row) return json({ ok: true, exists: false }, 200, cors);
+
+  return json({
+    ok: true,
+    exists: true,
+    initials: initialsOf(row.first_name, row.last_name),
+    /* Already out of the race. Said here, because otherwise the form offers "withdraw" to
+       somebody who has withdrawn, and the only way they would find out is by doing it again
+       and being told nothing happened. */
+    withdrawn: row.status === 'withdrawn',
+    // Whether editing is even on the table: a minor's entry hangs on a signed guardian
+    // authorisation, so the whole thing goes through a person.
+    minor: Boolean(row.is_minor)
+  }, 200, cors);
+}
+
+async function entryCode(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
+
+  const row = await findEntry(env, email);
+  /* The same answer whether the address is unknown or known-but-withdrawn. An endpoint
+     that distinguishes them is an endpoint that tells you which addresses are entered,
+     which is the one thing this whole flow is careful not to hand out in bulk. */
+  if (!row) return json({ ok: false, code: 'ENTRY_NOT_FOUND' }, 404, cors);
+
+  const locale = localeOf(row.locale);
+  const deck = COPY_DECK[locale] || COPY_DECK.it;
+  const code = newVerificationCode();
+
+  const stored = await insertRow(env, 'verification_codes', {
+    purpose: 'manage-entry',
+    email,
+    code_hash: await hashCode(env, email, code)
+  });
+  if (!stored.ok) return json({ ok: false, code: 'ENTRY_CODE_FAILED' }, 502, cors);
+
+  const delivered = await sendThroughOutbox(env, {
+    to: email,
+    subject: fill(deck.entrySubject, { CODE: code }),
+    html: renderTemplate(EMAIL_TEMPLATES.code, {
+      copy: deck,
+      ev: COPY_DECK._event || {},
+      loc: locale,
+      codeTitle: deck.entryCodeTitle,
+      codeLead: deck.entryCodeLead,
+      code,
+      codeNote: deck.entryCodeNote
+    })
+  });
+  if (!delivered) return json({ ok: false, code: 'ENTRY_MAIL_FAILED' }, 502, cors);
+
+  return json({ ok: true, email: maskEmail(email) }, 200, cors);
+}
+
+/**
+ * Checks a code and consumes it, or explains why not.
+ *
+ * Lifted out of unsubConfirm rather than copied: attempts, expiry and single use are the
+ * three things that make a six-digit code worth anything, and two copies of that is one
+ * copy that will eventually be missing one of them.
+ *
+ * @returns {{ok: true}|{ok: false, code: string, status: number, left?: number}}
+ */
+async function consumeCode(env, email, purpose, code) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/verification_codes`);
+  url.searchParams.set('select', 'id,code_hash,expires_at,attempts');
+  url.searchParams.set('email', `eq.${email}`);
+  url.searchParams.set('purpose', `eq.${purpose}`);
+  url.searchParams.set('consumed_at', 'is.null');
+  url.searchParams.set('order', 'created_at.desc');
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  const row = response.ok ? (await response.json().catch(() => []))?.[0] : null;
+  if (!row) return { ok: false, code: 'ENTRY_NO_CODE', status: 410 };
+
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    return { ok: false, code: 'ENTRY_CODE_EXPIRED', status: 410 };
+  }
+  if (row.attempts >= CODE_ATTEMPT_LIMIT) {
+    return { ok: false, code: 'ENTRY_TOO_MANY_TRIES', status: 429 };
+  }
+
+  if (row.code_hash !== (await hashCode(env, email, code))) {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${row.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ attempts: row.attempts + 1 })
+    }).catch(() => {});
+    return {
+      ok: false,
+      code: 'ENTRY_CODE_WRONG',
+      status: 422,
+      left: Math.max(CODE_ATTEMPT_LIMIT - row.attempts - 1, 0)
+    };
+  }
+
+  return { ok: true, id: row.id };
+}
+
+/** Marks a code used. Separate call, because `view` must not spend it. */
+function spendCode(env, id) {
+  return fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify({ consumed_at: new Date().toISOString() })
+  }).catch(() => {});
+}
+
+async function entryManage(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  const code = String(payload.code || '').replace(/\D/g, '');
+  const action = String(payload.action || 'view');
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
+  if (code.length !== 6) return json({ ok: false, code: 'ENTRY_BAD_CODE' }, 422, cors);
+  if (!['view', 'update', 'withdraw'].includes(action)) {
+    return json({ ok: false, code: 'ENTRY_UNKNOWN_ACTION' }, 400, cors);
+  }
+
+  const row = await findEntry(env, email);
+  if (!row) return json({ ok: false, code: 'ENTRY_NOT_FOUND' }, 404, cors);
+
+  const checked = await consumeCode(env, email, 'manage-entry', code);
+  if (!checked.ok) {
+    return json(
+      { ok: false, code: checked.code, ...(checked.left === undefined ? {} : { left: checked.left }) },
+      checked.status,
+      cors
+    );
+  }
+
+  /* `view` deliberately does not spend the code.
+     Somebody types six digits, sees their entry, changes the phone number and presses save —
+     that is two calls, and if the first one burned the code the second would fail and they
+     would have to ask for a new letter to do the thing they had just been shown. The code
+     lasts fifteen minutes either way. */
+  if (action === 'view') {
+    return json({
+      ok: true,
+      entry: {
+        raceNumber: row.race_number ? String(row.race_number).padStart(3, '0') : null,
+        initials: initialsOf(row.first_name, row.last_name),
+        email: maskEmail(row.email),
+        phone: row.phone || '',
+        address: row.address || '',
+        postalCode: row.postal_code || '',
+        cartName: row.cart_name || '',
+        category: row.category || 'classic',
+        teamName: row.team_name || '',
+        cartNotes: row.cart_notes || '',
+        status: row.status,
+        minor: Boolean(row.is_minor),
+        createdAt: row.created_at
+      }
+    }, 200, cors);
+  }
+
+  if (action === 'withdraw') {
+    await spendCode(env, checked.id);
+    /* `status` and nothing else. The trigger from migration 0011 clears the race number when
+       this lands, which puts it back in the pool for the next person — and it does that in
+       the database rather than here, so it also happens when the organiser changes the status
+       from the panel or by hand. */
+    const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${row.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ status: 'withdrawn' })
+    });
+    if (!patch.ok) return json({ ok: false, code: 'ENTRY_WRITE_FAILED' }, 502, cors);
+
+    /* Off the reminder list as well. Three letters counting down to a race somebody has
+       just left is the clearest possible way to look like nobody is reading anything. */
+    await fetch(
+      `${env.SUPABASE_URL}/rest/v1/reminder_subscribers?email=eq.${encodeURIComponent(email)}`,
+      {
+        method: 'PATCH',
+        headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ status: 'unsubscribed' })
+      }
+    ).catch(() => {});
+
+    return json({ ok: true, withdrawn: true }, 200, cors);
+  }
+
+  // update
+  const patchRow = {};
+  const setText = (key, column, max = 200) => {
+    if (payload[key] === undefined) return;
+    const value = String(payload[key]).trim().slice(0, max);
+    patchRow[column] = value || null;
+  };
+  setText('phone', 'phone', 40);
+  setText('address', 'address', 300);
+  setText('postalCode', 'postal_code', 12);
+  setText('cartName', 'cart_name', 120);
+  setText('teamName', 'team_name', 120);
+  setText('cartNotes', 'cart_notes', 1000);
+  if (payload.category !== undefined) {
+    patchRow.category = payload.category === 'art' ? 'art' : 'classic';
+  }
+
+  if (Object.keys(patchRow).length === 0) {
+    return json({ ok: false, code: 'ENTRY_NOTHING_TO_DO' }, 422, cors);
+  }
+
+  await spendCode(env, checked.id);
+  // Stamped so the organiser can tell "the rider corrected this" from "somebody mistyped it".
+  patchRow.self_updated_at = new Date().toISOString();
+
+  const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${row.id}`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify(patchRow)
+  });
+  if (!patch.ok) return json({ ok: false, code: 'ENTRY_WRITE_FAILED' }, 502, cors);
+
+  return json({ ok: true, updated: Object.keys(patchRow).filter((key) => key !== 'self_updated_at') }, 200, cors);
+}
+
 /**
  * One finished letter, handed to Make.
  *
@@ -2719,7 +3020,10 @@ async function wallPost(env, request, payload, cors) {
       photo_path: photoPath || null,
       photo_width: photoPath ? width : null,
       photo_height: photoPath ? height : null,
-      approved: false,
+      /* Visible immediately, moderated afterwards. See migration 0015 for the reasoning and
+         for the cost — spam is on the wall until somebody removes it. Written explicitly
+         rather than left to the column default so this file says what it does. */
+      approved: true,
       ip_hash: ipHash,
       user_agent: String(request.headers.get('User-Agent') || '').slice(0, 300)
     }])
@@ -2731,9 +3035,12 @@ async function wallPost(env, request, payload, cors) {
     return json({ ok: false, code: 'WALL_WRITE_FAILED' }, 502, cors);
   }
 
-  // `pending: true` is the honest answer: the message exists but nobody can see it
-  // yet. Telling the visitor it is live would be a lie they would notice.
-  return json({ ok: true, pending: true, photo: Boolean(photoPath), rating }, 200, cors);
+  /* `pending: false` — it is on the wall now.
+     This used to be `true` and the page said "your message will appear after we read it",
+     which was accurate then and is a lie now. The flag is kept rather than removed because
+     the page branches on it, and a wall that goes back to moderation later should not need a
+     second change on this side. */
+  return json({ ok: true, pending: false, photo: Boolean(photoPath), rating }, 200, cors);
 }
 
 /**
@@ -3019,6 +3326,9 @@ export default {
       if (type === 'purge') return purge(env, payload, cors);
       if (type === 'unsub-start') return unsubStart(env, payload, cors);
       if (type === 'unsub-confirm') return unsubConfirm(env, payload, cors);
+      if (type === 'entry-lookup') return entryLookup(env, payload, cors);
+      if (type === 'entry-code') return entryCode(env, payload, cors);
+      if (type === 'entry-manage') return entryManage(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 
