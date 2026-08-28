@@ -215,6 +215,36 @@ check(
 );
 check('no template calls a Make function', !/\{\{\s*(?:if|get|lower|upper|ifempty|parseJSON|formatDate)\s*\(/.test(templates));
 
+/* --- sygnal z czatu do organizatorow --------------------------------------
+   Trzy rzeczy, ktorych nie widac w zadnym przebiegu i o ktore latwo sie potknac przy
+   nastepnej zmianie w chatVisitor(). */
+
+const worker = read('worker/index.js');
+
+/* Ta asercja jest tu, bo ten blad juz raz powstal.
+
+   Wyciszenie powtorek opiera sie na unread_for_admin, ale trigger w 0005_chat.sql
+   podnosi ten licznik przy kazdej wiadomosci goscia — rowniez wtedy, gdy odpowiada AI,
+   a wtedy nikt go nie zeruje, bo organizator nie ma powodu otwierac watku. Warunek bez
+   `!handedOver` wycisza wiec przekazanie rozmowy po kilku pytaniach do AI, czyli
+   dokladnie ten jeden sygnal, ktory musi dojsc. */
+check(
+  'przekazanie rozmowy dzwoni zawsze, wyciszenie tylko w trybie human',
+  /if\s*\(\s*!handedOver\s*&&\s*Number\(\s*thread\.unread_for_admin/.test(worker)
+);
+
+check(
+  'alertOrganisers wolany na obu sciezkach: handover i human',
+  (worker.match(/await alertOrganisers\(/g) || []).length === 2
+);
+
+/* Repozytorium jest publiczne. Klucze CallMeBota sa juz jawne w blueprincie i to jest
+   jedna kopia za duzo — druga, w kodzie funkcji, nie ma prawa powstac. */
+check(
+  'worker nie ma wpisanych na sztywno kluczy CallMeBota',
+  !/apikey['"]?\s*[:,]\s*['"]\d{6,}/.test(worker)
+);
+
 let failed = 0;
 for (const { label, pass, extra } of results) {
   if (!pass) failed += 1;

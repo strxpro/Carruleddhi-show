@@ -457,6 +457,123 @@ async function askModel(env, deck, history, question) {
   }
 }
 
+/**
+ * Telefony, które mają dostać sygnał z czatu.
+ *
+ * Format: `numer:klucz,numer:klucz`. Numer bez plusa — jedzie w query stringu CallMeBota.
+ * Pusto albo brak zmiennej = żadnego WhatsAppa; mail i tak pójdzie, więc wiadomość nie
+ * ginie, a wdrożenie bez tej zmiennej nie wywala się na starcie.
+ *
+ * W zmiennej środowiskowej, a nie w kodzie, bo to repozytorium jest publiczne. Klucze
+ * CallMeBota, których używa scenariusz w Make, siedzą w make/blueprint-1-instant.json
+ * i są już przez to jawne — nie dokładam do tego trzeciej kopii.
+ */
+function whatsappTargets(env) {
+  return String(env.WHATSAPP_ALERTS || '')
+    .split(',')
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const [phone, apikey] = pair.split(':').map((part) => (part || '').trim());
+      return phone && apikey ? { phone, apikey } : null;
+    })
+    .filter(Boolean);
+}
+
+/**
+ * Sygnał do organizatorów, że ktoś czeka na czacie.
+ *
+ * KIEDY SIĘ ODZYWA — dokładnie raz na „wróć do tego wątku"
+ *   Warunkiem jest `unread_for_admin === 0` na wątku wczytanym PRZED zapisem tej
+ *   wiadomości. Licznik podnosi trigger w bazie przy każdej wiadomości gościa i zeruje
+ *   go panel, kiedy organizator wątek otworzy albo odpisze (0005_chat.sql).
+ *
+ *   Czyli: zero znaczy „ta rozmowa jest przeczytana", więc nowa wiadomość jest pierwszą
+ *   nieprzeczytaną i warto o niej powiedzieć. Cokolwiek powyżej zera znaczy „już
+ *   dzwoniliśmy i nikt jeszcze nie zajrzał" — drugi dzwonek nie niesie żadnej nowej
+ *   informacji, a gość piszący pięć zdań pod rząd wysłałby pięć WhatsAppów.
+ *
+ *   Nie trzeba do tego nowej kolumny ani pamięci w workerze: stan, który odpowiada na
+ *   pytanie „czy on już to widział", i tak jest w bazie.
+ *
+ * DLACZEGO MAIL IDZIE PRZEZ MAKE, A WHATSAPP NIE
+ *   Mail — przez sendThroughOutbox(), tą samą trasą co przypomnienia i newsletter, bo
+ *   worker nie ma SMTP i nie powinien mieć drugiego.
+ *
+ *   WhatsApp — prosto z workera, bo CallMeBot to zwykły GET. Przepuszczenie go przez
+ *   Make kosztowałoby operację na każdą wiadomość na czacie, a darmowy plan ma ich
+ *   10 000 na miesiąc i są jedynym naprawdę ograniczonym zasobem w tym systemie.
+ *   Dodatkowo sygnał przestaje zależeć od tego, czy Make akurat stoi.
+ *
+ * NIGDY NIE PRZERYWA ROZMOWY
+ *   Wszystko jest w try/catch z timeoutem. Gość zadał pytanie i ma dostać odpowiedź;
+ *   to, że organizatorowi nie doszedł WhatsApp, jest problemem organizatora, nie
+ *   powodem, żeby pokazać gościowi błąd.
+ */
+async function alertOrganisers(env, thread, body, handedOver) {
+  /* Wyciszenie dotyczy TYLKO wątków już prowadzonych przez człowieka.
+
+     Przekazanie rozmowy dzwoni zawsze, i to nie jest wyjątek dla wygody — bez tego
+     zgubiłby się dokładnie ten sygnał, na którym najbardziej zależy. Trigger w
+     0005_chat.sql podnosi unread_for_admin przy każdej wiadomości gościa, także wtedy,
+     gdy odpowiada AI, a panel zeruje licznik dopiero przy otwarciu wątku — więc rozmowa
+     obsłużona automatycznie nabija licznik, którego nikt nie kasuje, bo nikt nie ma
+     powodu tam zaglądać. Gość po pięciu pytaniach do AI miałby licznik na pięciu i
+     szósta wiadomość, ta z ESCALATE, poszłaby w ciszy.
+
+     Przekazanie zdarza się raz na wątek — mode idzie z 'ai' na 'human' i nie wraca —
+     więc „zawsze" nie może się tu zamienić w spam. */
+  if (!handedOver && Number(thread.unread_for_admin || 0) > 0) return;
+
+  const who = thread.display_name || thread.email || 'gość';
+  const excerpt = body.length > 300 ? `${body.slice(0, 300)}…` : body;
+  const lead = handedOver
+    ? 'AI nie znało odpowiedzi i oddało rozmowę.'
+    : 'Nowa wiadomość w rozmowie prowadzonej przez człowieka.';
+
+  const whatsapp = [
+    '💬 *CARRULEDDHI — CZAT*',
+    lead,
+    '',
+    `👤 ${who}`,
+    thread.email ? `✉️ ${thread.email}` : '',
+    `🌍 ${String(thread.locale || 'it').toUpperCase()}`,
+    '',
+    excerpt,
+    '',
+    'Odpisz w panelu: https://www.carruleddhishow.com/admin'
+  ].filter(Boolean).join('\n');
+
+  const tasks = whatsappTargets(env).map(({ phone, apikey }) => {
+    const url = new URL('https://api.callmebot.com/whatsapp.php');
+    url.searchParams.set('phone', phone);
+    url.searchParams.set('apikey', apikey);
+    url.searchParams.set('text', whatsapp);
+    return fetch(url, { signal: AbortSignal.timeout(6000) });
+  });
+
+  const html = [
+    '<!doctype html><html><body style="margin:0;padding:24px;background:#e9f1ff;font-family:system-ui,sans-serif;color:#12233d;">',
+    '<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;">',
+    `<tr><td><p style="margin:0 0 4px;font-size:13px;color:#5a6b85;">${escapeHtml(lead)}</p>`,
+    `<h1 style="margin:0 0 16px;font-size:20px;">${escapeHtml(who)} czeka na czacie</h1>`,
+    `<p style="margin:0 0 16px;padding:12px 14px;background:#f4f7fc;border-radius:8px;white-space:pre-wrap;">${escapeHtml(excerpt)}</p>`,
+    thread.email ? `<p style="margin:0 0 4px;font-size:14px;">E-mail: ${escapeHtml(thread.email)}</p>` : '',
+    `<p style="margin:0 0 20px;font-size:14px;">Język: ${escapeHtml(String(thread.locale || 'it').toUpperCase())}</p>`,
+    '<a href="https://www.carruleddhishow.com/admin" style="display:inline-block;padding:12px 20px;background:#12233d;color:#fff;text-decoration:none;border-radius:8px;">Odpowiedz w panelu</a>',
+    '</td></tr></table></body></html>'
+  ].filter(Boolean).join('');
+
+  tasks.push(sendThroughOutbox(env, {
+    to: 'info@carruleddhishow.com',
+    subject: `Czat: ${who} czeka na odpowiedź`,
+    html
+  }));
+
+  // allSettled, nie all: jeden padnięty kanał nie może zabrać pozostałych.
+  try { await Promise.allSettled(tasks); } catch (_) { /* sygnał, nie transakcja */ }
+}
+
 /** Visitor side: open, send, poll. */
 async function chatVisitor(env, request, payload, cors) {
   const action = String(payload.action || 'open');
@@ -501,6 +618,11 @@ async function chatVisitor(env, request, payload, cors) {
   // Already with a person: nothing to answer automatically, and answering anyway
   // would talk over them.
   if (thread.mode === 'human') {
+    /* Awaited, nie waitUntil. Na Vercelu ctx.waitUntil nie ma czego trzymać przy życiu
+       (patrz api/intake.js) — porzucony promise po prostu ginie razem z funkcją, więc
+       „wyślemy w tle" znaczyłoby „czasem wyślemy". Ta gałąź nie woła modelu, więc nie ma
+       tu żadnego budżetu na opóźnienie do przekroczenia, a każdy kanał ma swój timeout. */
+    await alertOrganisers(env, thread, body, false);
     return json({ ok: true, mode: 'human', reply: null }, 200, cors);
   }
 
@@ -522,6 +644,9 @@ async function chatVisitor(env, request, payload, cors) {
       open ? deck.chatHoursNow : deck.chatHoursLater
     ].filter(Boolean).join(' ');
     await insertRow(env, 'chat_messages', { thread_id: thread.id, author: 'ai', body: handover });
+    /* Ten sygnał jest ważniejszy od poprzedniego: gość właśnie przeczytał „przekazuję to
+       organizatorom", więc od tej chwili czeka na człowieka i wie o tym. */
+    await alertOrganisers(env, thread, body, true);
     return json({ ok: true, mode: 'human', reply: handover, chatOpen: open }, 200, cors);
   }
 

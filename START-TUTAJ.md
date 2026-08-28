@@ -72,6 +72,12 @@ Settings → Environment Variables. Po każdej zmianie **Redeploy**.
 | `AI_API_KEY` | `console.groq.com` → API Keys | czat odpowiada tylko na sześć pytań ze słownika, resztę oddaje człowiekowi |
 | `AI_API_URL` | `https://api.groq.com/openai/v1/chat/completions` | jak wyżej — bez tego leci do OpenAI, a tam klucz Groq nie zadziała |
 | `AI_MODEL` | `llama-3.3-70b-versatile` | domyślnie `gpt-4o-mini`, czyli model, którego Groq nie ma |
+| `WHATSAPP_ALERTS` | `48665626101:2990681,393284981574:3364881` | o nowej wiadomości na czacie dowiesz się tylko mailem, nie na telefon |
+
+`WHATSAPP_ALERTS` to pary `numer:klucz` po przecinku, numer bez plusa. Te same pary, które
+scenariusz w Make ma wpisane przy zapisach — ale tu w zmiennej, a nie w kodzie, bo
+repozytorium jest publiczne. Skoro i tak są jawne w `make/blueprint-1-instant.json`,
+warto je przy okazji wygenerować od nowa w CallMeBocie.
 
 `service_role` to klucz, który omija zabezpieczenia bazy. Nigdy nie trafia do
 przeglądarki — trzyma go tylko funkcja na Vercelu. Jeśli go gdzieś wkleisz publicznie,
@@ -325,12 +331,16 @@ czyta pliku z repo — import jest kopią.
 
 Uczciwa lista, żebyś nie szukał:
 
-1. **Czat dla gościa na stronie.** Backend stoi w całości — tabele, endpointy, panel admina
-   odpowiada. Brakuje zakładki czatu w sekcji kontaktu. Dlatego rezygnacja jest osobną
-   kartą, a nie rozmową na czacie.
-2. **Rezygnacja z samego wyścigu** (nie z powiadomień). Tabela na kody już jest i ma
-   przygotowany drugi typ `cancel-entry`.
-3. **Maile z większymi emocjami.** Są poprawne i spójne, ale suche.
-4. **Regulamin, prywatność i cookies w sześciu językach.** Dziś włoski i polski.
-5. **Scenariusz „ogłoś nową edycję".** Przycisk w panelu jest wyłączony.
-6. **Prawdziwe zdjęcia** galerii, trasy i nagród. Wszystko to nadal placeholdery SVG.
+1. **Rezygnacja z samego wyścigu** (nie z powiadomień). Tabela na kody już jest i ma
+   przygotowany drugi typ `cancel-entry`. Nie ma też ścieżki „zmień dane".
+2. **Odpowiedź na maila wracająca na czat** (IMAP). Zero kodu.
+3. **Newsletter: guzik „ogłoś nową edycję"** w panelu. Zakładka jest, przycisku nie ma.
+4. **Czat naprawdę w czasie rzeczywistym.** Panel odpytuje co 10 s — działa, ale to nie
+   jest to samo co push.
+5. **Maile z większymi emocjami.** Są poprawne i spójne, ale suche.
+6. **Regulamin, prywatność i cookies w sześciu językach.** Dziś włoski i polski.
+7. **Prawdziwe zdjęcia** galerii, trasy i nagród. Wszystko to nadal placeholdery SVG.
+
+Czego już nie ma na tej liście, a było: **czat dla gościa na stronie** (jest, w sekcji
+kontaktu) i **powiadomienie o nowej wiadomości** (mail plus WhatsApp, patrz
+`WHATSAPP_ALERTS` w kroku 3).
