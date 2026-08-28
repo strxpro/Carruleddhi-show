@@ -742,7 +742,12 @@ import { flagSvg } from './flags.js';
     const creep = (ms) => 0.9 * (1 - 1 / (Math.max(ms, 0) / 900 + 1));
 
     const step = (now) => {
-      if (dismissed) return;
+      if (dismissed) {
+        // Reached when the watchdog dismissed the overlay instead of this loop. Without it
+        // the interval below would keep firing for the rest of the visit.
+        window.clearInterval(ticker);
+        return;
+      }
       const elapsed = now - started;
 
       let value;
@@ -763,11 +768,26 @@ import { flagSvg } from './flags.js';
       // is not cut off mid-bar.
       if (value >= 1 && elapsed >= MIN) {
         window.clearTimeout(watchdog);
+        window.clearInterval(ticker);
         dismiss();
         return;
       }
       requestAnimationFrame(step);
     };
+
+    /* A timer running the same step function, as the path of last resort.
+       ---------------------------------------------------------------------------
+       This is a progress bar for a page that is loading, so the frames it needs are exactly
+       the frames the load is competing for. On a heavy first paint requestAnimationFrame can
+       be deferred for hundreds of milliseconds at a time, and a bar that only advances on
+       frames then sits still through the part of the load it exists to describe — measured at
+       a flat 0% in headless Chrome, where frames are starved hardest.
+       
+       50 ms is deliberately coarse. When frames are arriving this does nothing visible
+       (step() is idempotent — it derives everything from the clock, so being called twice in
+       a frame writes the same value twice). When they are not, it is the difference between a
+       bar that moves and an overlay that only leaves on the watchdog. */
+    const ticker = window.setInterval(() => step(performance.now()), 50);
     requestAnimationFrame(step);
   }
 
@@ -1634,6 +1654,27 @@ import { flagSvg } from './flags.js';
         const open = fold.classList.toggle('is-open');
         openButton.setAttribute('aria-expanded', String(open));
         openButton.classList.toggle('is-open', open);
+
+        /* Tell the panel layout the section just changed height.
+           ---------------------------------------------------------------------------
+           This is the fix for "the next card lies on top of the form". Sections on this page
+           are sticky panels, and setupPanels() decides per section whether it is short enough
+           to pin (`position: sticky`, one screen tall, overflow hidden) or has to scroll
+           normally. That decision was made once, at load, when this form was 0 px tall.
+
+           Opening it adds about 540 px. The section then needed more than a screen while
+           still marked as pinnable, so it stayed stuck at the top of the viewport with its
+           lower half — the form — under the next panel, which sits above it in the z-order by
+           construction.
+
+           Fired twice on purpose: now, because the height changes the moment the class lands
+           and the sooner the verdict is right the less there is to see, and again after the
+           420 ms unfold so the final measurement is taken against the settled height rather
+           than a value the transition was still moving through. */
+        const relayout = () => window.dispatchEvent(new Event('carruleddhi:relayout'));
+        relayout();
+        window.setTimeout(relayout, 460);
+
         if (open) {
           // Focus the first field, but only after the panel has somewhere to put it —
           // focusing inside a zero-height box scrolls the page to the wrong place.
@@ -3531,10 +3572,33 @@ import { flagSvg } from './flags.js';
       window.setTimeout(() => { selfInflicted = false; }, 0);
     }
 
+    /* One measurement per frame, with a way out if the frame never comes.
+       ---------------------------------------------------------------------------
+       The rAF-only version has the failure mode this page has now hit four times: when the
+       main thread is busy the callback is deferred, and everything waiting on it is simply
+       not done. Here that means a section keeps a stale `pinned` verdict — it stays
+       `position: sticky` with `overflow: hidden` while its content has grown — which is the
+       exact fault this observer was added to fix.
+
+       And the moment it matters most is the moment rAF is least likely to run: first load,
+       fonts settling, images decoding. Measured in headless Chrome, where frames are starved
+       hard, the rAF-only version never measured at all.
+
+       So the timer is not a belt-and-braces extra, it is the path that runs when the page is
+       under load. 80 ms is late enough that the frame usually wins and early enough that a
+       clipped form is not on screen long enough to be seen. */
     let frame = 0;
+    let fallback = 0;
+    const run = () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(fallback);
+      measure();
+    };
     const schedule = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
+      window.clearTimeout(fallback);
+      frame = requestAnimationFrame(run);
+      fallback = window.setTimeout(run, 80);
     };
 
     /**
@@ -3609,6 +3673,17 @@ import { flagSvg } from './flags.js';
       schedule();
     }, { passive: true });
     window.addEventListener('carruleddhi:language', schedule);
+    /* Explicit "I just changed my height" signal.
+       ---------------------------------------------------------------------------
+       The ResizeObserver above should catch this on its own, and in a real browser it does.
+       This exists because the ResizeObserver is the general case and the wall's form is the
+       one that has to work: measured in headless Chrome, the observer's notification for the
+       fold opening never arrived, while this event does. Two paths to the same measurement is
+       cheap — measure() collapses into one rAF either way — and the one that is explicit is
+       the one that can be reasoned about when something goes wrong.
+
+       Anything that grows a section after load should fire it. */
+    window.addEventListener('carruleddhi:relayout', schedule);
     if (document.fonts?.ready) document.fonts.ready.then(schedule).catch(() => {});
   }
 

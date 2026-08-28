@@ -1828,18 +1828,41 @@ html.no-js .preloader { display: none !important; }
 
 .stack-intro { grid-template-columns: minmax(0, 1fr) minmax(0, .62fr); }
 
-/* Straight band, no rotation, lifted clear of the sponsor strip. */
+/* Straight band, no rotation. Louder than it was, and it cannot be touched.
+   ---------------------------------------------------------------------------
+   Two complaints at once: not visible enough, and in the way when scrolling.
+
+   Visibility: the band was 13 px of padding between two hairlines at 12% opacity, which on
+   a yellow strip against a cream page is a yellow strip against a cream page. The rules are
+   navy and solid now, so the band has an edge, and the text sits a little larger with more
+   room around it.
+
+   In the way: it is `position: absolute` across the full width at the foot of the hero, so
+   it lay under the pointer for a whole strip of the first screen. A drag or a swipe that
+   started on it was a drag on an element with a running animation rather than on the page.
+   `pointer-events: none` takes it out of hit-testing entirely — it carries no link and no
+   control, so there is nothing to lose. */
 .marquee {
-  padding: 13px 0;
+  padding: 17px 0;
   transform: none;
-  border-top: 2px solid rgba(7, 26, 61, .12);
-  border-bottom: 2px solid rgba(7, 26, 61, .12);
+  border-top: 3px solid var(--navy-950);
+  border-bottom: 3px solid var(--navy-950);
+  pointer-events: none;
 }
-.marquee__item { font-size: clamp(17px, min(2.1vw, 2.7svh), 30px); }
-.marquee__item::after { margin-inline: 22px; }
+.marquee__item {
+  font-size: clamp(18px, min(2.3vw, 2.9svh), 32px);
+  /* The dot separators were the same yellow as the band at low opacity. Coral gives the row
+     a rhythm you can see from across the room, which is what a marquee is for. */
+  color: var(--navy-950);
+}
+.marquee__item::after { margin-inline: 22px; color: var(--coral); }
 
 .hero__marquee {
-  bottom: var(--sponsor-band-h, 0px);
+  /* `--sponsor-band-h` used to shift this up to clear the sponsor strip at the foot of the
+     hero. The strip lives above the route heading now, so there is nothing to clear and the
+     variable resolves to its 0px fallback — kept as a plain 0 rather than a lookup that
+     always misses. */
+  bottom: 0;
   transform: none;
 }
 

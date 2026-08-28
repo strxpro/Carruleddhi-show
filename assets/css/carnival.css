@@ -337,8 +337,22 @@
   transition: transform .16s var(--ease-snap), box-shadow .16s var(--ease-snap),
     background .25s ease, color .25s ease;
 }
-.btn:hover { transform: translateY(-2px); box-shadow: 0 6px 0 rgba(7, 26, 61, .38); }
-.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(7, 26, 61, .38); }
+/* Hover deepens the shadow; it does not lift the button.
+   ---------------------------------------------------------------------------
+   This is the rule that actually applies — main.css has its own .btn:hover and this file
+   loads after it, so editing that one changed nothing. Worth knowing before touching
+   button behaviour again: the ticket-booth look, the timing and the states all live here.
+
+   `translateY(-2px)` came off because these buttons sit inside sticky panels that measure
+   their own height. Moving the mouse across a row of them nudged the layout, and with the
+   panel measurement now watching for exactly that kind of change it would also have set off
+   a re-measure per hover. The shadow growing from 4px to 7px reads as the same "it is
+   alive" without moving anything.
+
+   The press is where the travel belongs, and it is bigger than it was: 4px down with the
+   shadow collapsing to 1px, so the button visibly bottoms out under the finger. */
+.btn:hover { box-shadow: 0 7px 0 rgba(7, 26, 61, .38); }
+.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(7, 26, 61, .38); }
 .btn--yellow, .btn--blue { box-shadow: 0 4px 0 rgba(7, 26, 61, .45); }
 
 /* Category cards. The transform on .stack-card itself belongs to the scroll

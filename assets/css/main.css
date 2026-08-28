@@ -424,7 +424,25 @@ img, svg { display: block; max-width: 100%; }
 .story-number { display: flex; align-items: baseline; gap: 20px; padding: 20px 26px; border-radius: 24px; background: var(--white); color: var(--navy-950); transition: transform .45s var(--ease-out); }
 .story-number:nth-child(2) { background: var(--yellow); }
 .story-number:nth-child(3) { background: var(--coral); color: var(--white); }
-.story-number:hover { transform: translateX(12px) rotate(-1deg); }
+/* The slide on hover stays here, because these are the one place on the page where it is
+   information rather than decoration: two of the three are links now, and the two that move
+   are exactly the two you can click. The third does not move because it does not go
+   anywhere. */
+.story-number--link { text-decoration: none; cursor: pointer; }
+.story-number--link:hover { transform: translateX(12px) rotate(-1deg); }
+.story-number--link:active { transform: translateX(12px) rotate(-1deg) scale(.985); }
+.story-number--link:focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; }
+/* A quiet arrow, so it reads as somewhere to go rather than as a figure that happens to be
+   clickable. Sits after the label and inherits its colour. */
+.story-number--link::after {
+  content: '↓';
+  margin-left: auto;
+  font-family: var(--font-meta);
+  font-size: 22px;
+  opacity: .5;
+  transition: transform .35s var(--ease-out), opacity .25s;
+}
+.story-number--link:hover::after { opacity: 1; transform: translateY(4px); }
 .story-number strong { font-family: var(--font-display); font-size: clamp(42px, 6vw, 72px); font-weight: 400; line-height: 1; }
 .story-number span { font-family: var(--font-meta); font-size: 20px; letter-spacing: .14em; text-transform: uppercase; }
 

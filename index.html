@@ -210,10 +210,19 @@
           <p class="lead" data-i18n="story.p1">I Carruleddhi sono carretti costruiti a mano: legno, cuscinetti e molta fantasia. Nessun motore, nessuna propulsione — solo gravità, coraggio e il rumore delle ruote sulla strada.</p>
           <p class="lead" data-i18n="story.p2">Alcuni corrono per il tempo, altri per lo spettacolo. Qui vince la velocità, ma anche l’idea più folle.</p>
         </div>
+        <!-- Two of the three lead somewhere, so they are links.
+             "2 categories" and "12 prizes" are the only headline facts on this page that have
+             a section of their own further down, and reading them without being able to go
+             there is a dead end. "0 engines" stays a plain figure: there is no section about
+             the absence of an engine, and a link that scrolls nowhere is worse than no link.
+
+             Ordinary anchors, not buttons with script. The existing #-link handler in app.js
+             already gives every in-page jump the wipe transition, so these get it for free and
+             still work with JavaScript off. -->
         <div class="story__numbers">
           <div class="story-number reveal"><strong>0</strong><span data-i18n="story.stat1">motori</span></div>
-          <div class="story-number reveal" data-delay="1"><strong>2</strong><span data-i18n="story.stat2">categorie</span></div>
-          <div class="story-number reveal" data-delay="2"><strong>12</strong><span data-i18n="story.stat3">premi</span></div>
+          <a class="story-number story-number--link reveal" data-delay="1" href="#categories"><strong>2</strong><span data-i18n="story.stat2">categorie</span></a>
+          <a class="story-number story-number--link reveal" data-delay="2" href="#prizes"><strong>12</strong><span data-i18n="story.stat3">premi</span></a>
         </div>
       </div>
     </section>
