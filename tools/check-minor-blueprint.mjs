@@ -346,6 +346,52 @@ check(
   !sanitizeScalar(crlfMail).includes('\n')
 );
 
+/* --- slownik szesciu pytan: co ma trafiac, a co ma isc do czlowieka ------
+   Ten slownik stoi PRZED modelem i jego odpowiedzi sa dosłownie tym, co napisal
+   organizator — o kasku i o wpisowym. Falszywe trafienie jest tu gorsze niz brak
+   trafienia: gosc dostaje pewna siebie odpowiedz nie na swoje pytanie, uznaje temat za
+   zalatwiony i nikt sie o tym nie dowiaduje. Brak trafienia oddaje rozmowe czlowiekowi,
+   czyli konczy sie dobrze.
+
+   Zmierzone na produkcji 28.08.2026, zanim to poprawiono:
+     "Czy na trasie beda punkty z woda dla widzow?" -> data i godzina startu
+   Klucz "wo" (niemieckie "gdzie") trafial w srodek slowa "woda". */
+const faqSource = worker.slice(
+  worker.indexOf('const FAQ_TOPICS'),
+  worker.indexOf('\n}', worker.indexOf('return null;', worker.indexOf('const FAQ_TOPICS'))) + 2
+);
+const faqAnswer = new Function(`${faqSource}; return faqAnswer;`)();
+const faqDeck = {
+  faqHelmet: 'KASK', faqCost: 'KOSZT', faqEngine: 'SILNIK',
+  faqWho: 'KTO', faqNumber: 'NUMER', faqWhen: 'KIEDY'
+};
+
+/* Odmiana musi trafiac: klucz to rdzen, nie cale slowo. Samo dopasowanie calego slowa
+   zabijalo "Ile kosztuje udzial?" — sprawdzone, wiec zostaje jako asercja. */
+for (const [question, expected] of [
+  ['Czy kask jest obowiazkowy?', 'KASK'],
+  ['Jade w kasku rowerowym, wystarczy?', 'KASK'],
+  ['Il casco e obbligatorio?', 'KASK'],
+  ['Ile kosztuje udzial?', 'KOSZT'],
+  ['Quanto costa iscriversi?', 'KOSZT'],
+  ['Czy minorenne puo partecipare?', 'KTO'],
+  ['Wo ist das Rennen?', 'KIEDY'],
+  ['Ile lat trzeba miec?', 'KTO']
+]) {
+  check(`slownik trafia: ${question}`, faqAnswer(faqDeck, question) === expected, faqAnswer(faqDeck, question));
+}
+
+/* A te MUSZA isc do czlowieka. Kazde z nich trafialo wczesniej w "kiedy i gdzie". */
+for (const question of [
+  'Czy na trasie beda punkty z woda dla widzow?',
+  'Czy jest woda na mecie?',
+  'Czy moge wziac wozek z drewna?',
+  'Czy bedzie wolno kibicowac?',
+  'Czy latarnia bedzie wlaczona?'
+]) {
+  check(`slownik NIE zgaduje: ${question}`, faqAnswer(faqDeck, question) === null, faqAnswer(faqDeck, question));
+}
+
 /* Repozytorium jest publiczne. Klucze CallMeBota sa juz jawne w blueprincie i to jest
    jedna kopia za duzo — druga, w kodzie funkcji, nie ma prawa powstac. */
 check(

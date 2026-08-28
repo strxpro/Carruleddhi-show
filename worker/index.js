@@ -357,21 +357,61 @@ function chatOpenNow(now = new Date()) {
   return hour >= CHAT_HOURS.from && hour < CHAT_HOURS.to;
 }
 
+/**
+ * Słowa, po których rozpoznajemy sześć pytań ze słownika.
+ *
+ * Klucze stoją poza funkcją, bo są stałe — zmienna jest tylko odpowiedź, którą bierzemy
+ * z decka w języku gościa. Dzięki temu wyrażenia regularne budują się raz przy starcie,
+ * a nie przy każdej wiadomości.
+ */
+const FAQ_TOPICS = [
+  { answer: 'faqHelmet', keys: ['kask', 'casco', 'helmet', 'helm', 'casque'] },
+  { answer: 'faqCost', keys: ['koszt', 'cena', 'płac', 'plac', 'costo', 'quanto costa', 'cost', 'price', 'preis', 'precio', 'prix', 'gratis', 'free'] },
+  { answer: 'faqEngine', keys: ['silnik', 'motore', 'engine', 'motor', 'moteur'] },
+  { answer: 'faqWho', keys: ['kto może', 'kto moze', 'wiek', 'lat', 'chi può', 'chi puo', 'who can', 'age', 'alter', 'edad', 'âge', 'minor', 'nieletni', 'niepełnoletni'] },
+  { answer: 'faqNumber', keys: ['numer startowy', 'numer', 'numero', 'race number', 'startnummer', 'dorsal'] },
+  { answer: 'faqWhen', keys: ['gdzie', 'kiedy', 'dojechać', 'dojechac', 'dove', 'quando', 'where', 'when', 'wann', 'wo', 'cuándo', 'dónde', 'quand', 'où'] }
+].map((topic) => ({
+  answer: topic.answer,
+  /* OD POCZĄTKU SŁOWA, NIE ZE ŚRODKA — i to nie jest drobiazg.
+
+     Wcześniej było `text.includes(key)`, czyli dopasowanie po dowolnym kawałku. Wśród
+     kluczy jest niemieckie „wo" (gdzie), więc każde polskie słowo z „wo" w środku
+     dostawało gotową odpowiedź o dacie i miejscu:
+
+       „Czy na trasie będzie WOda?"      -> data i godzina startu
+       „Czy mogę wziąć WÓzek z drewna?"  -> data i godzina startu
+
+     Gość dostawał pewną siebie odpowiedź nie na swoje pytanie. To gorsze niż oddanie
+     rozmowy człowiekowi, bo wygląda na obsłużone i nikt się o tym nie dowiaduje.
+
+     DWIE REGUŁY, BO JĘZYKI SĄ RÓŻNE
+       Klucz od czterech znaków w górę to rdzeń i wolno mu mieć końcówkę: „koszt" ma
+       trafiać w „kosztuje", „minor" we włoskie „minorenne", „płac" w „płacić". Samo
+       dopasowanie całego słowa zabiłoby odmianę — sprawdziłem, „Ile kosztuje udział?"
+       przestawało działać.
+
+       Klucz krótszy to w swoim języku całe słowo („wo", „lat", „age", „où") i musi
+       trafiać dokładnie. Przy okazji znika „latarnia" łapana przez „lat".
+
+     `\p{L}` zamiast `\b`, bo `\b` w JS nie zna liter „ą", „ż", „ó" — przy `\b` słowo
+     „wózek" nadal by trafiało, jako że „ó" jest dla `\b` granicą wyrazu. */
+  patterns: topic.keys.map((key) => {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const suffix = key.length >= 4 ? '' : '(?![\\p{L}\\p{N}])';
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}${suffix}`, 'iu');
+  })
+}));
+
 /** Answers built from the copy deck. Keys are the FAQ entries the site already has. */
 function faqAnswer(deck, question) {
-  const text = String(question || '').toLowerCase();
-  // Deliberately crude, and crude is the point: these fire only on an unmistakable
-  // word, and everything else goes to a person rather than to a guess.
-  const topics = [
-    { keys: ['kask', 'casco', 'helmet', 'helm', 'casque'], answer: deck.faqHelmet },
-    { keys: ['koszt', 'cena', 'płac', 'plac', 'costo', 'quanto costa', 'cost', 'price', 'preis', 'precio', 'prix', 'gratis', 'free'], answer: deck.faqCost },
-    { keys: ['silnik', 'motore', 'engine', 'motor', 'moteur'], answer: deck.faqEngine },
-    { keys: ['kto może', 'kto moze', 'wiek', 'lat', 'chi può', 'chi puo', 'who can', 'age', 'alter', 'edad', 'âge', 'minor', 'nieletni', 'niepełnoletni'], answer: deck.faqWho },
-    { keys: ['numer startowy', 'numer', 'numero', 'race number', 'startnummer', 'dorsal'], answer: deck.faqNumber },
-    { keys: ['gdzie', 'kiedy', 'dojechać', 'dojechac', 'dove', 'quando', 'where', 'when', 'wann', 'wo', 'cuándo', 'dónde', 'quand', 'où'], answer: deck.faqWhen }
-  ];
-  for (const topic of topics) {
-    if (topic.keys.some((key) => text.includes(key)) && topic.answer) return topic.answer;
+  const text = String(question || '');
+  // Nadal celowo prymitywne: odpowiadamy tylko na jednoznaczne słowo, a wszystko inne
+  // idzie do człowieka zamiast do zgadywanki. Zmieniło się to, że „jednoznaczne słowo"
+  // znaczy teraz całe słowo.
+  for (const topic of FAQ_TOPICS) {
+    const answer = deck[topic.answer];
+    if (answer && topic.patterns.some((pattern) => pattern.test(text))) return answer;
   }
   return null;
 }
