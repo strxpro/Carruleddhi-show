@@ -37,7 +37,18 @@ const ALLOWED_TYPES = new Set([
   // `chat-admin` is the organiser side and needs the passphrase.
   'chat', 'chat-admin',
   // Unread counts for the bell in the admin panel. Passphrase too.
-  'inbox'
+  'inbox',
+
+  /* Rezygnacja z powiadomień: `unsub-start` bierze token ze stopki listu i odsyła
+     zamaskowany adres, `unsub-confirm` przyjmuje kod i wypisuje z obu list. `purge`
+     to „wyczyść dane testowe" z panelu.
+
+     Handlery tych trzech istnieją od początku (patrz koniec fetch()), ale nie było
+     ich na tej liście, a lista jest sprawdzana wcześniej — więc wszystkie trzy
+     odpowiadały UNKNOWN_TYPE i nigdy do handlera nie docierały. Były w
+     SUPABASE_TYPES i w PROTECTED_TYPES, co wyglądało jak komplet i dlatego brak
+     nie rzucał się w oczy. */
+  'unsub-start', 'unsub-confirm', 'purge'
 ]);
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
