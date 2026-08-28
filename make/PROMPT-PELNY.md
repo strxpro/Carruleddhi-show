@@ -330,12 +330,13 @@ niego Make odmawia uruchomienia z komunikatem, który je wprost nazywa.
 
 `SUPABASE_SERVICE_KEY` omija zabezpieczenia bazy i **nigdy** nie trafia do przeglądarki.
 
-## MIGRACJE W SUPABASE — dziesięć plików, po kolei
+## MIGRACJE W SUPABASE — jedenaście plików, po kolei
 
 `0001` tablica komentarzy · `0002` zgłoszenia, obecność, przypomnienia, kontakt, newsletter ·
 `0003` zdjęcia · `0004` opiekunowie i sekwencja numerów · `0005` czat · `0006` ustawienia
 strony · `0007` reset numerów · `0008` kolejka newslettera · `0009` kody rezygnacji ·
-`0010` ograniczenia unikalne na e-mailu.
+`0010` ograniczenia unikalne na e-mailu · `0011` numery startowe: najniższy wolny, zwalniany
+przy rezygnacji.
 
 Wszystkie można puszczać ponownie. **`0010` jest obowiązkowa** — bez niej zapis na
 przypomnienia zwraca `502` z kodem `42P10`, bo `ON CONFLICT (email)` nie pasuje do
@@ -387,7 +388,12 @@ AI_MODEL   = llama-3.3-70b-versatile
 
 ## SYSTEM PROMPT DLA MODELU
 
-To wklej jako `system` w żądaniu do modelu:
+**Nie trzeba go nigdzie wklejać.** Od tej wersji siedzi w kodzie, w funkcji
+`chatSystemPrompt()` w `worker/index.js`, i jest wysyłany przy każdym pytaniu. Datę, miejsce
+i kontakt bierze z `emails/copy.json` (blok `_event`), więc zmiana daty w jednym miejscu
+zmienia też to, co czat mówi ludziom.
+
+Poniżej wersja do czytania — tak brzmi to, co dostaje model:
 
 ```
 Jesteś asystentem na stronie wydarzenia Carruleddhi Show 2026 — wyścigu ręcznie

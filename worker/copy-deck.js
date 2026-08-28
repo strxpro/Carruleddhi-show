@@ -119,7 +119,9 @@ export const COPY_DECK = {
     "faqNumber": "Il numero di partenza compare subito dopo l’iscrizione e arriva anche per e-mail, insieme al modulo in PDF.",
     "faqWhen": "17 ottobre 2026, Discesa Rena Bianca a Santa Teresa Gallura. Presentazione alle 12:00, partenza alle 14:30.",
     "chatHandover": "Questa la passo agli organizzatori: ti rispondono qui, in questa chat. Se preferisci, lascia la tua e-mail.",
-    "chatGreeting": "Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori."
+    "chatGreeting": "Ciao! Chiedimi quello che ti serve sulla gara. Se non lo so, passo la domanda agli organizzatori.",
+    "chatHoursNow": "Siamo in chat adesso (10:00–18:00), quindi la risposta arriva a breve.",
+    "chatHoursLater": "Adesso è fuori orario: rispondiamo dalle 10:00 alle 18:00, ora italiana. Ti scriviamo qui appena rientriamo."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -229,7 +231,9 @@ export const COPY_DECK = {
     "faqNumber": "Numer startowy pokazuje się od razu po zapisaniu i przychodzi też mailem, razem z formularzem w PDF.",
     "faqWhen": "17 października 2026, zjazd Rena Bianca w Santa Teresa Gallura. Prezentacja o 12:00, start o 14:30.",
     "chatHandover": "Przekazuję to organizatorom — odpiszą tutaj, w tym czacie. Jeśli chcesz, zostaw swój e-mail.",
-    "chatGreeting": "Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom."
+    "chatGreeting": "Cześć! Pytaj o cokolwiek związanego z wyścigiem. Czego nie wiem, przekażę organizatorom.",
+    "chatHoursNow": "Jesteśmy teraz na czacie (10:00–18:00), więc odpowiedź przyjdzie niedługo.",
+    "chatHoursLater": "Teraz jest po godzinach — odpowiadamy od 10:00 do 18:00 czasu włoskiego. Odpiszemy tutaj, jak tylko wrócimy."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -339,7 +343,9 @@ export const COPY_DECK = {
     "faqNumber": "Your start number appears as soon as you have entered, and arrives by e-mail too, with the form as a PDF.",
     "faqWhen": "17 October 2026, the Rena Bianca descent in Santa Teresa Gallura. Presentation at 12:00, start at 14:30.",
     "chatHandover": "I am passing this to the organisers — they will answer here, in this chat. Leave your e-mail if you prefer.",
-    "chatGreeting": "Hello! Ask me anything about the race. What I do not know, I pass to the organisers."
+    "chatGreeting": "Hello! Ask me anything about the race. What I do not know, I pass to the organisers.",
+    "chatHoursNow": "We are in the chat right now (10:00–18:00), so the answer will come shortly.",
+    "chatHoursLater": "It is outside our hours now — we answer between 10:00 and 18:00 Italian time. We will write here as soon as we are back."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -449,7 +455,9 @@ export const COPY_DECK = {
     "faqNumber": "Die Startnummer erscheint direkt nach der Anmeldung und kommt zusätzlich per E-Mail, mit dem Formular als PDF.",
     "faqWhen": "17. Oktober 2026, Abfahrt Rena Bianca in Santa Teresa Gallura. Vorstellung um 12:00, Start um 14:30.",
     "chatHandover": "Ich gebe das an die Organisatoren weiter — sie antworten hier im Chat. Wenn du magst, lass deine E-Mail da.",
-    "chatGreeting": "Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter."
+    "chatGreeting": "Hallo! Frag mich alles zum Rennen. Was ich nicht weiß, gebe ich an die Organisatoren weiter.",
+    "chatHoursNow": "Wir sind gerade im Chat (10:00–18:00), die Antwort kommt also bald.",
+    "chatHoursLater": "Gerade ist außerhalb der Zeiten — wir antworten von 10:00 bis 18:00 italienischer Zeit. Wir schreiben hier, sobald wir zurück sind."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -559,7 +567,9 @@ export const COPY_DECK = {
     "faqNumber": "El número de salida aparece justo después de inscribirse y llega también por correo, con el formulario en PDF.",
     "faqWhen": "17 de octubre de 2026, bajada Rena Bianca en Santa Teresa Gallura. Presentación a las 12:00, salida a las 14:30.",
     "chatHandover": "Paso esto a los organizadores: te responden aquí, en este chat. Si quieres, deja tu correo.",
-    "chatGreeting": "¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores."
+    "chatGreeting": "¡Hola! Pregúntame lo que quieras sobre la carrera. Lo que no sepa, lo paso a los organizadores.",
+    "chatHoursNow": "Estamos en el chat ahora mismo (10:00–18:00), así que la respuesta llegará pronto.",
+    "chatHoursLater": "Ahora estamos fuera de horario: respondemos de 10:00 a 18:00, hora italiana. Te escribimos aquí en cuanto volvamos."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -669,6 +679,8 @@ export const COPY_DECK = {
     "faqNumber": "Le numéro de départ apparaît juste après l’inscription et arrive aussi par e-mail, avec le formulaire en PDF.",
     "faqWhen": "17 octobre 2026, descente Rena Bianca à Santa Teresa Gallura. Présentation à 12:00, départ à 14:30.",
     "chatHandover": "Je transmets cela aux organisateurs — ils répondront ici, dans ce chat. Laissez votre e-mail si vous préférez.",
-    "chatGreeting": "Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs."
+    "chatGreeting": "Bonjour ! Demandez-moi ce que vous voulez sur la course. Ce que je ne sais pas, je le transmets aux organisateurs.",
+    "chatHoursNow": "Nous sommes sur le chat en ce moment (10:00–18:00), la réponse arrivera donc bientôt.",
+    "chatHoursLater": "Nous sommes hors horaires : nous répondons de 10:00 à 18:00, heure italienne. Nous vous écrirons ici dès notre retour."
   }
 };

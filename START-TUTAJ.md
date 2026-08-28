@@ -12,6 +12,11 @@ zawsze „nie". Zegar wyszedł na darmowy GitHub Actions, a Make jest dotykany t
 gdy naprawdę jest list. Trzeci (ogłoszenie nowej edycji) nie istnieje i nie jest potrzebny
 do niczego, co teraz działa.
 
+**Gdyby AI miało to zrobić za Ciebie**, w `make/` są trzy prompty i różnią się celem:
+`PROMPT-DLA-AI.md` — zaimportuj gotowy blueprint i sprawdź, czy się zgadza ·
+`PROMPT-PELNY.md` — odtwórz dokładnie ten scenariusz, moduł po module ·
+`PROMPT-CELE.md` — zbuduj to po swojemu, tu są cele, wejście i ograniczenia narzędzia.
+
 ---
 
 ## Krok 1 — Supabase (raz, 5 minut)
@@ -29,6 +34,8 @@ SQL Editor → New query → wklej całą treść pliku → **Run**. Po kolei:
 | `0007_purge_helpers.sql` | reset numerów po wyczyszczeniu danych |
 | `0008_newsletter_outbox.sql` | kolejka potwierdzeń newslettera |
 | `0009_unsubscribe.sql` | kody rezygnacji, tokeny w obu listach |
+| `0010_upsert_email_keys.sql` | **obowiązkowa** — bez niej zapis na przypomnienia daje `502` / `42P10` |
+| `0011_race_numbers_reuse.sql` | numery startowe: najniższy wolny, zwalniany przy rezygnacji |
 
 Wszystkie można puszczać ponownie — są napisane tak, że drugie uruchomienie nic nie psuje
 (`if not exists`, `on conflict do nothing`, `create or replace`).
@@ -62,6 +69,9 @@ Settings → Environment Variables. Po każdej zmianie **Redeploy**.
 | `WALL_SALT` | wymyśl losowy ciąg | hashe IP i kodów są przewidywalne |
 | `INTAKE_SHARED_KEY` | opcjonalne | nic — to dodatkowy nagłówek do Make |
 | `EVENT_DATE` | opcjonalne, domyślnie `2026-10-17T14:30:00+02:00` | nic |
+| `AI_API_KEY` | `console.groq.com` → API Keys | czat odpowiada tylko na sześć pytań ze słownika, resztę oddaje człowiekowi |
+| `AI_API_URL` | `https://api.groq.com/openai/v1/chat/completions` | jak wyżej — bez tego leci do OpenAI, a tam klucz Groq nie zadziała |
+| `AI_MODEL` | `llama-3.3-70b-versatile` | domyślnie `gpt-4o-mini`, czyli model, którego Groq nie ma |
 
 `service_role` to klucz, który omija zabezpieczenia bazy. Nigdy nie trafia do
 przeglądarki — trzyma go tylko funkcja na Vercelu. Jeśli go gdzieś wkleisz publicznie,

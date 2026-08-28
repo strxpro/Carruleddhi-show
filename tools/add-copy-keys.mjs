@@ -150,7 +150,43 @@ const UNSUB = {
   }
 };
 
-const GROUPS = [FAQ, UNSUB];
+/* --------------------------------------------------------- when a person will reply
+   Appended to chatHandover the moment a question goes to a human, so the visitor is told
+   *when* rather than just *that* somebody will answer. Two variants because "they will
+   reply here" means something different at 11:00 than at 23:00, and a chat that says the
+   same thing at both hours is a chat that feels abandoned at one of them.
+
+   The hours are 10:00–18:00 Europe/Rome and they live in one place: CHAT_HOURS in
+   worker/index.js. These strings spell them out for the reader; if the constant moves,
+   these sentences have to move with it. */
+const HOURS = {
+  it: {
+    chatHoursNow: 'Siamo in chat adesso (10:00–18:00), quindi la risposta arriva a breve.',
+    chatHoursLater: 'Adesso è fuori orario: rispondiamo dalle 10:00 alle 18:00, ora italiana. Ti scriviamo qui appena rientriamo.'
+  },
+  pl: {
+    chatHoursNow: 'Jesteśmy teraz na czacie (10:00–18:00), więc odpowiedź przyjdzie niedługo.',
+    chatHoursLater: 'Teraz jest po godzinach — odpowiadamy od 10:00 do 18:00 czasu włoskiego. Odpiszemy tutaj, jak tylko wrócimy.'
+  },
+  en: {
+    chatHoursNow: 'We are in the chat right now (10:00–18:00), so the answer will come shortly.',
+    chatHoursLater: 'It is outside our hours now — we answer between 10:00 and 18:00 Italian time. We will write here as soon as we are back.'
+  },
+  de: {
+    chatHoursNow: 'Wir sind gerade im Chat (10:00–18:00), die Antwort kommt also bald.',
+    chatHoursLater: 'Gerade ist außerhalb der Zeiten — wir antworten von 10:00 bis 18:00 italienischer Zeit. Wir schreiben hier, sobald wir zurück sind.'
+  },
+  es: {
+    chatHoursNow: 'Estamos en el chat ahora mismo (10:00–18:00), así que la respuesta llegará pronto.',
+    chatHoursLater: 'Ahora estamos fuera de horario: respondemos de 10:00 a 18:00, hora italiana. Te escribimos aquí en cuanto volvamos.'
+  },
+  fr: {
+    chatHoursNow: 'Nous sommes sur le chat en ce moment (10:00–18:00), la réponse arrivera donc bientôt.',
+    chatHoursLater: 'Nous sommes hors horaires : nous répondons de 10:00 à 18:00, heure italienne. Nous vous écrirons ici dès notre retour.'
+  }
+};
+
+const GROUPS = [FAQ, UNSUB, HOURS];
 const LANGS = ['it', 'pl', 'en', 'de', 'es', 'fr'];
 
 let added = 0;
