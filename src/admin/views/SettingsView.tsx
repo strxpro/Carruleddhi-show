@@ -12,7 +12,14 @@ import {
   Unlock
 } from 'lucide-react';
 import type { PanelLocale, TranslateKey } from '../i18n';
-import { fetchSettings, saveSettings, uploadSponsorLogo, type SiteSettings, type Sponsor } from '../api';
+import {
+  fetchSettings,
+  saveSettings,
+  uploadSponsorLogo,
+  type AiStatus,
+  type SiteSettings,
+  type Sponsor
+} from '../api';
 import { PurgePanel } from './PurgePanel';
 
 /**
@@ -83,13 +90,19 @@ export function SettingsView({
   locale,
   setLocale,
   onForget,
-  apiKey
+  apiKey,
+  ai
 }: {
   t: (key: TranslateKey) => string;
   locale: PanelLocale;
   setLocale: (locale: PanelLocale) => void;
   onForget: () => void;
   apiKey: string;
+  /* Comes from the inbox poll, which the panel already runs every ten seconds — rather than a
+     call of its own. Undefined until the first poll lands, and the section simply is not drawn
+     until then; a settings screen that flashes "the key is missing" while it finds out would be
+     worse than one that appears a moment late. */
+  ai?: AiStatus;
 }) {
   const pl = locale === 'pl';
 
@@ -484,6 +497,59 @@ export function SettingsView({
       {/* Last on the page, and the only red section. Nothing below it, so nobody scrolls
           past it on the way to something else. */}
       <PurgePanel t={t} apiKey={apiKey} />
+
+      {/* ------------------------------------------------------------- AI status */}
+      {ai ? (
+        <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">
+          <h3 className="text-sm font-bold text-white">
+            {pl ? 'Model na czacie' : 'Modello nella chat'}
+          </h3>
+
+          {ai.configured ? (
+            <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+              {pl
+                ? 'Klucz jest ustawiony. Automat odpowiada na sześć pytań ze słownika bez modelu, a wszystko inne wysyła do niego.'
+                : 'La chiave è impostata. Le sei domande frequenti hanno risposte dal dizionario, tutto il resto va al modello.'}
+            </p>
+          ) : (
+            /* Powiedziane wprost, bo bez tego jedyny sposób sprawdzenia to zadanie czatowi
+               pytania poza słownikiem — a odpowiedź „przekazuję organizatorom" wygląda tak
+               samo, gdy klucza nie ma i gdy model celowo eskalował. */
+            <p className="mt-2 rounded-lg border border-coral/40 bg-coral/10 px-3 py-2 text-[13px] leading-relaxed text-white/80">
+              {pl
+                ? 'Klucza nie ma. Czat odpowiada tylko na sześć pytań ze słownika, a wszystko inne od razu przekazuje Wam — to nie awaria, tylko brak konfiguracji. Dodaj AI_API_KEY, AI_API_URL i AI_MODEL w Vercel → Environment Variables i zrób Redeploy.'
+                : 'La chiave manca. La chat risponde solo alle sei domande del dizionario e passa tutto il resto a voi: non è un guasto, è configurazione mancante. Aggiungi AI_API_KEY, AI_API_URL e AI_MODEL in Vercel → Environment Variables e fai Redeploy.'}
+            </p>
+          )}
+
+          <dl className="mt-3 grid gap-2 text-[12px]">
+            <div className="flex flex-wrap gap-x-2 border-b border-white/8 pb-2">
+              <dt className="text-white/50">AI_API_KEY</dt>
+              <dd className={`ml-auto font-mono ${ai.configured ? 'text-green' : 'text-coral'}`}>
+                {ai.configured ? (pl ? 'jest' : 'presente') : (pl ? 'brak' : 'assente')}
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-x-2 border-b border-white/8 pb-2">
+              <dt className="text-white/50">AI_API_URL</dt>
+              <dd className="ml-auto break-all font-mono text-white/80">{ai.url}</dd>
+            </div>
+            <div className="flex flex-wrap gap-x-2">
+              <dt className="text-white/50">AI_MODEL</dt>
+              <dd className="ml-auto font-mono text-white/80">{ai.model}</dd>
+            </div>
+          </dl>
+
+          {/* Najczęstsza pomyłka, i taka, której nie widać po samym „klucz jest": klucz Groqa
+              wysyłany pod domyślny adres OpenAI. Wtedy wszystko wygląda na ustawione. */}
+          {ai.configured && ai.url.includes('openai.com') ? (
+            <p className="mt-3 rounded-lg border border-yellow/40 bg-yellow/10 px-3 py-2 text-[12px] leading-relaxed text-white/80">
+              {pl
+                ? 'Adres to domyślny OpenAI. Jeśli Twój klucz jest z Groqa, ustaw AI_API_URL na https://api.groq.com/openai/v1/chat/completions — inaczej klucz jest, a żądanie jest odrzucane.'
+                : 'L’indirizzo è quello predefinito di OpenAI. Se la chiave è di Groq, imposta AI_API_URL su https://api.groq.com/openai/v1/chat/completions, altrimenti la chiave c’è ma la richiesta viene rifiutata.'}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* ------------------------------------------------------ where things live */}
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">

@@ -3115,6 +3115,12 @@ import { flagSvg } from './flags.js';
      security decision, which is a worse place for it than a variable nobody else can reach.
      ======================================================================== */
   let entryIntent = '';
+  /* Raised once somebody has said "yes, I know, I am adding another rider".
+     Without it the gate opens again on every press of "Continue" with the same address in the
+     field — it would be asking a question it has already had answered, and the only way past
+     would be to keep pressing the same button. Reset when the address changes, because then it
+     is a different question. */
+  let entryGateCleared = false;
 
   function setupExistingEntry(form) {
     const panel = $('[data-entry-found]', form);
@@ -3127,6 +3133,13 @@ import { flagSvg } from './flags.js';
     const codeField = $('#entry-code', panel);
     const codeError = $('[data-entry-code-error]', panel);
     const emailOf = () => String(form.elements.namedItem('email')?.value || '').trim().toLowerCase();
+
+    /* A different address is a different question, so the "I know, another rider" answer stops
+       counting. Without this, changing the address after clearing the gate once would skip the
+       check for the new one — and that is the case where somebody really is entering twice. */
+    form.elements.namedItem('email')?.addEventListener('input', () => {
+      entryGateCleared = false;
+    });
 
     const show = (which) => {
       if (choices) choices.hidden = which !== 'choices';
@@ -3154,16 +3167,24 @@ import { flagSvg } from './flags.js';
       return map[result?.code] || 'entry.failed';
     };
 
-    /* ---------------------------------------------------------------- other address */
+    /* ------------------------------------------------------- another rider, same address
+       The address stays. That is the whole change: since migration 0020 one inbox can hold
+       several riders, so a family entering a second child carries on with the form they are
+       already filling in.
+
+       The previous version cleared the field and asked for a different address, which was
+       asking somebody to work around our database schema by inventing an e-mail — and half of
+       them would type one they cannot read, which is where the confirmation with the race
+       number and the form to sign would then go. */
     $('[data-entry-action="other"]', panel)?.addEventListener('click', () => {
       panel.hidden = true;
       show('choices');
       say('');
-      const field = form.elements.namedItem('email');
-      field.value = '';
-      markField(field, true);
-      field.focus();
+      // Remembered, so the gate does not stop the same person again on the next press of
+      // "Continue" — they have already answered the question it asks.
+      entryGateCleared = true;
       window.dispatchEvent(new Event('carruleddhi:relayout'));
+      setFormStep(state.formStep + 1);
     });
 
     /* ------------------------------------------------------- edit / withdraw: send code */
@@ -3319,6 +3340,8 @@ import { flagSvg } from './flags.js';
 
     const email = String(form.elements.namedItem('email')?.value || '').trim().toLowerCase();
     if (!email) return false;
+    // Already answered for this address. Asking again would be a button that does nothing.
+    if (entryGateCleared) return false;
 
     const original = button.textContent;
     button.disabled = true;
@@ -4016,8 +4039,38 @@ import { flagSvg } from './flags.js';
         const previous = panel.dataset.panel;
         panel.dataset.panel = 'measure';
         const needed = panel.scrollHeight;
-        panel.dataset.panel = needed > viewport + 4 ? 'flow' : 'pinned';
-        if (previous === panel.dataset.panel) return;
+
+        /* Histereza, a nie jeden próg.
+           ---------------------------------------------------------------------------
+           Warunek `needed > viewport + 4` ma jedną granicę, a `window.innerHeight` na
+           telefonie nie jest stałą: pasek adresu zmienia go o kilkadziesiąt pikseli w trakcie
+           przewijania. Sekcja, której treść wypada blisko wysokości ekranu — a takich jest tu
+           kilka, bo prawie wszystkie są projektowane na jeden ekran — przy każdym takim ruchu
+           przeskakiwała między `pinned` i `flow`. Zmiana z `sticky` na `relative` przestawia
+           pozycję sekcji w układzie, więc strona szarpie się pod palcem. To jest to
+           „teleportowanie".
+
+           Teraz są dwie granice, oddalone o 90 px — trochę więcej niż wysokość paska adresu.
+           Żeby przejść na `flow`, treść musi wyraźnie nie mieścić się w ekranie. Żeby wrócić na
+           `pinned`, musi wyraźnie się mieścić. Między nimi verdykt zostaje ten, co był, więc
+           samo chowanie się paska adresu nie jest już powodem do zmiany czegokolwiek.
+
+           Cena: sekcja, której treść siedzi dokładnie w tym pasie, zostaje przy pierwszym
+           verdykcie. Przy `flow` znaczy to jeden ekran z zapasem u dołu; przy `pinned` — że
+           kilkadziesiąt pikseli treści zostaje przycięte. Dlatego pas jest asymetryczny wokół
+           progu: pierwszy pomiar (przy `previous === undefined`) rozstrzyga ostro, a histereza
+           dotyczy tylko zmieniania już podjętej decyzji. */
+        const HYSTERESIS = 90;
+        let verdict;
+        if (!previous || previous === 'measure') {
+          verdict = needed > viewport + 4 ? 'flow' : 'pinned';
+        } else if (previous === 'pinned') {
+          verdict = needed > viewport + HYSTERESIS ? 'flow' : 'pinned';
+        } else {
+          verdict = needed < viewport - HYSTERESIS ? 'pinned' : 'flow';
+        }
+        panel.dataset.panel = verdict;
+        if (previous === verdict) return;
       });
       updateCardStack();
       /* Released after the browser has delivered the notifications this pass caused.
@@ -4114,12 +4167,32 @@ import { flagSvg } from './flags.js';
      *   animates over 420 ms and fires dozens of notifications, so the next one is 16 ms
      *   away.
      */
+    /* OBSERWOWANA JEST TREŚĆ, NIE PANEL — i to jest naprawa przeskakiwania pod palcem.
+       ---------------------------------------------------------------------------
+       Pierwsza wersja obserwowała same sekcje. Każda z nich ma `min-height: 100svh`, a `svh`
+       na telefonie **nie jest stałą**: chowający się pasek adresu zmienia go o 60–100 px w
+       trakcie przewijania. Czyli przy każdym ruchu palcem wszystkie panele zmieniały wysokość,
+       obserwator to zgłaszał, `measure()` liczył od nowa — i sekcja stojąca blisko granicy
+       jednego ekranu przeskakiwała między `pinned` (position: sticky) i `flow`
+       (position: relative). To zmienia jej pozycję w układzie i szarpie stroną pod ręką.
+
+       Ten sam błąd jest już opisany kilkadziesiąt linii wyżej, przy `onResize`: tam zdarzenie
+       `resize` z telefonu było celowo ignorowane, jeśli szerokość się nie zmieniła. Obserwator
+       dodany później obszedł to zabezpieczenie od drugiej strony, bo patrzył na wysokość
+       pudełka, a właśnie ta wysokość jest tym, co pasek adresu rusza.
+
+       `.container` w środku sekcji nie zależy od `svh` — jej wysokość bierze się z tekstu,
+       obrazków i rozwiniętych formularzy, czyli z rzeczy, których pomiar naprawdę dotyczy.
+       Rozwinięcie formularza tablicy nadal jest łapane; schowanie paska adresu już nie. */
     if (typeof ResizeObserver === 'function') {
       const observer = new ResizeObserver(() => {
         if (selfInflicted) return;
         schedule();
       });
-      panels.forEach((panel) => observer.observe(panel));
+      panels.forEach((panel) => {
+        const content = panel.querySelector(':scope > .container') || panel.firstElementChild;
+        if (content) observer.observe(content);
+      });
     }
 
     measure();

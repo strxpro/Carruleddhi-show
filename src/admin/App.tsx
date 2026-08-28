@@ -326,6 +326,7 @@ export default function App() {
               setLocale={setLocale}
               onForget={lock}
               apiKey={key}
+              ai={inbox?.ai}
             />
           ) : null}
         </div>

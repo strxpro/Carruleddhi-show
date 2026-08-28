@@ -188,13 +188,16 @@ const FIELD_WHITELIST = {
      się z tego endpointu wyciągnąć. */
   'entry-lookup': ['email'],
   // `intent` is 'edit' or 'withdraw' and picks which code is issued. See ENTRY_PURPOSE.
-  'entry-code': ['email', 'intent'],
+  // `entryId` names which rider on a shared address the letter is about.
+  'entry-code': ['email', 'intent', 'entryId'],
   /* Pola do poprawienia są wymienione po imieniu i nie ma tu `firstName`, `lastName` ani
      `birthDate`. To nie przeoczenie: te trzy są wydrukowane na liberatorii, którą człowiek
      ma już w skrzynce, a cicha zmiana w bazie robi rozjazd między papierem a listą startową,
      którego nikt nie zauważy do dnia zawodów. Zmienia je organizator, po rozmowie. */
   'entry-manage': [
     'email', 'code', 'action',
+    // Which rider on this address, when there is more than one. See findEntry.
+    'entryId',
     'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes'
   ]
 };
@@ -1146,7 +1149,27 @@ async function inbox(env, payload, cors) {
     since,
     counts: { registrations, contacts, reminders, newsletter, wall, chats },
     total: registrations + contacts + reminders + newsletter + wall + chats,
-    ...(items ? { items } : {})
+    ...(items ? { items } : {}),
+
+    /* Czy model do czatu jest w ogóle podłączony.
+       ---------------------------------------------------------------------------
+       Bez tego jedyny sposób sprawdzenia to zadanie czatowi pytania, którego nie ma w
+       słowniku, i domyślenie się z odpowiedzi — a odpowiedź „przekazuję organizatorom" wygląda
+       identycznie, gdy klucza nie ma i gdy model celowo eskalował. Dwie różne rzeczy, jedno
+       zdanie na ekranie.
+
+       Wychodzi tylko to, co pozwala rozpoznać pomyłkę w konfiguracji: czy klucz jest ustawiony
+       (sam klucz nigdy), jaki adres i model. Adres jest tu ważny, bo najczęstszym błędem jest
+       klucz Groqa wysyłany pod domyślny adres OpenAI — wtedy klucz „jest", a nic nie działa.
+       Za passphrase, jak cała reszta tego typu. */
+    ai: {
+      configured: Boolean(env.AI_API_KEY),
+      url: env.AI_API_URL || env.AI_BASE_URL || 'https://api.openai.com/v1/chat/completions',
+      model: env.AI_MODEL || 'gpt-4o-mini',
+      // Nazwa, pod którą klucz został znaleziony — albo pusta. Rozstrzyga literówkę w nazwie
+      // zmiennej, która jest najczęstszą przyczyną „mam klucz i nie działa".
+      keyFrom: env.AI_API_KEY ? 'AI_API_KEY' : ''
+    }
   }, 200, cors);
 }
 
@@ -1925,6 +1948,10 @@ function rosterRow(row) {
     // Non-null means the rider corrected something themselves through the site. Worth
     // showing: it tells "they fixed this" apart from "somebody mistyped it".
     selfUpdatedAt: row.self_updated_at || null,
+    /* How many riders in total share this address. 1 for most, more for a family entering
+       several children from one inbox — which since 0020 is allowed and normal. Absent when
+       the row came from a PATCH rather than from the view, hence the fallback. */
+    emailGroupSize: Number(row.email_group_size) || 1,
     isMinor: Boolean(row.is_minor),
     riderAge: row.rider_age,
     guardian: row.is_minor
@@ -1969,8 +1996,16 @@ async function roster(env, payload, cors) {
 
   if (action === 'list') {
     const limit = Math.min(Math.max(Number(payload.limit) || 200, 1), 1000);
-    const url = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
-    url.searchParams.set('select', ROSTER_COLUMNS);
+    /* Read from the view, not the table.
+       `registrations_with_group` is `registrations` plus `email_group_size` — how many riders
+       share this address. Since 0020 that is a normal thing to be more than one, and the
+       organiser needs to see that three entries are one family rather than three unrelated
+       people who happen to be next to each other in the list.
+
+       A window function in a view rather than a count per row in this loop: the database
+       computes it once for the whole table instead of once per entry. */
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/registrations_with_group`);
+    url.searchParams.set('select', `${ROSTER_COLUMNS},email_group_size`);
     /* Oldest first, because that is the order the numbers were given out and the order a
        start list reads in. The panel sorts and filters what it has. */
     url.searchParams.set('order', 'created_at.asc');
@@ -2190,8 +2225,14 @@ function initialsOf(first, last) {
   return `${one}${two}`.toUpperCase();
 }
 
-/** The row for an address, or null. One indexed lookup on lower(email). */
-async function findEntry(env, email) {
+/**
+ * Every entry on one address, newest first.
+ *
+ * A list and not a row since migration 0020: one address may hold several riders, because a
+ * family enters three children from one inbox and that is the normal way people sign up here,
+ * not an edge case. What used to be "the entry for this address" is now "which of them".
+ */
+async function findEntries(env, email) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
   url.searchParams.set(
     'select',
@@ -2199,33 +2240,58 @@ async function findEntry(env, email) {
     + 'cart_name,category,team_name,cart_notes,locale,status,is_minor,created_at,self_updated_at'
   );
   url.searchParams.set('email', `eq.${email}`);
-  url.searchParams.set('limit', '1');
+  url.searchParams.set('order', 'created_at.desc');
+  url.searchParams.set('limit', '20');
   const response = await fetch(url, { headers: supabaseHeaders(env) });
-  if (!response.ok) return null;
+  if (!response.ok) return [];
   const rows = await response.json().catch(() => []);
-  return Array.isArray(rows) ? rows[0] || null : null;
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** The one entry being managed, chosen by id when there are several. */
+async function findEntry(env, email, id = '') {
+  const rows = await findEntries(env, email);
+  if (!rows.length) return null;
+  if (id) return rows.find((row) => row.id === id) || null;
+  /* No id given: the most recent one. Kept for the single-entry case, which is still the
+     common one — asking somebody with one entry to choose which entry would be absurd. */
+  return rows[0];
 }
 
 async function entryLookup(env, payload, cors) {
   const email = String(payload.email || '').trim().toLowerCase();
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
 
-  const row = await findEntry(env, email);
+  const rows = await findEntries(env, email);
   // Not 404. "No entry on this address" is the normal answer and the form acts on it by
   // carrying on, so it is a successful lookup with `exists: false`.
-  if (!row) return json({ ok: true, exists: false }, 200, cors);
+  if (!rows.length) return json({ ok: true, exists: false }, 200, cors);
+
+  /* All of them, not just the first.
+     Since 0020 one address can hold several riders, and the page has to be able to say
+     "these three are already entered — add a fourth, or correct one of them". Sending only the
+     newest would make the other two invisible and unmanageable.
+
+     Initials rather than names, for the same reason as before: enough to recognise your own
+     family, not enough to be worth harvesting. The race number goes with them because it is
+     the thing that tells two brothers apart at a glance, and it is public anyway — it is
+     printed on the cart and read out at the start line. */
+  const entries = rows.map((row) => ({
+    id: row.id,
+    initials: initialsOf(row.first_name, row.last_name),
+    raceNumber: row.race_number ? String(row.race_number).padStart(3, '0') : null,
+    withdrawn: row.status === 'withdrawn',
+    minor: Boolean(row.is_minor)
+  }));
 
   return json({
     ok: true,
     exists: true,
-    initials: initialsOf(row.first_name, row.last_name),
-    /* Already out of the race. Said here, because otherwise the form offers "withdraw" to
-       somebody who has withdrawn, and the only way they would find out is by doing it again
-       and being told nothing happened. */
-    withdrawn: row.status === 'withdrawn',
-    // Whether editing is even on the table: a minor's entry hangs on a signed guardian
-    // authorisation, so the whole thing goes through a person.
-    minor: Boolean(row.is_minor)
+    entries,
+    // Kept for the single-entry case so nothing that reads the old shape breaks.
+    initials: entries[0].initials,
+    withdrawn: entries[0].withdrawn,
+    minor: entries[0].minor
   }, 200, cors);
 }
 
@@ -2246,7 +2312,7 @@ async function entryCode(env, payload, cors) {
   const intent = payload.intent === 'withdraw' ? 'withdraw' : 'edit';
   const purpose = ENTRY_PURPOSE[intent];
 
-  const row = await findEntry(env, email);
+  const row = await findEntry(env, email, String(payload.entryId || ''));
   /* The same answer whether the address is unknown or known-but-withdrawn. An endpoint
      that distinguishes them is an endpoint that tells you which addresses are entered,
      which is the one thing this whole flow is careful not to hand out in bulk. */
@@ -2349,7 +2415,9 @@ async function entryManage(env, payload, cors) {
     return json({ ok: false, code: 'ENTRY_UNKNOWN_ACTION' }, 400, cors);
   }
 
-  const row = await findEntry(env, email);
+  /* `entryId` names which rider, when the address holds more than one. Absent means the newest,
+     which is what a single-entry address has always meant. */
+  const row = await findEntry(env, email, String(payload.entryId || ''));
   if (!row) return json({ ok: false, code: 'ENTRY_NOT_FOUND' }, 404, cors);
 
   /* The code has to have been issued for what is being asked.

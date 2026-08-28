@@ -63,6 +63,14 @@ export interface InboxItem {
   detail: string;
 }
 
+/** Whether the chat's model is wired up. Never carries the key itself. */
+export interface AiStatus {
+  configured: boolean;
+  url: string;
+  model: string;
+  keyFrom: string;
+}
+
 export interface Inbox {
   ok: true;
   since: string;
@@ -70,6 +78,7 @@ export interface Inbox {
   total: number;
   /** Only present when the bell asked for it — the ten-second poll does not. */
   items?: InboxItem[];
+  ai?: AiStatus;
 }
 
 /** A guardian block travels with a minor's entry and is null on an adult one. */
@@ -105,6 +114,8 @@ export interface RosterRow {
   printedAt: string | null;
   /** Non-null when the rider corrected something themselves through the site. */
   selfUpdatedAt: string | null;
+  /** Riders sharing this e-mail address. More than one means a family entry. */
+  emailGroupSize: number;
   isMinor: boolean;
   riderAge: number | null;
   guardian: RosterGuardian | null;

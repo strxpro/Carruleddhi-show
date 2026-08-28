@@ -215,6 +215,17 @@ export function Registrations({
                   </td>
                   <td className="px-4 py-3 text-[12px] text-muted-foreground">
                     <div className="break-all">{row.email || '—'}</div>
+                    {/* More than one rider on this address. Worth a badge: three entries from
+                        one inbox are a family, not three strangers who happen to be adjacent
+                        in the list — and it changes who you ring when one of them has a
+                        question about another. */}
+                    {row.emailGroupSize > 1 ? (
+                      <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                        {pl
+                          ? `${row.emailGroupSize} osoby z tego adresu`
+                          : `${row.emailGroupSize} iscritti da questo indirizzo`}
+                      </div>
+                    ) : null}
                     <div>{row.phone}</div>
                     <div className="uppercase opacity-70">{row.locale}</div>
                   </td>
