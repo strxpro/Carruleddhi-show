@@ -303,6 +303,49 @@ for (const [label, input, expected] of replies) {
    nadmiar niz nic. */
 check('sam cytat nie zostaje przyciety do pustki', stripQuotedReply('> tylko cytat').length > 0);
 
+/* --- ZLOZENIE sanitizeScalar + stripQuotedReply --------------------------
+   Ta asercja istnieje, bo ten blad przeszedl przez wszystkie powyzsze.
+
+   stripQuotedReply dzialalo poprawnie i testy to potwierdzaly — dostawaly tekst
+   z nowymi liniami. Ale zanim tekst do niego trafi, przechodzi przez sanitizeScalar,
+   ktory zamienial WSZYSTKIE znaki sterujace na spacje, w tym \n. Markery sa
+   zakotwiczone na poczatku linii, wiec bez \n zaden nie mial czego trafic i do watku
+   na czacie wpadala cala nasza wiadomosc doklejona pod odpowiedzia klienta.
+
+   Wykryl to dopiero test na zywym endpoincie. Dlatego tutaj sprawdzamy oba kroki
+   w tej kolejnosci, w jakiej wykonuje je worker, a nie kazdy z osobna. */
+const sanitizeSource = worker.slice(
+  worker.indexOf('function sanitizeScalar'),
+  worker.indexOf('\n}', worker.indexOf('function sanitizeScalar')) + 2
+);
+const sanitizeScalar = new Function(
+  'MAX_FIELD_LENGTH',
+  `${sanitizeSource}; return sanitizeScalar;`
+)(3000);
+
+check(
+  'sanitizePayload przepuszcza pola wielolinijkowe przez flage',
+  /sanitizeScalar\(value,\s*MULTILINE_FIELDS\.has\(key\)\)/.test(worker)
+);
+check(
+  'MULTILINE_FIELDS obejmuje text, message i cartNotes',
+  /MULTILINE_FIELDS = new Set\(\[[^\]]*'text'[^\]]*'message'[^\]]*'cartNotes'[^\]]*\]\)/.test(worker)
+);
+
+const crlfMail = 'Dzien dobry,\r\n\r\nczy kask wystarczy?\r\n\r\nDnia 28 sierpnia 2026 Carruleddhi <info@carruleddhishow.com> napisał(a):\r\n> Twoj numer to 061';
+check(
+  'CRLF z poczty przezywa sanitizacje jako \\n',
+  sanitizeScalar(crlfMail, true).includes('\n') && !sanitizeScalar(crlfMail, true).includes('\r')
+);
+check(
+  'po sanitizacji cytat NADAL da sie obciac',
+  stripQuotedReply(sanitizeScalar(crlfMail, true)) === 'Dzien dobry,\n\nczy kask wystarczy?'
+);
+check(
+  'bez flagi nowe linie znikaja (zachowanie dla imienia, adresu, telefonu)',
+  !sanitizeScalar(crlfMail).includes('\n')
+);
+
 /* Repozytorium jest publiczne. Klucze CallMeBota sa juz jawne w blueprincie i to jest
    jedna kopia za duzo — druga, w kodzie funkcji, nie ma prawa powstac. */
 check(

@@ -170,6 +170,26 @@ const MAX_BODY_BYTES = 16 * 1024;
 const MAX_PHOTO_BODY_BYTES = 1536 * 1024;
 /** Fields that are allowed to be long. Everything else is capped at 3000 chars. */
 const LONG_FIELDS = new Set(['photo']);
+
+/**
+ * Pola, w których nowa linia jest treścią, a nie śmieciem.
+ *
+ * sanitizeScalar() zamienia znaki sterujące na spacje i ma rację — w imieniu, adresie
+ * czy numerze telefonu znak sterujący jest albo pomyłką, albo próbą wstrzyknięcia czegoś
+ * w nagłówek listu. Ale ten zakres obejmuje takze \n, a w treści wiadomości akapit
+ * jest informacją.
+ *
+ * KOSZTOWAŁO TO BŁĄD, KTÓRY WYSZEDŁ DOPIERO NA ŻYWYM TEŚCIE
+ *   stripQuotedReply() rozpoznaje cytat po markerach zakotwiczonych na początku linii
+ *   (`^Dnia`, `^On`, `^>`). Kiedy sanitizeScalar zjadł nowe linie, żaden marker nie miał
+ *   czego trafić i do wątku na czacie wpadała cała nasza wiadomość doklejona pod
+ *   odpowiedzią klienta. Testy na samej funkcji tego nie widziały, bo dostawały tekst
+ *   z nowymi liniami — psuło się piętro wyżej.
+ *
+ * Lista jest krótka i ma taka zostać: wpisanie tu pola, które ląduje w nagłówku maila,
+ * otwiera wstrzykiwanie nagłówków.
+ */
+const MULTILINE_FIELDS = new Set(['text', 'message', 'cartNotes']);
 const RATE_LIMIT_MAX = 6;
 const RATE_LIMIT_WINDOW_SECONDS = 600;
 
@@ -200,10 +220,26 @@ function json(body, status, extraHeaders = {}) {
   });
 }
 
-function sanitizeScalar(value) {
+function sanitizeScalar(value, keepNewlines = false) {
   if (typeof value === 'boolean' || typeof value === 'number') return value;
   if (typeof value !== 'string') return undefined;
-  return value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, MAX_FIELD_LENGTH);
+  if (!keepNewlines) {
+    return value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, MAX_FIELD_LENGTH);
+  }
+  /* Wersja dla pól z MULTILINE_FIELDS: \n zostaje, reszta znaków sterujących nie.
+
+     CRLF sprowadzamy do samego \n, zanim cokolwiek innego się wydarzy — poczta przychodzi
+     z CRLF, a osierocone \r wychodzi potem w panelu jako pusty prostokąt. Normalizacja raz,
+     tutaj, jest tańsza niż w trzech miejscach dalej.
+
+     Więcej niż dwie puste linie pod rząd to artefakt po stopce albo po obciętym cytacie,
+     a nie akapit. */
+  return value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, MAX_FIELD_LENGTH);
 }
 
 /* ============================================================================
@@ -2742,7 +2778,7 @@ function sanitizePayload(type, input) {
       if (items.length) output[key] = items;
       continue;
     }
-    const scalar = sanitizeScalar(value);
+    const scalar = sanitizeScalar(value, MULTILINE_FIELDS.has(key));
     if (scalar !== undefined && scalar !== '') output[key] = scalar;
   }
   output.type = type;
