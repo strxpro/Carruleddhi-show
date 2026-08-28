@@ -300,3 +300,22 @@ html.is-demo .wall-note { position: relative; }
 .entry-found__edit[hidden] { display: none; }
 
 .entry-found__edit .form-grid { gap: 12px; }
+
+/* A sponsor with no logo file, set in type instead.
+   ---------------------------------------------------------------------------
+   Most of these are a favour from somebody in town who does not have a PNG to hand, and the
+   strip should be able to go up the day they say yes rather than the day their artwork
+   arrives. The display face at this size reads as a wordmark rather than as a missing image,
+   which is the whole point — an <img> with no src would be a broken-image icon in a strip
+   whose job is to say thank you. */
+.sponsor-logo__name {
+  display: block;
+  padding: 0 4px;
+  color: var(--navy-900, #0a2454);
+  font-family: var(--font-display, inherit);
+  font-size: clamp(15px, 2.4vw, 22px);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}

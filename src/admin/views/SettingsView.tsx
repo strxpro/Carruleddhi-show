@@ -381,8 +381,20 @@ export function SettingsView({
           ))}
         </ul>
 
+        {/* Says why the strip is not on the site, not just that the list is empty.
+            "Nobody added yet" is a fact about this screen; "that is why the band is invisible
+            on the page" is the answer to the question somebody actually has — and it is the
+            question that came back four times, because an empty list and a hidden strip look
+            the same from the front page. */}
         {settings.sponsors.length === 0 ? (
-          <p className="mt-3 text-[13px] text-white/40">{t('set.sponsorsEmpty')}</p>
+          <div className="mt-3 rounded-xl border border-dashed border-white/15 p-3.5">
+            <p className="text-[13px] text-white/55">{t('set.sponsorsEmpty')}</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-white/40">
+              {pl
+                ? 'Dopóki lista jest pusta, pasek nad nagłówkiem trasy jest ukryty — pusty pas logotypów wygląda na zepsuty, więc strona go nie pokazuje. Wystarczy nazwa: plik z logo jest opcjonalny, a bez niego pokazujemy nazwę napisem.'
+                : 'Finché l’elenco è vuoto, la striscia sopra il titolo del percorso resta nascosta: una fascia di logo vuota sembra un errore, quindi il sito non la mostra. Basta il nome: il file del logo è opzionale e senza di esso mostriamo il nome scritto.'}
+            </p>
+          </div>
         ) : null}
 
         <div className="mt-4 flex flex-wrap items-center gap-3">

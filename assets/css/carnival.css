@@ -881,14 +881,42 @@ body { overflow-x: clip; }
    flick moves exactly one panel instead of skipping two.
 
    Strictness stays `proximity`: with `mandatory` the middle of a tall section is
-   unreachable, because the nearest target would always be a section boundary. */
-@media (prefers-reduced-motion: no-preference) and (min-height: 600px) {
+   unreachable, because the nearest target would always be a section boundary.
+
+   AND IT IS OFF ON A PHONE ENTIRELY. That is this section's third revision and the
+   measurement is why.
+   ---------------------------------------------------------------------------
+   Measured on a 500px-wide window, scrolling in 220px steps: twenty-four of forty steps
+   landed somewhere other than where they were asked to, and the drift was a flat -220px —
+   exactly one step, over and over. The document height never changed, so nothing was pushing
+   the layout about; the browser was pulling the position back to the nearest panel edge.
+   Reported as "the page jumps on the phone", and that is precisely what it is.
+
+   `scroll-snap-stop: always` makes it worse rather than better on a touchscreen: it means a
+   flick cannot pass a target, so every panel boundary is a full stop. On a mouse wheel, where
+   one notch is one deliberate act, that reads as decisive. Under a thumb, where a flick is one
+   gesture meant to cover several screens, it reads as the page fighting back.
+
+   A phone already has momentum scrolling — it has its own idea of where a flick should end,
+   and it is a better idea than ours because it is the one every other app on the device uses.
+   So above 760px the snap stays, because a wheel benefits from it. Below, the device's own
+   physics wins. */
+@media (prefers-reduced-motion: no-preference) and (min-height: 600px) and (min-width: 761px) {
   html { scroll-snap-type: y proximity; }
   #main > section.section-card { scroll-snap-align: none; }
   #main > section.section-card[data-panel='pinned'] {
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
+}
+
+/* Belt and braces for the phone: the rule above simply does not apply below 761px, but
+   experience.css has its own snap block from an earlier pass and specificity between two
+   files is not a thing worth relying on when the symptom is this hard to attribute. */
+@media (max-width: 760px) {
+  html { scroll-snap-type: none; }
+  #main > section.section-card,
+  .site-footer { scroll-snap-align: none; }
 }
 
 /* ============================================================

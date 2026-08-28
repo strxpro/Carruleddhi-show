@@ -4283,12 +4283,22 @@ import { flagSvg } from './flags.js';
         item.setAttribute('aria-hidden', 'true');
         if (linked) item.tabIndex = -1;
       }
-      const image = document.createElement('img');
-      image.src = sponsor.image;
-      image.alt = duplicate ? '' : (sponsor.name || 'Sponsor');
-      image.loading = 'lazy';
-      image.decoding = 'async';
-      item.appendChild(image);
+      /* A file if there is one, the name set in type if there is not.
+         An <img> with an empty src is a broken-image icon in a strip meant to thank somebody,
+         so the two cases get different elements rather than one element and a fallback. */
+      if (sponsor.image) {
+        const image = document.createElement('img');
+        image.src = sponsor.image;
+        image.alt = duplicate ? '' : (sponsor.name || 'Sponsor');
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        item.appendChild(image);
+      } else {
+        const wordmark = document.createElement('span');
+        wordmark.className = 'sponsor-logo__name';
+        wordmark.textContent = sponsor.name;
+        item.appendChild(wordmark);
+      }
       return item;
     };
 
@@ -4423,12 +4433,23 @@ import { flagSvg } from './flags.js';
        so what arrives here is ready to put in a src. `image` is the name the renderer
        already uses; renaming it there would touch the CSS as well for no gain. */
     if (Array.isArray(settings.sponsors)) {
+      /* A name is enough. A file is not required.
+         ---------------------------------------------------------------------------
+         This filter used to demand `sponsor.logo` as well, which put the page and the server
+         at odds: cleanSettings() accepts an empty logo on purpose (see the comment there), so
+         the panel would save "Cantina Gallura" with no file, the database would hold it, and
+         this line would silently drop it. The organiser sees a saved sponsor and an empty
+         strip, with nothing anywhere saying why.
+
+         Most of these are a favour from somebody in town who does not have a PNG to hand. A
+         name set in the display face is a perfectly good thank-you, and it means the strip can
+         go up the day the first sponsor says yes rather than the day their logo arrives. */
       const usable = settings.sponsors
-        .filter((sponsor) => sponsor && sponsor.name && sponsor.logo)
+        .filter((sponsor) => sponsor && sponsor.name)
         .map((sponsor) => ({
           name: String(sponsor.name),
           url: String(sponsor.url || ''),
-          image: String(sponsor.logo)
+          image: String(sponsor.logo || '')
         }));
       // Only replace the built-in list once there is something to replace it with. An
       // empty list from a half-configured database should not blank a working band.
