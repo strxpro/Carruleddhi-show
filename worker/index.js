@@ -588,6 +588,14 @@ function noteModelFailure(reason) {
   lastModelFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
 }
 
+/* To samo dla WhatsAppa, z tego samego powodu: CallMeBot odmawia ze statusem 200,
+   a odmowa siedzi w treści odpowiedzi. Bez tego wyczerpany limit wygląda w Make jak
+   udana wysyłka i nikt się nie dowiaduje, dopóki ktoś nie zapyta, czemu nie dzwoni. */
+let lastWhatsappFailure = '';
+function noteWhatsappFailure(reason) {
+  lastWhatsappFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
+}
+
 async function askModel(env, deck, history, question) {
   if (!env.AI_API_KEY) {
     noteModelFailure('brak AI_API_KEY');
@@ -732,12 +740,36 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
     'Odpisz w panelu: https://www.carruleddhishow.com/admin'
   ].filter(Boolean).join('\n');
 
-  const tasks = whatsappTargets(env).map(({ phone, apikey }) => {
+  /* CallMeBot ODMAWIA ZE STATUSEM 200 — dlatego trzeba czytać treść, nie kod.
+     ---------------------------------------------------------------------------
+     Wyczerpany darmowy limit wygląda tak:
+
+       HTTP 200  "You have 0 messages left. (...) Message not sent"
+
+     Czyli sukces po kodzie, brak wiadomości w rzeczywistości. Zmierzone na numerze
+     48665626101 dnia 29.08.2026: przebiegi w Make były zielone przez cały czas, a telefon
+     milczał, bo moduł HTTP patrzy wyłącznie na status.
+
+     Sprawdzamy więc treść i zapisujemy powód tam, gdzie widać powód nieodpowiadającego
+     modelu — jedno miejsce w panelu na wszystkie ciche awarie kanałów. */
+  const tasks = whatsappTargets(env).map(async ({ phone, apikey }) => {
     const url = new URL('https://api.callmebot.com/whatsapp.php');
     url.searchParams.set('phone', phone);
     url.searchParams.set('apikey', apikey);
     url.searchParams.set('text', whatsapp);
-    return fetch(url, { signal: AbortSignal.timeout(6000) });
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const body = (await response.text().catch(() => '')).replace(/<[^>]*>/g, ' ');
+      // Ostatnie cztery cyfry wystarczą, żeby rozpoznać telefon; całego numeru tu nie trzymamy.
+      const tail = phone.slice(-4);
+      if (!response.ok) {
+        noteWhatsappFailure(`...${tail}: HTTP ${response.status}`);
+      } else if (/not sent|0 messages left|APIKey is not valid|not registered/i.test(body)) {
+        noteWhatsappFailure(`...${tail}: ${body.replace(/\s+/g, ' ').trim().slice(0, 160)}`);
+      }
+    } catch (error) {
+      noteWhatsappFailure(`...${phone.slice(-4)}: ${error?.name || 'Error'}`);
+    }
   });
 
   const html = [
@@ -1222,7 +1254,11 @@ async function inbox(env, payload, cors) {
          „za wolno" (TimeoutError). Bez tego wszystkie trzy wyglądają jak
          „przekazuję organizatorom", a konfiguracja wygląda na kompletną. */
       lastFailure: lastModelFailure
-    }
+    },
+    /* Ostatnia cicha odmowa CallMeBota — puste znaczy „ostatnia wysyłka przeszła".
+       Osobno od `ai`, bo to inny kanał, ale w tym samym miejscu, żeby panel miał jedno
+       okno na wszystkie awarie, które nie zgłaszają się same. */
+    whatsapp: { lastFailure: lastWhatsappFailure }
   }, 200, cors);
 }
 
