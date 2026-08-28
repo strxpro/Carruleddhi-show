@@ -4022,9 +4022,63 @@ import { flagSvg } from './flags.js';
        for ever. */
     let selfInflicted = false;
 
+    /**
+     * Wysokość jednego ekranu — mierzona TĄ SAMĄ jednostką, której użyje CSS.
+     *
+     * TO JEST WŁAŚCIWA PRZYCZYNA PRZESKAKIWANIA, A NIE JEJ OBJAW
+     *   Sekcja przypięta dostaje z CSS `min-height: 100svh`. Werdykt „mieści się na jednym
+     *   ekranie czy nie" musi więc być liczony względem `100svh` — bo to jest ta wysokość,
+     *   którą sekcja naprawdę dostanie, jeśli ją przypniemy.
+     *
+     *   Wcześniej porównanie szło do `window.innerHeight`. Na telefonie to są dwie różne
+     *   liczby: `svh` to wysokość przy WIDOCZNYM pasku adresu i jest **stała**, a
+     *   `window.innerHeight` puchnie i chudnie o 60–100 px za każdym razem, gdy pasek się
+     *   chowa. Kod decydował więc o układzie rządzonym stałą, porównując go z liczbą, która
+     *   się rusza — i sekcja stojąca blisko granicy dostawała inny werdykt zależnie od tego,
+     *   w którym momencie przewijania akurat wypadł pomiar. Zmiana `pinned` na `flow` to
+     *   zmiana `position` ze `sticky` na `relative`, czyli przestawienie sekcji w układzie:
+     *   strona szarpie pod palcem.
+     *
+     *   Histereza 90 px, dodana wcześniej, jest opatrunkiem dokładnie tej samej wielkości co
+     *   ruch paska adresu — więc go maskuje, ale sekcje blisko progu dalej stoją na krawędzi.
+     *   Zostaje, bo chroni przed drganiem treści (font, obrazek, tłumaczenie o linijkę
+     *   dłuższe), ale nie musi już udawać, że rozwiązuje tamto.
+     *
+     * DLACZEGO POMIAR, A NIE OBLICZENIE
+     *   `svh` nie da się policzyć z niczego, co jest w JS. Trzeba dać przeglądarce pudełko
+     *   o wysokości `100svh` i zapytać, ile to wyszło. Element jest bezwymiarowy w poziomie,
+     *   `visibility: hidden` i poza kolejnością malowania, więc niczego nie zasłania ani nie
+     *   przesuwa.
+     *
+     * KIEDY SIĘ TO ZMIENIA
+     *   Przy obrocie telefonu i przy prawdziwej zmianie okna — czyli dokładnie wtedy, gdy
+     *   `onResize` niżej i tak przelicza wszystko od nowa. Chowanie paska adresu tego nie
+     *   rusza, i o to chodzi.
+     */
+    let svhProbe = null;
+    let screenHeight = 0;
+    function measureScreenHeight() {
+      if (!(window.CSS && CSS.supports && CSS.supports('height', '100svh'))) {
+        // Przeglądarka bez svh (starsze WebView): innerHeight jest wtedy jedyną liczbą,
+        // jaką mamy, a bez svh w CSS sekcje i tak dostają fallback z tej samej rodziny.
+        screenHeight = window.innerHeight;
+        return;
+      }
+      if (!svhProbe) {
+        svhProbe = document.createElement('div');
+        svhProbe.setAttribute('aria-hidden', 'true');
+        svhProbe.style.cssText =
+          'position:absolute;top:0;left:0;width:0;height:100svh;' +
+          'visibility:hidden;pointer-events:none;';
+        document.body.appendChild(svhProbe);
+      }
+      screenHeight = svhProbe.getBoundingClientRect().height || window.innerHeight;
+    }
+    measureScreenHeight();
+
     function measure() {
       selfInflicted = true;
-      const viewport = window.innerHeight;
+      const viewport = screenHeight || window.innerHeight;
       const routeFlows = window.innerWidth <= routeFlowsBelow;
       panels.forEach((panel) => {
         if (alwaysFlow.has(panel.id) || (panel.id === 'route' && routeFlows)) {
@@ -4129,6 +4183,10 @@ import { flagSvg } from './flags.js';
       const width = window.innerWidth;
       if (width === lastWidth) return;
       lastWidth = width;
+      // Szerokość naprawdę się zmieniła, więc jeden ekran ma teraz inną wysokość.
+      // Przeliczane tutaj, a nie w measure(), żeby zostało kosztem zmiany okna,
+      // a nie kosztem każdego pomiaru.
+      measureScreenHeight();
       schedule();
     };
 
@@ -4199,6 +4257,15 @@ import { flagSvg } from './flags.js';
     window.addEventListener('resize', onResize, { passive: true });
     window.addEventListener('orientationchange', () => {
       lastWidth = window.innerWidth;
+      /* Po obrocie `100svh` to inna liczba, a pomiar musi poczekać, aż przeglądarka poda
+         nowe wymiary — na części urządzeń `orientationchange` przychodzi wcześniej.
+         Stąd pomiar i tutaj, i w rAF-ie: pierwszy łapie urządzenia, które są już gotowe,
+         drugi te, które jeszcze nie. */
+      measureScreenHeight();
+      requestAnimationFrame(() => {
+        measureScreenHeight();
+        schedule();
+      });
       schedule();
     }, { passive: true });
     window.addEventListener('carruleddhi:language', schedule);

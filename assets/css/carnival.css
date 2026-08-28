@@ -920,6 +920,55 @@ body { overflow-x: clip; }
 }
 
 /* ============================================================
+   Kotwiczenie przewijania — TO BYŁA PRAWDZIWA PRZYCZYNA PRZESKAKIWANIA.
+   ============================================================
+   Objaw: przy przewijaniu strona co jakiś czas sama przeskakuje do przodu, w losowym
+   momencie. Zgłaszany trzy razy, dwa razy uznany za naprawiony — i to jest tu
+   najważniejsze, bo obie poprzednie naprawy celowały w co innego.
+
+   CO ZOSTAŁO WYKLUCZONE, POMIAREM A NIE ROZUMOWANIEM
+     scroll-snap — wyliczone `scroll-snap-type` na `html` przy 500 px szerokości to
+       `none`. Blok wyżej działa. Snap nie ma z tym nic wspólnego.
+
+     przeskakiwanie sekcji między `pinned` a `flow` — żadna sekcja nie zmienia trybu
+       w trakcie przewijania. Co więcej, nie może: wszystkie mierzone sekcje mają treść
+       poniżej jednego ekranu (najwyższa, `story`, na 658 px przy ekranie 670 px), a te,
+       które wpadają w pas ruszany przez pasek adresu (`contact` 710 px, `wall` 743 px),
+       są na liście `alwaysFlow` i nie są w ogóle mierzone.
+
+     rosnący dokument — wysokość strony przy przeskoku nie zmienia się ani o piksel
+       (12588 -> 12588).
+
+   CO ZOSTAŁO ZMIERZONE
+     Przeskok ma stałą sygnaturę: prosimy o pozycję 6380, lądujemy na 6552. Dryf +172 px
+     do przodu, w sekcji `prizes`. Czyli coś przewija stronę samo.
+
+     `overflow-anchor` był `auto`, czyli kotwiczenie włączone. Przeglądarka wybiera sobie
+     element-kotwicę i gdy cokolwiek nad nim zmieni rozmiar, dosuwa `scrollTop`, żeby
+     kotwica została w tym samym miejscu na ekranie. Przy sekcjach `position: sticky`,
+     które z definicji zmieniają swoje pudełko w trakcie przewijania, przeglądarka co
+     jakiś czas uznaje, że musi skorygować — i to jest ten skok.
+
+   DOWÓD, A NIE PRZYPUSZCZENIE
+     Z kotwiczeniem:  2 przeskoki na 8 przebiegów sondy (~27% na dłuższej próbie).
+     Bez kotwiczenia: 0 przeskoków na 20 przebiegów.
+
+     Przy częstości 27% zero na dwudziestu wychodzi przypadkiem raz na pięćset.
+     Sonda: tools/probe-scroll-jump.mjs.
+
+   DLACZEGO TO JEST BEZPIECZNE TUTAJ
+     Kotwiczenie istnieje po to, żeby treść doładowana NAD widokiem nie zepchnęła
+     czytanego akapitu w dół. Na tej stronie nie ma czego doładowywać w ten sposób:
+     obrazki siedzą w pudełkach o stałej wysokości, a sonda potwierdza, że wysokość
+     dokumentu w trakcie przewijania nie drgnie. Zysk z kotwiczenia jest więc zerowy,
+     a koszt to skok co czwarte przewinięcie.
+   ============================================================ */
+html,
+body,
+#main,
+#main > section.section-card { overflow-anchor: none; }
+
+/* ============================================================
    17. Custom scroll bar.
    ============================================================
    Firefox gets the two-colour form; Chrome and Safari get the full thing. The
