@@ -3730,6 +3730,23 @@ import { flagSvg } from './flags.js';
     const dot = $('[data-cursor-dot]');
     const ring = $('[data-cursor-ring]');
     if (!dot || !ring) return;
+
+    /* Systemowy kursor chowamy dopiero TUTAJ, nie w arkuszu stylów.
+       ---------------------------------------------------------------------------
+       Do tej pory widać było dwa kursory naraz: systemową strzałkę i żółtą kropkę
+       z pierścieniem.
+
+       Kusi, żeby dopisać `cursor: none` do `body` w CSS i mieć spokój. To jest pułapka:
+       ta funkcja kończy się przedwcześnie na trzy sposoby — urządzenie bez precyzyjnego
+       wskaźnika (`finePointer`), włączone ograniczenie ruchu (`reducedMotion`) i brak
+       elementów w HTML-u. W każdym z nich reguła z CSS nadal by działała, a własny kursor
+       już nie — czyli użytkownik z włączonym „ogranicz animacje" zostawałby bez
+       jakiegokolwiek kursora. To nie jest efekt, to jest niesprawna strona.
+
+       Klasa zakładana po przejściu wszystkich trzech warunków wiąże ukrycie z istnieniem
+       zamiennika. Zdejmowana nie jest, bo `setupCursor` uruchamia się raz. */
+    document.documentElement.classList.add('has-custom-cursor');
+
     let pointerX = -100;
     let pointerY = -100;
     let ringX = -100;

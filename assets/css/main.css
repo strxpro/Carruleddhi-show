@@ -165,6 +165,20 @@ img, svg { display: block; max-width: 100%; }
   background: linear-gradient(90deg, var(--yellow), var(--orange), var(--coral));
   box-shadow: 0 0 18px rgba(255, 201, 40, .65);
 }
+/* Systemowy kursor znika tylko wtedy, gdy własny naprawdę działa.
+
+   Klasę `has-custom-cursor` zakłada app.js po sprawdzeniu trzech warunków: precyzyjny
+   wskaźnik, brak włączonego ograniczenia ruchu i obecność obu elementów w HTML-u.
+   `cursor: none` wpisane wprost na `body` wyglądałoby tak samo w przeglądarce autora,
+   a użytkownikowi z włączonym „ogranicz animacje" zabrałoby kursor bez dawania
+   czegokolwiek w zamian.
+
+   `!important` i `*`, bo w tym arkuszu jest kilkadziesiąt reguł `cursor: pointer`,
+   `grab` i `zoom-in` na przyciskach, kartach i zdjęciach — bez tego systemowa strzałka
+   wracałaby dokładnie tam, gdzie kursor jest najbardziej widoczny. */
+html.has-custom-cursor,
+html.has-custom-cursor * { cursor: none !important; }
+
 .cursor-dot, .cursor-ring {
   position: fixed;
   z-index: 998;
