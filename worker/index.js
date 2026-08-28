@@ -19,6 +19,8 @@ import { EMAIL_TEMPLATES } from './email-templates.js';
 
 const ALLOWED_TYPES = new Set([
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
+  // Listy przypomnień i newslettera dla panelu. Za passphrase, jak roster.
+  'subscribers',
   // Public wall. `wall` reads approved messages, `wall-post` adds one,
   // `wall-translate` translates one on demand, `wall-admin` moderates.
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
@@ -68,7 +70,12 @@ const SUPABASE_TYPES = new Set([
   'settings', 'settings-admin', 'reminders-due', 'purge',
   'unsub-start', 'unsub-confirm',
   'chat', 'chat-admin', 'chat-inbound', 'inbox',
-  'entry-lookup', 'entry-code', 'entry-manage'
+  'entry-lookup', 'entry-code', 'entry-manage',
+  /* `roster` belongs here and did not, which is why the entries screen in the panel showed
+     "nobody has signed up yet" no matter what was in the database: the request cleared the
+     passphrase check and then went to the Make webhook, which answers with "Accepted" and no
+     rows. See the comment above the roster() function. */
+  'roster', 'subscribers'
 ]);
 
 /**
@@ -101,7 +108,8 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * admin.html as well before using this on a public hostname.
  */
 const PROTECTED_TYPES = new Set([
-  'roster', 'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge'
+  'roster', 'subscribers',
+  'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge'
 ]);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
@@ -120,7 +128,16 @@ const FIELD_WHITELIST = {
   attendance: ['attendeeId'],
   contact: ['name', 'email', 'message'],
   counts: [],
-  roster: ['since', 'limit'],
+  /* The participant list, and editing it. `email` is not on this list even for the organiser:
+     it is the row's identity and where the confirmation went, so a wrong address means a new
+     entry plus a withdrawal rather than a silent swap. See ROSTER_EDITABLE. */
+  roster: [
+    'action', 'id', 'since', 'limit',
+    'firstName', 'lastName', 'birthDate', 'postalCode', 'phone', 'address',
+    'cartName', 'teamName', 'cartNotes', 'category', 'raceNumber', 'status'
+  ],
+  // Reminders and the newsletter. `list` names which one and is checked against a fixed set.
+  subscribers: ['action', 'list', 'id', 'limit'],
   wall: ['limit', 'before'],
   // `photo` is a data URL from the browser, already downscaled there. See wallPost.
   // The dimensions come from the browser too, and are used only to reserve the right
@@ -1039,12 +1056,117 @@ async function inbox(env, payload, cors) {
     countSince('chat_threads', 'last_message_at', ['mode', 'eq.human'])
   ]);
 
+  /* The bell had a number and nothing behind it: clicking it marked everything read and
+     opened the dashboard, so "what is new" was answered with six totals and no way to see
+     what any of them referred to. A count tells you something happened; it does not tell you
+     a rider called Marco entered ten minutes ago.
+
+     `action: 'list'` returns the things themselves, newest first. Asked for only when the
+     bell is opened, so the ten-second poll stays what it was — six indexed counts and no
+     rows. */
+  const items = String(payload.action || 'counts') === 'list'
+    ? await inboxItems(env, since)
+    : null;
+
   return json({
     ok: true,
     since,
     counts: { registrations, contacts, reminders, newsletter, wall, chats },
-    total: registrations + contacts + reminders + newsletter + wall + chats
+    total: registrations + contacts + reminders + newsletter + wall + chats,
+    ...(items ? { items } : {})
   }, 200, cors);
+}
+
+/**
+ * What is actually new, as a list.
+ *
+ * Five tables, one small query each, merged and cut to the twenty most recent. Not a union
+ * in SQL: PostgREST has no union, and a view would be a sixth thing to keep in step with
+ * five tables whose columns keep changing. Five parallel reads of at most twenty rows each
+ * is a few milliseconds and needs no migration.
+ *
+ * Every item is `{ kind, at, title, detail, id }` — the panel groups by `kind` and does not
+ * need to know which table anything came from.
+ */
+async function inboxItems(env, since) {
+  const read = async (table, select, order = 'created_at') => {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+    url.searchParams.set('select', select);
+    url.searchParams.set(order, `gt.${since}`);
+    url.searchParams.set('order', `${order}.desc`);
+    url.searchParams.set('limit', '20');
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) return [];
+    const rows = await response.json().catch(() => []);
+    return Array.isArray(rows) ? rows : [];
+  };
+
+  const [entries, messages, reminders, news, comments, threads] = await Promise.all([
+    read('registrations', 'id,created_at,first_name,last_name,race_number,category'),
+    read('contact_messages', 'id,created_at,name,email,message'),
+    read('reminder_subscribers', 'id,created_at,name,email'),
+    read('newsletter_subscribers', 'id,created_at,name,email'),
+    read('wall_comments', 'id,created_at,display_name,message'),
+    read('chat_threads', 'id,last_message_at,display_name,email', 'last_message_at')
+  ]);
+
+  /* Trimmed hard. This is a dropdown, not a report — a full message body would push the next
+     item off the screen, and the point of the list is to recognise the thing, then click it. */
+  const short = (value, max = 90) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  };
+
+  const items = [
+    ...entries.map((row) => ({
+      kind: 'registrations',
+      id: row.id,
+      at: row.created_at,
+      title: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+      detail: [
+        row.race_number ? `#${String(row.race_number).padStart(3, '0')}` : '',
+        row.category || ''
+      ].filter(Boolean).join(' · ')
+    })),
+    ...messages.map((row) => ({
+      kind: 'contacts',
+      id: row.id,
+      at: row.created_at,
+      title: row.name || row.email,
+      detail: short(row.message)
+    })),
+    ...reminders.map((row) => ({
+      kind: 'reminders',
+      id: row.id,
+      at: row.created_at,
+      title: row.name || row.email,
+      detail: row.email
+    })),
+    ...news.map((row) => ({
+      kind: 'newsletter',
+      id: row.id,
+      at: row.created_at,
+      title: row.name || row.email,
+      detail: row.email
+    })),
+    ...comments.map((row) => ({
+      kind: 'wall',
+      id: row.id,
+      at: row.created_at,
+      title: row.display_name || '',
+      detail: short(row.message)
+    })),
+    ...threads.map((row) => ({
+      kind: 'chats',
+      id: row.id,
+      at: row.last_message_at,
+      title: row.display_name || row.email || '',
+      detail: row.email || ''
+    }))
+  ];
+
+  items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return items.slice(0, 20);
 }
 
 /* ============================================================================
@@ -1671,6 +1793,293 @@ async function unsubConfirm(env, payload, cors) {
 
   if (cleared.length === 0) return json({ ok: false, code: 'UNSUB_WRITE_FAILED' }, 502, cors);
   return json({ ok: true, email: maskEmail(email), cleared }, 200, cors);
+}
+
+/* ============================================================================
+   The participant list, for the organiser
+   ============================================================================
+   WHY THIS FUNCTION DID NOT EXIST UNTIL NOW, AND WHAT THAT COST
+     `roster` was on ALLOWED_TYPES and on PROTECTED_TYPES from the beginning, so the panel's
+     request passed the passphrase check and then — because the type was never added to
+     SUPABASE_TYPES — fell through to the Make webhook. Make answers a webhook with "Accepted",
+     not with a list of entries. The panel read `rows` off that, found nothing, and drew
+     "nobody has signed up yet".
+
+     So the entries screen has never worked. It failed in the one way that is hardest to
+     notice: an empty list is exactly what a new event looks like, and the number beside it
+     said "0 zgłoszeń" with complete confidence. Nothing errored, nothing was logged.
+
+     The lesson is in ALLOWED_TYPES already, in the comment about the three unsubscribe types
+     that were handled but not listed. Same shape of mistake, mirrored: this one is listed
+     everywhere except in the set that decides who answers it.
+
+   WHAT IT RETURNS
+     Everything the organiser needs to run a start line: name, number, contact, category,
+     cart, status, and the guardian block for a minor. That is personal data, which is why
+     this type is behind the passphrase and why `roster` has a rate limit of 12 rather than
+     the usual ceiling — a leaked passphrase should not also mean a fast bulk download.
+   ========================================================================== */
+
+const ROSTER_COLUMNS = [
+  'id', 'created_at', 'race_number', 'first_name', 'last_name', 'birth_date', 'postal_code',
+  'email', 'phone', 'address', 'cart_name', 'category', 'team_name', 'cart_notes', 'locale',
+  'status', 'email_status', 'printed_at', 'self_updated_at',
+  'is_minor', 'rider_age', 'child_kind', 'guardian_relation', 'guardian_name',
+  'guardian_email', 'guardian_phone', 'mother_name', 'father_name', 'guardian_consent'
+].join(',');
+
+/** One row, in the shape the panel speaks. */
+function rosterRow(row) {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    raceNumber: row.race_number ? String(row.race_number).padStart(3, '0') : null,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    birthDate: row.birth_date || '',
+    postalCode: row.postal_code || '',
+    email: row.email,
+    phone: row.phone || '',
+    address: row.address || '',
+    cartName: row.cart_name || '',
+    category: row.category || 'classic',
+    teamName: row.team_name || '',
+    cartNotes: row.cart_notes || '',
+    locale: row.locale,
+    status: row.status,
+    emailStatus: row.email_status,
+    printedAt: row.printed_at,
+    // Non-null means the rider corrected something themselves through the site. Worth
+    // showing: it tells "they fixed this" apart from "somebody mistyped it".
+    selfUpdatedAt: row.self_updated_at || null,
+    isMinor: Boolean(row.is_minor),
+    riderAge: row.rider_age,
+    guardian: row.is_minor
+      ? {
+        childKind: row.child_kind || '',
+        relation: row.guardian_relation || '',
+        name: row.guardian_name || '',
+        email: row.guardian_email || '',
+        phone: row.guardian_phone || '',
+        motherName: row.mother_name || '',
+        fatherName: row.father_name || '',
+        consent: Boolean(row.guardian_consent)
+      }
+      : null
+  };
+}
+
+/* The fields the organiser may change from the panel, and the column each one writes.
+   Wider than what a rider may change about themselves — the organiser is the one who takes
+   the phone call about a misspelled surname, and is looking at the signed form while doing
+   it. `email` is deliberately absent even here: it is the row's identity (unique index on
+   lower(email)), it is where the confirmation went, and changing it would silently detach the
+   entry from the person holding the PDF. A wrong address means a new entry and a withdrawal
+   of the old one, which is two visible acts rather than one invisible one. */
+const ROSTER_EDITABLE = {
+  firstName: 'first_name',
+  lastName: 'last_name',
+  birthDate: 'birth_date',
+  postalCode: 'postal_code',
+  phone: 'phone',
+  address: 'address',
+  cartName: 'cart_name',
+  teamName: 'team_name',
+  cartNotes: 'cart_notes',
+  category: 'category',
+  raceNumber: 'race_number',
+  status: 'status'
+};
+
+async function roster(env, payload, cors) {
+  const action = String(payload.action || 'list');
+
+  if (action === 'list') {
+    const limit = Math.min(Math.max(Number(payload.limit) || 200, 1), 1000);
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
+    url.searchParams.set('select', ROSTER_COLUMNS);
+    /* Oldest first, because that is the order the numbers were given out and the order a
+       start list reads in. The panel sorts and filters what it has. */
+    url.searchParams.set('order', 'created_at.asc');
+    url.searchParams.set('limit', String(limit));
+    if (payload.since) url.searchParams.set('created_at', `gt.${payload.since}`);
+
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) return json({ ok: false, code: 'ROSTER_READ_FAILED' }, 502, cors);
+    const rows = await response.json().catch(() => []);
+    return json({ ok: true, rows: (Array.isArray(rows) ? rows : []).map(rosterRow) }, 200, cors);
+  }
+
+  const id = String(payload.id || '');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ ok: false, code: 'ROSTER_BAD_ID' }, 422, cors);
+
+  if (action === 'update') {
+    const patch = {};
+    for (const [key, column] of Object.entries(ROSTER_EDITABLE)) {
+      if (payload[key] === undefined) continue;
+
+      if (key === 'category') {
+        patch[column] = payload[key] === 'art' ? 'art' : 'classic';
+      } else if (key === 'status') {
+        /* Only the three the column's own check allows. An unknown value would be rejected by
+           Postgres anyway, but as a 502 that reads like the server is broken rather than as a
+           422 that says what was wrong. */
+        if (!['new', 'confirmed', 'withdrawn'].includes(payload[key])) {
+          return json({ ok: false, code: 'ROSTER_BAD_STATUS' }, 422, cors);
+        }
+        patch[column] = payload[key];
+      } else if (key === 'raceNumber') {
+        /* Empty clears it, which puts the number back in the pool. Anything else has to be a
+           positive integer; the unique index refuses a number somebody else already has, and
+           that comes back as a duplicate rather than as a silent overwrite. */
+        const raw = String(payload[key]).trim();
+        if (!raw) patch[column] = null;
+        else {
+          const number = Number.parseInt(raw, 10);
+          if (!Number.isInteger(number) || number < 1 || number > 9999) {
+            return json({ ok: false, code: 'ROSTER_BAD_NUMBER' }, 422, cors);
+          }
+          patch[column] = number;
+        }
+      } else if (key === 'birthDate') {
+        const raw = String(payload[key]).trim();
+        if (raw && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          return json({ ok: false, code: 'ROSTER_BAD_DATE' }, 422, cors);
+        }
+        patch[column] = raw || null;
+      } else {
+        const value = String(payload[key]).trim().slice(0, 300);
+        // first_name and last_name are `not null` with a length check, so an empty string
+        // would be a 502. Refused here with something the panel can put next to the field.
+        if (!value && (key === 'firstName' || key === 'lastName')) {
+          return json({ ok: false, code: 'ROSTER_NAME_REQUIRED' }, 422, cors);
+        }
+        patch[column] = value || null;
+      }
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return json({ ok: false, code: 'ROSTER_NOTHING_TO_DO' }, 422, cors);
+    }
+
+    const response = await fetch(
+      `${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${id}&select=${ROSTER_COLUMNS}`,
+      {
+        method: 'PATCH',
+        headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
+        body: JSON.stringify(patch)
+      }
+    );
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      // A clash on the race number or the address is a fact to report, not a fault.
+      const duplicate = detail.includes('23505') || detail.includes('duplicate key');
+      return json(
+        { ok: false, code: duplicate ? 'ROSTER_DUPLICATE' : 'ROSTER_WRITE_FAILED', detail: detail.slice(0, 300) },
+        duplicate ? 409 : 502,
+        cors
+      );
+    }
+    const rows = await response.json().catch(() => []);
+    // The updated row goes back so the panel shows what the database actually holds rather
+    // than what it hoped it wrote — the race-number trigger can change it on a withdrawal.
+    return json({ ok: true, row: Array.isArray(rows) && rows[0] ? rosterRow(rows[0]) : null }, 200, cors);
+  }
+
+  if (action === 'delete') {
+    /* Deleting rather than withdrawing, for a test row or a duplicate created by hand.
+       Withdrawal is the normal path and is a status change — it keeps the history and frees
+       the number. This is for rows that should never have existed. */
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' })
+    });
+    if (!response.ok) return json({ ok: false, code: 'ROSTER_WRITE_FAILED' }, 502, cors);
+    return json({ ok: true, id, deleted: true }, 200, cors);
+  }
+
+  return json({ ok: false, code: 'ROSTER_UNKNOWN_ACTION' }, 400, cors);
+}
+
+/* ============================================================================
+   The two subscription lists
+   ============================================================================
+   The panel said "there is no endpoint for reading this list yet" and sent the organiser to
+   the Supabase table editor. That was honest and it is still a gap: the counter on the
+   dashboard said four people had signed up and there was no way to see who.
+
+   One type for both lists rather than two, because they are the same three columns and the
+   same two actions. The list is named in the payload and validated against a fixed set, so
+   the table name is never taken from the request.
+   ========================================================================== */
+
+const SUBSCRIBER_LISTS = {
+  reminders: 'reminder_subscribers',
+  newsletter: 'newsletter_subscribers'
+};
+
+async function subscribers(env, payload, cors) {
+  const list = String(payload.list || 'reminders');
+  const table = SUBSCRIBER_LISTS[list];
+  if (!table) return json({ ok: false, code: 'SUBS_UNKNOWN_LIST' }, 422, cors);
+
+  const action = String(payload.action || 'list');
+
+  if (action === 'list') {
+    const limit = Math.min(Math.max(Number(payload.limit) || 200, 1), 1000);
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+    /* `last_reminder` only exists on the reminder list. Asking for it on the newsletter would
+       be a 400 from PostgREST for a column that is not there. */
+    url.searchParams.set(
+      'select',
+      list === 'reminders'
+        ? 'id,created_at,name,email,locale,status,last_reminder'
+        : 'id,created_at,name,email,locale,status,source'
+    );
+    url.searchParams.set('order', 'created_at.desc');
+    url.searchParams.set('limit', String(limit));
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) return json({ ok: false, code: 'SUBS_READ_FAILED' }, 502, cors);
+    const rows = await response.json().catch(() => []);
+    return json({
+      ok: true,
+      list,
+      rows: (Array.isArray(rows) ? rows : []).map((row) => ({
+        id: row.id,
+        createdAt: row.created_at,
+        name: row.name || '',
+        email: row.email,
+        locale: row.locale,
+        status: row.status,
+        lastReminder: row.last_reminder || null,
+        source: row.source || null
+      }))
+    }, 200, cors);
+  }
+
+  const id = String(payload.id || '');
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ ok: false, code: 'SUBS_BAD_ID' }, 422, cors);
+
+  if (action === 'unsubscribe' || action === 'resubscribe') {
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ status: action === 'unsubscribe' ? 'unsubscribed' : 'active' })
+    });
+    if (!response.ok) return json({ ok: false, code: 'SUBS_WRITE_FAILED' }, 502, cors);
+    return json({ ok: true, id, status: action === 'unsubscribe' ? 'unsubscribed' : 'active' }, 200, cors);
+  }
+
+  if (action === 'delete') {
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' })
+    });
+    if (!response.ok) return json({ ok: false, code: 'SUBS_WRITE_FAILED' }, 502, cors);
+    return json({ ok: true, id, deleted: true }, 200, cors);
+  }
+
+  return json({ ok: false, code: 'SUBS_UNKNOWN_ACTION' }, 400, cors);
 }
 
 /* ============================================================================
@@ -3329,6 +3738,8 @@ export default {
       if (type === 'entry-lookup') return entryLookup(env, payload, cors);
       if (type === 'entry-code') return entryCode(env, payload, cors);
       if (type === 'entry-manage') return entryManage(env, payload, cors);
+      if (type === 'roster') return roster(env, payload, cors);
+      if (type === 'subscribers') return subscribers(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 

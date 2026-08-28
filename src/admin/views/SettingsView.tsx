@@ -479,13 +479,19 @@ export function SettingsView({
           {pl ? 'Gdzie co zmienić' : 'Dove si cambia cosa'}
         </h3>
         <dl className="mt-3 grid gap-2.5 text-[13px]">
+          {/* Two of these used to be wrong, which is worse than missing: somebody following
+              them would have gone looking in the right-sounding wrong place.
+                - "entry data → Table Editor" was true when nothing in the panel could read the
+                  entries. The list works now and has an edit dialog, so it says so.
+                - "reminders → Make scenario 2" describes a scenario that was deleted. The clock
+                  is a GitHub Action; Make only has the one scenario left. */}
           {[
             [pl ? 'Hasła i klucze' : 'Password e chiavi', 'Vercel → Settings → Environment Variables'],
-            [pl ? 'Dane zgłoszeń' : 'Dati delle iscrizioni', 'Supabase → Table Editor'],
+            [pl ? 'Dane zgłoszeń' : 'Dati delle iscrizioni', pl ? 'Panel → Zgłoszenia → ołówek' : 'Pannello → Iscrizioni → matita'],
             [pl ? 'Treść maili' : 'Testo delle e-mail', 'emails/copy.json'],
             [pl ? 'Treść formularzy PDF' : 'Testo dei moduli PDF', 'emails/pdf-copy.json'],
-            [pl ? 'Wysyłka maili' : 'Invio delle e-mail', 'Make → scenariusz 1'],
-            [pl ? 'Przypomnienia' : 'Promemoria', 'Make → scenariusz 2']
+            [pl ? 'Wysyłka maili' : 'Invio delle e-mail', pl ? 'Make → jeden scenariusz' : 'Make → un solo scenario'],
+            [pl ? 'Zegar przypomnień' : 'Orologio dei promemoria', '.github/workflows/reminders.yml']
           ].map(([label, where]) => (
             <div key={label} className="flex flex-wrap gap-x-2 border-b border-white/8 pb-2">
               <dt className="text-white/50">{label}</dt>

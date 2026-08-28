@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  // `Bell` is still here as the sidebar icon for the reminders tab. The bell in the header
+  // and its `BellRing` variant moved into NotificationBell together with the dropdown.
   Bell,
-  BellRing,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -24,7 +25,7 @@ import {
   type NavItemData
 } from '@/components/ui/dashboard-sidebar';
 import { dictionaries, type PanelLocale, type TranslateKey } from './i18n';
-import { fetchInbox, markInboxSeen, type Inbox } from './api';
+import { fetchInbox, type Inbox } from './api';
 import { useSession } from './useSession';
 import { Gate } from './Gate';
 import { Dashboard } from './views/Dashboard';
@@ -32,6 +33,7 @@ import { Registrations } from './views/Registrations';
 import { Chat } from './views/Chat';
 import { Wall } from './views/Wall';
 import { Subscribers } from './views/Subscribers';
+import { NotificationBell } from './views/NotificationBell';
 import { SettingsView } from './views/SettingsView';
 
 const LOCALE_KEY = 'carruleddhi.admin.locale';
@@ -286,43 +288,37 @@ export default function App() {
             <RefreshCw className="size-4" strokeWidth={1.5} />
           </button>
 
-          {/* The bell. Clicking it marks everything read and takes you to the summary,
-              because "what is new" and "I have seen it" are the same gesture. */}
-          <button
-            type="button"
-            onClick={() => {
-              setTab('dashboard');
-              if (total > 0) {
-                markInboxSeen(key)
-                  .then(refreshInbox)
-                  .catch(() => {});
-              }
-            }}
-            title={t('top.markSeen')}
-            className="relative grid size-9 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            {total > 0 ? (
-              <BellRing className="size-4 text-primary" strokeWidth={1.5} />
-            ) : (
-              <Bell className="size-4" strokeWidth={1.5} />
-            )}
-            {total > 0 ? (
-              <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-                {total > 99 ? '99+' : total}
-              </span>
-            ) : null}
-          </button>
+          {/* The bell, and what is behind it.
+              It used to mark everything read and open the dashboard — so "what is new" was
+              answered with six totals and no way to see what any of them referred to. Now it
+              opens a list of the things themselves and marking them read is a separate,
+              deliberate press. Two gestures, because they are two decisions: "show me" and
+              "I have dealt with it". */}
+          <NotificationBell
+            t={t}
+            locale={locale}
+            apiKey={key}
+            total={total}
+            onGo={setTab}
+            onSeen={refreshInbox}
+          />
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-7">
           {tab === 'dashboard' ? (
             <Dashboard t={t} locale={locale} inbox={inbox} onGo={setTab} apiKey={key} />
           ) : null}
-          {tab === 'registrations' ? <Registrations t={t} locale={locale} apiKey={key} /> : null}
+          {tab === 'registrations' ? (
+            <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} />
+          ) : null}
           {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
-          {tab === 'reminders' ? <Subscribers t={t} kind="reminders" /> : null}
-          {tab === 'newsletter' ? <Subscribers t={t} kind="newsletter" /> : null}
+          {tab === 'reminders' ? (
+            <Subscribers t={t} locale={locale} apiKey={key} kind="reminders" onChanged={refreshInbox} />
+          ) : null}
+          {tab === 'newsletter' ? (
+            <Subscribers t={t} locale={locale} apiKey={key} kind="newsletter" onChanged={refreshInbox} />
+          ) : null}
           {tab === 'settings' ? (
             <SettingsView
               t={t}
