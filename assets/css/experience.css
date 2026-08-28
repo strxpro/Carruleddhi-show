@@ -232,7 +232,8 @@
     visibility .24s;
 }
 
-.site-header.is-compact { width: min(292px, calc(100vw - 20px)); }
+/* 292 -> 372: chip z procentem zostaje teraz w pigulce i potrzebuje miejsca. */
+.site-header.is-compact { width: min(372px, calc(100vw - 20px)); }
 .site-header.is-compact .nav-shell {
   min-height: 62px;
   gap: 7px;
@@ -244,7 +245,34 @@
   min-width: 0;
   flex: 1;
 }
-.site-header.is-compact .nav-current,
+
+/* POSTEP ZOSTAJE WIDOCZNY ZAWSZE — takze w zwinietej pigulce i na telefonie.
+
+   Wczesniej chip znikal razem z jezykiem i "Ci saro", a komentarz w carnival.css
+   tlumaczyl to tak: przy rozwijaniu odslanial sie od zerowej szerokosci i kropka
+   pojawiala sie samotnie, zanim doszla etykieta.
+
+   To byl argument przeciwko ANIMOWANIU go, nie przeciwko pokazywaniu. Chip, ktory
+   nigdy sie nie zwija, nie ma czego odslaniac — problem znika razem ze zwijaniem.
+
+   W pigulce zostaje kropka i procent; nazwa sekcji sie chowa, bo to ona zajmuje
+   miejsce, a procent niesie te informacje, dla ktorej ten chip istnieje. */
+.site-header.is-compact .nav-current {
+  max-width: 92px;
+  min-width: 0;
+  overflow: hidden;
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  padding-inline: 0;
+}
+.site-header.is-compact .nav-current [data-current-section] {
+  display: none;
+}
+.site-header.is-compact .nav-current__progress {
+  font-size: 11px;
+  letter-spacing: .06em;
+}
 .site-header.is-compact .nav-attend,
 .site-header.is-compact .language-picker {
   overflow: hidden;
@@ -466,7 +494,10 @@ body.is-language-transitioning .nav-current__copy {
     font-size: 8px;
     letter-spacing: .13em;
   }
-  .site-header .nav-current { display: none; }
+  /* Byla tu regula display none. Postep na telefonie jest potrzebny bardziej niz na
+     pulpicie, bo strona ma 12 sekcji i bez niego nie wiadomo, ile jeszcze zostalo. */
+  .site-header .nav-current { max-width: 78px; }
+  .site-header .nav-current [data-current-section] { display: none; }
   .site-header .nav-actions { gap: 6px; }
 
   /* The flag never collapses on a phone.

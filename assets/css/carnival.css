@@ -537,12 +537,16 @@
     opacity: 1;
     transform: none;
   }
-  /* Stays collapsed on purpose — see the note above. */
+  /* Chip zostaje widoczny takze po rozwinieciu — od kiedy nie zwija sie do zera,
+     nie ma juz efektu "kropka bez etykiety", ktory kazal go tu chowac. Po
+     rozwinieciu jest miejsce, wiec wraca tez nazwa sekcji. */
   .site-header.is-compact:hover .nav-current,
   .site-header.is-compact:focus-within .nav-current {
-    max-width: 0;
-    overflow: hidden;
-    opacity: 0;
+    max-width: 200px;
+  }
+  .site-header.is-compact:hover .nav-current [data-current-section],
+  .site-header.is-compact:focus-within .nav-current [data-current-section] {
+    display: inline;
   }
   .site-header.is-compact:hover .menu-toggle,
   .site-header.is-compact:focus-within .menu-toggle {
