@@ -46,7 +46,8 @@ SQL Editor → New query → wklej całą treść pliku → **Run**. Po kolei:
 | `0010_upsert_email_keys.sql` | **obowiązkowa** — bez niej zapis na przypomnienia daje `502` / `42P10` |
 | `0011_race_numbers_reuse.sql` | numery startowe: najniższy wolny, zwalniany przy rezygnacji |
 | `0012_race_number_drop_default.sql` | **obowiązkowa** — bez niej `0011` nie robi nic, patrz niżej |
-| `0013_chat_message_source.sql` | skąd przyszła wiadomość na czacie: z okna czy z maila |
+| `0013_counts_newest_initials.sql` | rządek awatarów pokazuje najnowszych, nie pierwszych |
+| `0014_chat_message_source.sql` | skąd przyszła wiadomość na czacie: z okna czy z maila |
 
 Wszystkie można puszczać ponownie — są napisane tak, że drugie uruchomienie nic nie psuje
 (`if not exists`, `on conflict do nothing`, `create or replace`).

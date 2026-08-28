@@ -1,5 +1,5 @@
 /* ============================================================================
-   0013 — skąd przyszła wiadomość na czacie: z okna na stronie czy z e-maila.
+   0014 — skąd przyszła wiadomość na czacie: z okna na stronie czy z e-maila.
 
    PO CO
      Odpowiedź klienta na naszego maila ma trafiać do tego samego wątku, co rozmowa

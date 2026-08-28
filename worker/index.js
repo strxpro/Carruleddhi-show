@@ -343,7 +343,7 @@ async function chatMessages(env, threadId, since = '') {
        organizator wiedział, czy odpowiedź wpisana w oknie czatu w ogóle dojdzie do
        adresata — człowiek piszący z Gmaila okna czatu nie widzi.
 
-       `|| 'chat'` dla wierszy sprzed 0013, które tej kolumny jeszcze nie miały. */
+       `|| 'chat'` dla wierszy sprzed 0014, które tej kolumny jeszcze nie miały. */
     source: row.source || 'chat'
   }));
 }
