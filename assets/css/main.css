@@ -777,8 +777,39 @@ img, svg { display: block; max-width: 100%; }
 .modal__icon { display: grid; width: 65px; height: 65px; margin-bottom: 22px; place-items: center; border-radius: 22px; background: var(--yellow); font-size: 30px; transform: rotate(-6deg); }
 .modal h2 { margin: 0 45px 14px 0; font-family: var(--font-display); font-size: clamp(30px,5vw,54px); font-weight: 400; line-height: 1; }
 .modal__lead { color: var(--muted); line-height: 1.65; }
-.reminder-times { display: flex; flex-wrap: wrap; gap: 7px; margin: 24px 0; }
-.reminder-times span { padding: 8px 12px; border-radius: 999px; background: var(--blue-100); color: var(--blue-700); font-family: var(--font-meta); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+/* Three equal chips, not three chips of three different sizes.
+   ---------------------------------------------------------------------------
+   This was `display: flex; flex-wrap: wrap`, so each pill was as wide as its own words —
+   "7 days before", "1 day before", "3 hours before" are three different lengths — and when
+   they wrapped, the row broke two-and-one with a ragged right edge. They describe one set of
+   three choices, so they should look like one set of three.
+
+   A grid gives them equal width; the flex centring inside each one, plus the row taking the
+   height of the tallest, gives them equal height even when a translation wraps onto a second
+   line. Both are needed: without the inner centring a one-line pill in a two-line row has
+   its text stuck to the top. */
+.reminder-times {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 24px 0;
+}
+.reminder-times span {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--blue-100);
+  color: var(--blue-700);
+  font-family: var(--font-meta);
+  font-size: 13px;
+  letter-spacing: .06em;
+  line-height: 1.25;
+  text-align: center;
+  text-transform: uppercase;
+}
 .modal__success { display: none; text-align: center; }
 .modal__success.is-visible { display: block; }
 .modal__form.is-hidden { display: none; }

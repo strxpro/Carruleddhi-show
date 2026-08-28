@@ -1074,15 +1074,16 @@
         </div>
       </div>
 
-      <!-- The wall is public and moderated, so a question posted here waits for
-           approval before anyone reads it. Anyone who actually wants an answer
-           belongs in the contact section, one jump away. -->
-      <div class="container">
-        <p class="wall-ask">
-          <span data-i18n="wall.askLead">Hai una domanda per gli organizzatori? La bacheca non è il posto giusto: le scrivi in pubblico e passano dal controllo.</span>
-          <a class="btn btn--small" href="#contact"><span data-i18n="wall.askCta">Scrivici direttamente</span><span aria-hidden="true">↘</span></a>
-        </p>
-      </div>
+      <!-- The "ask us directly" block used to be here, after the list.
+           It was a coral button the width of the column sitting between the messages and
+           the "show more" button, so scrolling the wall ran into a call to action that has
+           nothing to do with reading messages — and on a phone it looked like the end of
+           the section, which is why the rest of the comments were reported as missing.
+
+           Nothing is lost: the section right below this one is the contact section, and the
+           footer and the menu both link to it. A signpost is not needed halfway down a list
+           when the destination is the next thing on the page. -->
+
 
       <!-- A native <dialog> rather than a div: showModal() gives the focus trap, the
            backdrop and Escape for free, and all three are easy to get wrong by hand. -->

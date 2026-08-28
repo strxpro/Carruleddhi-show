@@ -582,17 +582,14 @@
   .modal h2 { font-size: clamp(20px, 6.2vw, 26px); line-height: 1.08; }
   .modal__lead { font-size: 13.5px; line-height: 1.5; }
   .modal__close { top: 10px; right: 10px; }
-  /* Three time chips wrapped to two lines and left a ragged edge. */
-  .reminder-times {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
+  /* The grid and the centring are in main.css now; this only tightens the type so three
+     Polish or German phrases fit three across on a 360 px screen. */
+  .reminder-times { gap: 6px; }
   .reminder-times span {
+    min-height: 44px;
     padding: 7px 4px;
     font-size: 10.5px;
-    letter-spacing: .02em;
-    text-align: center;
+    letter-spacing: .01em;
   }
   .modal .form-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .modal .consent-box { padding: 12px 12px; }
@@ -1209,14 +1206,17 @@ html {
   margin: 0;
   padding: 0;
   list-style: none;
-  columns: 260px 3;
-  column-gap: 14px;
+  /* 210px, not 260px. Narrower notes mean more of them on screen at once, which is what the
+     wall is for — and at this width a 24" monitor gets four columns instead of three without
+     any of them becoming a newspaper column. */
+  columns: 210px 4;
+  column-gap: 12px;
 }
 
 .wall-list > .wall-note {
   /* A note split across a column break would be unreadable. */
   break-inside: avoid;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 @media (max-width: 700px) {
@@ -1226,15 +1226,18 @@ html {
 
 /* Each note is a scrap of paper pinned to a board, tilted by a per-item variable
    set in JS so no two sit at the same angle. */
+/* Smaller and lighter than it was: 12px of padding instead of 16, a 1.5px rule instead of
+   2, and a softer drop. The colour is still what carries each note — the heavy black outline
+   plus a hard offset shadow on every card made a wall of ten look like a filing cabinet. */
 .wall-note {
   position: relative;
   display: grid;
-  padding: 16px 16px 12px;
-  gap: 10px;
-  border: 2px solid var(--navy-950);
-  border-radius: 16px;
+  padding: 12px 13px 10px;
+  gap: 8px;
+  border: 1.5px solid rgb(7 26 61 / 0.75);
+  border-radius: 14px;
   background: var(--white);
-  box-shadow: 4px 5px 0 rgba(7, 26, 61, .16);
+  box-shadow: 3px 3px 0 rgb(7 26 61 / 0.1);
   transform: rotate(var(--tilt, 0deg));
   transition: transform .28s var(--ease-snap), box-shadow .28s ease;
 }
@@ -1268,23 +1271,65 @@ html {
 .wall-note { margin-top: 8px; }
 .wall-note__text {
   margin: 0;
-  font-size: 14.5px;
-  line-height: 1.5;
+  font-size: 13.5px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
+
+/* One row: avatar, then name over place, then the time hard right.
+   It was a flex row of loose items aligned on their baselines, so a note with a place had its
+   name, town and timestamp on one line and a note without one did not — three items of
+   different lengths wrapping differently in every card. A fixed grid makes every note's
+   footer the same shape whether or not the optional parts are there. */
 .wall-note__meta {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
   color: var(--muted);
   font-family: var(--font-meta);
-  font-size: 11px;
-  letter-spacing: .06em;
+  font-size: 10.5px;
+  letter-spacing: .05em;
   text-transform: uppercase;
 }
-.wall-note__meta strong { color: var(--navy-950); font-weight: 800; }
-.wall-note__meta time { margin-left: auto; }
+.wall-note__who { display: grid; min-width: 0; }
+.wall-note__who strong {
+  overflow: hidden;
+  color: var(--navy-950);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wall-note__who span {
+  overflow: hidden;
+  font-size: 9.5px;
+  opacity: .85;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wall-note__meta time { white-space: nowrap; }
+
+/* Initials in a coloured disc. The tone is set in JS from a hash of the name, so it is the
+   same colour for the same person every repaint — Math.random() here would mean somebody
+   changed colour while being read, because this list repaints on sort and on "load more". */
+.wall-note__avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border: 1.5px solid rgb(7 26 61 / 0.8);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.wall-note__avatar[data-tone='0'] { background: var(--yellow); color: var(--navy-950); }
+.wall-note__avatar[data-tone='1'] { background: var(--coral); color: var(--white); }
+.wall-note__avatar[data-tone='2'] { background: var(--blue-600); color: var(--white); }
+.wall-note__avatar[data-tone='3'] { background: #2fbf71; color: var(--navy-950); }
+.wall-note__avatar[data-tone='4'] { background: var(--orange); color: var(--white); }
+.wall-note__avatar[data-tone='5'] { background: var(--navy-900); color: var(--yellow); }
 
 /* A card, not a stray sentence. Empty and error are the states a visitor is most
    likely to meet before the event, so they get a shape of their own instead of one
@@ -1450,11 +1495,41 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
    the top right, which is exactly where the header's menu button sits. */
 .modal { padding-top: calc(18px + 76px + 12px); }
 @media (max-width: 760px) {
-  .modal { padding-top: calc(10px + 66px + 10px); }
+  /* 66px was the header's old minimum height; the bar is 82px tall now that the flag stays in
+     it, and the reserve was 6px short — measured, the dialog's top edge sat above the header's
+     bottom edge. The header is only dimmed rather than hidden, so that overlap is visible. */
+  .modal { padding-top: calc(10px + 82px + 12px); }
 }
-/* The dialog is above everything, so the header must not compete with it. */
-body.is-modal-open .site-header { opacity: 0; pointer-events: none; }
+/* The header stays on screen while a dialog is open.
+   ---------------------------------------------------------------------------
+   It used to be faded to `opacity: 0`. The reason was real — the dialog's close button is in
+   its top right, which is where the header's menu button sits — but the fix was aimed at the
+   wrong thing: `.modal` already reserves the header's height as top padding, so the two are
+   not in the same place to begin with. Hiding it meant opening a dialog made the page look
+   like it had lost its navigation.
+
+   It is made non-interactive instead. The dialog traps focus and the backdrop swallows
+   clicks, so the header must not be reachable while one is open; it just does not have to be
+   invisible to achieve that. Slightly dimmed so it reads as "not now" rather than "broken". */
+body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 .site-header { transition: opacity .2s ease, width .42s var(--ease-out), transform .4s var(--ease-out); }
+
+/* ============================================================
+   25b. The dialog opens at its final size.
+   ============================================================
+   `modal-in` animates `scale(.94)` up to 1. On a desktop card that is a subtle pop. On a
+   phone the dialog is the full width of the screen, so starting it at 94% means it appears
+   noticeably narrower than the screen and then grows into it — which is exactly the "the box
+   is a different size and then adjusts to the phone" report. It is not a reflow, and no
+   amount of sizing work would have fixed it, because the size it settles at was right all
+   along.
+
+   The entrance keeps its movement and loses its scale: it slides up and fades in, at the
+   width it is going to stay. */
+@media (max-width: 760px) {
+  .modal__dialog { animation-name: modal-in-sheet; }
+}
+@keyframes modal-in-sheet { from { opacity: 0; transform: translateY(28px); } }
 
 /* ============================================================
    26. Prize deck on a phone: smaller, and it moves with the finger.
@@ -1516,7 +1591,16 @@ body.is-modal-open .site-header { opacity: 0; pointer-events: none; }
   #signup .step-list::before { top: 15px; }
   #signup .step-indicator__copy strong { font-size: 9.5px; }
 
-  #signup .form-main { padding: 16px 14px 18px; }
+  /* Top padding kept clear of the progress dot.
+     ---------------------------------------------------------------------------
+     This was 16px all round. The progress bar sits at `top: 12px` and its runner is a 24px
+     circle centred on it, so the dot occupies roughly 0 to 24px from the top of the panel —
+     and the heading started at 16px, straight through it. On the narrowest screens the dot
+     landed on the first word of "Najpierw się poznajmy".
+
+     32px is the dot's own bottom edge plus a little air. Only the top changes; the sides and
+     the bottom are as tight as they were. */
+  #signup .form-main { padding: 32px 14px 18px; }
   #signup .form-step h3 { margin-bottom: 6px; font-size: clamp(19px, 5.6vw, 24px); }
   #signup .form-step__intro { margin-bottom: 14px; font-size: 12.5px; line-height: 1.45; }
 

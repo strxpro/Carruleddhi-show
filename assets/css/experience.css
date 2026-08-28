@@ -468,6 +468,28 @@ body.is-language-transitioning .nav-current__copy {
   }
   .site-header .nav-current { display: none; }
   .site-header .nav-actions { gap: 6px; }
+
+  /* The flag never collapses on a phone.
+     ---------------------------------------------------------------------------
+     `is-compact` hides the language picker along with the section label and the "I'll be
+     there" button, so after scrolling 120 px the header was a logo and a hamburger — and
+     changing language meant opening the menu to find the flag. On a site whose visitors
+     arrive in six languages that is the one control that has to stay reachable.
+
+     The compact bar is widened to fit it (see the `is-compact` width further down this
+     block). The button and the label still collapse: the button's job is done from the
+     section it belongs to, and the label only reports. */
+  .site-header.is-compact .language-picker {
+    overflow: visible;
+    max-width: 80px;
+    min-width: auto;
+    padding-inline: 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+  }
+  .site-header.is-compact .nav-actions { gap: 6px; }
   .language-picker__trigger { width: 68px; min-width: 68px; height: 50px; gap: 5px; padding-inline: 8px; }
   .language-picker__flag { font-size: 19px; }
   .language-picker__trigger svg { width: 8px; }
@@ -479,7 +501,10 @@ body.is-language-transitioning .nav-current__copy {
     border-radius: 50%;
   }
   .menu-toggle__label { display: none; }
-  .site-header.is-compact { width: min(254px, calc(100vw - 20px)); }
+  /* 254px was the width of a logo and a round menu button. The flag stays visible now, so
+     the pill has to be wide enough to hold it — 322px on a 360px screen still reads as a
+     pill rather than a full-width bar, which is the whole point of the compact state. */
+  .site-header.is-compact { width: min(322px, calc(100vw - 20px)); }
   .site-header.is-compact .nav-shell { min-height: 60px; padding: 5px 6px 5px 15px; }
   .site-header.is-menu-open { width: calc(100vw - 20px); }
   .site-header.is-menu-open .nav-shell { border-radius: 25px 25px 14px 14px; }

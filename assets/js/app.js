@@ -935,10 +935,28 @@ import { flagSvg } from './flags.js';
       ticking = false;
     }
 
+    /* Once per frame, with a timer for the frames that do not come.
+       ---------------------------------------------------------------------------
+       Same shape as the route zoom and the panel measurement, and here for the same reason:
+       `ticking` stays raised if the callback is starved, and then every later scroll is
+       discarded. This handler carries the reading progress bar, the compact header, the
+       active menu item and the card stack, so a starved frame does not just drop an
+       animation — it leaves the header expanded over the page and the wrong section
+       highlighted, and it stays that way because the flag is never lowered.
+
+       Measured in headless Chrome, where frames are starved hardest: the header never
+       compacted at all. A phone with a busy main thread on first load is the same situation,
+       less severely. */
+    let tickFallback = 0;
+    const runScroll = () => {
+      window.clearTimeout(tickFallback);
+      updateScroll();
+    };
     window.addEventListener('scroll', () => {
       if (ticking) return;
       ticking = true;
-      requestAnimationFrame(updateScroll);
+      requestAnimationFrame(runScroll);
+      tickFallback = window.setTimeout(runScroll, 100);
     }, { passive: true });
 
     menuToggle?.addEventListener('click', () => setMenu(!menu.classList.contains('is-open')));
@@ -2014,23 +2032,66 @@ import { flagSvg } from './flags.js';
 
         const meta = document.createElement('div');
         meta.className = 'wall-note__meta';
-        const who = document.createElement('strong');
-        who.textContent = comment.name;
-        meta.appendChild(who);
+
+        /* An avatar for everybody, generated rather than uploaded.
+           ---------------------------------------------------------------------------
+           Initials in a coloured disc, and the colour comes from the name — not from
+           Math.random(). Random would mean the same person is a different colour on every
+           repaint, and this list repaints on sort, on "load more" and on a language change,
+           so somebody would visibly change identity while being read.
+
+           A tiny hash over the characters gives one of six palette slots: stable for a given
+           name, spread evenly enough across different ones. Nothing is stored and nothing is
+           requested over the network — no service, no tracking pixel, no image to wait for. */
+        const avatar = document.createElement('span');
+        avatar.className = 'wall-note__avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        const initials = String(comment.name || '?')
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((part) => part[0] || '')
+          .join('')
+          .toUpperCase() || '?';
+        avatar.textContent = initials;
+        /* FNV-1a, not `(h * 31 + c) % 997`.
+           The multiply-and-take-a-prime version spread badly here: 997 mod 6 is 1, so the
+           final `% 6` inherited that bias and six different names came out in two colours.
+           Measured on the demo set — two tones out of six. FNV mixes every bit of the input
+           into the accumulator, so the low bits are usable on their own. */
+        let hash = 2166136261;
+        for (const char of String(comment.name || '')) {
+          hash ^= char.codePointAt(0);
+          hash = Math.imul(hash, 16777619);
+        }
+        avatar.dataset.tone = String(Math.abs(hash) % 6);
+        meta.appendChild(avatar);
+
+        const who = document.createElement('div');
+        who.className = 'wall-note__who';
+        const name = document.createElement('strong');
+        name.textContent = comment.name;
+        who.appendChild(name);
         if (comment.place) {
           const where = document.createElement('span');
           where.textContent = comment.place;
-          meta.appendChild(where);
+          who.appendChild(where);
         }
+        meta.appendChild(who);
+
         const when = document.createElement('time');
         when.dateTime = comment.createdAt;
         when.textContent = relative(comment.createdAt);
         meta.appendChild(when);
 
-        const translate = attachTranslate(item, comment, body);
-        if (translate) meta.appendChild(translate);
-
         item.appendChild(meta);
+
+        /* The translate link goes after the footer, not inside it.
+           The footer is a fixed three-column grid now — avatar, name, time — so a fourth
+           child would either land in an implicit column and squash the name, or wrap the row
+           onto two lines in exactly the notes that have a translation available. */
+        const translate = attachTranslate(item, comment, body);
+        if (translate) item.appendChild(translate);
         list.appendChild(item);
       }
       const total = list.children.length;
