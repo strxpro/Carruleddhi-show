@@ -129,26 +129,57 @@ html.is-demo .wall-note { position: relative; }
    behind a button now and unfolds underneath it.
    ========================================================================== */
 .wall-open {
-  display: inline-flex;
+  /* `flex` plus `width: fit-content` plus auto side margins, not `inline-flex`.
+     An inline-flex box cannot be centred by margins — it sits wherever the text flow puts
+     it, which was hard against the left edge of the column while the panel it opens spans
+     the full width. That read as a tab stuck to one corner rather than a lid on a box. */
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 10px;
-  margin: clamp(18px, 3svh, 30px) 0 0;
+  margin: clamp(18px, 3svh, 30px) auto 0;
   padding: 13px 20px;
   border: 2px solid #ffc928;
   border-radius: 999px;
   background: transparent;
-  color: #fff;
+  /* Navy, not white.
+     ---------------------------------------------------------------------------
+     This was `#fff` and the button rendered as an empty yellow outline: the wall
+     section's background is the cream page colour, so the label was white text on
+     cream. It only became readable after the click, because `.is-open` sets a navy
+     colour — which is why the fault looked like "the label appears when I open it"
+     rather than "the label is the wrong colour".
+
+     Taken from the same token the section's own copy uses, so it cannot drift away
+     from the background it has to sit on. */
+  color: var(--navy-900, #071a3d);
   font: inherit;
   font-size: 13.5px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.25s, color 0.25s, border-radius 0.25s;
+  transition:
+    background 0.25s,
+    color 0.25s,
+    border-radius 0.25s,
+    box-shadow 0.18s,
+    transform 0.11s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-.wall-open:hover { background: #ffc928; color: #071a3d; }
-.wall-open:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+/* Filled on hover, and the label keeps its navy — the fill is the yellow it was
+   already outlined in, so only the background changes. */
+.wall-open:hover { background: #ffc928; }
+
+/* Pressed, not lifted. Hover used to raise buttons on this page; a raised button
+   under the cursor pushes the card below it and the layout twitches. The satisfying
+   part belongs to the click. */
+.wall-open:active { transform: translateY(2px) scale(0.985); }
+
+/* Navy ring, for the same reason the label is navy: a white outline on the cream section
+   background is an outline nobody can see, and this one is the only thing telling a
+   keyboard user where they are. */
+.wall-open:focus-visible { outline: 3px solid var(--navy-900, #071a3d); outline-offset: 3px; }
 
 .wall-open__icon { font-size: 15px; }
 
@@ -162,9 +193,12 @@ html.is-demo .wall-note { position: relative; }
 .wall-open.is-open {
   background: #ffc928;
   color: #071a3d;
-  /* Square at the bottom while the panel below it is open, so the two read as one object
-     rather than a pill floating above a box. */
-  border-radius: 22px 22px 6px 6px;
+  /* Stays a pill.
+     The squared-off bottom corners were there to make the button and the panel below read
+     as one object. That worked while the button was hard left, directly above the panel's
+     left edge. Now that it is centred it is not touching the panel at either corner, so
+     squaring them off left two flat edges pointing at nothing. */
+  border-radius: 999px;
 }
 
 .wall-open.is-open .wall-open__chevron { transform: rotate(180deg); }
@@ -187,11 +221,14 @@ html.is-demo .wall-note { position: relative; }
 .wall-fold__inner {
   /* All the padding lives here so the outer box can close to exactly zero without leaving a
      sliver of border or background behind. */
-  margin-top: -2px;
-  padding: 22px 20px 6px;
+  margin-top: 14px;
+  padding: 22px 20px 10px;
+  /* A closed box on all four sides. The top border used to be transparent and the top-left
+     corner square, so the panel appeared to hang from the button sitting on its left corner.
+     With the button centred there is nothing above either corner to hang from, and an
+     invisible top edge just looked like a rendering fault. */
   border: 2px solid rgb(255 201 40 / 0.45);
-  border-top-color: transparent;
-  border-radius: 0 18px 18px 18px;
+  border-radius: 18px;
   background: rgb(255 255 255 / 0.04);
 }
 

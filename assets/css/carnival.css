@@ -448,8 +448,17 @@
   box-shadow: 0 5px 0 #5f0f1d, 0 12px 26px rgba(0, 0, 0, .34), inset 0 5px 14px rgba(0, 0, 0, .35);
 }
 .attendance__press.is-done:active { transform: translateY(16px) scale(.98); }
+/* The tick is gone.
+   ---------------------------------------------------------------------------
+   There was a green '✓' pinned to the top-right corner of the button. Two things already
+   say the press landed: the button is sunk into its own shadow and the label changed to
+   "JESTEŚ Z NAMI!". A third marker floating in a corner of a round button read as a badge
+   stuck on rather than as part of it, and it was the one asked to go.
+
+   Kept as a rule rather than deleted so the intent survives: the state is carried by the
+   button's shape and its words, not by an icon. */
 .attendance__press.is-done::after {
-  content: '✓';
+  content: none;
   position: absolute;
   top: 8px;
   right: 12px;
@@ -698,6 +707,11 @@
   pointer-events: none;
   transform: translate(-50%, -50%) translateX(125%) rotate(16deg);
 }
+/* Set for one frame while a thrown card is put back at the rear of the deck.
+   Without it the card animates all the way from off screen into the stack, crossing the
+   next card as it comes forward — two cards moving opposite ways through each other, which
+   is what the juddering actually was. The trip back is bookkeeping; nobody should see it. */
+.prize-card.is-resetting { transition: none; }
 .prize-card:active { cursor: grabbing; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1695,24 +1709,47 @@ body.is-modal-open .site-header { opacity: 0; pointer-events: none; }
   position: absolute;
   inset: -30%;
   pointer-events: none;
-  opacity: .42;
-  filter: blur(18px) saturate(1.15);
+  opacity: .38;
+  /* Blur raised from 18px. The wedges below now fade at their own edges as well, and the
+     two together are what turns "four spinning shapes" into light. Still one filtered
+     surface, not four: the cost is the same as before. */
+  filter: blur(30px) saturate(1.2);
 }
 .preloader__confetti i {
   position: absolute;
   inset: 0;
-  border-radius: 44%;
+  /* A circle, not 44%. At 44% the shape is a rounded square, and a rounded square with a
+     hard-edged gradient inside it turning slowly is exactly the "angular" that came back:
+     you could see the corners pass. */
+  border-radius: 50%;
+  /* Every colour stop now has a gradual run in and out.
+     ---------------------------------------------------------------------------
+     Before, each band went `transparent 22%, yellow 22%` — a step, so the wedge had a
+     visible straight edge sweeping round like a clock hand. A blur softens an edge; it
+     does not remove one that is 8% of a circle wide and fully opaque.
+
+     Same four colours, same rhythm, but each fades up over 6% and down over 6%. There is
+     no hard boundary left anywhere in the gradient, so there is no edge for the eye to
+     lock onto and follow. */
   background: conic-gradient(
     from calc(var(--i) * 90deg),
-    transparent 0 22%,
-    var(--yellow) 22% 30%,
-    transparent 30% 52%,
-    var(--coral) 52% 60%,
-    transparent 60% 78%,
-    var(--blue-500) 78% 86%,
-    transparent 86% 100%
+    transparent 0 16%,
+    rgb(255 218 61 / .55) 25%,
+    var(--yellow) 31%,
+    rgb(255 218 61 / .5) 37%,
+    transparent 46%,
+    rgb(246 73 79 / .5) 55%,
+    var(--coral) 61%,
+    rgb(246 73 79 / .45) 67%,
+    transparent 74%,
+    rgb(37 118 224 / .5) 82%,
+    var(--blue-500) 88%,
+    rgb(37 118 224 / .45) 93%,
+    transparent 100%
   );
-  animation: preloader-spin calc(9s + var(--i) * 2.5s) linear infinite;
+  /* Slower, and no two at the same speed. 9s read as "spinning"; at 16s the bands drift,
+     which is what light does. */
+  animation: preloader-spin calc(16s + var(--i) * 4s) linear infinite;
   animation-direction: var(--dir, normal);
 }
 .preloader__confetti i:nth-child(even) { --dir: reverse; }

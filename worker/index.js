@@ -36,6 +36,8 @@ const ALLOWED_TYPES = new Set([
   // Live chat. `chat` is the visitor side (open a thread, send, poll);
   // `chat-admin` is the organiser side and needs the passphrase.
   'chat', 'chat-admin',
+  /* Odpowiedz klienta na maila, wciagnieta przez scenariusz IMAP w Make. Za passphrase. */
+  'chat-inbound',
   // Unread counts for the bell in the admin panel. Passphrase too.
   'inbox',
 
@@ -56,7 +58,7 @@ const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
   'unsub-start', 'unsub-confirm',
-  'chat', 'chat-admin', 'inbox'
+  'chat', 'chat-admin', 'chat-inbound', 'inbox'
 ]);
 
 /**
@@ -89,7 +91,7 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * admin.html as well before using this on a public hostname.
  */
 const PROTECTED_TYPES = new Set([
-  'roster', 'wall-admin', 'chat-admin', 'inbox', 'settings-admin', 'reminders-due', 'purge'
+  'roster', 'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge'
 ]);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
@@ -123,6 +125,12 @@ const FIELD_WHITELIST = {
   chat: ['action', 'token', 'message', 'name', 'email', 'since'],
   // Organiser side. Same passphrase as the roster.
   'chat-admin': ['action', 'threadId', 'message', 'mode', 'limit'],
+  /* Odpowiedź na maila, podana przez scenariusz IMAP w Make. `messageId` to Message-Id
+     listu i jedyny powód, dla którego ten sam mail pobrany dwa razy nie staje się dwiema
+     wypowiedziami w wątku. `subject` nie jest tu przepuszczany celowo: temat odpowiedzi
+     to prawie zawsze „Re: " plus nasz własny temat, więc w rozmowie nie niesie niczego,
+     a niósłby numer startowy w każdej linijce. */
+  'chat-inbound': ['from', 'name', 'text', 'messageId', 'locale'],
   inbox: ['action'],
   // A public read takes no input at all, which is the shortest possible answer to
   // "what can a visitor ask this endpoint to do".
@@ -318,7 +326,7 @@ async function chatThread(env, request, payload, create = false) {
 
 async function chatMessages(env, threadId, since = '') {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_messages`);
-  url.searchParams.set('select', 'id,created_at,author,body');
+  url.searchParams.set('select', 'id,created_at,author,body,source');
   url.searchParams.set('thread_id', `eq.${threadId}`);
   url.searchParams.set('order', 'created_at.asc');
   url.searchParams.set('limit', String(CHAT_MAX_MESSAGES));
@@ -330,7 +338,13 @@ async function chatMessages(env, threadId, since = '') {
     id: row.id,
     at: row.created_at,
     author: row.author,
-    body: row.body
+    body: row.body,
+    /* Kanał, którym ta wypowiedź przyszła. Panel rysuje z tego etykietę „z e-maila", żeby
+       organizator wiedział, czy odpowiedź wpisana w oknie czatu w ogóle dojdzie do
+       adresata — człowiek piszący z Gmaila okna czatu nie widzi.
+
+       `|| 'chat'` dla wierszy sprzed 0013, które tej kolumny jeszcze nie miały. */
+    source: row.source || 'chat'
   }));
 }
 
@@ -510,7 +524,7 @@ function whatsappTargets(env) {
  *   to, że organizatorowi nie doszedł WhatsApp, jest problemem organizatora, nie
  *   powodem, żeby pokazać gościowi błąd.
  */
-async function alertOrganisers(env, thread, body, handedOver) {
+async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) {
   /* Wyciszenie dotyczy TYLKO wątków już prowadzonych przez człowieka.
 
      Przekazanie rozmowy dzwoni zawsze, i to nie jest wyjątek dla wygody — bez tego
@@ -527,9 +541,11 @@ async function alertOrganisers(env, thread, body, handedOver) {
 
   const who = thread.display_name || thread.email || 'gość';
   const excerpt = body.length > 300 ? `${body.slice(0, 300)}…` : body;
-  const lead = handedOver
-    ? 'AI nie znało odpowiedzi i oddało rozmowę.'
-    : 'Nowa wiadomość w rozmowie prowadzonej przez człowieka.';
+  const lead = viaEmail
+    ? 'Klient odpisał na e-maila — wiadomość jest w wątku na czacie.'
+    : handedOver
+      ? 'AI nie znało odpowiedzi i oddało rozmowę.'
+      : 'Nowa wiadomość w rozmowie prowadzonej przez człowieka.';
 
   const whatsapp = [
     '💬 *CARRULEDDHI — CZAT*',
@@ -564,14 +580,168 @@ async function alertOrganisers(env, thread, body, handedOver) {
     '</td></tr></table></body></html>'
   ].filter(Boolean).join('');
 
-  tasks.push(sendThroughOutbox(env, {
-    to: 'info@carruleddhishow.com',
-    subject: `Czat: ${who} czeka na odpowiedź`,
-    html
-  }));
+  /* Wiadomość, która przyszła z maila, NIE dostaje powiadomienia mailem.
+
+     To nie jest oszczędzanie na wiadomościach, tylko jedyne miejsce, w którym da się
+     przeciąć pętlę. Scenariusz IMAP patrzy na skrzynkę info@carruleddhishow.com, a
+     powiadomienia z czatu idą na ten sam adres. Zawiadomienie mailem o mailu wyglądałoby
+     tak: list wpada do INBOX-a, IMAP go zabiera, worker robi z niego wiadomość na czacie,
+     czat wysyła powiadomienie na info@, IMAP zabiera je z powrotem — i tak do wyczerpania
+     limitu operacji albo cierpliwości dostawcy poczty.
+
+     Filtr po nadawcy w scenariuszu też jest (patrz niżej, chatInbound), ale filtr można
+     wyklikać inaczej przy następnej edycji. To tutaj jest warunek, który przeżyje.
+
+     Nic się przez to nie gubi: mail, o którym mowa, leży już w tej samej skrzynce, na
+     którą przyszłoby powiadomienie. WhatsApp idzie normalnie i to on jest tu sygnałem. */
+  if (!viaEmail) {
+    tasks.push(sendThroughOutbox(env, {
+      to: 'info@carruleddhishow.com',
+      subject: `Czat: ${who} czeka na odpowiedź`,
+      html
+    }));
+  }
 
   // allSettled, nie all: jeden padnięty kanał nie może zabrać pozostałych.
   try { await Promise.allSettled(tasks); } catch (_) { /* sygnał, nie transakcja */ }
+}
+
+/**
+ * Obcina cytat z odpowiedzi na maila.
+ *
+ * Klient pisze trzy zdania, a jego program pocztowy dokleja pod spodem całą naszą
+ * wiadomość razem ze stopką i numerem startowym. Bez obcięcia w wątku na czacie stoi
+ * ściana tekstu, w której trzeba szukać tych trzech zdań — a body i tak jest ucinane do
+ * 2000 znaków, więc przy dłuższej korespondencji ucięłoby się dokładnie to, co człowiek
+ * napisał, zostawiając cytat.
+ *
+ * Wzorce są celowo pospolite i celowo niekompletne. To heurystyka, nie parser MIME:
+ * najgorsze, co może zrobić nietrafiony wzorzec, to zostawić trochę cytatu, a najgorsze,
+ * co może zrobić zbyt chciwy, to zjeść wypowiedź. Dlatego ucinamy tylko na markerach,
+ * które stoją na początku linii, i tylko wtedy, gdy coś przed nimi zostaje.
+ */
+function stripQuotedReply(text) {
+  /* Klasy znaków zamiast liter z ogonkami — `napisa[łl]`, a nie `napisał`.
+
+     Nie z lenistwa: ten sam Gmail podaje raz „napisał(a)", a raz „napisal(a)", zależnie
+     od kodowania, przez które list przeszedł po drodze. Wersja przywiązana do diakrytyku
+     przepuszczała cały cytat i wyszło to dopiero na teście — na oko wyrażenie wyglądało
+     dobrze, bo po polsku było napisane poprawnie.
+
+     Zakres rozciągnięty do 120 znaków, bo między datą a „napisał" siedzi nazwa nadawcy
+     razem z adresem w nawiasach ostrych, a na to 80 nie starcza. */
+  const markers = [
+    /^>.*/m,                                    // klasyczny cytat
+    /^-{2,}\s*Original Message\s*-{2,}/im,
+    /^_{10,}/m,                                 // Outlook
+    /^On .{10,120} wrote:/im,
+    /^Il giorno .{10,120} ha scritto:/im,       // it
+    /^Dnia .{10,120} napisa[łl]\(a\):/im,       // pl
+    /^W dniu .{10,120} napisa[łl]/im,
+    /^Am .{10,120} schrieb/im,                  // de
+    /^Le .{10,120} a [ée]crit/im,               // fr
+    /^El .{10,120} escribi[óo]/im,              // es
+    /^Od:\s|^From:\s|^Da:\s|^Von:\s/m
+  ];
+  let cut = text.length;
+  for (const marker of markers) {
+    const hit = text.match(marker);
+    if (hit && hit.index > 0 && hit.index < cut) cut = hit.index;
+  }
+  const kept = text.slice(0, cut).trim();
+  // Jeśli obcięcie zostawiło pustkę, wolimy nadmiar niż nic.
+  return kept.length >= 2 ? kept : text.trim();
+}
+
+/**
+ * Odpowiedź klienta na maila, wciągnięta przez scenariusz IMAP w Make.
+ *
+ * Ląduje w tym samym wątku, co rozmowa w oknie czatu, bo dla organizatora to jest jedna
+ * rozmowa z jednym człowiekiem. Wątek szukany po adresie nadawcy; jeśli nie ma żadnego,
+ * powstaje nowy z tokenem, którego żadna przeglądarka nie zna — bo po stronie e-maila
+ * nie ma przeglądarki, a kolumna jest NOT NULL UNIQUE.
+ *
+ * TRYB OD RAZU 'human'
+ *   Do maila nie odpisuje bot. Ktoś nam napisał wiadomość, którą sam zaadresował, i
+ *   automatyczna odpowiedź na nią jest gorsza od milczenia. Wątek idzie prosto do
+ *   człowieka i zapala się na dzwonku.
+ *
+ * ZA PASSPHRASE
+ *   To jest w PROTECTED_TYPES. Bez tego dowolny człowiek z internetu wstawiałby sobie
+ *   wiadomości do cudzych wątków, podając czyjkolwiek adres w polu `from`.
+ */
+async function chatInbound(env, payload, cors) {
+  const from = String(payload.from || '').trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(from)) return json({ ok: false, code: 'INBOUND_BAD_SENDER' }, 422, cors);
+
+  /* Pierwsza z dwóch zapór na pętlę — druga jest w alertOrganisers().
+     Nasza własna skrzynka nie może być nadawcą wiadomości na czacie: to albo powiadomienie
+     wracające do siebie, albo kopia Bcc zgłoszenia, albo autoresponder. */
+  if (from.endsWith('@carruleddhishow.com')) {
+    return json({ ok: true, skipped: 'own-address' }, 200, cors);
+  }
+  /* Odbicia i autorespondery. Adres z `mailer-daemon` albo `noreply` nie jest człowiekiem
+     czekającym na odpowiedź, a wątek czatu jest miejscem dla ludzi. */
+  if (/^(mailer-daemon|postmaster|no-?reply|bounce)/.test(from)) {
+    return json({ ok: true, skipped: 'automated' }, 200, cors);
+  }
+
+  const raw = String(payload.text || '').trim();
+  if (!raw) return json({ ok: false, code: 'INBOUND_EMPTY' }, 422, cors);
+  // 2000 to limit z checka na chat_messages.body — ucinamy tu, żeby baza nie odrzuciła.
+  const body = stripQuotedReply(raw).slice(0, 2000);
+
+  const messageId = trimmed(payload.messageId) || null;
+
+  // Najświeższy wątek tego adresu. Starsze zostają, gdzie były — historia się nie scala.
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_threads`);
+  url.searchParams.set('select', 'id,mode,locale,display_name,email,unread_for_admin');
+  url.searchParams.set('email', `eq.${from}`);
+  url.searchParams.set('order', 'last_message_at.desc');
+  url.searchParams.set('limit', '1');
+  const found = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!found.ok) return json({ ok: false, code: 'CHAT_READ_FAILED' }, 502, cors);
+
+  let thread = (await found.json())[0];
+  if (!thread) {
+    const made = await insertRow(env, 'chat_threads', {
+      /* Token syntetyczny i celowo nie do odgadnięcia. Nie służy do niczego poza
+         spełnieniem NOT NULL UNIQUE — z maila nikt nie wraca do okna czatu tym tokenem,
+         bo go nie zna. Prefiks „mail_" mówi w bazie, skąd wątek się wziął. */
+      visitor_token: `mail_${crypto.randomUUID().replace(/-/g, '')}`,
+      locale: localeOf(payload.locale),
+      display_name: trimmed(payload.name) || null,
+      email: from,
+      mode: 'human'
+    }, 'id,mode,locale,display_name,email,unread_for_admin');
+    if (!made.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+    thread = made.row;
+  } else if (thread.mode !== 'human') {
+    await setThreadMode(env, thread.id, 'human');
+  }
+
+  const stored = await insertRow(env, 'chat_messages', {
+    thread_id: thread.id,
+    author: 'visitor',
+    source: 'email',
+    email_message_id: messageId,
+    body
+  });
+
+  if (!stored.ok) {
+    /* Naruszony unikalny indeks na email_message_id, czyli ten sam list drugi raz — Make
+       pobrał go ponownie po zerwanym połączeniu. Dla Make'a to ma być sukces: 502
+       kazałoby mu próbować dalej i zapełnić kolejkę powtórką, której i tak nie wstawi.
+
+       insertRow() rozpoznaje to po 23505 w treści odpowiedzi, nie po samym kodzie HTTP —
+       PostgREST odpowiada na naruszenie unikalności 409, ale 409 potrafi znaczyć też co
+       innego, a 23505 znaczy dokładnie „to już jest". */
+    if (stored.duplicate) return json({ ok: true, duplicate: true }, 200, cors);
+    return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+  }
+
+  await alertOrganisers(env, thread, body, false, true);
+  return json({ ok: true, threadId: thread.id }, 200, cors);
 }
 
 /** Visitor side: open, send, poll. */
@@ -2493,7 +2663,7 @@ async function wallPost(env, request, payload, cors) {
 }
 
 /**
- * Two totals and up to five sets of initials, in one request.
+ * Two totals and the initials of the four most recent riders, in one request.
  *
  * Reads the `public_counts` view, never the tables. The view runs with its owner's
  * rights and returns only aggregates and two-letter initials, so even if this
@@ -2515,7 +2685,10 @@ async function readCounts(env, cors) {
     ok: true,
     attendees: Number(row.attendees) || 0,
     pilots: Number(row.pilots) || 0,
-    initials: Array.isArray(row.initials) ? row.initials.filter(Boolean).slice(0, 5) : []
+    /* Four, matching the four initial circles the page draws. The view already returns
+       four since 0013; the cap stays as a second line of defence, because a deployment
+       running an older view would otherwise send a fifth initial that nothing displays. */
+    initials: Array.isArray(row.initials) ? row.initials.filter(Boolean).slice(0, 4) : []
   }, 200, cors);
 }
 
@@ -2763,6 +2936,7 @@ export default {
       if (type === 'wall-post') return wallPost(env, request, payload, cors);
       if (type === 'wall-translate') return wallTranslate(env, payload, cors);
       if (type === 'chat') return chatVisitor(env, request, payload, cors);
+      if (type === 'chat-inbound') return chatInbound(env, payload, cors);
       if (type === 'chat-admin') return chatAdmin(env, payload, cors);
       if (type === 'inbox') return inbox(env, payload, cors);
       if (type === 'settings') return settingsRead(env, cors);

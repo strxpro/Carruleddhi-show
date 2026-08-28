@@ -3,14 +3,23 @@
 Jedna instrukcja, po kolei. Nie przeskakuj kroków — każdy następny zakłada, że poprzedni
 przeszedł.
 
-**Ile scenariuszy w Make?** Jeden. Nie dwa, nie trzy.
+**Ile scenariuszy w Make?** Dwa, i oba są wyzwalane zdarzeniem, nie zegarem.
 
-To jest ważne, bo wcześniej mówiłem inaczej. Drugi scenariusz (przypomnienia na zegarze)
-kosztował ~720 operacji miesięcznie na odpowiedź „nie ma nic do wysłania" — Make liczy
-operację za każde uruchomienie modułu, a przez jedenaście miesięcy w roku odpowiedź jest
-zawsze „nie". Zegar wyszedł na darmowy GitHub Actions, a Make jest dotykany tylko wtedy,
-gdy naprawdę jest list. Trzeci (ogłoszenie nowej edycji) nie istnieje i nie jest potrzebny
-do niczego, co teraz działa.
+To jest jedyna reguła, której warto tu pilnować: **Make wolno budzić tylko wtedy, gdy
+naprawdę jest co robić.** Operacja liczy się za każde uruchomienie modułu, a darmowy plan
+daje ich 10 000 na miesiąc. Scenariusz z przypomnieniami, który co godzinę pytał „jest coś
+do wysłania?", zjadał ~720 operacji miesięcznie na odpowiedź „nie" — przez jedenaście
+miesięcy w roku zawsze „nie". Wyleciał; zegar stoi teraz na darmowym GitHub Actions,
+a Make dostaje gotowy list. Z tego samego powodu poczta wchodzi mailhookiem, a nie
+odpytywaniem IMAP-a, które kosztowałoby ~2900 operacji miesięcznie.
+
+| # | Scenariusz | Wyzwalacz |
+|---|---|---|
+| 1 | `Carruleddhi — 1 — wszystko (webhook)` | POST z funkcji na Vercelu |
+| 2 | `Carruleddhi — 2 — poczta na czat (mailhook)` | list przekierowany z `info@` |
+
+Trzeci (ogłoszenie nowej edycji) nie istnieje i nie będzie potrzebny — pójdzie trasą
+`outbox`, która już stoi w scenariuszu 1.
 
 **Gdyby AI miało to zrobić za Ciebie**, w `make/` są trzy prompty i różnią się celem:
 `PROMPT-DLA-AI.md` — zaimportuj gotowy blueprint i sprawdź, czy się zgadza ·
@@ -36,12 +45,27 @@ SQL Editor → New query → wklej całą treść pliku → **Run**. Po kolei:
 | `0009_unsubscribe.sql` | kody rezygnacji, tokeny w obu listach |
 | `0010_upsert_email_keys.sql` | **obowiązkowa** — bez niej zapis na przypomnienia daje `502` / `42P10` |
 | `0011_race_numbers_reuse.sql` | numery startowe: najniższy wolny, zwalniany przy rezygnacji |
+| `0012_race_number_drop_default.sql` | **obowiązkowa** — bez niej `0011` nie robi nic, patrz niżej |
+| `0013_chat_message_source.sql` | skąd przyszła wiadomość na czacie: z okna czy z maila |
 
 Wszystkie można puszczać ponownie — są napisane tak, że drugie uruchomienie nic nie psuje
 (`if not exists`, `on conflict do nothing`, `create or replace`).
 
 **Sprawdź:** Table Editor powinien pokazywać 10 tabel, w tym `site_settings`
 i `verification_codes`.
+
+**Dlaczego `0012` jest obowiązkowa.** `0011` obiecuje „najniższy wolny numer startowy",
+ale `0004` zostawiła na kolumnie `DEFAULT nextval(...)`, a DEFAULT wylicza się **przed**
+triggerem `BEFORE INSERT`. Warunek `if new.race_number is null` nigdy więc nie był
+prawdą i `claim_race_number()` była martwym kodem — numery rosły w nieskończoność, a luki
+po rezygnacjach nie zapełniały się nigdy. Sprawdzisz to jednym zapytaniem:
+
+```sql
+select column_default from information_schema.columns
+ where table_name = 'registrations' and column_name = 'race_number';
+```
+
+Ma zwrócić `NULL`. Cokolwiek innego znaczy, że `0012` nie przeszła.
 
 ---
 
@@ -104,7 +128,7 @@ wyjdzie**. To najczęstsza przyczyna „nic nie przychodzi".
 
 ---
 
-## Krok 5 — Make, jeden scenariusz (raz, 15 minut)
+## Krok 5 — Make (raz, 20 minut)
 
 ### 5a. Import
 
@@ -183,6 +207,48 @@ moduł HTTP musiałby być warunkowy. Nie da się.
 Trasa **outbox** to wszystko, co wysyła zegar: trzy przypomnienia, potwierdzenia
 newslettera i kody rezygnacji. List przychodzi gotowy — `to`, `subject`, `html`, nic do
 rozwiązania — bo funkcja wyrenderowała go w języku odbiorcy przed wysłaniem żądania.
+
+---
+
+### 5g. Odpowiedzi z poczty na czat (drugi scenariusz)
+
+Klient dostaje maila, odpowiada na niego — i ta odpowiedź ma wylądować w tym samym wątku
+czatu, w którym z nim rozmawiasz. Dla Ciebie to jedna rozmowa z jednym człowiekiem, nawet
+jeśli technicznie przyszła dwoma kanałami.
+
+Scenariusz **Carruleddhi — 2 — poczta na czat (mailhook)** jest już w folderze
+`carruleddhi`. Zostaje jedno kliknięcie po stronie poczty.
+
+**OVH → skrzynka `info@carruleddhishow.com` → Przekierowania (Redirections)** → dodaj
+przekierowanie na adres mailhooka:
+
+```
+belnkkgh5txojchpjegut4sl718c9nvo@hook.eu1.make.com
+```
+
+**Zostaw „zachowaj kopię" włączone.** Bez tego poczta znika ze skrzynki i jedynym miejscem,
+gdzie jest, staje się baza — a wtedy awaria bazy zabiera Ci korespondencję.
+
+### Dlaczego mailhook, a nie IMAP
+
+IMAP trzeba odpytywać. Co 15 minut to ~2900 operacji miesięcznie na samo pytanie „czy coś
+przyszło", przy limicie 10 000 — czyli ta sama pułapka, przez którą wyleciał scenariusz
+z przypomnieniami. Mailhook kosztuje operację tylko wtedy, gdy naprawdę przyszedł list.
+Przy okazji nie trzeba nigdzie trzymać hasła do skrzynki.
+
+### Pętla, i dlaczego jej nie ma
+
+Powiadomienia z czatu idą na `info@carruleddhishow.com`. Gdyby mailhook je łapał i robił
+z nich wiadomości na czacie, każda taka wiadomość wysłałaby kolejne powiadomienie — i tak
+w kółko, aż do wyczerpania operacji. Zapory są dwie i celowo w dwóch różnych miejscach:
+
+1. **filtr w scenariuszu** — odrzuca nadawcę z domeny `carruleddhishow.com`
+2. **`alertOrganisers()` w kodzie** — wiadomość, która przyszła z maila, nigdy nie wysyła
+   powiadomienia mailem, tylko WhatsAppem
+
+Druga zapora jest ważniejsza, bo scenariusz da się przeklikać, a kod jest pilnowany
+asercją. I nic się przez to nie gubi: mail, o którym byłoby powiadomienie, leży już
+w tej samej skrzynce, na którą by przyszło.
 
 ---
 
@@ -333,13 +399,12 @@ Uczciwa lista, żebyś nie szukał:
 
 1. **Rezygnacja z samego wyścigu** (nie z powiadomień). Tabela na kody już jest i ma
    przygotowany drugi typ `cancel-entry`. Nie ma też ścieżki „zmień dane".
-2. **Odpowiedź na maila wracająca na czat** (IMAP). Zero kodu.
-3. **Newsletter: guzik „ogłoś nową edycję"** w panelu. Zakładka jest, przycisku nie ma.
-4. **Czat naprawdę w czasie rzeczywistym.** Panel odpytuje co 10 s — działa, ale to nie
+2. **Newsletter: guzik „ogłoś nową edycję"** w panelu. Zakładka jest, przycisku nie ma.
+3. **Czat naprawdę w czasie rzeczywistym.** Panel odpytuje co 10 s — działa, ale to nie
    jest to samo co push.
-5. **Maile z większymi emocjami.** Są poprawne i spójne, ale suche.
-6. **Regulamin, prywatność i cookies w sześciu językach.** Dziś włoski i polski.
-7. **Prawdziwe zdjęcia** galerii, trasy i nagród. Wszystko to nadal placeholdery SVG.
+4. **Maile z większymi emocjami.** Są poprawne i spójne, ale suche.
+5. **Regulamin, prywatność i cookies w sześciu językach.** Dziś włoski i polski.
+6. **Prawdziwe zdjęcia** galerii, trasy i nagród. Wszystko to nadal placeholdery SVG.
 
 Czego już nie ma na tej liście, a było: **czat dla gościa na stronie** (jest, w sekcji
 kontaktu) i **powiadomienie o nowej wiadomości** (mail plus WhatsApp, patrz

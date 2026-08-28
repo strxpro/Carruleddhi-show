@@ -234,9 +234,74 @@ check(
 );
 
 check(
-  'alertOrganisers wolany na obu sciezkach: handover i human',
-  (worker.match(/await alertOrganisers\(/g) || []).length === 2
+  'alertOrganisers wolany na trzech sciezkach: handover, human, mail',
+  (worker.match(/await alertOrganisers\(/g) || []).length === 3
 );
+
+/* NAJWAZNIEJSZA ASERCJA W TYM PLIKU.
+
+   Scenariusz IMAP patrzy na skrzynke info@carruleddhishow.com, a powiadomienia z czatu
+   ida na ten sam adres. Powiadomienie mailem o mailu zamyka petle: list wpada do INBOX-a,
+   IMAP go zabiera, worker robi z niego wiadomosc na czacie, czat wysyla powiadomienie na
+   info@, IMAP zabiera je z powrotem. Petla nie zglasza sie jako blad — po prostu zjada
+   operacje w Make i wysyla setki maili, zanim ktokolwiek zauwazy.
+
+   Filtr po nadawcy w scenariuszu tez jest, ale scenariusz mozna przeklikac. To jest
+   warunek, ktory przezyje edycje w UI. */
+check(
+  'wiadomosc z maila nie wysyla powiadomienia mailem (przerwana petla IMAP)',
+  /if\s*\(\s*!viaEmail\s*\)\s*\{[\s\S]{0,200}?sendThroughOutbox\(/.test(worker)
+);
+
+check(
+  'chatInbound odrzuca wlasna skrzynke jako nadawce',
+  /from\.endsWith\(\s*['"]@carruleddhishow\.com['"]\s*\)/.test(worker)
+);
+
+/* Odpowiedz na maila niesie pod spodem cala nasza wiadomosc. Bez obciecia body i tak
+   jest przycinane do 2000 znakow — czyli ucieloby sie to, co czlowiek napisal, a zostalby
+   cytat. Kolejnosc tych dwoch operacji jest cala roznica. */
+check(
+  'cytat obcinany PRZED przycieciem do 2000 znakow',
+  /stripQuotedReply\(raw\)\.slice\(0,\s*2000\)/.test(worker)
+);
+
+/* --- obcinanie cytatu, na prawdziwych ksztaltach odpowiedzi ---------------
+   Tu sprawdzamy zachowanie, a nie tresc pliku. Reszta asercji w tym pliku patrzy na
+   kod jako na tekst, co wystarcza do pilnowania struktury, ale nie powie, czy wyrazenie
+   regularne faktycznie trafia. A nie trafialo: pierwsza wersja markerow byla przywiazana
+   do polskich i francuskich znakow diakrytycznych i przepuszczala caly cytat, kiedy list
+   przeszedl przez kodowanie, ktore je zgubilo. Na oko wygladala poprawnie.
+
+   Funkcja jest wyjmowana ze zrodla, bo worker/index.js to jeden modul bez eksportow
+   pomocniczych, a dodawanie eksportu tylko na potrzeby testu zmienialoby produkcyjny
+   plik pod test. */
+const stripSource = worker.slice(
+  worker.indexOf('function stripQuotedReply'),
+  worker.indexOf('\n}', worker.indexOf('function stripQuotedReply')) + 2
+);
+const stripQuotedReply = new Function(`${stripSource}; return stripQuotedReply;`)();
+
+const replies = [
+  ['gmail pl z ogonkiem',  'Czy kask rowerowy wystarczy?\n\nDnia 28 sierpnia 2026 o 15:12 Carruleddhi <info@carruleddhishow.com> napisał(a):\n> Twoj numer to 061', 'Czy kask rowerowy wystarczy?'],
+  ['gmail pl bez ogonka',  'Czy kask rowerowy wystarczy?\n\nDnia 28 sierpnia 2026 o 15:12 Carruleddhi <info@carruleddhishow.com> napisal(a):\n> Twoj numer to 061', 'Czy kask rowerowy wystarczy?'],
+  ['francuski z akcentem', 'Merci beaucoup.\n\nLe 28 août 2026 à 15:12, Carruleddhi <info@carruleddhishow.com> a écrit :\n> original', 'Merci beaucoup.'],
+  ['francuski bez akcentu','Merci beaucoup.\n\nLe 28 aout 2026 a 15:12, Carruleddhi <info@carruleddhishow.com> a ecrit :\n> original', 'Merci beaucoup.'],
+  ['hiszpanski',           'Gracias.\n\nEl 28 ago 2026 a las 15:12, Carruleddhi <info@carruleddhishow.com> escribió:\n> original', 'Gracias.'],
+  ['outlook wloski',       'Grazie mille!\n\n________________________________\nDa: info@carruleddhishow.com', 'Grazie mille!'],
+  ['apple mail',           'Sounds good.\n\nOn 28 Aug 2026, at 15:12, Carruleddhi <info@carruleddhishow.com> wrote:\n> original', 'Sounds good.'],
+  ['niemiecki',            'Danke schön.\n\nAm 28.08.2026 um 15:12 schrieb Carruleddhi <info@carruleddhishow.com>:\n> alt', 'Danke schön.'],
+  ['bez cytatu',           'Krotka wiadomosc bez cytatu.', 'Krotka wiadomosc bez cytatu.']
+];
+for (const [label, input, expected] of replies) {
+  const got = stripQuotedReply(input);
+  check(`cytat obciety: ${label}`, got === expected, got);
+}
+
+/* Skrajny przypadek osobno: sam cytat, bez ani jednego wlasnego zdania. Obciecie
+   zostawiloby pustke, a pusty body lamie check na chat_messages — wiec wolimy oddac
+   nadmiar niz nic. */
+check('sam cytat nie zostaje przyciety do pustki', stripQuotedReply('> tylko cytat').length > 0);
 
 /* Repozytorium jest publiczne. Klucze CallMeBota sa juz jawne w blueprincie i to jest
    jedna kopia za duzo — druga, w kodzie funkcji, nie ma prawa powstac. */

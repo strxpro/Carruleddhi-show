@@ -1760,6 +1760,18 @@ html.no-js .preloader { display: none !important; }
   /* JavaScript finished first: cancel the fallback and use the scripted exit. */
   animation: none;
 }
+/* JavaScript is alive and owns the timing — stand down.
+   ---------------------------------------------------------------------------
+   `is-running` is set synchronously by setupPreloader() before anything else, so its
+   presence proves the module executed. That matters now: since the overlay waits for
+   `window.load` rather than a fixed 1250 ms, a slow first load can legitimately keep it
+   up for four or five seconds, and this fallback would have faded it out at 2.6 s —
+   revealing a page that was still loading, which is the exact thing the wait was added
+   to prevent.
+
+   The 2.6 s fallback stays for the case it was written for: the script never running at
+   all. Opening the file over file:// blocks ES modules, and then nothing here is set. */
+.preloader.is-running { animation: none; }
 /* The bar is driven by JavaScript, and only by JavaScript.
    There used to be a `preloader-fill` keyframe animation here as well as `width: 0` and a
    width transition in main.css and a background repaint in carnival.css — three stylesheets
@@ -1921,58 +1933,18 @@ html.no-js .preloader { display: none !important; }
 .route__frame .route__pin--end { background: var(--coral); }
 .route__frame .route__pin--end::before { background: var(--white); }
 
-/* Side note, rotated along the right edge of the photo. */
-.route__aside {
-  position: absolute;
-  z-index: 4;
-  top: 50%;
-  right: 0;
-  width: max-content;
-  max-width: min(46vw, 330px);
-  margin: 0;
-  padding: 8px 14px;
-  border-radius: 12px 12px 0 0;
-  background: rgba(7, 26, 61, .9);
-  color: var(--white);
-  font-family: var(--font-meta);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .1em;
-  line-height: 1.45;
-  text-transform: uppercase;
-  transform: translate(50%, -50%) rotate(-90deg);
-  transform-origin: center;
-  backdrop-filter: blur(8px);
-}
-.route__aside::before {
-  content: '';
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-right: 8px;
-  border-radius: 2px;
-  background: var(--yellow);
-  vertical-align: 1px;
-}
+/* `.route__aside` used to live here — a rotated navy strip along the right edge of the
+   photograph on desktop, dropping to a full-width bar across its bottom on a phone. Both
+   are gone with the element; the sentence they carried duplicated the obstacles fact in the
+   column beside the picture, and the phone version covered the lower quarter of the
+   descent. Removed rather than left unused so nothing re-styles a caption that no longer
+   exists. */
 
 .route__fact--obstacles strong { color: var(--coral); }
 .route__fact--obstacles { border-left: 4px solid var(--yellow); }
 
 @media (max-width: 900px) {
-  /* Rotated text is unreadable in a narrow frame; drop to a normal strip. */
-  .route__aside {
-    top: auto;
-    right: 8px;
-    bottom: 8px;
-    left: 8px;
-    width: auto;
-    max-width: none;
-    border-radius: 10px;
-    font-size: 10px;
-    letter-spacing: .06em;
-    text-align: center;
-    transform: none;
-  }
+  /* The finish pin overlaps the start pin once the frame is this narrow. */
   .route__frame .route__pin--end { display: none; }
 }
 

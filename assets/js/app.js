@@ -656,12 +656,30 @@ import { flagSvg } from './flags.js';
       return;
     }
 
-    const duration = 1250;
+    /* How long this lasts is now decided by the page, not by a constant.
+       ---------------------------------------------------------------------------
+       It used to be a flat 1250 ms. That is wrong in both directions: on a warm cache the
+       page was ready in 200 ms and the visitor watched a progress bar for a second with
+       nothing loading behind it, and on a cold 3G load the overlay left at 1250 ms onto a
+       page still missing its fonts and its hero image — which is the worse of the two,
+       because the first thing you see is the layout settling.
+
+       So: the bar tracks real progress, and the overlay leaves when `window.load` fires.
+
+       MIN and MAX are the two guards that make that safe.
+         MIN  A load that finishes in 150 ms would otherwise flash the overlay on and off,
+              which reads as a glitch rather than as speed. Below this it is not worth
+              having shown it at all, so it stays for a moment.
+         MAX  `load` waits for every image, and one stalled request from a third party can
+              hold it for half a minute. Past this point the page is usable and waiting for
+              the last byte is no longer honest. */
+    const MIN = 650;
+    const MAX = 6000;
     document.body.classList.add('is-locked');
     preloader.classList.add('is-running');
 
     // Hard stop: whatever happens, the overlay is gone by this point.
-    const watchdog = window.setTimeout(dismiss, duration + 1400);
+    const watchdog = window.setTimeout(dismiss, MAX + 400);
 
     /**
      * The bar and the number, from one clock.
@@ -684,26 +702,73 @@ import { flagSvg } from './flags.js';
      */
     const number = $('[data-preloader-number]', preloader);
     const bar = $('[data-preloader-bar]', preloader);
-    if (number || bar) {
-      const started = performance.now();
-      // Eased, so it moves fast at first and settles — a linear bar reads as slower than it
-      // is, because the last third looks the same as the first.
-      const ease = (value) => 1 - Math.pow(1 - value, 3);
+    const started = performance.now();
 
-      const step = (now) => {
-        const linear = clamp((now - started) / duration, 0, 1);
-        const eased = ease(linear);
-        if (bar) bar.style.width = `${(eased * 100).toFixed(1)}%`;
-        if (number) number.textContent = String(Math.round(eased * 100)).padStart(2, '0');
-        if (linear < 1 && !dismissed) requestAnimationFrame(step);
-      };
+    /* Ready means: the browser fired `load`, or we ran out of patience.
+       Written as a promise-free flag because this has to work when `load` already happened
+       before this script ran — a cached page can reach `readyState === 'complete'` before
+       a deferred module executes, and an event listener added after the event never fires.
+       That is the whole bug class the earlier fixed timer was quietly hiding. */
+    let ready = document.readyState === 'complete';
+    let readyAt = ready ? started : 0;
+    const markReady = () => {
+      if (ready) return;
+      ready = true;
+      readyAt = performance.now();
+    };
+    window.addEventListener('load', markReady, { once: true });
+    window.setTimeout(markReady, MAX);
+
+    /**
+     * One loop drives the bar, the number and the dismissal.
+     *
+     * WHY THE BAR CANNOT SIMPLY SHOW ELAPSED TIME
+     *   The honest number — bytes loaded — is not available to a page about itself. So the
+     *   bar does what every progress bar without a total does: it approaches a ceiling it
+     *   never reaches on its own. `1 - 1/(1 + t)` climbs quickly, then crawls, and sits
+     *   just under 90% however long the load takes. It cannot reach 100 by waiting, which
+     *   means it can never claim to be finished while the page is still loading.
+     *
+     *   When `load` arrives, the remaining distance is covered in 260 ms. That jump to 100
+     *   is the part that reads as "done", and it is the only part that is telling the truth
+     *   about anything.
+     *
+     * rAF, not setInterval
+     *   A 40 ms interval paints whenever it fires, which is not when the browser is about
+     *   to draw — on a busy first load that shows as a bar moving in steps.
+     */
+    // Approaches 0.9 and never gets there. 900 ms is the half-life-ish scale: about 47% by
+    // then, ~64% at two seconds, still short of 90% at ten.
+    const creep = (ms) => 0.9 * (1 - 1 / (Math.max(ms, 0) / 900 + 1));
+
+    const step = (now) => {
+      if (dismissed) return;
+      const elapsed = now - started;
+
+      let value;
+      if (ready) {
+        // Where the creeping curve had got to when `load` landed, then a fast run to 1.
+        const atReady = creep(readyAt - started);
+        value = atReady + (1 - atReady) * clamp((now - readyAt) / 260, 0, 1);
+      } else {
+        value = creep(elapsed);
+      }
+
+      value = clamp(value, 0, 1);
+      if (bar) bar.style.width = `${(value * 100).toFixed(1)}%`;
+      if (number) number.textContent = String(Math.round(value * 100)).padStart(2, '0');
+
+      // Gone once the bar has actually arrived and the overlay has been up long enough to
+      // have been seen. Both conditions, so a fast load still gets a beat and a slow one
+      // is not cut off mid-bar.
+      if (value >= 1 && elapsed >= MIN) {
+        window.clearTimeout(watchdog);
+        dismiss();
+        return;
+      }
       requestAnimationFrame(step);
-    }
-
-    window.setTimeout(() => {
-      window.clearTimeout(watchdog);
-      dismiss();
-    }, duration + 180);
+    };
+    requestAnimationFrame(step);
   }
 
   function setupReveal() {
@@ -1011,12 +1076,57 @@ import { flagSvg } from './flags.js';
       outgoing.style.removeProperty('transition');
       void outgoing.offsetWidth;
       outgoing.classList.add(direction < 0 ? 'is-gone-back' : 'is-gone');
-      window.setTimeout(() => {
+
+      /* Wait for the throw to actually finish, then reset without animating.
+         ---------------------------------------------------------------------------
+         TWO BUGS WERE STACKED HERE, AND TOGETHER THEY WERE THE "IT STICKS" REPORT.
+
+         1. The wait was 300 ms and the CSS transition is 380 ms (carnival.css shortened it
+            from .7s and this number was not updated with it). So the class came off while
+            the card was about four fifths of the way off screen, and the card jumped back
+            from there.
+
+         2. Removing `is-gone` puts the card at the back of the stack — and it went there
+            *through the transition*, because the transition is on `.prize-card` itself.
+            So every advance ended with the outgoing card visibly flying from off-screen
+            back into the deck, on top of the next card coming forward. Two cards moving in
+            opposite directions across each other is what read as juddering.
+
+         `transitionend` rather than a timer, with a timer as the way out. A transition that
+         never fires its event is the same failure mode as a rAF that never runs, and this
+         page has been bitten by that three times; the escape hatch is written in from the
+         start rather than added after somebody reports a deck that has stopped responding. */
+      const settle = () => {
         state.deckIndex = (state.deckIndex + direction + cards.length) % cards.length;
+        // No animation for the trip back to the rear of the stack: it is bookkeeping, not
+        // something anybody should watch.
+        outgoing.classList.add('is-resetting');
         outgoing.classList.remove('is-gone', 'is-gone-back');
         layout();
-        window.setTimeout(() => { state.deckLocked = false; }, 90);
-      }, reducedMotion ? 10 : 300);
+        void outgoing.offsetWidth;
+        requestAnimationFrame(() => outgoing.classList.remove('is-resetting'));
+        window.setTimeout(() => { state.deckLocked = false; }, 60);
+      };
+
+      if (reducedMotion) {
+        window.setTimeout(settle, 10);
+        return;
+      }
+
+      let done = false;
+      const once = () => {
+        if (done) return;
+        done = true;
+        outgoing.removeEventListener('transitionend', onEnd);
+        settle();
+      };
+      const onEnd = (event) => {
+        // Only the transform, and only this card's own — `transitionend` bubbles, and
+        // opacity finishes 80 ms earlier than the movement does.
+        if (event.target === outgoing && event.propertyName === 'transform') once();
+      };
+      outgoing.addEventListener('transitionend', onEnd);
+      window.setTimeout(once, 460);
     }
 
     /**
@@ -1167,8 +1277,17 @@ import { flagSvg } from './flags.js';
       circle.hidden = initials.length > 0 && index >= initials.length;
     });
 
+    /* The remainder counts riders, not attendees.
+       ---------------------------------------------------------------------------
+       This read attendeeTotal(), which is the "I'll be there" tally — a different set of
+       people from the ones whose initials fill the circles. With 3 attendees and 5 real
+       riders the row said "+0" next to five faces, and once attendance overtook the entry
+       list the number was simply a different quantity from the one the circles implied.
+
+       The circles come from `registrations`; so does the remainder. Four faces and "+46"
+       now means what it looks like it means: fifty riders. */
     const shown = initials.length ? Math.min(initials.length, slots) : slots;
-    const rest = Math.max(0, attendeeTotal() - shown);
+    const rest = Math.max(0, pilotTotal() - shown);
     const last = circles[circles.length - 1];
     last.textContent = `+${formatNumber(rest)}`;
     last.hidden = rest <= 0;
@@ -3378,7 +3497,14 @@ import { flagSvg } from './flags.js';
     // visit. It is declared instead.
     const alwaysPinned = new Set(['gallery']);
 
+    /* Raised while measure() is running and for the rest of that frame.
+       Explained in full at the ResizeObserver below: the measurement itself resizes every
+       panel it looks at, so without this the observer would report our own work back to us
+       for ever. */
+    let selfInflicted = false;
+
     function measure() {
+      selfInflicted = true;
       const viewport = window.innerHeight;
       panels.forEach((panel) => {
         if (alwaysFlow.has(panel.id)) {
@@ -3397,6 +3523,12 @@ import { flagSvg } from './flags.js';
         if (previous === panel.dataset.panel) return;
       });
       updateCardStack();
+      /* Released after the browser has delivered the notifications this pass caused.
+         The order within a frame is: rAF callbacks (this function), then layout, then
+         ResizeObserver delivery, then paint — and a timeout runs after all of it. So a
+         setTimeout is the first moment at which lowering the flag cannot let our own
+         changes back in. */
+      window.setTimeout(() => { selfInflicted = false; }, 0);
     }
 
     let frame = 0;
@@ -3426,6 +3558,49 @@ import { flagSvg } from './flags.js';
       lastWidth = width;
       schedule();
     };
+
+    /**
+     * Content that grows after the first measurement.
+     *
+     * WHAT WAS BROKEN
+     *   measure() ran once and then only on a width change. The comment wall's "leave a
+     *   message" panel unfolds to about 520 px of form, which happens long after that — so
+     *   the section was still marked `pinned`, and a pinned section is `position: sticky`
+     *   with `overflow: hidden` and `min-height: 100svh`. It cannot grow. The form opened
+     *   into a box that was not allowed to get taller, the overflow clipped it, and the next
+     *   sticky panel — which has a higher z-index by construction — slid straight over the
+     *   part that stuck out. That is the "the card lies on top of it" report.
+     *
+     * WHY A ResizeObserver AND NOT A CALLBACK ON THE TOGGLE
+     *   The fold is one of several things that change height after load: the FAQ accordion,
+     *   the chat panel, a validation message appearing under a field, a translated string
+     *   that wraps onto a third line. Wiring each of them to call measure() means every
+     *   future one has to remember to. Observing the sections themselves catches all of it,
+     *   including the cases nobody has thought of yet.
+     *
+     * WHY IT NEEDS THE FLAG TO NOT SPIN FOR EVER
+     *   Being idempotent is not enough here, and assuming it was is the trap. measure()
+     *   does not just write a verdict — it puts every panel into `data-panel="measure"`
+     *   first, which drops `position: sticky` and `min-height`, reads scrollHeight, and puts
+     *   the panel back. That resizes the observed box on every single pass, whatever the
+     *   verdict, so the observer would report our own measurement back to us and we would
+     *   measure again, for ever. The browser caps that with "ResizeObserver loop completed
+     *   with undelivered notifications" rather than freezing, which is worse than a freeze:
+     *   it is a page quietly burning a core, which is what "it feels laggy" is made of.
+     *
+     *   `selfInflicted` is raised for the duration of a pass and lowered in a timeout, by
+     *   which point the notifications that pass caused have already been dropped. A real
+     *   resize landing inside that one-frame window is lost, and that is fine: the fold
+     *   animates over 420 ms and fires dozens of notifications, so the next one is 16 ms
+     *   away.
+     */
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(() => {
+        if (selfInflicted) return;
+        schedule();
+      });
+      panels.forEach((panel) => observer.observe(panel));
+    }
 
     measure();
     window.addEventListener('resize', onResize, { passive: true });

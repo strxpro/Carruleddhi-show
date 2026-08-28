@@ -360,8 +360,16 @@
             <span class="route__pin route__pin--start" data-i18n="route.startShort">Partenza</span>
             <span class="route__pin route__pin--end" data-i18n="route.finishShort">Arrivo</span>
 
-            <!-- Side note: obstacle layout changes from one edition to the next. -->
-            <p class="route__aside" data-i18n="route.obstaclesNote">Ostacoli lungo la discesa. Ogni anno sono disposti in modo diverso.</p>
+            <!-- Nothing is written on the photograph.
+                 There was a rotated strip along the right edge on desktop and a full-width
+                 bar across the bottom on a phone, both saying the obstacles move between
+                 editions. It is the same sentence as the `route.obstaclesLabel` fact in the
+                 column beside the picture, so the photo was carrying a caption that
+                 duplicated the copy next to it — and on a phone the bar covered the bottom
+                 quarter of the descent, which is the part the photograph is of.
+
+                 The fact stays in .route__facts where it reads as information. The photo is
+                 a photo. -->
           </div>
           <figcaption data-i18n="route.figureNote">Fotografia della discesa. La linea del percorso è indicativa e si regola dal pannello admin.</figcaption>
         </figure>
@@ -538,8 +546,13 @@
         <div class="attendance__label" data-i18n="attendance.label">persone hanno detto “ci sarò”</div>
         <button class="attendance__press reveal" type="button" data-attendance-button><span data-i18n="attendance.press">CI SARÒ!</span></button>
         <p class="attendance__hint" data-i18n="attendance.hint">Un clic per persona. Salviamo la scelta solo in questo browser finché non colleghi il database.</p>
+        <!-- Four initials and a remainder. Was five and a remainder; four is what was
+             asked for and it also divides the row evenly on a narrow phone.
+             These five are placeholders so the row is never empty on first paint —
+             paintAvatars() replaces them with the four most recent real riders as soon as
+             the counts endpoint answers. Only initials ever leave the database. -->
         <div class="avatar-stack" aria-hidden="true">
-          <span class="avatar">AM</span><span class="avatar">LG</span><span class="avatar">SR</span><span class="avatar">FC</span><span class="avatar">MB</span><span class="avatar">+407</span>
+          <span class="avatar">AM</span><span class="avatar">LG</span><span class="avatar">SR</span><span class="avatar">FC</span><span class="avatar avatar--rest">+407</span>
         </div>
         <button class="btn btn--yellow" type="button" data-open-reminder style="margin-top:28px" data-i18n="attendance.reminder">Vuoi anche un promemoria?</button>
       </div>
