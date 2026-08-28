@@ -41,7 +41,7 @@ SQL Editor → New query → wklej całą treść pliku → **Run**. Po kolei:
 | `0005_chat.sql` | czat |
 | `0006_site_settings.sql` | sponsorzy, blokada strony, przełączniki sekcji |
 | `0007_purge_helpers.sql` | reset numerów po wyczyszczeniu danych |
-| `0008_newsletter_outbox.sql` | kolejka potwierdzeń newslettera |
+| `0008_newsletter_outbox.sql` | **obowiązkowa** — kolejka potwierdzeń newslettera; bez niej cichy `400`, patrz krok 6 |
 | `0009_unsubscribe.sql` | kody rezygnacji, tokeny w obu listach |
 | `0010_upsert_email_keys.sql` | **obowiązkowa** — bez niej zapis na przypomnienia daje `502` / `42P10` |
 | `0011_race_numbers_reuse.sql` | numery startowe: najniższy wolny, zwalniany przy rezygnacji |
@@ -255,6 +255,46 @@ w tej samej skrzynce, na którą by przyszło.
 
 ## Krok 6 — Zegar przypomnień, za darmo (raz, 3 minuty)
 
+Zegar woła jeden adres, a ten sam decyduje, komu dziś należy się list, renderuje go
+i wypycha do Make. Skąd woła — obojętne. Poniżej dwie drogi; **wybierz jedną**.
+
+### Wariant A — cron-job.org (nic nie trzeba umieć)
+
+**Zadania cykliczne → Utwórz zadanie cron**, zakładka **WSPÓLNE**:
+
+| Pole | Wartość |
+|---|---|
+| Tytuł | `Carruleddhi — przypomnienia` |
+| URL | `https://www.carruleddhishow.com/api/carruleddhi/reminders-due` |
+| Włącz zadanie | **tak** |
+| Zapisz odpowiedzi w historii zadań | **tak** — bez tego nie zobaczysz, co odpowiedział serwer |
+| Harmonogram | **Co 15 minut** (`*/15 * * * *`) |
+
+Potem zakładka **ZAAWANSOWANE**:
+
+| Pole | Wartość |
+|---|---|
+| Metoda żądania | **POST** |
+| Nagłówek 1 | `Content-Type` → `application/json` |
+| Nagłówek 2 | `X-Carruleddhi-Roster-Key` → Twój `ROSTER_KEY` |
+| Treść żądania (body) | `{"deliver":true}` |
+
+Kliknij **URUCHOMIENIE TESTOWE**, zanim zapiszesz. Poprawna odpowiedź wygląda tak:
+
+```json
+{"ok":true,"due":"","hoursLeft":1197,"count":0,"messages":[]}
+```
+
+`count: 0` to **dobry wynik** — do zjazdu jest więcej niż tydzień, więc nie ma czego
+wysyłać. Gdyby w odpowiedzi pojawiło się pole `note`, przeczytaj je: tam trafiają błędy,
+których endpoint nie chce zamieniać na awarię całego przebiegu.
+
+Dlaczego co 15 minut, a nie co godzinę: przypomnienie „3 godziny przed" ma być trzy
+godziny przed, a nie trzy i pięćdziesiąt. Ten zegar nie kosztuje operacji w Make —
+Make jest dotykany dopiero wtedy, gdy naprawdę jest list.
+
+### Wariant B — GitHub Actions
+
 Plik `.github/workflows/reminders.yml` jest już w repo.
 
 1. GitHub → repo → **Settings → Secrets and variables → Actions → New repository secret**
@@ -262,11 +302,24 @@ Plik `.github/workflows/reminders.yml` jest już w repo.
    - `SITE_URL` — `https://www.carruleddhishow.com` *(opcjonalnie)*
 2. **Actions → Reminders → Run workflow** — sprawdź, zanim zaufasz zegarowi.
 
-Odpowiedź `{"ok":true,"due":"","hoursLeft":9700,...}` to **poprawny wynik**. Do zjazdu
-jest więcej niż tydzień, więc nie ma czego wysyłać.
+### Jeśli uruchomisz oba naraz — nic się nie stanie
+
+Endpoint zapisuje w `reminder_subscribers.last_reminder`, co już wysłał, więc drugie
+wywołanie w tej samej godzinie nie znajduje nic do zrobienia. To nie jest powód, żeby
+trzymać oba — ale nie jest to też błąd, który komuś wyśle dwa listy.
 
 Dlaczego nie Vercel Cron: plan Hobby daje jeden cron uruchamiany **raz na dobę**,
 a przypomnienie 3 h przed potrzebuje lepszej rozdzielczości.
+
+### Sprawdź, czy `0008` przeszła — inaczej newsletter milczy
+
+Zapytanie o kolejkę newslettera pyta o kolumnę `confirmation_sent_at`, którą dodaje
+migracja `0008`. Bez niej Supabase odpowiada `400`, a endpoint **połyka to po cichu** —
+zwraca `"ok": true` z dopiskiem `"note":"newsletter read failed: 400"` i leci dalej.
+Przypomnienia chodzą, potwierdzenia zapisu do newslettera nie wychodzą i nic nie krzyczy.
+
+Tak było na tej bazie do 28.08.2026. Jeżeli w odpowiedzi testowej widzisz `note`,
+uruchom `0008_newsletter_outbox.sql` jeszcze raz.
 
 ---
 
