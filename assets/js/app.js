@@ -5460,11 +5460,10 @@ import { flagSvg } from './flags.js';
          onwards it covers the whole descent, which is the part worth watching. */
       if (routeCartPlacer) routeCartPlacer(clamp((progress - 0.35) / 0.65, 0, 1));
 
-      /* On a phone the copy fades almost completely away over the photograph, and an invisible
-         link is still a link — the "open in Google Maps" button would sit on top of the picture
-         waiting to be tapped by accident. A threshold rather than a smooth value because
-         `pointer-events` has nothing between `auto` and `none`. */
-      section.classList.toggle('is-route-copy-gone', progress > 0.8);
+      /* `is-route-copy-gone` used to be set here, to switch off pointer events on copy that had
+         been faded to near-invisible. The copy is no longer faded — it shrinks and keeps full
+         contrast, so the map button stays visible and stays meant to be pressed. Nothing to
+         disable, and a class that only ever mattered because something else was wrong. */
     };
 
     /**

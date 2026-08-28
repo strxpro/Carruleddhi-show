@@ -60,9 +60,20 @@ const probe = `
     const read = (asked) => {
       const fs = getComputedStyle(frame);
       const m = new DOMMatrixReadOnly(fs.transform === 'none' ? '' : fs.transform);
-      const pin = document.querySelector('.route__frame .route__pin--start');
+      const startPin = document.querySelector('.route__frame .route__pin--start');
+      const endPin = document.querySelector('.route__frame .route__pin--end');
       const nextRect = next ? next.getBoundingClientRect() : null;
       const frameRect = frame.getBoundingClientRect();
+      const copyStyle = getComputedStyle(copy);
+      const copyM = new DOMMatrixReadOnly(copyStyle.transform === 'none' ? '' : copyStyle.transform);
+      /* Ile pinezki wystaja poza kadr zdjecia. Dodatnie = wychodza. To bylo widac na zrzucie
+         jako "META" poza obrazkiem i to jest liczba, ktora o tym mowi. */
+      const outside = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return Math.round(Math.max(0, frameRect.left - r.left, r.right - frameRect.right,
+          frameRect.top - r.top, r.bottom - frameRect.bottom));
+      };
       return {
         asked,
         actual: Math.round(window.scrollY),
@@ -70,11 +81,15 @@ const probe = `
         scale: Number(m.a.toFixed(3)),
         // Kat obrotu z macierzy: b/a to tangens, wiec atan daje stopnie.
         rotate: Number((Math.atan2(m.b, m.a) * 180 / Math.PI).toFixed(2)),
-        copyOpacity: Number(getComputedStyle(copy).opacity).toFixed(3),
-        copyY: Number(new DOMMatrixReadOnly(
-          getComputedStyle(copy).transform === 'none' ? '' : getComputedStyle(copy).transform).f.toFixed(1)),
-        copyGone: section.classList.contains('is-route-copy-gone'),
-        pinScale: pin ? getComputedStyle(pin).scale : null,
+        frameOpacity: Number(getComputedStyle(frame).opacity).toFixed(2),
+        copyOpacity: Number(copyStyle.opacity).toFixed(3),
+        // Skala tekstu: to ona ma teraz ustepowac miejsca, nie krycie.
+        copyScale: Number(copyM.a.toFixed(3)),
+        copyY: Number(copyM.f.toFixed(1)),
+        // Zdjecie na srodku przypietego obszaru: odleglosc gornej i dolnej krawedzi od ekranu.
+        frameTop: Math.round(frameRect.top),
+        frameBottom: Math.round(window.innerHeight - frameRect.bottom),
+        pinOutside: Math.max(outside(startPin) ?? 0, outside(endPin) ?? 0),
         // Ile pikseli nastepnej sekcji zachodzi na zdjecie. Ujemne = jeszcze nie dotarla.
         nextOverlap: nextRect ? Math.round(frameRect.bottom - nextRect.top) : null
       };
@@ -139,12 +154,13 @@ try {
   console.log(`błędy JS: ${r.errors.length ? r.errors.join(' | ') : 'brak'}\n`);
 
   console.log('W DÓŁ');
-  console.log('scroll   postęp  skala  obrót   krycie  przesuw  pinezka  zachodzenie');
+  console.log('scroll   postęp  skalaZ obrót   kryZ  kryT  skalaT  góra dół  pinPoza zachodz');
   for (const s of r.down) {
     console.log(
       `${String(s.actual).padEnd(8)} ${String(s.progress).padEnd(7)} ${String(s.scale).padEnd(6)} `
-      + `${String(s.rotate).padEnd(7)} ${String(s.copyOpacity).padEnd(7)} ${String(s.copyY).padEnd(8)} `
-      + `${String(s.pinScale).padEnd(8)} ${s.nextOverlap}`
+      + `${String(s.rotate).padEnd(7)} ${String(s.frameOpacity).padEnd(5)} ${String(s.copyOpacity).padEnd(5)} `
+      + `${String(s.copyScale).padEnd(7)} ${String(s.frameTop).padEnd(4)} ${String(s.frameBottom).padEnd(4)} `
+      + `${String(s.pinOutside).padEnd(7)} ${s.nextOverlap}`
     );
   }
 
@@ -159,14 +175,25 @@ try {
   const rotates = new Set(r.down.map((s) => s.rotate));
   check(rotates.size > 1, `obrót się zmienia i wyrównuje: ${[...rotates].join(', ')}°`);
 
-  const opacities = r.down.map((s) => Number(s.copyOpacity));
-  check(Math.min(...opacities) < 0.15 && Math.max(...opacities) > 0.9,
-    `napisy odjeżdżają do zniknięcia: ${Math.max(...opacities)} → ${Math.min(...opacities)}`);
-  const ys = r.down.map((s) => s.copyY);
-  check(Math.min(...ys) < -40, `i idą do góry: ${Math.max(...ys)} → ${Math.min(...ys)} px`);
+  /* Tekst ma ustępować rozmiarem, nie widocznością. Oba warunki naraz, bo pierwsza wersja
+     spełniała drugi (gasła do 0.06) i to był właśnie zgłoszony błąd. */
+  const copyOpacities = r.down.map((s) => Number(s.copyOpacity));
+  check(Math.min(...copyOpacities) > 0.9,
+    `tekst nie gaśnie: krycie ${Math.max(...copyOpacities)} → ${Math.min(...copyOpacities)}`);
+  const copyScales = r.down.map((s) => s.copyScale);
+  check(Math.min(...copyScales) < 0.85,
+    `tekst maleje, robiąc miejsce: skala ${Math.max(...copyScales)} → ${Math.min(...copyScales)}`);
 
-  const pins = new Set(r.down.map((s) => s.pinScale));
-  check(pins.size > 1, `pinezki pojawiają się animowane: ${[...pins].join(' → ')}`);
+  const frameOpacities = r.down.map((s) => Number(s.frameOpacity));
+  check(Math.min(...frameOpacities) > 0.99,
+    `zdjęcie nigdzie nie jest przygaszone: krycie ${Math.min(...frameOpacities)}`);
+
+  // Kończy większe niż jeden, czyli faktycznie „wychodzi" ze swojego pudełka na środek.
+  check(Math.max(...scales) > 1,
+    `zdjęcie kończy powiększone: ${Math.max(...scales)}`);
+
+  const outside = Math.max(...r.down.map((s) => s.pinOutside));
+  check(outside === 0, `pinezki nie wychodzą poza kadr (najwięcej ${outside} px)`);
 
   /* Najważniejsze: zdjęcie ma skończyć, zanim następna sekcja zacznie zachodzić. */
   const doneAt = r.down.findIndex((s) => s.progress >= 0.999);

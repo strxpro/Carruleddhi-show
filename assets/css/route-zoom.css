@@ -77,9 +77,22 @@
 :root {
   --route-progress: 1;
 }
+/* One rule for both widths: the copy gives up SIZE, never contrast.
+   ---------------------------------------------------------------------------
+   This was `opacity: calc(1 - progress * 0.58)` — the column faded to 42% as the photograph
+   arrived. Measured on a phone that came out as a section going grey: heading, three facts and
+   the map button all half-legible at the end of the scroll, which is where somebody has
+   actually stopped to read them. The complaint was "everything is dimmed", and it was right.
+
+   Shrinking does the same job honestly. The column steps back to 84% and slides aside, which
+   frees real space for the frame to grow into, and every word stays at full contrast at every
+   scroll position. `transform-origin` on the left so it recedes towards its own edge instead
+   of drifting away from the heading above it. */
 .route__copy {
-  opacity: calc(1 - var(--route-progress) * 0.58);
-  transform: translateX(calc(var(--route-progress) * -46px));
+  transform-origin: left center;
+  transform:
+    translateX(calc(var(--route-progress) * -30px))
+    scale(calc(1 - var(--route-progress) * 0.16));
   /* No `will-change` here, and that is a measured decision rather than an omission.
      ---------------------------------------------------------------------------
      With `will-change: opacity, transform` on this element Chrome promoted it to its own
@@ -170,32 +183,63 @@
     align-content: center;
   }
 
-  /* The words lift and go, rather than sliding sideways.
-     Up, because that is the direction the page is travelling — the copy leaves the way the
-     scroll is taking it, so it reads as being carried off rather than pushed aside. It goes
-     nearly all the way: at this width there is no room for a half-faded paragraph over a
-     photograph, and the same three facts are in the picture itself. */
-  .route__copy {
-    opacity: calc(1 - var(--route-progress) * 0.94);
-    transform: translateY(calc(var(--route-progress) * -70px));
-  }
-  /* Untappable once it has faded out. The class is set by setupRouteZoom past 0.8, because
-     `pointer-events` cannot be interpolated — there is no value between `auto` and `none`, so
-     it has to be a threshold and the threshold has to live somewhere that can compare numbers.
-     Without it there is an invisible "open in Google Maps" link lying over the photograph. */
-  #route.is-route-copy-gone .route__copy { pointer-events: none; }
+  /* The words shrink and step back. They do not fade.
+     ---------------------------------------------------------------------------
+     The first version took the copy to `opacity: 0.06` and lifted it 70px. On screen that was
+     a section going blank: the heading, the three facts and the map button all became grey
+     ghosts, and because the photograph was ALSO being faded in from small, the middle of the
+     sequence had nothing legible in it at all. Reported as "everything is dimmed and the
+     photo is not visible", which is exactly what it was.
 
-  /* Bigger, straighter, centred.
-     0.72 to 1 is a touch under 40% of growth — more than the desktop's 30, because the phone
-     frame is smaller to begin with and the copy has cleared out of its way. The rotation
-     unwinds as it arrives: it comes in tilted along the fall of the road and settles level,
-     which is the "it turns to match the line" part. No sideways drift, because in a single
-     column it is already centred. */
+     So the copy gives up space instead of visibility. It scales to 78%, tightens its own
+     spacing, and slides up by the amount that scaling frees — full contrast the whole way, so
+     the heading is readable at every scroll position including the end. What makes room for
+     the photograph is the copy getting smaller, not disappearing.
+
+     `transform-origin: top center` matters: scaling from the middle would pull the heading
+     down as it shrank, which reads as the text sagging rather than receding. */
+  .route__copy {
+    transform-origin: top center;
+    transform:
+      translateY(calc(var(--route-progress) * -22px))
+      scale(calc(1 - var(--route-progress) * 0.22));
+  }
+  /* The gaps inside the column close up too, otherwise a scaled-down block keeps the airy
+     spacing of a full-size one and the saving is only in the glyphs. */
+  #route .route__facts {
+    gap: calc(10px - var(--route-progress) * 4px);
+    margin-block: calc(24px - var(--route-progress) * 14px);
+  }
+  /* The paragraph is the one part that may genuinely go: the heading names the section, the
+     three facts and the button are information, and this is the sentence that sets the scene.
+     It is given away by height rather than by opacity, so what remains is fully legible
+     instead of being a grey block. */
+  #route .route__copy .lead {
+    max-height: calc(200px - var(--route-progress) * 150px);
+    overflow: hidden;
+    margin-bottom: calc(var(--route-progress) * -6px);
+  }
+
+  /* Bigger, straighter, and it ends up in the middle of the section.
+     ---------------------------------------------------------------------------
+     0.82 to 1.06, so it finishes slightly LARGER than its own box rather than merely reaching
+     full size. That is what "it grows a bit and moves to the centre" needs: at exactly 1 the
+     picture is only as big as the space the layout gave it, which on a phone is a strip under
+     a paragraph.
+
+     No opacity anywhere in here. The frame was never faded, but it was starting at 0.72 —
+     small enough that the road inside it was unreadable for the first half of the scroll,
+     which amounts to the same complaint.
+
+     The upward travel is what centres it. The copy above has given back about 22px of
+     translation plus a fifth of its height; the frame moves up into that, so at the end of the
+     sequence the picture sits in the middle of the pinned area with the shrunken text above
+     it. Both numbers are tied to the same progress value, so they cannot drift apart. */
   .route__frame {
     transform:
-      translateY(calc((1 - var(--route-progress)) * 40px))
-      rotate(calc((1 - var(--route-progress)) * -2.6deg))
-      scale(calc(0.72 + var(--route-progress) * 0.28));
+      translateY(calc(var(--route-progress) * -34px))
+      rotate(calc((1 - var(--route-progress)) * -2.2deg))
+      scale(calc(0.82 + var(--route-progress) * 0.24));
   }
 
   /* Start and finish pop in as the picture settles.
@@ -214,18 +258,41 @@
      tied to the road finishing drawing. Two owners for opacity would be one too many.
 
      `--route-pin-in` runs 0 to 1 across the second half of the sequence, so the arithmetic
-     lives in one place instead of being repeated in each declaration. */
+     lives in one place instead of being repeated in each declaration.
+
+     THE SCALE ON THE PIN LABELS IS GONE, AND THAT WAS A REAL FAULT
+       They were scaled from 0.55 up to 1 as well. `scale` uses the element's own centre as its
+       origin while the label's `translate` has already moved it away from the point it marks —
+       so a scaled label sits at a different distance from its dot than a full-size one, and
+       the two ends drifted by different amounts because their translations differ (the start
+       label sits above its dot, the finish below). On a phone frame that put "META" partly
+       outside the picture. The dots keep a small pop-in; the labels do not move. */
   .route__frame {
     --route-pin-in: clamp(0, calc((var(--route-progress) - 0.45) * 3.2), 1);
   }
-  .route__frame .route__pin { scale: calc(0.55 + var(--route-pin-in) * 0.45); }
-  .route__frame .route__node { scale: calc(0.4 + var(--route-pin-in) * 0.6); }
+  .route__frame .route__node { scale: calc(0.55 + var(--route-pin-in) * 0.45); }
+
+  /* Both labels kept inside the frame.
+     `max-width` in per cent of the frame rather than of the viewport: the frame is what they
+     have to fit in, and it is now scaled by a factor that changes while you scroll, so a
+     viewport-based cap would be right at one scroll position and wrong at the others. */
+  .route__frame .route__pin {
+    max-width: 42%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Lifted less far above its dot than on a desktop — the frame is shorter here, and 20px of
+     clearance put the start label over the top edge. */
+  .route__frame .route__pin--start { transform: translate(-50%, calc(-100% - 10px)); }
+  .route__frame .route__pin--end { transform: translate(-50%, 14px); }
 }
 
 @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
   /* Everything at its resting state: the section is still two screens tall so the layout does
      not change, but nothing moves as a function of scrolling. */
-  #route .route__copy { opacity: 1; transform: none; }
+  #route .route__copy { transform: none; }
+  #route .route__copy .lead { max-height: none; }
   #route .route__frame { transform: none; }
   #route .route__frame .route__pin,
   #route .route__frame .route__node { scale: 1; }

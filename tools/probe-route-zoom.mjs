@@ -93,6 +93,15 @@ const probe = `
           const copy = document.querySelector('.route__copy');
           return copy ? Number(getComputedStyle(copy).opacity).toFixed(2) : null;
         })(),
+        /* Skala tekstu, bo to ona ustepuje miejsca zdjeciu. Wczesniej mierzone bylo krycie —
+           tekst gasl do 42% i to bylo zglaszane jako „wszystko przygaszone". Teraz krycie ma
+           stac na 1 i to jest osobna asercja nizej. */
+        copyScale: (() => {
+          const copy = document.querySelector('.route__copy');
+          if (!copy) return null;
+          const style = getComputedStyle(copy).transform;
+          return Number(new DOMMatrixReadOnly(style === 'none' ? '' : style).a.toFixed(3));
+        })(),
         // Co naprawde odziedziczyl tekst. Rozjazd miedzy tym a kolumna "progress" znaczy, ze
         // wlasciwosc nie doszla do sekcji; zgodnosc znaczy, ze to arkusz jej nie czyta.
         sectionProgress: getComputedStyle(document.querySelector('.route__copy'))
@@ -191,10 +200,14 @@ try {
   /* Trzy osobne asercje, bo trzy osobne rzeczy mogą nie działać niezależnie od siebie. */
   const carts = result.samples.map((s) => s.cart).filter(Boolean);
   const cartMoved = new Set(carts.map((c) => `${c.left}|${c.top}`)).size > 1;
-  const copyFaded = new Set(result.samples.map((s) => s.copyOpacity)).size > 1;
+  const copyScales = result.samples.map((s) => s.copyScale).filter((value) => value !== null);
+  const copyRecedes = new Set(copyScales).size > 1 && Math.min(...copyScales) < 0.92;
+  const opacities = result.samples.map((s) => Number(s.copyOpacity));
+  const copyStaysLit = opacities.every((value) => value > 0.95);
   console.log('');
   console.log(`${cartMoved ? 'ok  ' : 'FAIL'}  wózek jedzie po trasie (różnych pozycji: ${new Set(carts.map((c) => c.left)).size})`);
-  console.log(`${copyFaded ? 'ok  ' : 'FAIL'}  tekst obok zdjęcia odchodzi (różnych kryć: ${new Set(result.samples.map((s) => s.copyOpacity)).size})`);
+  console.log(`${copyRecedes ? 'ok  ' : 'FAIL'}  tekst ustępuje miejsca rozmiarem: skala ${Math.max(...copyScales)} → ${Math.min(...copyScales)}`);
+  console.log(`${copyStaysLit ? 'ok  ' : 'FAIL'}  i nie gaśnie: krycie ${Math.min(...opacities)} → ${Math.max(...opacities)}`);
   console.log(`      reduced-motion w przeglądarce: ${result.samples[0]?.reduced}`);
   console.log(`      transform tekstu: ${result.samples[0]?.copyTransform} ... ${result.samples.at(-1)?.copyTransform}`);
   const diag = result.samples[0]?.opacityRules;
