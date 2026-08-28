@@ -5,6 +5,7 @@ import type { PanelLocale, TranslateKey } from '../i18n';
 import {
   fetchThreadMessages,
   fetchThreads,
+  pingTyping,
   replyToThread,
   setThreadMode,
   type ChatMessage,
@@ -95,6 +96,27 @@ export function Chat({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(false);
+
+  /**
+   * Tells the visitor that somebody is writing, at most once every three seconds.
+   *
+   * Throttled and not debounced, and the difference matters here. Debounced would fire after
+   * a pause in typing — which is the moment the signal is least true. Throttled fires on the
+   * first keystroke and keeps refreshing while keys are being pressed, which is when the dots
+   * should be up.
+   *
+   * Three seconds against the server's six-second expiry, so continuous typing always keeps
+   * the value fresh with one spare interval for a dropped request.
+   */
+  const lastTypingPing = useRef(0);
+  const announceTyping = useCallback(() => {
+    if (!active) return;
+    const now = Date.now();
+    if (now - lastTypingPing.current < 3000) return;
+    lastTypingPing.current = now;
+    // Not awaited: a lost ping costs one cycle of dots and nothing else.
+    pingTyping(apiKey, active);
+  }, [apiKey, active]);
 
   const scroller = useRef<HTMLDivElement | null>(null);
   /** True while the reader is at the bottom. Drives whether new messages scroll. */
@@ -364,7 +386,11 @@ export function Chat({
               >
                 <textarea
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                    // Tells the visitor somebody is writing. Throttled in announceTyping.
+                    announceTyping();
+                  }}
                   onKeyDown={(event) => {
                     // Enter sends, Shift+Enter makes a line. Same as everywhere else.
                     if (event.key === 'Enter' && !event.shiftKey) {

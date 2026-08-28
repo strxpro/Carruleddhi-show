@@ -176,3 +176,96 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .animate-skeleton { animation: none; opacity: 0.7; }
 }
+
+/* ============================================================================
+   Start cards on paper
+   ============================================================================
+   Rendered by src/admin/views/StartCards.tsx, invisible on screen, and the only thing on the
+   page when "print cards" is pressed. Before this, that button called window.print() on the
+   panel itself — so it printed a dark sidebar, a search box and whichever table rows happened
+   to be scrolled into view.
+   ========================================================================== */
+.start-cards { display: none; }
+
+@media print {
+  /* Everything except the cards goes.
+     One selector, and it only works because StartCards renders through a portal into <body> —
+     so the cards are a sibling of the app root rather than buried inside it. Written as
+     "everything that is not this" rather than as a list of components, so a screen added next
+     year does not have to remember to hide itself. */
+  body > *:not(.start-cards) { display: none !important; }
+  .start-cards { display: block !important; }
+
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    /* The panel is dark. Paper is not, and printing a dark theme is how a cartridge is emptied
+       on one job — most browsers drop backgrounds by default, which would leave white text on
+       white paper. Forced back to black on white here rather than hoped for. */
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .start-cards__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8mm;
+    border-bottom: 1pt solid #000;
+    margin-bottom: 4mm;
+    padding-bottom: 2mm;
+    font-size: 9pt;
+  }
+
+  .start-card {
+    /* Two across on A4, so forty riders are twenty sheets rather than forty. */
+    display: flex;
+    width: 92mm;
+    align-items: center;
+    gap: 4mm;
+    /* Never split a card across a page: half a number is worse than a wasted centimetre. */
+    break-inside: avoid;
+    border: 1.5pt solid #000;
+    border-radius: 3mm;
+    margin: 0 2mm 3mm 0;
+    padding: 3mm;
+    vertical-align: top;
+  }
+  .start-cards { column-count: 2; column-gap: 4mm; }
+
+  .start-card__number {
+    min-width: 22mm;
+    /* Big enough to read from a metre away, which is the distance a marshal reads it from. */
+    font-size: 26pt;
+    font-weight: 800;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .start-card__body { display: grid; gap: 0.6mm; min-width: 0; }
+  .start-card__name { font-size: 12pt; font-weight: 700; }
+  .start-card__cart { font-size: 9pt; }
+  .start-card__meta { font-size: 8pt; }
+
+  /* The one line somebody may need in a hurry, so it is the one line with a box round it. */
+  .start-card__minor {
+    margin-top: 0.8mm;
+    border: 1pt solid #000;
+    padding: 0.6mm 1.5mm;
+    font-size: 7.5pt;
+    font-weight: 800;
+  }
+
+  .start-card__checks {
+    display: grid;
+    gap: 1mm;
+    margin-left: auto;
+    font-size: 7.5pt;
+    white-space: nowrap;
+  }
+
+  .start-cards__empty { font-size: 10pt; }
+}

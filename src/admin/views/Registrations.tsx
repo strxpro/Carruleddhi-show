@@ -9,6 +9,7 @@ import {
   type RosterEdit,
   type RosterRow
 } from '../api';
+import { StartCards } from './StartCards';
 
 /* The `pick()` helper and the snake_case fallbacks that used to be at the top of this file
    are gone. They existed because nothing on the server answered `roster` — the request went
@@ -82,10 +83,14 @@ export function Registrations({
           <h2 className="text-2xl font-bold tracking-tight text-foreground">{t('reg.title')}</h2>
           <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{t('reg.lead')}</p>
         </div>
+        {/* Disabled until the entries are loaded. Printing a list that has not arrived yet
+            produces a sheet with a header and nothing under it, and the only way to find that
+            out is at the printer. */}
         <button
           type="button"
+          disabled={!rows || rows.length === 0}
           onClick={() => window.print()}
-          className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+          className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:opacity-40"
         >
           <Printer className="size-3.5" />
           {t('reg.print')}
@@ -245,6 +250,12 @@ export function Registrations({
           ? 'Numer startowy to najniższy wolny. Rezygnacja („withdrawn") zwalnia go i następna osoba go dostaje — dlatego rezygnację robi się zmianą statusu, a nie usunięciem wiersza. Adresu e-mail nie da się tu zmienić: jest tożsamością zgłoszenia i tam poszło potwierdzenie z PDF-em. Zły adres to nowe zgłoszenie plus rezygnacja starego.'
           : 'Il numero di partenza è il più basso libero. Un ritiro («withdrawn») lo libera e lo prende il prossimo iscritto: per questo un ritiro è un cambio di stato e non la cancellazione della riga. L’indirizzo e-mail non si cambia qui: è l’identità dell’iscrizione ed è dove è arrivata la conferma con il PDF. Un indirizzo sbagliato significa una nuova iscrizione più il ritiro di quella vecchia.'}
       </p>
+
+      {/* One card per rider, invisible on screen and the only thing on the page when the print
+          dialog opens — `@media print` in admin.css does the swap. Fed the whole list rather
+          than `visible`, so a search box left with something typed in it cannot silently reduce
+          the stack of cards taken to the start line. */}
+      {rows ? <StartCards rows={rows} locale={locale} /> : null}
 
       {editing ? (
         <EditDialog

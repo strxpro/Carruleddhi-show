@@ -301,7 +301,21 @@ const QUIT = {
   }
 };
 
-const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT];
+/* ------------------------------------------------- poprawione zgłoszenie: nowe potwierdzenie
+   Po edycji idzie ten sam list co przy zapisie — z numerem startowym i formularzami w PDF —
+   bo kopia w skrzynce jest już nieaktualna, a to ona zostanie przyniesiona na start.
+   Przedrostek w temacie, bo dwa identyczne potwierdzenia w jednej skrzynce to sytuacja, w
+   której ktoś drukuje to starsze. */
+const EDITED = {
+  it: { editedPrefix: '[Aggiornato]' },
+  pl: { editedPrefix: '[Poprawione]' },
+  en: { editedPrefix: '[Updated]' },
+  de: { editedPrefix: '[Aktualisiert]' },
+  es: { editedPrefix: '[Actualizado]' },
+  fr: { editedPrefix: '[Mis à jour]' }
+};
+
+const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED];
 // (Ten plik obsługuje emails/copy.json. Klucze interfejsu strony idą przez
 //  tools/add-i18n-keys.mjs — to dwa różne słowniki i mieszanie ich kończy się kluczem,
 //  którego szuka przeglądarka, a jest tylko w mailach.)

@@ -133,7 +133,8 @@ export const COPY_DECK = {
     "quitDoneSubject": "Ritiro confermato — Carruleddhi Show 2026",
     "quitDoneTitle": "Ti abbiamo ritirato dalla gara",
     "quitDoneLead": "Il numero %RACENUMBER% torna disponibile e non ti mandiamo più promemoria.",
-    "quitDoneNote": "Se non sei stato tu, scrivici subito a %ORGEMAIL% — si può rimettere a posto."
+    "quitDoneNote": "Se non sei stato tu, scrivici subito a %ORGEMAIL% — si può rimettere a posto.",
+    "editedPrefix": "[Aggiornato]"
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -257,7 +258,8 @@ export const COPY_DECK = {
     "quitDoneSubject": "Rezygnacja przyjęta — Carruleddhi Show 2026",
     "quitDoneTitle": "Wycofaliśmy Cię z wyścigu",
     "quitDoneLead": "Numer %RACENUMBER% wraca do puli, a przypomnień już nie wysyłamy.",
-    "quitDoneNote": "Jeśli to nie Ty, napisz do nas od razu na %ORGEMAIL% — da się to odkręcić."
+    "quitDoneNote": "Jeśli to nie Ty, napisz do nas od razu na %ORGEMAIL% — da się to odkręcić.",
+    "editedPrefix": "[Poprawione]"
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -381,7 +383,8 @@ export const COPY_DECK = {
     "quitDoneSubject": "Withdrawal confirmed — Carruleddhi Show 2026",
     "quitDoneTitle": "You are withdrawn from the race",
     "quitDoneLead": "Number %RACENUMBER% goes back into the pool and no more reminders are coming.",
-    "quitDoneNote": "If this was not you, write to us straight away at %ORGEMAIL% — it can be put back."
+    "quitDoneNote": "If this was not you, write to us straight away at %ORGEMAIL% — it can be put back.",
+    "editedPrefix": "[Updated]"
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -505,7 +508,8 @@ export const COPY_DECK = {
     "quitDoneSubject": "Rücktritt bestätigt — Carruleddhi Show 2026",
     "quitDoneTitle": "Du bist vom Rennen zurückgetreten",
     "quitDoneLead": "Die Nummer %RACENUMBER% geht zurück in den Pool, und Erinnerungen kommen keine mehr.",
-    "quitDoneNote": "Wenn das nicht du warst, schreib uns sofort an %ORGEMAIL% — das lässt sich zurücknehmen."
+    "quitDoneNote": "Wenn das nicht du warst, schreib uns sofort an %ORGEMAIL% — das lässt sich zurücknehmen.",
+    "editedPrefix": "[Aktualisiert]"
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -629,7 +633,8 @@ export const COPY_DECK = {
     "quitDoneSubject": "Retirada confirmada — Carruleddhi Show 2026",
     "quitDoneTitle": "Te hemos retirado de la carrera",
     "quitDoneLead": "El dorsal %RACENUMBER% vuelve a estar disponible y no te enviamos más avisos.",
-    "quitDoneNote": "Si no has sido tú, escríbenos enseguida a %ORGEMAIL%: se puede deshacer."
+    "quitDoneNote": "Si no has sido tú, escríbenos enseguida a %ORGEMAIL%: se puede deshacer.",
+    "editedPrefix": "[Actualizado]"
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -753,6 +758,7 @@ export const COPY_DECK = {
     "quitDoneSubject": "Retrait confirmé — Carruleddhi Show 2026",
     "quitDoneTitle": "Vous êtes retiré de la course",
     "quitDoneLead": "Le numéro %RACENUMBER% retourne dans la réserve et nous ne vous enverrons plus de rappels.",
-    "quitDoneNote": "Si ce n’était pas vous, écrivez-nous tout de suite à %ORGEMAIL% — cela peut être rétabli."
+    "quitDoneNote": "Si ce n’était pas vous, écrivez-nous tout de suite à %ORGEMAIL% — cela peut être rétabli.",
+    "editedPrefix": "[Mis à jour]"
   }
 };

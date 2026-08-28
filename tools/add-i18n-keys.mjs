@@ -389,9 +389,21 @@ const ENTRY_UI = {
   }
 };
 
+/* Po zapisaniu zmian idzie nowe potwierdzenie z formularzami — trzeba to powiedzieć, bo
+   inaczej człowiek wydrukuje starszy PDF, który ma już w skrzynce. */
+const SAVED_MAILED = {
+  it: { 'entry.savedMailed': 'Fatto. Ti abbiamo rimandato la conferma con i moduli aggiornati — stampa quella nuova.' },
+  pl: { 'entry.savedMailed': 'Gotowe. Wysłaliśmy nowe potwierdzenie z formularzami — wydrukuj to najnowsze.' },
+  en: { 'entry.savedMailed': 'Done. We have sent the confirmation again with updated forms — print the newest one.' },
+  de: { 'entry.savedMailed': 'Erledigt. Wir haben die Bestätigung mit aktualisierten Formularen erneut gesendet — drucke die neueste.' },
+  es: { 'entry.savedMailed': 'Hecho. Te hemos reenviado la confirmación con los formularios actualizados: imprime la más nueva.' },
+  fr: { 'entry.savedMailed': 'C’est fait. Nous avons renvoyé la confirmation avec les formulaires à jour — imprimez la plus récente.' }
+};
+
 const CHAT_GATE = {
   it: {
     ...WALL_LIVE.it,
+    ...SAVED_MAILED.it,
     ...ENTRY_UI.it,
     'chat.gateLead': 'Prima di iniziare: come ti chiami e a quale indirizzo possiamo risponderti?',
     'chat.gateName': 'Come ti chiami *',
@@ -411,6 +423,7 @@ const CHAT_GATE = {
   },
   pl: {
     ...WALL_LIVE.pl,
+    ...SAVED_MAILED.pl,
     ...ENTRY_UI.pl,
     'chat.gateLead': 'Zanim zaczniemy: jak się nazywasz i na jaki adres możemy odpisać?',
     'chat.gateName': 'Jak się nazywasz *',
@@ -430,6 +443,7 @@ const CHAT_GATE = {
   },
   en: {
     ...WALL_LIVE.en,
+    ...SAVED_MAILED.en,
     ...ENTRY_UI.en,
     'chat.gateLead': 'Before we start: what is your name, and where can we reply?',
     'chat.gateName': 'Your name *',
@@ -449,6 +463,7 @@ const CHAT_GATE = {
   },
   de: {
     ...WALL_LIVE.de,
+    ...SAVED_MAILED.de,
     ...ENTRY_UI.de,
     'chat.gateLead': 'Bevor wir anfangen: wie heißt du, und an welche Adresse können wir antworten?',
     'chat.gateName': 'Dein Name *',
@@ -468,6 +483,7 @@ const CHAT_GATE = {
   },
   es: {
     ...WALL_LIVE.es,
+    ...SAVED_MAILED.es,
     ...ENTRY_UI.es,
     'chat.gateLead': 'Antes de empezar: ¿cómo te llamas y a qué dirección podemos responderte?',
     'chat.gateName': 'Tu nombre *',
@@ -487,6 +503,7 @@ const CHAT_GATE = {
   },
   fr: {
     ...WALL_LIVE.fr,
+    ...SAVED_MAILED.fr,
     ...ENTRY_UI.fr,
     'chat.gateLead': 'Avant de commencer : comment vous appelez-vous, et à quelle adresse pouvons-nous répondre ?',
     'chat.gateName': 'Votre nom *',

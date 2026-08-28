@@ -3295,7 +3295,10 @@ import { flagSvg } from './flags.js';
         if (!result?.ok) throw Object.assign(new Error('update'), { payload: result });
         show('choices');
         if (choices) choices.hidden = true;
-        say('entry.saved');
+        /* Says the confirmation went out again, because it did — with the race number and the
+           forms attached. Worth saying: the copy already in their inbox is now the older of two
+           and they should print the new one. */
+        say(result.mailed ? 'entry.savedMailed' : 'entry.saved');
       } catch (error) {
         say(explain(error.payload));
       } finally {
@@ -5370,6 +5373,16 @@ import { flagSvg } from './flags.js';
           if (!result || result.ok === false) return;
           mode = result.mode || mode;
           (result.messages || []).forEach((message) => append(message, false));
+          /* Dots while a person is writing an answer.
+             They already appear while the model is thinking, which is a second at most. This is
+             the case where they matter: the question went to a human, somebody is typing three
+             sentences in the panel, and until now there was nothing on this side saying so.
+
+             Shown after the messages are appended, so if the answer arrived in this same poll
+             the dots go up and come straight back down rather than appearing under a message
+             that is already there. */
+          if (result.theirTyping) showTyping();
+          else hideTyping();
         } catch (_) {
           /* A dropped poll is not worth telling anybody about; the next one retries. */
         }

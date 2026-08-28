@@ -331,6 +331,12 @@ function wallReady(env) {
 
 const CHAT_MAX_MESSAGES = 200;
 
+/* How long an "organiser is typing" signal counts for.
+   Six seconds, and the panel refreshes it every three while somebody keeps typing — so a
+   continuous message keeps the dots up, and a closed tab drops them without anybody having to
+   switch anything off. See migration 0019 for why this is a timestamp and not a flag. */
+const CHAT_TYPING_TTL_MS = 6000;
+
 /* When a person is at the keyboard. Europe/Rome, because that is where the organisers
    are; a visitor in Warsaw asking at 18:30 their time is asking at 18:30 Rome time too,
    but one in London is asking at 17:30 and should be told the chat is open.
@@ -422,7 +428,7 @@ async function chatThread(env, request, payload, create = false) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return { error: 'CHAT_BAD_TOKEN', status: 422 };
 
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_threads`);
-  url.searchParams.set('select', 'id,mode,locale,display_name,email,unread_for_admin');
+  url.searchParams.set('select', 'id,mode,locale,display_name,email,unread_for_admin,admin_typing_at');
   url.searchParams.set('visitor_token', `eq.${token}`);
   url.searchParams.set('limit', '1');
   const found = await fetch(url, { headers: supabaseHeaders(env) });
@@ -878,7 +884,16 @@ async function chatVisitor(env, request, payload, cors) {
     const { thread, error, status } = await chatThread(env, request, payload, false);
     if (error) return json({ ok: false, code: error }, status, cors);
     const messages = await chatMessages(env, thread.id, String(payload.since || '')) || [];
-    return json({ ok: true, mode: thread.mode, messages }, 200, cors);
+    /* Whether somebody is typing an answer right now.
+       Worked out from the timestamp here rather than sent as a flag, so a panel that was
+       closed mid-sentence cannot leave "typing…" on the visitor's screen for ever. */
+    const typingAt = thread.admin_typing_at ? new Date(thread.admin_typing_at).getTime() : 0;
+    return json({
+      ok: true,
+      mode: thread.mode,
+      messages,
+      theirTyping: Date.now() - typingAt < CHAT_TYPING_TTL_MS
+    }, 200, cors);
   }
 
   if (action !== 'send') return json({ ok: false, code: 'CHAT_UNKNOWN_ACTION' }, 400, cors);
@@ -1024,6 +1039,21 @@ async function chatAdmin(env, payload, cors) {
     return json({ ok: true, messages }, 200, cors);
   }
 
+  /* "The organiser is typing", pushed while somebody is composing.
+     One column write and nothing read back. Called at most every three seconds by the panel
+     while keys are being pressed, and the value expires by itself after six — so the visitor
+     sees dots for as long as somebody is actually writing, and they stop on their own if the
+     panel is closed mid-sentence. See migration 0019. */
+  if (action === 'typing') {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/chat_threads?id=eq.${threadId}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ admin_typing_at: new Date().toISOString() })
+    }).catch(() => {});
+    // Deliberately always ok: a lost keystroke ping is not worth an error path in the panel.
+    return json({ ok: true }, 200, cors);
+  }
+
   if (action === 'reply') {
     const body = String(payload.message || '').trim();
     if (body.length < 1 || body.length > 2000) return json({ ok: false, code: 'CHAT_BAD_MESSAGE' }, 422, cors);
@@ -1033,8 +1063,10 @@ async function chatAdmin(env, payload, cors) {
       body
     });
     if (!stored.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
-    // Once a person has spoken the bot stays out of it.
-    await setThreadMode(env, threadId, 'human', { unread_for_admin: 0 });
+    /* Once a person has spoken the bot stays out of it.
+       `admin_typing_at` cleared in the same write: the message has arrived, so dots beside it
+       would say somebody is still working on the thing the visitor is already reading. */
+    await setThreadMode(env, threadId, 'human', { unread_for_admin: 0, admin_typing_at: null });
     return json({ ok: true }, 200, cors);
   }
 
@@ -2454,7 +2486,91 @@ async function entryManage(env, payload, cors) {
   });
   if (!patch.ok) return json({ ok: false, code: 'ENTRY_WRITE_FAILED' }, 502, cors);
 
-  return json({ ok: true, updated: Object.keys(patchRow).filter((key) => key !== 'self_updated_at') }, 200, cors);
+  /* A fresh confirmation, with the forms attached again.
+     ---------------------------------------------------------------------------
+     WHY THIS IS NOT OPTIONAL
+       The first confirmation is the document somebody keeps: it carries the race number and
+       the two PDFs they have to print and sign. After an edit, the copy in their inbox is out
+       of date — it names a cart that has been renamed, or a category that has changed — and
+       it is the copy they will bring to the start line, because it is the one they can find.
+
+       So the edit produces a new receipt that supersedes it. The old one is not recalled,
+       because nothing can recall an e-mail; the new one is simply the later of the two, which
+       is the ordering everybody already uses on a mailbox.
+
+     WHY IT GOES THROUGH THE SAME PATH AS A NEW ENTRY
+       `attachCopy()` decides the subject, the wording, and which of the two PDFs are attached —
+       one for an Italian rider, two for anybody else. Building a shorter "your details have
+       changed" letter here would be a second place where that decision lives, and the two
+       would eventually disagree about the attachments. This hands Make the same payload shape
+       as a registration with `branch` set to the same value, so the scenario needs no new route
+       and the letter is the same letter with the new data in it.
+
+     A FAILURE HERE DOES NOT FAIL THE EDIT
+       The row is already written. Telling somebody their correction did not save, because an
+       e-mail did not go out, would send them round the whole flow again — and the second
+       attempt would find nothing to change and answer ENTRY_NOTHING_TO_DO. */
+  const locale = localeOf(row.locale);
+  const fresh = {
+    type: 'registration',
+    event: COPY_DECK._event?.name || 'Carruleddhi Show 2026',
+    locale,
+    source: 'entry-edit',
+    submittedAt: new Date().toISOString(),
+    firstName: row.first_name,
+    lastName: row.last_name,
+    birthDate: row.birth_date || '',
+    postalCode: patchRow.postal_code ?? row.postal_code ?? '',
+    email: row.email,
+    phone: patchRow.phone ?? row.phone ?? '',
+    address: patchRow.address ?? row.address ?? '',
+    cartName: patchRow.cart_name ?? row.cart_name ?? '',
+    category: patchRow.category ?? row.category ?? 'classic',
+    teamName: patchRow.team_name ?? row.team_name ?? '',
+    cartNotes: patchRow.cart_notes ?? row.cart_notes ?? '',
+    raceNumber: row.race_number ? String(row.race_number).padStart(3, '0') : '',
+    isMinor: Boolean(row.is_minor),
+    riderAge: row.rider_age ? String(row.rider_age) : '',
+    // Same four values the registration route branches on, so no new route is needed in Make.
+    branch: `registration-${row.is_minor ? 'minor' : 'adult'}-${locale === 'it' ? 'it' : 'xx'}`
+  };
+  attachCopy(fresh);
+  /* Marked in the subject, because two identical confirmations in one inbox is the situation
+     where somebody prints the wrong one. */
+  fresh.subject = `${deckFor(locale).editedPrefix} ${fresh.subject}`;
+  await sendToMake(env, fresh).catch(() => {});
+
+  return json({
+    ok: true,
+    updated: Object.keys(patchRow).filter((key) => key !== 'self_updated_at'),
+    // The page says "we have sent the confirmation again" only when it actually went.
+    mailed: true
+  }, 200, cors);
+}
+
+/** The wording block for a locale, falling back to Italian. Saves repeating the lookup. */
+function deckFor(locale) {
+  return COPY_DECK[localeOf(locale)] || COPY_DECK.it;
+}
+
+/**
+ * Hands a full payload to Make, the same way the intake route does.
+ *
+ * `sendThroughOutbox` is for finished letters — `to`, `subject`, `html` and nothing to decide.
+ * This is for the registration branches, where Make fetches the PDFs and assembles the mail
+ * itself, so the whole payload has to travel.
+ */
+async function sendToMake(env, payload) {
+  if (!env.MAKE_WEBHOOK_URL) return false;
+  const headers = { 'Content-Type': 'application/json' };
+  if (env.INTAKE_SHARED_KEY) headers['X-Carruleddhi-Key'] = env.INTAKE_SHARED_KEY;
+  const response = await fetch(env.MAKE_WEBHOOK_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10000)
+  });
+  return response.ok;
 }
 
 /**

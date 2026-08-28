@@ -225,6 +225,16 @@ export const fetchThreadMessages = (key: string, threadId: string) =>
 export const replyToThread = (key: string, threadId: string, message: string) =>
   call<{ ok: true }>('chat-admin', key, { action: 'reply', threadId, message });
 
+/**
+ * Tells the visitor somebody is writing.
+ *
+ * Fire and forget: the caller does not await it and does not care if it fails. A lost
+ * keystroke ping costs one cycle of dots not appearing, and an error path for that would be
+ * more code than the feature.
+ */
+export const pingTyping = (key: string, threadId: string) =>
+  call<{ ok: true }>('chat-admin', key, { action: 'typing', threadId }).catch(() => {});
+
 export const setThreadMode = (key: string, threadId: string, mode: ChatThread['mode']) =>
   call<{ ok: true; mode: string }>('chat-admin', key, { action: 'mode', threadId, mode });
 
