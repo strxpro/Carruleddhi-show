@@ -202,12 +202,23 @@ import { demoVotingState } from './demo-content.js';
       return;
     }
 
+    /* Wąski ekran sprawdzany przy każdym pytaniu, nie raz przy budowie: obrót telefonu zmienia
+       odpowiedź, a pasek żyje tyle, ile strona. */
+    const isWide = () => window.matchMedia('(min-width: 761px)').matches;
+
     const setPhase = (phase) => {
       demoPhase = phase;
       /* Rysunek podium rysuje się raz, więc przy powrocie do tej fazy trzeba zdjąć klasę,
          inaczej drugie wejście pokazuje gotowy cokół bez animacji. */
       $('[data-podium-art]')?.classList.remove('is-drawn');
       paintDemo();
+      /* Na telefonie zwija się po wyborze. Faza jest wybierana po to, żeby ZOBACZYĆ, co się
+         zmieniło, a rozwinięta lista zasłania dolną trzecią ekranu. Na szerokim zostaje
+         otwarta — tam nie zasłania niczego. */
+      if (!isWide()) {
+        open = false;
+        paintOpen();
+      }
     };
 
     /* Przypięty do okna, nie wstawiony w sekcję głosowania.
@@ -224,9 +235,46 @@ import { demoVotingState } from './demo-content.js';
     bar.setAttribute('role', 'group');
     bar.setAttribute('aria-label', 'DEMO');
 
-    const label = document.createElement('strong');
-    label.textContent = 'DEMO';
-    bar.append(label);
+    /**
+     * Zwijany, bo na telefonie inaczej się nie da.
+     * ---------------------------------------------------------------------------
+     * ZMIERZONE 390×844, gdy pasek był zawsze rozwinięty:
+     *   — przyciski miały 29 px wysokości. Zalecane minimum celu dotykowego to 44;
+     *   — cztery napisy zawijały się do TRZECH rzędów i zabierały 90 px, czyli 11% ekranu;
+     *   — baner cookies stoi w tym samym miejscu: 375 px wysokości, od 459 do 834 px, czyli
+     *     dolna połowa ekranu. Pasek leżał na nim i oba były nieczytelne.
+     *
+     * Domyślnie zwinięty do jednej pigułki z napisem DEMO — zajmuje tyle, ile zajmuje słowo, i
+     * nie ma z czym kolidować. Naciśnięcie rozwija listę faz nad nią, w kolumnie, z celami po
+     * 44 px. Na szerokim ekranie startuje rozwinięty, bo tam miejsca nie brakuje i schowanie
+     * czegokolwiek byłoby utrudnieniem bez powodu.
+     */
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'voting-demo__toggle';
+    toggle.dataset.demoToggle = '';
+    toggle.textContent = 'DEMO';
+    toggle.setAttribute('aria-controls', 'voting-demo-phases');
+
+    const phases = document.createElement('div');
+    phases.className = 'voting-demo__phases';
+    phases.dataset.demoPhases = '';
+    phases.id = 'voting-demo-phases';
+
+    let open = isWide();
+    const paintOpen = () => {
+      bar.classList.toggle('is-open', open);
+      /* `hidden` zamiast samego CSS-a: zwinięte przyciski wypadają wtedy też z kolejności
+         czytania i z wędrówki tabulatorem, a nie tylko z widoku. */
+      phases.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+    };
+    toggle.addEventListener('click', () => {
+      open = !open;
+      paintOpen();
+    });
+
+    bar.append(toggle, phases);
 
     for (const [phase, key] of [
       ['scheduled', 'voting.demoScheduled'],
@@ -238,7 +286,7 @@ import { demoVotingState } from './demo-content.js';
       button.dataset.demoPhase = phase;
       button.textContent = text(key);
       button.addEventListener('click', () => setPhase(phase));
-      bar.append(button);
+      phases.append(button);
     }
 
     /* Osobny przycisk na „licznik doszedł do zera".
@@ -253,9 +301,17 @@ import { demoVotingState } from './demo-content.js';
     skip.addEventListener('click', () => {
       state.raceStartsAt = new Date(Date.now() + 2000).toISOString();
       paintClock();
+      if (!isWide()) {
+        open = false;
+        paintOpen();
+      }
     });
-    bar.append(skip);
+    /* Wewnątrz zwijanej części, nie obok pigułki: zwinięty pasek ma być SZEROKOŚCIĄ słowa DEMO,
+       a ten napis jest najdłuższy z wszystkich („Zakończ odliczanie") i sam zawinąłby pasek do
+       dwóch rzędów. */
+    phases.append(skip);
 
+    paintOpen();
     document.body.append(bar);
     paintDemoSwitch();
   }

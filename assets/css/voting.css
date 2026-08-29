@@ -283,10 +283,33 @@
   backdrop-filter: blur(6px);
   box-shadow: var(--shadow-md);
 }
-.voting-demo > strong {
-  font: 900 10px/1 var(--font-meta); letter-spacing: .18em;
-  color: var(--coral, #ee625f);
+/* Pigułka „DEMO" — zwinięty pasek to ona jedna.
+   ---------------------------------------------------------------------------
+   Była tu wcześniej nieklikalna etykieta `<strong>`. Zastąpił ją przycisk, bo pasek jest
+   zwijany, a etykieta nie ma jak niczego rozwinąć. Wygląd zostaje ten sam: pisane wersalikami,
+   koralowe, drobne — czyli nadal czyta się jak znak wodny podglądu, a nie jak część serwisu. */
+.voting-demo__toggle {
+  flex: 0 0 auto;
+  border-color: rgb(238 98 95 / .55) !important;
+  color: var(--coral, #ee625f) !important;
+  font: 900 10px/1 var(--font-meta) !important; letter-spacing: .18em !important;
 }
+.voting-demo__toggle::after {
+  content: '▾'; margin-left: 6px; display: inline-block;
+  transition: transform .2s;
+}
+.voting-demo.is-open .voting-demo__toggle::after { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .voting-demo__toggle::after { transition: none; } }
+
+/* Rozwinięta lista faz. W kolumnie, bo w rzędzie cztery napisy zawijały się na telefonie do
+   trzech poziomów i zabierały 90 px — a w kolumnie zajmują tyle samo, tylko czytelnie i z
+   celami, w które da się trafić palcem. */
+.voting-demo__phases {
+  display: flex; flex-direction: column; gap: 8px;
+  min-width: 0;
+}
+.voting-demo__phases[hidden] { display: none; }
+
 .voting-demo button {
   padding: 7px 14px; border: 2px solid var(--line); border-radius: 999px;
   background: var(--white); color: var(--blue-700); cursor: pointer;
@@ -307,10 +330,39 @@
 }
 .voting-demo__skip[hidden] { display: none; }
 
-/* Na telefonie pasek demo zajmuje całą szerokość nad dolną krawędzią — trzy przyciski w rzędzie
-   po 11 px nie są celem dla palca, a zawinięte w kolumnę zasłaniałyby pół ekranu. */
-@media (max-width: 560px) {
-  .voting-demo { left: 10px; right: 10px; bottom: 10px; max-width: none; justify-content: center; }
+/* Na szerokim ekranie fazy stoją w rzędzie — miejsca jest tyle, że kolumna byłaby dziwactwem. */
+@media (min-width: 761px) {
+  .voting-demo__phases { flex-direction: row; align-items: center; }
+}
+
+/* Na telefonie: zwinięta pigułka, a po rozwinięciu kolumna celów po 44 px.
+   ---------------------------------------------------------------------------
+   ZMIERZONE 390×844 na wersji „zawsze rozwinięty pasek na całą szerokość":
+     — przyciski 29 px wysokości (zalecane minimum celu dotykowego: 44);
+     — cztery napisy zawijały się do trzech rzędów, 90 px = 11% ekranu;
+     — baner cookies stoi w tym samym miejscu (od 459 do 834 px), więc pasek leżał na nim.
+
+   `column-reverse` nie jest ozdobą: DOM ma pigułkę pierwszą, a rysunek odwrotny, więc lista
+   rośnie DO GÓRY i pigułka nie rusza się z miejsca przy rozwijaniu. Kciuk zostaje tam, gdzie
+   nacisnął. */
+@media (max-width: 760px) {
+  .voting-demo {
+    left: 10px; right: auto; bottom: 10px;
+    max-width: calc(100vw - 20px);
+    flex-direction: column-reverse; flex-wrap: nowrap; align-items: stretch;
+    padding: 8px;
+  }
+  .voting-demo button { min-height: 44px; padding: 12px 16px; font-size: 12px; }
+  .voting-demo__toggle { align-self: flex-start; }
+
+  /* Baner cookies zajmuje na telefonie całą szerokość nad dolną krawędzią. Dopóki wisi, pasek
+     demo przenosi się pod nagłówek — nie ma tu nic do wyboru między nimi, oba są przypięte do
+     tego samego róga. Selektor rodzeństwa działa, bo baner stoi w znaczniku, a pasek dokłada
+     się na końcu ciała dokumentu. Po zamknięciu banera pasek wraca na dół sam. */
+  .cookie-banner.is-visible ~ .voting-demo {
+    top: 74px; bottom: auto;
+    flex-direction: column; align-items: flex-start;
+  }
 }
 
 /* ============================================================ zapisy wstrzymane */
