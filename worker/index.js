@@ -16,6 +16,7 @@
  */
 import { COPY_DECK } from './copy-deck.js';
 import { EMAIL_TEMPLATES } from './email-templates.js';
+import { PRINT_TEMPLATES, PRINT_WORDING, PRINT_DATA_KEYS } from './print-templates.js';
 
 const ALLOWED_TYPES = new Set([
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
@@ -3464,6 +3465,137 @@ function supabaseHeaders(env, extra = {}) {
   };
 }
 
+/**
+ * Token do formularza jednej osoby — liczony, nie przechowywany.
+ *
+ * DLACZEGO NIE SAMO `id` W ADRESIE
+ *   Uuid zgłoszenia jest w panelu, w logach i w każdym zapytaniu do bazy. Adres
+ *   `/form?id=<uuid>` znaczyłby, że każdy, kto je gdziekolwiek zobaczy, otwiera cudzy
+ *   formularz z adresem zamieszkania i numerem telefonu — a przy nieletnim także
+ *   z danymi opiekuna.
+ *
+ * DLACZEGO NIE NOWA KOLUMNA
+ *   Token dałoby się wylosować i zapisać przy zgłoszeniu, ale to migracja, kolumna
+ *   i jeden stan więcej do utrzymania. HMAC z `id` daje to samo bez niczego z tych
+ *   trzech: serwer przelicza go w locie i porównuje.
+ *
+ *   Efekt uboczny, który jest zaletą: rotacja `WALL_SALT` unieważnia wszystkie linki
+ *   naraz. Gdyby kiedyś trzeba było je odciąć, jest czym.
+ */
+async function printToken(env, id) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(env.WALL_SALT || 'carruleddhi'),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`print:${id}`));
+  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+/**
+ * Formularz tej jednej osoby, gotowy do druku.
+ *
+ *   GET /api/carruleddhi/form?id=<uuid>&t=<token>
+ *
+ * Ta sama treść i ten sam układ co PDF w załączniku, tylko z wpisanymi danymi.
+ * Uczestnik otwiera link, drukuje albo zapisuje jako PDF z menu druku przeglądarki.
+ *
+ * DLACZEGO STRONA, A NIE PDF
+ *   Na Vercelu nie ma Chrome, a szablon to HTML z `@page`. Przepisanie go na bibliotekę
+ *   PDF-ową znaczyłoby odtworzenie układu od zera i utratę tego, że wszystkie czternaście
+ *   plików mieści się na jednej stronie — co kosztowało dwa przebiegi pomiarów.
+ *   Pełny wywód w make/PLAN-FORMULARZ-Z-DANYMI.md.
+ */
+async function printableForm(env, url, cors) {
+  const headers = {
+    'Content-Type': 'text/html; charset=utf-8',
+    /* Ta strona niesie czyjeś nazwisko, adres i telefon. Nie ma prawa trafić do
+       wyszukiwarki ani zostać w cache pośrednika po zamknięciu karty. */
+    'Cache-Control': 'private, no-store',
+    'X-Robots-Tag': 'noindex, nofollow'
+  };
+  const fail = (status, message) =>
+    new Response(`<!doctype html><meta charset="utf-8"><title>Carruleddhi</title>`
+      + `<body style="font:16px/1.6 system-ui;margin:12vh auto;max-width:32rem;padding:0 1.5rem;color:#071a3d">`
+      + `<p>${escapeHtml(message)}</p>`, { status, headers: { ...headers, ...cors } });
+
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return fail(503, 'Formularz chwilowo niedostępny.');
+
+  const id = String(url.searchParams.get('id') || '');
+  const token = String(url.searchParams.get('t') || '');
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !/^[0-9a-f]{32}$/.test(token)) return fail(400, 'Nieprawidłowy adres.');
+
+  /* Porównanie po przeliczeniu, nie wyszukanie po tokenie — dzięki temu nie ma czego
+     zgadywać w bazie, a zły token kosztuje jedno HMAC i nic więcej. */
+  if (token !== await printToken(env, id)) return fail(403, 'Link jest nieprawidłowy albo wygasł.');
+
+  const query = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
+  query.searchParams.set('select', '*');
+  query.searchParams.set('id', `eq.${id}`);
+  query.searchParams.set('limit', '1');
+  const found = await fetch(query, { headers: supabaseHeaders(env) });
+  if (!found.ok) return fail(502, 'Nie udało się wczytać zgłoszenia.');
+  const row = (await found.json())[0];
+  if (!row) return fail(404, 'Nie znaleziono tego zgłoszenia.');
+
+  /* Rezygnacja unieważnia formularz. Bez tego ktoś drukuje kartę startową po tym, jak
+     zrezygnował, i przychodzi z nią na start — a jego numer należy już do kogoś innego,
+     bo trigger z 0011 zwolnił go do puli. */
+  if (row.status === 'withdrawn') return fail(410, 'To zgłoszenie zostało wycofane.');
+
+  const minor = Boolean(row.is_minor);
+  const locale = localeOf(row.locale);
+  const template = PRINT_TEMPLATES[minor ? 'minor' : 'adult'];
+  const words = PRINT_WORDING[`${locale}:${minor ? 'minor' : 'adult'}`];
+  if (!template || !words) return fail(500, 'Brak szablonu dla tego języka.');
+
+  const date = (value) => {
+    const parsed = value ? new Date(value) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) return '';
+    return new Intl.DateTimeFormat('pl-PL', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }).format(parsed);
+  };
+  const relation = COPY_DECK[locale]?.minRel?.[row.guardian_relation] || row.guardian_relation || '';
+
+  const values = {
+    RACE_NUMBER: String(row.race_number ?? '').padStart(3, '0'),
+    FULL_NAME: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+    BIRTH_DATE: date(row.birth_date),
+    POSTAL_CODE: row.postal_code || '',
+    PHONE: row.phone || '',
+    EMAIL: row.email || '',
+    ADDRESS: row.address || '',
+    CART_NAME: row.cart_name || '',
+    CATEGORY: String(row.category || '').toUpperCase(),
+    TEAM: row.team_name || '—',
+    CART_NOTES: row.cart_notes || '—',
+    RIDER_AGE: String(row.rider_age ?? ''),
+    GUARDIAN_NAME: row.guardian_name || '',
+    GUARDIAN_EMAIL: row.guardian_email || '',
+    GUARDIAN_PHONE: row.guardian_phone || '',
+    MOTHER_NAME: row.mother_name || '—',
+    FATHER_NAME: row.father_name || '—',
+    GUARDIAN_RELATION: relation
+  };
+
+  /* Każde pole przez escapeHtml: to są dane wpisane przez człowieka w formularzu na
+     stronie, a nazwisko z apostrofem albo nazwa wózka z nawiasem ostrym rozwaliłyby
+     dokument, który ktoś zaraz podpisuje. */
+  let html = template;
+  for (const key of PRINT_DATA_KEYS) {
+    html = html.split(`{{${key}}}`).join(escapeHtml(values[key] ?? ''));
+  }
+  for (const [key, value] of Object.entries(words)) {
+    // Słowa pochodzą z pdf-copy.json i celowo niosą własny HTML (listy, blok ostrzeżenia).
+    html = html.split(`{{${key}}}`).join(String(value));
+  }
+  // Data wydruku, nie data zbudowania generatora — dlatego placeholder dotrwał aż tutaj.
+  html = html.split('%GENERATEDAT%').join(date(new Date().toISOString()));
+
+  return new Response(html, { status: 200, headers: { ...headers, ...cors } });
+}
+
 /** Salted hash of the caller's address. The address itself is never stored. */
 async function hashIp(env, request) {
   const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
@@ -4028,11 +4160,26 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (!url.pathname.startsWith('/api/carruleddhi')) return new Response('Not found', { status: 404, headers: cors });
-    if (request.method !== 'POST') return json({ ok: false, code: 'METHOD_NOT_ALLOWED' }, 405, cors);
 
     // The ceiling depends on the route, and the route is in the path, so it is read
     // before the body. Only the wall may carry an image.
     const pathType = url.pathname.replace(/^\/api\/carruleddhi\/?/, '').replace(/\/+$/, '');
+
+    /* JEDEN WYJĄTEK OD "TYLKO POST", I ZOSTAJE JEDNYM.
+       ---------------------------------------------------------------------------
+       Reguła niżej jest słuszna: żadnej trasy tego API nie wolno wywołać z paska adresu,
+       bo wtedy wystarczyłby link, żeby cudzym imieniem zapisać kogoś na wyścig.
+
+       Formularz do druku jest inny z natury. To jest link w mailu, a linku w mailu nie
+       da się wysłać POST-em — czytelnik go klika i przeglądarka robi GET. Gdyby trasa
+       została przy POST, jedynym sposobem byłby formularz z przyciskiem na stronie
+       pośredniej, czyli dodatkowy klik i dodatkowa strona po to, żeby obejść regułę,
+       która i tak nie chroni tutaj przed niczym: to jest odczyt, nie zapis.
+
+       Ochroną jest token w adresie (patrz printableForm), a nie metoda HTTP. */
+    if (request.method === 'GET' && pathType === 'form') return printableForm(env, url, cors);
+    if (request.method !== 'POST') return json({ ok: false, code: 'METHOD_NOT_ALLOWED' }, 405, cors);
+
     /* `settings-admin` is on this list because a sponsor logo arrives the same way a
        wall photo does — as a data URL in the body — and the default ceiling would
        reject it before the handler ever saw it. */
