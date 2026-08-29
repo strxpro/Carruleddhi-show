@@ -45,17 +45,25 @@ export function Registrations({
 
   useEffect(load, [load]);
 
+  /* Newest first on screen.
+     The server sends the roster oldest first on purpose — that is the order the numbers were
+     given out and the order a start list reads in — and `StartCards` below still prints in
+     exactly that order. But the screen answers a different question: "who just signed up".
+     Sorting a copy rather than `rows` is what keeps those two apart; sorting in place would
+     silently reshuffle the stack of cards carried to the start line. */
   const visible = useMemo(() => {
     if (!rows) return [];
     const needle = query.trim().toLowerCase();
-    if (!needle) return rows;
-    return rows.filter((row) =>
-      [row.raceNumber, row.firstName, row.lastName, row.cartName, row.email, row.phone, row.teamName]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(needle)
-    );
+    const found = !needle
+      ? rows
+      : rows.filter((row) =>
+          [row.raceNumber, row.firstName, row.lastName, row.cartName, row.email, row.phone, row.teamName]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(needle)
+        );
+    return [...found].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [rows, query]);
 
   /** Replaces one row with what the server says it now holds. */

@@ -25,7 +25,28 @@
   align-content: center;
   margin-top: 0;
   padding-block: var(--section-card-pad);
-  overflow: hidden;
+  /* `clip`, NIE `hidden` — i to jest naprawa teleportowania na telefonie.
+     ---------------------------------------------------------------------------
+     Oba ucinają to samo. Różnica jest niewidoczna na obrazku i decydująca w zachowaniu:
+     `overflow: hidden` TWORZY kontener przewijania z obszarem nadmiaru, który przeglądarka
+     może przewijać sama — przy ognisku klawiatury, przy `scrollIntoView`, przy kotwicy, i pod
+     palcem. `overflow: clip` nie tworzy go wcale; nie ma czego przewijać.
+
+     ZMIERZONE 390×844: `#hero` jest przypięty, ma pudełko 844 px i treść 945 px, czyli 101 px
+     nadmiaru. Ta sekcja była więc kontenerem przewijania o wysokości ekranu, z setką pikseli
+     do przewinięcia w środku — a takich sekcji jest czternaście. Przeciągnięcie palcem w
+     obrębie takiej sekcji przewija JĄ, nie stronę, i wraca; z zewnątrz wygląda to jak
+     przeskok do innego miejsca i powrót. „Najbardziej na dolnych sekcjach", bo tam nad
+     bieżącą stoi ich najwięcej.
+
+     Programowe przewijanie tego nie pokazywało: `window.scrollTo` rusza dokumentem i nigdy
+     nie trafia w wewnętrzny kontener. Dlatego sześćdziesiąt kroków sondy dawało zero dryfu
+     przy objawie zgłaszanym trzy razy.
+
+     Ten sam argument stoi już w carnival.css przy `html { overflow-x: clip }`: „hidden
+     zamieniłoby korzeń w kontener przewijania i każdy panel `position: sticky` przestałby
+     się przyklejać". Ta sama właściwość, ta sama pułapka, o jeden poziom niżej. */
+  overflow: clip;
   border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;
   box-shadow:
     0 -26px 70px rgba(7, 26, 61, .26),
@@ -221,16 +242,46 @@
 }
 .site-header .brand__name,
 .site-header .brand__date { transition: font-size .4s var(--ease-out), opacity .25s ease; }
+/* Wszystkie cztery czasy sa takie same, i to jest naprawa mignięcia.
+   ---------------------------------------------------------------------------
+   Bylo: szerokosc 0.42s, przezroczystosc i widocznosc 0.24s. `visibility` przelacza sie
+   na koncu swojego przejscia, wiec przy zwijaniu „Bede tam" znikalo po 240 ms, majac
+   jeszcze okolo 40 px szerokosci — czyli gaslo w polowie sciskania i przez kolejne
+   180 ms w pasku zostawala po nim dziura, ktora dopiero sie domykala. Przy najmniejszym
+   ruchu kolkiem w gore (app.js dodaje `is-peeked` juz przy 3 px) cala sekwencja szla od
+   nowa w druga strone.
+
+   Rowne 0.42s znaczy, ze przycisk gasnie dokladnie wtedy, kiedy konczy sie zwezac. */
 .site-header .nav-current,
 .site-header .nav-attend,
 .site-header .language-picker {
   transition:
     max-width .42s var(--ease-out),
     min-width .42s var(--ease-out),
-    opacity .24s ease,
+    opacity .42s ease,
     transform .42s var(--ease-out),
-    visibility .24s;
+    visibility .42s;
 }
+
+/* Nazwa sekcji na srodku PASKA, nie na srodku tego, co zostalo.
+   ---------------------------------------------------------------------------
+   `.nav-current` mial `flex: 1` i `justify-content: center`, co centruje chip w wolnym
+   miejscu miedzy marka a przyciskami — a te dwie strony nigdy nie sa rowne: marka ma
+   150 px, prawa strona z flaga, „Ci saro" i „Menu" okolo 280. Zmierzone na 1440x900:
+   srodek nazwy lezal 66 px na lewo od srodka paska; w pigulce 59 px na prawo; po
+   rozwinieciu 231 px. Na 700 px szerokosci — 182 px.
+
+   Obie strony dostaja `flex: 1 1 0`, wiec dziela wolne miejsce po rowno i to, co jest
+   miedzy nimi, wypada na srodku samo. Bez mierzenia czegokolwiek w JavaScripcie i bez
+   marginesow dobranych na oko, ktore rozjezdzaja sie przy kazdej zmianie tresci.
+
+   Bez `min-width: 0`: domyslne `auto` nie pozwala skurczyc zadnej ze stron ponizej jej
+   wlasnej tresci, wiec w najciasniejszym stanie centrowanie ustepuje, zamiast obcinac
+   nazwe marki. */
+.site-header .brand,
+.site-header .nav-actions { flex: 1 1 0; }
+.site-header .nav-actions { justify-content: flex-end; }
+.site-header .nav-current { flex: 0 1 auto; }
 
 /* 292 -> 560: w pigulce zostaja teraz flaga i pelny chip z nazwa sekcji, wiec
    zwiniety pasek jest blizszy pelnemu niz kropce. To jest swiadomy wybor — kontrolki,
@@ -2034,6 +2085,17 @@ html.no-js .preloader { display: none !important; }
 }
 .sponsor-logo img {
   width: auto;
+  /* Wysokość musi być podana, inaczej logo w SVG bez atrybutów width/height znika.
+     ---------------------------------------------------------------------------
+     Zmierzone na przykładowych logotypach (?demo=1): `naturalWidth` 300, `naturalHeight`
+     90, a wyliczony rozmiar 0×0 — obrazek z samym `viewBox` niesie proporcję, nie wymiar,
+     i przy `width: auto` razem z `height: auto` w komórce siatki wychodzi z tego zero.
+     Pas miał wtedy poprawne 72 px wysokości i osiem niewidocznych logotypów w środku.
+
+     `height: 100%` daje wymiar, `max-height` niżej i tak go ogranicza, a `object-fit`
+     pilnuje proporcji. Logotypy rastrowe mają własny wymiar i nic dla nich się nie
+     zmienia. */
+  height: 100%;
   max-width: clamp(96px, 13vw, 168px);
   max-height: calc(var(--sponsor-band-h) - clamp(20px, 3svh, 30px));
   object-fit: contain;

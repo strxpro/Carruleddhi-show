@@ -203,7 +203,18 @@
   background: #fff;
   color: #071a3d;
   font: inherit;
-  font-size: 15px;
+  /* 16 px, nie 15 — i to nie jest decyzja o wielkości liter.
+     ---------------------------------------------------------------------------
+     iOS Safari powiększa CAŁĄ stronę, gdy ognisko klawiatury trafia w pole o wyliczonym
+     rozmiarze mniejszym niż 16 px. Przy 15 px kosztem był jeden piksel wyglądu, a objawem
+     „chcę napisać na czacie, a strona się powiększa i przeskakuje do sekcji z komentarzami" —
+     bo powiększenie zmienia widoczny obszar, a to pole leży w sekcji kontaktowej.
+
+     Drugą drogą byłoby `maximum-scale=1` w meta viewport. Odrzucona: zabiera szczypanie do
+     powiększania każdemu, kto go potrzebuje, żeby oszczędzić jednego piksela tutaj.
+
+     Pilnowane pomiarem — tools/probe-touch-input.mjs sprawdza wszystkie pola na stronie. */
+  font-size: 16px;
   line-height: 1.45;
   resize: none;
 
@@ -402,4 +413,176 @@
   .chat__chips-list,
   .chat__chips-caret { transition: none; }
   .chat-typing__dots i { animation: none; opacity: 0.6; }
+}
+
+/* ============================================================
+   Koniec rozmowy i nowa rozmowa
+   ============================================================
+   Rozwiązuje objaw zgłaszany jako „AI nie odpowiada". Nic nie było zepsute: gdy organizator raz
+   odpisze, wątek przechodzi na tryb rozmowy z człowiekiem i automat celowo milczy, żeby nie
+   mówić mu przez ramię. Bez sposobu na zakończenie rozmowy wątek zostawał z człowiekiem na
+   zawsze, a gość widział ciszę. Patrz komentarz przy akcji `close` w worker/index.js.
+
+   Oba elementy są budowane z JavaScriptu w setupChat — panel czatu jest w całości obsługiwany
+   stamtąd, więc przycisk kończący rozmowę w statycznym znaczniku byłby widoczny u kogoś, kto nie
+   ma czym go obsłużyć. */
+
+.chat__tools { display: flex; justify-content: flex-end; margin: 0 0 -2px; }
+.chat__tools[hidden] { display: none; }
+
+/* Cichy, tekstowy, w prawym górnym rogu rozmowy. Nie „btn", bo zakończenie rozmowy nie jest
+   czynnością, do której ktokolwiek ma być zachęcany — ma być możliwa i odnajdywalna, nie
+   pierwsza w kolejności. */
+.chat__end {
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: #6b7c9c;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+}
+.chat__end:hover { color: #8a2026; }
+.chat__end:focus-visible { outline: 3px solid #ffc928; outline-offset: 3px; }
+
+/* Karta na miejscu dziennika. Wysokość zbliżona do dziennika, żeby zakończenie rozmowy nie
+   zwijało karty kontaktowej o pół ekranu — #contact jest sekcją, która sama decyduje o swojej
+   wysokości, a skok układu w tym miejscu wygląda jak awaria. */
+.chat-ended {
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  min-height: 190px;
+  padding: 24px 20px;
+  border: 2px dashed rgb(7 26 61 / 0.18);
+  border-radius: 18px;
+  background: #f7faff;
+  text-align: center;
+}
+.chat-ended[hidden] { display: none; }
+.chat-ended strong { color: #071a3d; font-size: 15.5px; }
+.chat-ended p {
+  margin: 0;
+  max-width: 34ch;
+  color: #6b7c9c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.chat-ended .btn { justify-self: center; }
+
+@media (max-width: 560px) {
+  .chat-ended { min-height: 150px; padding: 20px 16px; }
+}
+
+/* ============================================================
+   Załączniki: przycisk, podgląd, zdjęcie w bąbelku
+   ============================================================
+   Połowa pytań o pojazd brzmi „czy takie koło przejdzie kontrolę", a odpowiedź na nie bez
+   zobaczenia koła jest zgadywaniem. Zdjęcie idzie do prywatnego bucketa (migracja 0024) i — gdy
+   ustawiony jest AI_VISION_MODEL — do modelu wizyjnego. Model tekstowy obrazów nie przyjmuje;
+   bez tej zmiennej wiadomość ze zdjęciem trafia prosto do organizatora, i to jest właściwa
+   odpowiedź, nie awaria. Patrz askModel() w worker/index.js. */
+
+.chat__attach {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  /* 44 px, tyle samo co przycisk wysyłki: cel dla kciuka, nie dla kursora. */
+  width: 44px;
+  height: 46px;
+  padding: 0;
+  border: 2px solid rgb(7 26 61 / 0.16);
+  border-radius: 16px;
+  background: #fff;
+  color: #45577a;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.chat__attach svg { width: 20px; height: 20px; }
+.chat__attach:hover { border-color: #071a3d; color: #071a3d; }
+.chat__attach:focus-visible { outline: 3px solid #ffc928; outline-offset: 2px; }
+/* Zdjęcie już wybrane: przycisk to potwierdza, żeby nie dało się wysłać załącznika,
+   o którym się zapomniało. */
+.chat__attach.is-set { border-color: #ffc928; background: #fffaf0; color: #8a6a00; }
+
+/* ----------------------------------------------------------------- podgląd */
+
+.chat__preview {
+  position: relative;
+  width: 84px;
+  margin: 0 0 8px;
+}
+.chat__preview[hidden] { display: none; }
+.chat__preview img {
+  display: block;
+  width: 84px;
+  height: 62px;
+  border: 2px solid rgb(7 26 61 / 0.16);
+  border-radius: 12px;
+  object-fit: cover;
+}
+.chat__preview-drop {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #071a3d;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.chat__preview-drop:focus-visible { outline: 3px solid #ffc928; outline-offset: 2px; }
+
+/* -------------------------------------------------------- zdjęcie w bąbelku */
+
+.chat-msg__photo {
+  margin: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgb(7 26 61 / 0.06);
+}
+.chat-msg__photo img {
+  display: block;
+  /* Szerokość bąbelka, wysokość z proporcji: kadr pionowy z telefonu nie ma zajmować całego
+     okna rozmowy, a poziomy nie ma być pocięty. `max-height` w jednostce svh, bo dziennik
+     czatu sam ma ograniczoną wysokość. */
+  width: 100%;
+  max-height: 34svh;
+  object-fit: contain;
+}
+/* Bąbelek ze zdjęciem jest szerszy od bąbelka z jednym zdaniem — inaczej zdjęcie zwężałoby się
+   do szerokości tekstu, który je komentuje. */
+.chat-msg.has-photo { max-width: 82%; }
+.chat-msg.has-photo .chat-msg__body { margin-top: 8px; }
+
+@media (max-width: 560px) {
+  .chat-msg.has-photo { max-width: 94%; }
+  .chat-msg__photo img { max-height: 28svh; }
+}
+
+/* Zbrojony przycisk „zakończ rozmowę": pierwsze naciśnięcie pyta, drugie kończy.
+   Zamiast systemowego okna `confirm`, które wygląda jak komunikat przeglądarki, a nie jak część
+   tej strony, na telefonie zakrywa pół ekranu i nie da się go przetłumaczyć. */
+.chat__end.is-armed {
+  color: #8a2026;
+  text-decoration-color: #f6494f;
+  animation: chat-end-armed 1.1s ease-in-out infinite;
+}
+@keyframes chat-end-armed { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) {
+  .chat__end.is-armed { animation: none; }
 }

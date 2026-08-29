@@ -1169,10 +1169,408 @@
     }
   };
 
+  /**
+   * „Ta osoba jest już zapisana" — inne zdanie niż „ten adres jest już zapisany".
+   *
+   * Osobna paczka, bo klucze `entry.*` w blokach wyżej leżą po jednej długiej linii na
+   * język i wplatanie w nie czterech kolejnych apostrofów to sposób, w jaki cudzysłów
+   * trafia w niewłaściwe miejsce. Ten sam powód co przy wallAskExtras.
+   *
+   * `differentPerson` jest sformułowane jako czynność, nie jako zaprzeczenie: człowiek,
+   * który zapisuje kuzyna o tym samym imieniu, ma nacisnąć przycisk mówiący, co się
+   * stanie, a nie spierać się z komunikatem.
+   */
+  const samePersonExtras = {
+    it: {
+      'entry.samePersonTitle': 'Questa persona è già iscritta.',
+      'entry.samePersonLead': 'Nome, cognome e indirizzo coincidono con un’iscrizione che c’è già. Se è la tua, correggila o ritirala. Se è un omonimo, continua.',
+      'entry.samePersonMark': 'già iscritta',
+      'entry.differentPerson': 'È un’altra persona, continua'
+    },
+    pl: {
+      'entry.samePersonTitle': 'Ta osoba jest już zapisana.',
+      'entry.samePersonLead': 'Imię, nazwisko i adres zgadzają się ze zgłoszeniem, które już jest w bazie. Jeśli to Twoje, popraw je albo wycofaj. Jeśli to imiennik, kontynuuj.',
+      'entry.samePersonMark': 'już zapisana',
+      'entry.differentPerson': 'To inna osoba — kontynuuj'
+    },
+    en: {
+      'entry.samePersonTitle': 'This person is already entered.',
+      'entry.samePersonLead': 'The name, surname and address match an entry that already exists. If it is yours, correct it or withdraw it. If this is a namesake, carry on.',
+      'entry.samePersonMark': 'already entered',
+      'entry.differentPerson': 'This is someone else — carry on'
+    },
+    de: {
+      'entry.samePersonTitle': 'Diese Person ist schon angemeldet.',
+      'entry.samePersonLead': 'Vorname, Nachname und Adresse stimmen mit einer bestehenden Anmeldung überein. Ist es deine, korrigiere sie oder zieh sie zurück. Ist es ein Namensvetter, mach weiter.',
+      'entry.samePersonMark': 'schon angemeldet',
+      'entry.differentPerson': 'Das ist jemand anderes — weiter'
+    },
+    es: {
+      'entry.samePersonTitle': 'Esta persona ya está inscrita.',
+      'entry.samePersonLead': 'Nombre, apellido y dirección coinciden con una inscripción que ya existe. Si es la tuya, corrígela o retírala. Si es un homónimo, continúa.',
+      'entry.samePersonMark': 'ya inscrita',
+      'entry.differentPerson': 'Es otra persona, continúa'
+    },
+    fr: {
+      'entry.samePersonTitle': 'Cette personne est déjà inscrite.',
+      'entry.samePersonLead': 'Le prénom, le nom et l’adresse correspondent à une inscription qui existe déjà. Si c’est la vôtre, corrigez-la ou retirez-la. S’il s’agit d’un homonyme, continuez.',
+      'entry.samePersonMark': 'déjà inscrite',
+      'entry.differentPerson': 'C’est une autre personne — continuez'
+    }
+  };
+
+  /**
+   * Głosowanie publiczności: odliczanie, oceny, podium.
+   *
+   * Osobna paczka, bo to trzydzieści kluczy na język i wciśnięcie ich w bloki wyżej — po
+   * jednej długiej linii na język — skończyłoby się cudzysłowem w niewłaściwym miejscu.
+   *
+   * `already` mówi „w tej kategorii", nie „już głosowałeś": limit jest na kategorię, a bez
+   * tego doprecyzowania ktoś, kto ocenił jeden pojazd, uznałby, że skończył z całą stroną.
+   */
+  const votingExtras = {
+    it: {
+      'voting.cta': 'Vota il partecipante',
+      'voting.kicker': 'Voto del pubblico',
+      'voting.title': 'Vota il partecipante.',
+      'voting.lead': 'Tocca un carretto e dagli da 3 a 10 punti. Un voto per categoria.',
+      'voting.resultsKicker': 'Classifica finale',
+      'voting.resultsLead': 'Il voto è chiuso. Ecco tutti i partecipanti, dal più votato.',
+      'voting.podiumKicker': 'Risultato del pubblico',
+      'voting.podiumTitle': 'Il podio.',
+      'voting.podiumLead': 'Media dei voti del pubblico. Tre carretti su tre gradini.',
+      'voting.podiumArt': 'Podio con tre gradini',
+      'voting.seeAll': 'Classifica completa',
+      'voting.empty': 'La lista dei partecipanti non è ancora pubblicata.',
+      'voting.voted': 'votato',
+      'voting.votes': 'voti',
+      'voting.yourScore': 'Il tuo voto:',
+      'voting.noProject': 'Carretto senza nome',
+      'voting.scoreLabel': 'Il tuo voto',
+      'voting.name': 'Nome *',
+      'voting.email': 'E-mail *',
+      'voting.note': 'Ti mandiamo la conferma e un link per cambiare idea finché il voto è aperto.',
+      'voting.send': 'Invia il voto',
+      'voting.sending': 'Invio…',
+      'voting.thanks': 'Grazie! Il voto è registrato: guarda la posta per la conferma.',
+      'voting.thanksNoMail': 'Voto registrato. La conferma per e-mail non è partita, ma il voto conta.',
+      'voting.already': 'In questa categoria hai già votato. Il link per cambiare voto è nella mail di conferma.',
+      'voting.notOpen': 'Il voto non è aperto in questo momento.',
+      'voting.badScore': 'Scegli un punteggio da 3 a 10.',
+      'voting.tokenGone': 'Questo link non è più valido.',
+      'voting.changeByEmail': 'Hai già votato questo carretto. Per cambiare voto usa il link nella mail di conferma.',
+      'voting.timeLeft': 'Tempo rimasto:',
+      'voting.closing': 'Il voto si sta chiudendo…',
+      'voting.closed': 'Il voto è chiuso.',
+      'voting.openNoLimit': 'Il voto è aperto.',
+      'voting.startsIn': 'Partenza tra:',
+      'voting.demoScheduled': 'Prima della partenza',
+      'voting.demoVoting': 'Voto aperto',
+      'voting.demoClosed': 'Podio',
+      'voting.demoSkip': 'Fine del conto alla rovescia',
+      'voting.signupLockedTitle': 'La gara è in corso.',
+      'voting.signupLockedLead': 'Le iscrizioni riaprono dopo la premiazione. Intanto puoi votare i carretti in pista.'
+    },
+    pl: {
+      'voting.cta': 'Zagłosuj na uczestnika',
+      'voting.kicker': 'Głos publiczności',
+      'voting.title': 'Zagłosuj na uczestnika.',
+      'voting.lead': 'Dotknij pojazdu i daj mu od 3 do 10 punktów. Jeden głos na kategorię.',
+      'voting.resultsKicker': 'Wyniki końcowe',
+      'voting.resultsLead': 'Głosowanie zamknięte. Poniżej wszyscy uczestnicy, od najwyżej ocenionego.',
+      'voting.podiumKicker': 'Wynik publiczności',
+      'voting.podiumTitle': 'Podium.',
+      'voting.podiumLead': 'Średnia ocen publiczności. Trzy pojazdy na trzech stopniach.',
+      'voting.podiumArt': 'Podium z trzema stopniami',
+      'voting.seeAll': 'Pełny ranking',
+      'voting.empty': 'Lista uczestników nie została jeszcze opublikowana.',
+      'voting.voted': 'zagłosowano',
+      'voting.votes': 'głosów',
+      'voting.yourScore': 'Twoja ocena:',
+      'voting.noProject': 'Pojazd bez nazwy',
+      'voting.scoreLabel': 'Twoja ocena',
+      'voting.name': 'Imię *',
+      'voting.email': 'E-mail *',
+      'voting.note': 'Wyślemy potwierdzenie i odsyłacz do zmiany decyzji, dopóki głosowanie trwa.',
+      'voting.send': 'Wyślij głos',
+      'voting.sending': 'Wysyłam…',
+      'voting.thanks': 'Dziękujemy! Głos zapisany — potwierdzenie jest w skrzynce.',
+      'voting.thanksNoMail': 'Głos zapisany. Potwierdzenie mailem nie wyszło, ale głos się liczy.',
+      'voting.already': 'W tej kategorii już głosowałeś. Odsyłacz do zmiany oceny jest w mailu z potwierdzeniem.',
+      'voting.notOpen': 'Głosowanie nie jest teraz otwarte.',
+      'voting.badScore': 'Wybierz ocenę od 3 do 10.',
+      'voting.tokenGone': 'Ten odsyłacz już nie działa.',
+      'voting.changeByEmail': 'Na ten pojazd już głosowałeś. Aby zmienić ocenę, użyj odsyłacza z maila z potwierdzeniem.',
+      'voting.timeLeft': 'Pozostało:',
+      'voting.closing': 'Głosowanie się zamyka…',
+      'voting.closed': 'Głosowanie zamknięte.',
+      'voting.openNoLimit': 'Głosowanie jest otwarte.',
+      'voting.startsIn': 'Start za:',
+      'voting.demoScheduled': 'Przed startem',
+      'voting.demoVoting': 'Głosowanie otwarte',
+      'voting.demoClosed': 'Podium',
+      'voting.demoSkip': 'Zakończ odliczanie',
+      'voting.signupLockedTitle': 'Wyścig właśnie trwa.',
+      'voting.signupLockedLead': 'Zapisy otworzą się po wręczeniu nagród. W tym czasie możesz oceniać pojazdy na trasie.'
+    },
+    en: {
+      'voting.cta': 'Vote for a rider',
+      'voting.kicker': "Audience vote",
+      'voting.title': 'Vote for a rider.',
+      'voting.lead': 'Tap a cart and give it 3 to 10 points. One vote per category.',
+      'voting.resultsKicker': 'Final standings',
+      'voting.resultsLead': 'Voting is closed. Here is everyone, best rated first.',
+      'voting.podiumKicker': 'The audience decided',
+      'voting.podiumTitle': 'The podium.',
+      'voting.podiumLead': 'Average of the public vote. Three carts on three steps.',
+      'voting.podiumArt': 'Podium with three steps',
+      'voting.seeAll': 'Full standings',
+      'voting.empty': 'The list of riders is not published yet.',
+      'voting.voted': 'voted',
+      'voting.votes': 'votes',
+      'voting.yourScore': 'Your score:',
+      'voting.noProject': 'Cart without a name',
+      'voting.scoreLabel': 'Your score',
+      'voting.name': 'Name *',
+      'voting.email': 'Email *',
+      'voting.note': 'We send a confirmation and a link to change your mind while voting is open.',
+      'voting.send': 'Send the vote',
+      'voting.sending': 'Sending…',
+      'voting.thanks': 'Thank you! The vote is in — check your inbox for the confirmation.',
+      'voting.thanksNoMail': 'Vote recorded. The confirmation e-mail did not go out, but the vote counts.',
+      'voting.already': 'You have already voted in this category. The link to change it is in the confirmation e-mail.',
+      'voting.notOpen': 'Voting is not open right now.',
+      'voting.badScore': 'Pick a score from 3 to 10.',
+      'voting.tokenGone': 'This link no longer works.',
+      'voting.changeByEmail': 'You have already voted for this cart. Use the link in the confirmation e-mail to change it.',
+      'voting.timeLeft': 'Time left:',
+      'voting.closing': 'Voting is closing…',
+      'voting.closed': 'Voting is closed.',
+      'voting.openNoLimit': 'Voting is open.',
+      'voting.startsIn': 'Starts in:',
+      'voting.demoScheduled': 'Before the start',
+      'voting.demoVoting': 'Voting open',
+      'voting.demoClosed': 'Podium',
+      'voting.demoSkip': 'End the countdown',
+      'voting.signupLockedTitle': 'The race is running.',
+      'voting.signupLockedLead': 'Entries reopen after the prize ceremony. Meanwhile you can vote for the carts on the hill.'
+    },
+    de: {
+      'voting.cta': 'Für einen Teilnehmer stimmen',
+      'voting.kicker': 'Publikumsvoting',
+      'voting.title': 'Stimme für einen Teilnehmer.',
+      'voting.lead': 'Tippe einen Wagen an und gib ihm 3 bis 10 Punkte. Eine Stimme pro Kategorie.',
+      'voting.resultsKicker': 'Endstand',
+      'voting.resultsLead': 'Das Voting ist geschlossen. Hier sind alle, die beste Bewertung zuerst.',
+      'voting.podiumKicker': 'Das Publikum hat entschieden',
+      'voting.podiumTitle': 'Das Podium.',
+      'voting.podiumLead': 'Durchschnitt der Publikumsstimmen. Drei Wagen auf drei Stufen.',
+      'voting.podiumArt': 'Podium mit drei Stufen',
+      'voting.seeAll': 'Gesamtwertung',
+      'voting.empty': 'Die Teilnehmerliste ist noch nicht veröffentlicht.',
+      'voting.voted': 'abgestimmt',
+      'voting.votes': 'Stimmen',
+      'voting.yourScore': 'Deine Bewertung:',
+      'voting.noProject': 'Wagen ohne Namen',
+      'voting.scoreLabel': 'Deine Bewertung',
+      'voting.name': 'Name *',
+      'voting.email': 'E-Mail *',
+      'voting.note': 'Wir senden eine Bestätigung und einen Link, um es zu ändern, solange abgestimmt wird.',
+      'voting.send': 'Stimme senden',
+      'voting.sending': 'Senden…',
+      'voting.thanks': 'Danke! Die Stimme ist gezählt — die Bestätigung liegt im Postfach.',
+      'voting.thanksNoMail': 'Stimme gespeichert. Die Bestätigung ging nicht raus, die Stimme zählt trotzdem.',
+      'voting.already': 'In dieser Kategorie hast du schon abgestimmt. Der Link zum Ändern steht in der Bestätigung.',
+      'voting.notOpen': 'Das Voting ist gerade nicht offen.',
+      'voting.badScore': 'Wähle eine Bewertung von 3 bis 10.',
+      'voting.tokenGone': 'Dieser Link gilt nicht mehr.',
+      'voting.changeByEmail': 'Für diesen Wagen hast du schon gestimmt. Zum Ändern nimm den Link aus der Bestätigung.',
+      'voting.timeLeft': 'Restzeit:',
+      'voting.closing': 'Das Voting schließt…',
+      'voting.closed': 'Das Voting ist geschlossen.',
+      'voting.openNoLimit': 'Das Voting ist offen.',
+      'voting.startsIn': 'Start in:',
+      'voting.demoScheduled': 'Vor dem Start',
+      'voting.demoVoting': 'Voting offen',
+      'voting.demoClosed': 'Podium',
+      'voting.demoSkip': 'Countdown beenden',
+      'voting.signupLockedTitle': 'Das Rennen läuft.',
+      'voting.signupLockedLead': 'Anmeldungen öffnen nach der Siegerehrung wieder. Bis dahin kannst du die Wagen bewerten.'
+    },
+    es: {
+      'voting.cta': 'Vota a un participante',
+      'voting.kicker': 'Voto del público',
+      'voting.title': 'Vota a un participante.',
+      'voting.lead': 'Toca un carro y dale de 3 a 10 puntos. Un voto por categoría.',
+      'voting.resultsKicker': 'Clasificación final',
+      'voting.resultsLead': 'El voto está cerrado. Aquí están todos, del mejor valorado en adelante.',
+      'voting.podiumKicker': 'Lo decidió el público',
+      'voting.podiumTitle': 'El podio.',
+      'voting.podiumLead': 'Media de los votos del público. Tres carros en tres escalones.',
+      'voting.podiumArt': 'Podio con tres escalones',
+      'voting.seeAll': 'Clasificación completa',
+      'voting.empty': 'La lista de participantes aún no está publicada.',
+      'voting.voted': 'votado',
+      'voting.votes': 'votos',
+      'voting.yourScore': 'Tu voto:',
+      'voting.noProject': 'Carro sin nombre',
+      'voting.scoreLabel': 'Tu voto',
+      'voting.name': 'Nombre *',
+      'voting.email': 'E-mail *',
+      'voting.note': 'Te enviamos la confirmación y un enlace para cambiar de idea mientras el voto siga abierto.',
+      'voting.send': 'Enviar el voto',
+      'voting.sending': 'Enviando…',
+      'voting.thanks': '¡Gracias! El voto está registrado: mira el correo para la confirmación.',
+      'voting.thanksNoMail': 'Voto registrado. La confirmación por correo no salió, pero el voto cuenta.',
+      'voting.already': 'En esta categoría ya has votado. El enlace para cambiarlo está en el correo de confirmación.',
+      'voting.notOpen': 'El voto no está abierto ahora mismo.',
+      'voting.badScore': 'Elige una puntuación de 3 a 10.',
+      'voting.tokenGone': 'Este enlace ya no funciona.',
+      'voting.changeByEmail': 'Ya has votado este carro. Para cambiarlo usa el enlace del correo de confirmación.',
+      'voting.timeLeft': 'Tiempo restante:',
+      'voting.closing': 'El voto se está cerrando…',
+      'voting.closed': 'El voto está cerrado.',
+      'voting.openNoLimit': 'El voto está abierto.',
+      'voting.startsIn': 'Salida en:',
+      'voting.demoScheduled': 'Antes de la salida',
+      'voting.demoVoting': 'Voto abierto',
+      'voting.demoClosed': 'Podio',
+      'voting.demoSkip': 'Terminar la cuenta atrás',
+      'voting.signupLockedTitle': 'La carrera está en marcha.',
+      'voting.signupLockedLead': 'Las inscripciones reabren tras la entrega de premios. Mientras, puedes votar los carros.'
+    },
+    fr: {
+      'voting.cta': 'Votez pour un participant',
+      'voting.kicker': 'Vote du public',
+      'voting.title': 'Votez pour un participant.',
+      'voting.lead': 'Touchez un chariot et donnez-lui de 3 à 10 points. Un vote par catégorie.',
+      'voting.resultsKicker': 'Classement final',
+      'voting.resultsLead': 'Le vote est clos. Voici tout le monde, le mieux noté en premier.',
+      'voting.podiumKicker': 'Le public a décidé',
+      'voting.podiumTitle': 'Le podium.',
+      'voting.podiumLead': 'Moyenne des votes du public. Trois chariots sur trois marches.',
+      'voting.podiumArt': 'Podium à trois marches',
+      'voting.seeAll': 'Classement complet',
+      'voting.empty': 'La liste des participants n’est pas encore publiée.',
+      'voting.voted': 'voté',
+      'voting.votes': 'votes',
+      'voting.yourScore': 'Votre note :',
+      'voting.noProject': 'Chariot sans nom',
+      'voting.scoreLabel': 'Votre note',
+      'voting.name': 'Prénom *',
+      'voting.email': 'E-mail *',
+      'voting.note': 'Nous envoyons une confirmation et un lien pour changer d’avis tant que le vote est ouvert.',
+      'voting.send': 'Envoyer le vote',
+      'voting.sending': 'Envoi…',
+      'voting.thanks': 'Merci ! Le vote est enregistré : la confirmation est dans votre boîte.',
+      'voting.thanksNoMail': 'Vote enregistré. La confirmation n’est pas partie, mais le vote compte.',
+      'voting.already': 'Vous avez déjà voté dans cette catégorie. Le lien pour le changer est dans la confirmation.',
+      'voting.notOpen': 'Le vote n’est pas ouvert pour le moment.',
+      'voting.badScore': 'Choisissez une note de 3 à 10.',
+      'voting.tokenGone': 'Ce lien ne fonctionne plus.',
+      'voting.changeByEmail': 'Vous avez déjà voté pour ce chariot. Utilisez le lien de la confirmation pour le changer.',
+      'voting.timeLeft': 'Temps restant :',
+      'voting.closing': 'Le vote se ferme…',
+      'voting.closed': 'Le vote est clos.',
+      'voting.openNoLimit': 'Le vote est ouvert.',
+      'voting.startsIn': 'Départ dans :',
+      'voting.demoScheduled': 'Avant le départ',
+      'voting.demoVoting': 'Vote ouvert',
+      'voting.demoClosed': 'Podium',
+      'voting.demoSkip': 'Terminer le décompte',
+      'voting.signupLockedTitle': 'La course est en cours.',
+      'voting.signupLockedLead': 'Les inscriptions rouvrent après la remise des prix. En attendant, votez pour les chariots.'
+    }
+  };
+
+  /**
+   * Zakończenie rozmowy i nowa rozmowa.
+   *
+   * Rozwiązuje objaw zgłaszany jako „AI nie odpowiada": po pierwszej odpowiedzi organizatora
+   * wątek przechodzi na rozmowę z człowiekiem i automat celowo milczy, a bez sposobu na
+   * zakończenie zostawał tak na zawsze. Patrz akcja `close` w worker/index.js.
+   *
+   * `endedLead` mówi wprost, że nowa rozmowa startuje od pustej karty i od pytania o adres —
+   * bo to jedyna rzecz, która może kogoś zaskoczyć, gdy naciśnie „nowa rozmowa".
+   */
+  const chatEndExtras = {
+    it: {
+      'chat.end': 'Chiudi la conversazione',
+      /* Krótko, bo to jest teraz napis na przycisku, nie zdanie w okienku systemowym. */
+      'chat.endConfirm': 'Sicuro? Premi di nuovo',
+      'chat.endedTitle': 'Conversazione chiusa.',
+      'chat.endedLead': 'Grazie. Se serve altro, apri una nuova conversazione: ripartiamo da capo e ti richiediamo nome ed e-mail.',
+      'chat.restart': 'Nuova conversazione',
+      'chat.attach': 'Allega una foto',
+      'chat.attachDrop': 'Togli la foto',
+      'chat.attachFailed': 'Non riesco a preparare questa immagine. Prova con un JPG o un PNG.',
+      'chat.photoAlt': 'Foto allegata alla conversazione'
+    },
+    pl: {
+      'chat.end': 'Zakończ rozmowę',
+      /* Krótko, bo to jest teraz napis na przycisku, nie zdanie w okienku systemowym. */
+      'chat.endConfirm': 'Na pewno? Naciśnij ponownie',
+      'chat.endedTitle': 'Rozmowa zakończona.',
+      'chat.endedLead': 'Dziękujemy. Jeśli coś jeszcze, otwórz nową rozmowę — zaczynamy od czystej karty i pytamy ponownie o imię i e-mail.',
+      'chat.restart': 'Nowa rozmowa',
+      'chat.attach': 'Dołącz zdjęcie',
+      'chat.attachDrop': 'Usuń zdjęcie',
+      'chat.attachFailed': 'Nie udało się przygotować tego obrazu. Spróbuj z plikiem JPG lub PNG.',
+      'chat.photoAlt': 'Zdjęcie dołączone do rozmowy'
+    },
+    en: {
+      'chat.end': 'End the conversation',
+      'chat.endConfirm': 'Sure? Press again',
+      'chat.endedTitle': 'Conversation closed.',
+      'chat.endedLead': 'Thank you. If anything else comes up, start a new conversation — it begins fresh and asks for your name and e-mail again.',
+      'chat.restart': 'New conversation',
+      'chat.attach': 'Attach a photo',
+      'chat.attachDrop': 'Remove the photo',
+      'chat.attachFailed': 'This image could not be prepared. Try a JPG or a PNG.',
+      'chat.photoAlt': 'Photo attached to the conversation'
+    },
+    de: {
+      'chat.end': 'Gespräch beenden',
+      'chat.endConfirm': 'Sicher? Nochmal drücken',
+      'chat.endedTitle': 'Gespräch beendet.',
+      'chat.endedLead': 'Danke. Wenn noch etwas ist, starte ein neues Gespräch — es beginnt von vorn und fragt Name und E-Mail erneut.',
+      'chat.restart': 'Neues Gespräch',
+      'chat.attach': 'Foto anhängen',
+      'chat.attachDrop': 'Foto entfernen',
+      'chat.attachFailed': 'Dieses Bild konnte nicht vorbereitet werden. Versuche ein JPG oder PNG.',
+      'chat.photoAlt': 'An das Gespräch angehängtes Foto'
+    },
+    es: {
+      'chat.end': 'Cerrar la conversación',
+      'chat.endConfirm': '¿Seguro? Pulsa otra vez',
+      'chat.endedTitle': 'Conversación cerrada.',
+      'chat.endedLead': 'Gracias. Si surge algo más, abre una conversación nueva: empieza de cero y te pedimos otra vez nombre y e-mail.',
+      'chat.restart': 'Nueva conversación',
+      'chat.attach': 'Adjuntar una foto',
+      'chat.attachDrop': 'Quitar la foto',
+      'chat.attachFailed': 'No se ha podido preparar esta imagen. Prueba con un JPG o un PNG.',
+      'chat.photoAlt': 'Foto adjunta a la conversación'
+    },
+    fr: {
+      'chat.end': 'Terminer la conversation',
+      'chat.endConfirm': 'Sûr ? Appuyez encore',
+      'chat.endedTitle': 'Conversation terminée.',
+      'chat.endedLead': 'Merci. S’il y a autre chose, ouvrez une nouvelle conversation : elle repart de zéro et redemande nom et e-mail.',
+      'chat.restart': 'Nouvelle conversation',
+      'chat.attach': 'Joindre une photo',
+      'chat.attachDrop': 'Retirer la photo',
+      'chat.attachFailed': 'Cette image n’a pas pu être préparée. Essayez un JPG ou un PNG.',
+      'chat.photoAlt': 'Photo jointe à la conversation'
+    }
+  };
+
   Object.keys(interactionExtras).forEach((locale) => Object.assign(extras[locale], interactionExtras[locale]));
   Object.keys(consentExtras).forEach((locale) => Object.assign(extras[locale], consentExtras[locale]));
   Object.keys(miscExtras).forEach((locale) => Object.assign(extras[locale], miscExtras[locale]));
   Object.keys(wallAskExtras).forEach((locale) => Object.assign(extras[locale], wallAskExtras[locale]));
+  Object.keys(samePersonExtras).forEach((locale) => Object.assign(extras[locale], samePersonExtras[locale]));
+  Object.keys(votingExtras).forEach((locale) => Object.assign(extras[locale], votingExtras[locale]));
+  Object.keys(chatEndExtras).forEach((locale) => Object.assign(extras[locale], chatEndExtras[locale]));
 
   Object.assign(it, extras.it);
   Object.assign(pl, extras.pl);

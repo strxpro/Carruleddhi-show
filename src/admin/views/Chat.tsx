@@ -141,6 +141,33 @@ export function Chat({
     [apiKey]
   );
 
+  /**
+   * Opening a thread is what marks it read.
+   *
+   * The server already does it — `action: 'messages'` sets `unread_for_admin` to zero, so
+   * the badge was correct in the database the moment the thread was opened. What was wrong
+   * was the screen: `threads` still held the count fetched before the click, so the red
+   * number sat on a conversation being read until the next poll happened to replace the
+   * list. Long enough to be read as "this did not work" and clicked again.
+   *
+   * So the count is cleared here too, against the copy on screen. No extra request: this
+   * mirrors the write the server already performed, in the one place it was not visible.
+   *
+   * The bell is deliberately not told. Its chat number counts threads whose last message
+   * arrived after `seen_at` and whose mode is `human` — reading one changes none of those
+   * three, so a recount would return the same total. Marking the bell read is its own
+   * button, and it should stay that way.
+   */
+  const openThread = useCallback((threadId: string) => {
+    setActive(threadId);
+    pinned.current = true;
+    setThreads((current) =>
+      current
+        ? current.map((thread) => (thread.id === threadId ? { ...thread, unread: 0 } : thread))
+        : current
+    );
+  }, []);
+
   useEffect(() => {
     loadThreads();
     const timer = window.setInterval(() => {
@@ -240,7 +267,22 @@ export function Chat({
           </div>
           <ul className="max-h-[62vh] overflow-y-auto">
             {threads === null ? (
-              <li className="px-4 py-6 text-sm text-white/40">{t('common.loading')}</li>
+              /* Three lines per row, the same three the real thread has: name, address and
+                 how long ago. The list keeps its height while it loads, so the conversation
+                 pane beside it does not shift when the threads arrive. */
+              Array.from({ length: 5 }).map((_, row) => (
+                <li
+                  key={`skeleton-${row}`}
+                  className="flex flex-col gap-1.5 border-l-2 border-transparent px-4 py-3"
+                  role="status"
+                  aria-busy="true"
+                  aria-label={t('common.loading')}
+                >
+                  <span className="block h-3.5 w-32 animate-skeleton rounded bg-white/10" />
+                  <span className="block h-3 w-40 animate-skeleton rounded bg-white/10" />
+                  <span className="block h-3 w-16 animate-skeleton rounded bg-white/10" />
+                </li>
+              ))
             ) : threads.length === 0 ? (
               <li className="px-4 py-6 text-sm text-white/40">{t('chat.empty')}</li>
             ) : (
@@ -248,10 +290,7 @@ export function Chat({
                 <li key={thread.id}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setActive(thread.id);
-                      pinned.current = true;
-                    }}
+                    onClick={() => openThread(thread.id)}
                     className={cn(
                       'flex w-full flex-col gap-1 border-l-2 px-4 py-3 text-left transition',
                       active === thread.id

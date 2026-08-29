@@ -21,6 +21,17 @@ import { join } from 'node:path';
 
 const base = process.argv[2] || 'http://127.0.0.1:4173';
 
+/**
+ * Rozmiar okna jako argument: `node tools/probe-scroll-jump.mjs <adres> 390x844`
+ *
+ * Wcześniej był wpisany na sztywno jako 420×860 i to była luka w pomiarze, nie drobiazg.
+ * O tym, czy sekcja jest wyższa od ekranu — czyli czy trafia w tryb `pinned` i czy w ogóle
+ * może szarpnąć przewinięciem — decyduje wysokość okna. Jeden zmierzony rozmiar znaczy jeden
+ * sprawdzony telefon, a „u mnie przeskakuje" przychodzi z całej reszty.
+ */
+const size = /^(\d{3,4})x(\d{3,4})$/.exec(process.argv[3] || '') || [null, '420', '860'];
+const viewport = `${size[1]},${size[2]}`;
+
 function chromePath() {
   const candidates = [
     join(process.env.ProgramFiles || '', 'Google/Chrome/Application/chrome.exe'),
@@ -119,7 +130,7 @@ try {
   const dom = execFileSync(chromePath(), [
     '--headless=new',
     '--disable-gpu',
-    '--window-size=420,860',
+    `--window-size=${viewport}`,
     '--virtual-time-budget=60000',
     `--user-data-dir=${profile}`,
     '--dump-dom',

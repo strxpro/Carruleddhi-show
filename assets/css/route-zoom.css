@@ -10,6 +10,35 @@
    animations arguing.
    ========================================================================== */
 
+/* ----------------------------------------------------------------------------
+   Dwie liczby, nie jedna: `--route-progress` i `--route-zoom`
+   ----------------------------------------------------------------------------
+   app.js zaczyna liczyc progres od `top - viewport * 1.1`, czyli caly ekran z okladem
+   ZANIM sekcja w ogole wejdzie w kadr. Zmierzone na 1440x900: zdjecie miesci sie w
+   calosci dopiero przy `--route-progress` = 0.606, a jest wtedy przeskalowane juz do
+   0.909 z docelowego 1.0. Szescdziesiat procent powiekszenia dzialo sie poza ekranem
+   i na gorze bylo widac tylko koncowke — stad "efekt zaczyna sie za wczesnie".
+
+   Okno pomiarowe nalezy do app.js (tor A), wiec zostaje nietkniete. Zamiast tego jego
+   wynik jest tu przeliczany: `--route-zoom` stoi na zerze, dopoki sekcja nie jest w
+   calosci widoczna, i dopiero potem przebiega pelne 0 -> 1.
+
+   `--route-zoom-gate` to prog, `--route-zoom-rate` to 1/(1 - prog) — mnozenie zamiast
+   dzielenia, ten sam ksztalt, ktory nizej ma juz `--route-pin-in`.
+
+   Na koncu wygladzenie: t*t*(3-2t). Liniowa rampa zaczyna sie i konczy kantem, a po
+   scisnieciu calego ruchu do krotszego okna ten kant bylo widac na obu koncach.
+
+   Wartosc jest liczona i na :root, i na samej ramce, bo app.js pisze `--route-progress`
+   w oba miejsca — powod jest w komentarzu setupRouteZoom i nadal obowiazuje. */
+:root,
+.route__frame {
+  --route-zoom-gate: 0.60;
+  --route-zoom-rate: 2.5;
+  --route-zoom-t: clamp(0, calc((var(--route-progress) - var(--route-zoom-gate)) * var(--route-zoom-rate)), 1);
+  --route-zoom: calc(var(--route-zoom-t) * var(--route-zoom-t) * (3 - 2 * var(--route-zoom-t)));
+}
+
 .route__frame {
   /* The fallback matters. Without JavaScript the property is never set, and every calc()
      below would be invalid — which in CSS means the whole declaration is dropped and the
@@ -35,17 +64,22 @@
      grid, and past that it starts to overlap the text it is displacing. */
   transform:
     translate(
-      calc(var(--route-progress) * -8%),
-      calc((1 - var(--route-progress)) * 34px)
+      calc(var(--route-zoom) * -8%),
+      calc((1 - var(--route-zoom)) * 34px)
     )
-    scale(calc(0.77 + var(--route-progress) * 0.23));
+    scale(calc(0.77 + var(--route-zoom) * 0.23));
 
-  /* The shadow deepens with the scale so the frame appears to lift off the section rather
-     than merely get bigger. */
-  box-shadow:
-    0 calc(10px + var(--route-progress) * 26px)
-    calc(24px + var(--route-progress) * 42px)
-    rgb(7 26 61 / calc(0.10 + var(--route-progress) * 0.16));
+  /* Cien juz sie nie animuje, i to jest zmiana o plynnosc, nie o wyglad.
+     ---------------------------------------------------------------------------
+     Byl liczony z progresu: przesuniecie 10 -> 36px, rozmycie 24 -> 66px, alfa 0.10 ->
+     0.26. Kazda z tych trzech liczb to geometria cienia, a zmiana geometrii cienia to
+     ODMALOWANIE elementu — nie da sie tego zlozyc na GPU jak transformacji. Efekt:
+     przy kazdej klatce przewijania przegladarka przerysowywala 68-pikselowe rozmycie
+     dookola calego zdjecia, obok skalowania samej fotografii i tekstu obok niej.
+
+     Glebia i tak jest w skali; cien stoi teraz na wartosci ze srodka dawnego zakresu
+     i maluje sie raz. */
+  box-shadow: 0 24px 46px rgb(7 26 61 / 0.18);
 
   /* Not a transition. The property changes once per frame from a scroll position, so a
      transition on top of it would add lag between the finger and the picture — the exact
@@ -91,8 +125,8 @@
 .route__copy {
   transform-origin: left center;
   transform:
-    translateX(calc(var(--route-progress) * -30px))
-    scale(calc(1 - var(--route-progress) * 0.16));
+    translateX(calc(var(--route-zoom) * -30px))
+    scale(calc(1 - var(--route-zoom) * 0.16));
   /* No `will-change` here, and that is a measured decision rather than an omission.
      ---------------------------------------------------------------------------
      With `will-change: opacity, transform` on this element Chrome promoted it to its own
@@ -128,7 +162,10 @@
   line-height: 1;
   pointer-events: none;
   /* Invisible until the zoom is most of the way done — matches the 0.35 gate in app.js, so
-     the cart does not sit parked at the start line while the picture is still growing. */
+     the cart does not sit parked at the start line while the picture is still growing.
+     Jedyne miejsce, ktore zostaje na surowym `--route-progress`, i celowo: pozycje wozka
+     na drodze wylicza routeCartPlacer w app.js z tej samej liczby. Przestawienie tu progu
+     na `--route-zoom` rozjechaloby moment pojawienia sie z momentem ruszenia. */
   opacity: calc((var(--route-progress) - 0.34) * 6);
   filter: drop-shadow(0 3px 5px rgb(7 26 61 / 0.45));
 }
@@ -172,6 +209,15 @@
     align-content: start;
   }
 
+  /* Prog jest tu wyzej niz na desktopie, bo kolumna jest nad zdjeciem, nie obok — zanim
+     fotografia zmiesci sie w kadrze w calosci, trzeba przewinac przez cala kopie.
+     Zmierzone na 390x844: pelna widocznosc dopiero miedzy 0.606 a 0.697 progresu. */
+  :root,
+  .route__frame {
+    --route-zoom-gate: 0.68;
+    --route-zoom-rate: 3.125;
+  }
+
   /* The contents pin inside the tall section. `100svh` and not `100vh`: on a phone the
      address bar makes vh taller than what you can actually see, and the difference is exactly
      enough to push the picture's bottom edge off screen. */
@@ -201,23 +247,23 @@
   .route__copy {
     transform-origin: top center;
     transform:
-      translateY(calc(var(--route-progress) * -22px))
-      scale(calc(1 - var(--route-progress) * 0.22));
+      translateY(calc(var(--route-zoom) * -22px))
+      scale(calc(1 - var(--route-zoom) * 0.22));
   }
   /* The gaps inside the column close up too, otherwise a scaled-down block keeps the airy
      spacing of a full-size one and the saving is only in the glyphs. */
   #route .route__facts {
-    gap: calc(10px - var(--route-progress) * 4px);
-    margin-block: calc(24px - var(--route-progress) * 14px);
+    gap: calc(10px - var(--route-zoom) * 4px);
+    margin-block: calc(24px - var(--route-zoom) * 14px);
   }
   /* The paragraph is the one part that may genuinely go: the heading names the section, the
      three facts and the button are information, and this is the sentence that sets the scene.
      It is given away by height rather than by opacity, so what remains is fully legible
      instead of being a grey block. */
   #route .route__copy .lead {
-    max-height: calc(200px - var(--route-progress) * 150px);
+    max-height: calc(200px - var(--route-zoom) * 150px);
     overflow: hidden;
-    margin-bottom: calc(var(--route-progress) * -6px);
+    margin-bottom: calc(var(--route-zoom) * -6px);
   }
 
   /* Bigger, straighter, and it ends up in the middle of the section.
@@ -237,9 +283,9 @@
      it. Both numbers are tied to the same progress value, so they cannot drift apart. */
   .route__frame {
     transform:
-      translateY(calc(var(--route-progress) * -34px))
-      rotate(calc((1 - var(--route-progress)) * -2.2deg))
-      scale(calc(0.82 + var(--route-progress) * 0.24));
+      translateY(calc(var(--route-zoom) * -34px))
+      rotate(calc((1 - var(--route-zoom)) * -2.2deg))
+      scale(calc(0.82 + var(--route-zoom) * 0.24));
   }
 
   /* Start and finish pop in as the picture settles.
@@ -268,7 +314,7 @@
        label sits above its dot, the finish below). On a phone frame that put "META" partly
        outside the picture. The dots keep a small pop-in; the labels do not move. */
   .route__frame {
-    --route-pin-in: clamp(0, calc((var(--route-progress) - 0.45) * 3.2), 1);
+    --route-pin-in: clamp(0, calc((var(--route-zoom) - 0.45) * 3.2), 1);
   }
   .route__frame .route__node { scale: calc(0.55 + var(--route-pin-in) * 0.45); }
 
@@ -296,4 +342,73 @@
   #route .route__frame { transform: none; }
   #route .route__frame .route__pin,
   #route .route__frame .route__node { scale: 1; }
+}
+
+/* A warm bloom that follows scroll progress without blurring the large photograph.
+   Radial gradients and opacity stay on the existing lightweight overlay; the photo itself
+   remains sharp and fully visible, including on lower-powered phones. */
+.route__frame::after {
+  z-index: 3;
+  background:
+    radial-gradient(circle at 58% 44%, rgb(255 224 129 / .46), transparent 33%),
+    radial-gradient(circle at 28% 74%, rgb(75 157 255 / .22), transparent 39%),
+    linear-gradient(145deg, rgb(255 255 255 / .18), transparent 42%, rgb(7 26 61 / .1));
+  opacity: calc(.18 + var(--route-zoom) * .62);
+  /* Bylo tu jeszcze `transform: scale(.9 -> 1)`. Dwa powody, dla ktorych go nie ma:
+     to jest dziecko ramki, wiec skaluje sie razem z nia i wlasne dziesiec procent
+     bylo dokladane do juz istniejacego ruchu; a skalowana warstwa z `mix-blend-mode`
+     musi byc w kazdej klatce przerysowana i ponownie zmieszana z tlem, co przy dwoch
+     gradientach radialnych na calej powierzchni zdjecia kosztowalo wiecej niz cala
+     reszta efektu. Zostaje sama przezroczystosc — ta sklada sie na GPU. */
+  mix-blend-mode: screen;
+  will-change: opacity;
+}
+.route__frame .route__pin,
+.route__frame .route__node,
+.route__frame .route__cart { z-index: 5; }
+@media (prefers-reduced-motion: reduce) {
+  .route__frame::after { opacity: .48; transform: none; will-change: auto; }
+}
+
+/* ============================================================================
+   Ten sam zapas przewijania na szerokim ekranie
+   ============================================================================
+   ZMIERZONE, ZANIM COKOLWIEK TU POWSTAŁO
+     1440×900: sekcja `#route` miała dokładnie 900 px, czyli jeden ekran, tryb `pinned`,
+     `position: sticky` — i zapas przewijania przy pełnej widoczności równy ZERO.
+     390×844: 1688 px, tryb `flow`, zapas 844 px.
+
+   Czyli na telefonie efekt miał cały ekran przewijania, a na komputerze nie miał ani piksela.
+   Prośba „efekt ma zaczynać się dopiero, gdy cała sekcja jest widoczna" była tam po prostu
+   niewykonalna: w chwili, gdy sekcja wypełnia ekran, nie ma już czego przewijać, więc całe
+   powiększanie musiało dziać się PRZED jej pojawieniem się — i dlatego zaczynało się
+   `1,1 ekranu` za wcześnie, poza widokiem.
+
+   Rozwiązanie nie jest nowe: to dokładnie to, co blok wyżej robi na telefonie od dawna i co
+   tam działa. Sekcja na dwa ekrany, treść przypięta w środku. Jeden ekran na przebieg efektu,
+   drugi na to, żeby zdjęcie postało w spokoju, zanim następna karta zacznie wjeżdżać.
+
+   SKUTEK UBOCZNY, KTÓRY JEST ZAMIERZONY
+     Sekcja wyższa od ekranu przestaje być panelem `pinned` i staje się `flow` — tak samo jak
+     na telefonie. Przypinanie przechodzi z sekcji na jej wewnętrzną siatkę, czyli o jeden
+     poziom niżej, a na ekranie wygląda to tak samo. Zysk: efekt ma gdzie się odbyć.
+   ========================================================================== */
+@media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
+  /* Selektor przebija `#main > section.section-card[data-panel='flow']`, gdzie siedzi
+     `min-height: 100svh` dla paneli w przepływie — z tego samego powodu co w bloku mobilnym.
+     Zwykłe `#route` tam przegrywa i reguła byłaby obecna, opisana i bezczynna. */
+  #main > section#route.section-card {
+    min-height: 200svh;
+    align-content: start;
+  }
+
+  /* Treść przypięta w środku wysokiej sekcji. `100svh`, nie `100vh` — na wypadek przeglądarki
+     z chowanym paskiem, bo różnica to dokładnie tyle, ile trzeba, żeby dolna krawędź zdjęcia
+     zeszła poza ekran. Kolumny zostają, jakie były: ta reguła nie rusza grid-template-columns. */
+  #route .route__grid {
+    position: sticky;
+    top: 0;
+    min-height: 100svh;
+    align-content: center;
+  }
 }

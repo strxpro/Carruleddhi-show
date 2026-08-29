@@ -284,6 +284,105 @@ export const saveSettings = (key: string, settings: Partial<SiteSettings>) =>
 export const uploadSponsorLogo = (key: string, photo: string) =>
   call<{ ok: true; logo: string; url: string }>('settings-admin', key, { action: 'logo', photo });
 
+/* ------------------------------------------------------------------ voting
+
+   The endpoint is `voting-admin`, behind the same passphrase as the roster. Note the two
+   status-shaped fields it answers with: `phase` is worked out from the clock, `status` is
+   what the organiser last declared. They disagree on purpose — see the view. */
+
+export type VotingPhase = 'scheduled' | 'voting' | 'closed';
+
+export interface VotingParticipant {
+  id: string;
+  category: string;
+  startNumber: number;
+  firstName: string;
+  lastName: string;
+  projectName: string;
+  /** A signed URL, good for one read; empty when the participant has no picture. */
+  photo: string;
+  voteCount: number;
+  averageScore: number;
+  /** Set when this participant was picked from the start list rather than typed in. */
+  registrationId: string | null;
+  /** The bucket path. What `save` wants back; `photo` above is only for showing. */
+  imagePath: string;
+  active: boolean;
+}
+
+export interface VotingState {
+  ok: true;
+  phase: VotingPhase;
+  status: VotingPhase;
+  raceStartsAt: string | null;
+  votingEndsAt: string | null;
+  durationMinutes: number;
+  scoreMin: number;
+  scoreMax: number;
+  participants: VotingParticipant[];
+  totalVotes: number;
+}
+
+/** What may be sent for one participant. Every field optional: an edit sends what changed. */
+export interface ParticipantEdit {
+  registrationId?: string;
+  category?: string;
+  startNumber?: string;
+  firstName?: string;
+  lastName?: string;
+  projectName?: string;
+  imagePath?: string;
+  active?: boolean;
+}
+
+export interface VotingWinner {
+  place: number;
+  category: string;
+  startNumber: number;
+  projectName: string;
+  participantName: string;
+  averageScore: number;
+  voteCount: number;
+}
+
+export const fetchVoting = (key: string) => call<VotingState>('voting-admin', key, { action: 'state' });
+
+/**
+ * Adds a participant, or edits one when `id` is given.
+ *
+ * Answers with the stored row in the database's own spelling — `start_number`, not
+ * `startNumber` — unlike every other call here, which is why nothing reads it. The view
+ * re-fetches the state instead, which also picks up the recalculated averages.
+ */
+export const saveParticipant = (key: string, id: string | null, changes: ParticipantEdit) =>
+  call<{ ok: true }>('voting-admin', key, { action: 'save', ...(id ? { id } : {}), ...changes });
+
+export const removeParticipant = (key: string, id: string) =>
+  call<{ ok: true; removed: string }>('voting-admin', key, { action: 'remove', id });
+
+/** Uploads the picture and hands back its bucket path. Saving the participant is separate. */
+export const uploadParticipantPhoto = (key: string, photo: string) =>
+  call<{ ok: true; imagePath: string; url: string }>('voting-admin', key, { action: 'photo', photo });
+
+/* The four below all answer with the whole state, because each one changes the phase and the
+   countdown along with it. One round trip rather than a write followed by a read. */
+
+export const scheduleVoting = (key: string, raceStartsAt: string, durationMinutes: number) =>
+  call<VotingState>('voting-admin', key, { action: 'schedule', raceStartsAt, durationMinutes });
+
+export const openVoting = (key: string, durationMinutes: number) =>
+  call<VotingState>('voting-admin', key, { action: 'open', durationMinutes });
+
+export const closeVoting = (key: string) => call<VotingState>('voting-admin', key, { action: 'close' });
+
+/** Only answers once voting is closed; 409 VOTING_STILL_OPEN before that. */
+export const mailWinners = (key: string) =>
+  call<{ ok: true; sent: VotingWinner[]; unreachable: VotingWinner[]; podium: number }>(
+    'voting-admin',
+    key,
+    { action: 'winners' }
+  );
+
 /* ------------------------------------------------------------------- purge */
 
 export type PurgeScope =

@@ -93,6 +93,117 @@ const probe = `
       buttonDisabled: Boolean(next?.disabled),
       buttonLabel: next?.textContent.trim() || ''
     };
+
+    /* --- wspolny e-mail: najpierw osoba, dopiero potem kod dla jej entryId. */
+    document.querySelector('[data-form-step="2"] [data-form-back]')?.click();
+    await sleep(250);
+    let codePayload = null;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = String(typeof input === 'string' ? input : input?.url || '');
+      if (url.includes('/entry-lookup')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          exists: true,
+          entries: [
+            { id: '11111111-1111-4111-8111-111111111111', initials: 'MR', raceNumber: '007', withdrawn: false, minor: false },
+            { id: '22222222-2222-4222-8222-222222222222', initials: 'AR', raceNumber: '014', withdrawn: false, minor: false }
+          ]
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.includes('/entry-code')) {
+        codePayload = JSON.parse(init?.body || '{}');
+        return new Response(JSON.stringify({ ok: true, email: 'k***@example.com' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      return originalFetch(input, init);
+    };
+    fill('email', 'rodzina@example.com');
+    next?.click();
+    await sleep(700);
+    const people = [...panel.querySelectorAll('[data-entry-person]')];
+    const edit = panel.querySelector('[data-entry-action="edit"]');
+    const disabledBefore = Boolean(edit?.disabled);
+    people[1]?.click();
+    const disabledAfter = Boolean(edit?.disabled);
+    edit?.click();
+    await sleep(500);
+    out.multiple = {
+      count: people.length,
+      labels: people.map((person) => person.textContent.trim()),
+      disabledBefore,
+      disabledAfter,
+      selected: people[1]?.getAttribute('aria-pressed') || '',
+      codeEntryId: codePayload?.entryId || ''
+    };
+
+    /* --- ta sama osoba, nie tylko ta sama skrzynka.
+       Panel ma wtedy powiedzieć co innego i podstawić inny przycisk. Sprawdzane przez
+       policzony display, a nie przez sam atrybut hidden: hidden daje display:none z arkusza
+       przeglądarki i przegrywa z każdą własną regułą display, a oba przełączane elementy
+       takie reguły dostają — akapit jest gridem, a span siedzi w przycisku. */
+    document.querySelector('[data-form-step="2"] [data-form-back]')?.click();
+    await sleep(250);
+    const shown = (element) => Boolean(element)
+      && getComputedStyle(element).display !== 'none'
+      && element.offsetParent !== null;
+
+    window.fetch = async (input, init) => {
+      const url = String(typeof input === 'string' ? input : input?.url || '');
+      if (url.includes('/entry-lookup')) {
+        const sent = JSON.parse(init?.body || '{}');
+        return new Response(JSON.stringify({
+          ok: true,
+          exists: true,
+          duplicate: true,
+          duplicateId: '22222222-2222-4222-8222-222222222222',
+          entries: [
+            { id: '11111111-1111-4111-8111-111111111111', initials: 'AR', raceNumber: '007', withdrawn: false, minor: false, samePerson: false },
+            { id: '22222222-2222-4222-8222-222222222222', initials: 'MR', raceNumber: '014', withdrawn: false, minor: false, samePerson: true }
+          ],
+          echo: sent
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(input, init);
+    };
+
+    let sentToLookup = null;
+    const lookupSpy = window.fetch;
+    window.fetch = async (input, init) => {
+      const url = String(typeof input === 'string' ? input : input?.url || '');
+      if (url.includes('/entry-lookup')) sentToLookup = JSON.parse(init?.body || '{}');
+      return lookupSpy(input, init);
+    };
+
+    fill('email', 'imiennik@example.com');
+    next?.click();
+    await sleep(700);
+    const samePill = panel.querySelector('[data-entry-person][data-entry-id="22222222-2222-4222-8222-222222222222"]');
+    out.duplicate = {
+      // Czy imię i nazwisko wyszły w zapytaniu. Bez nich serwer nie ma czego porównać.
+      sentFirstName: sentToLookup?.firstName || '',
+      sentLastName: sentToLookup?.lastName || '',
+      addressLeadShown: shown(panel.querySelector('[data-entry-lead="address"]')),
+      personLeadShown: shown(panel.querySelector('[data-entry-lead="person"]')),
+      personLeadText: panel.querySelector('[data-entry-lead="person"]')?.textContent.trim().slice(0, 40) || '',
+      otherLabelAddressShown: shown(panel.querySelector('[data-entry-other-label="address"]')),
+      otherLabelPersonShown: shown(panel.querySelector('[data-entry-other-label="person"]')),
+      panelMarked: panel.classList.contains('is-same-person'),
+      samePillMarked: Boolean(samePill?.classList.contains('is-same')),
+      // Trafiona osoba ma być wybrana od razu, żeby „popraw" nie celowało w brata.
+      samePillSelected: samePill?.getAttribute('aria-pressed') || '',
+      badges: [...panel.querySelectorAll('.entry-person__same')].length
+    };
+
+    /* --- i wyjście: „to inna osoba" musi przepuścić dalej. */
+    panel.querySelector('[data-entry-action="other"]')?.click();
+    await sleep(500);
+    out.duplicate.stepAfterOverride = document.querySelector('[data-form-shell]')?.dataset.formActive || '';
+    out.duplicate.panelHiddenAfterOverride = panel.hidden;
+
+    window.fetch = originalFetch;
   }
 
   const marker = document.createElement('pre');
@@ -159,6 +270,31 @@ try {
       `przy niedostępnym API formularz idzie dalej: krok ${f.stepBefore} → ${f.stepAfter}`);
     check(f.panelShown === false, 'panel nie wyskakuje bez powodu');
     check(f.buttonDisabled === false, `przycisk odblokowany po zapytaniu (napis „${f.buttonLabel}")`);
+  }
+
+  if (r.multiple) {
+    console.log('');
+    check(r.multiple.count === 2, `dwie osoby renderują dwie pastylki: ${r.multiple.labels.join(' / ')}`);
+    check(r.multiple.disabledBefore && !r.multiple.disabledAfter && r.multiple.selected === 'true',
+      'edycja jest zablokowana do wyboru konkretnej osoby');
+    check(r.multiple.codeEntryId === '22222222-2222-4222-8222-222222222222',
+      `kod wysłany dla wybranej osoby: ${r.multiple.codeEntryId}`);
+  }
+
+  if (r.duplicate) {
+    const d = r.duplicate;
+    console.log('');
+    check(d.sentFirstName === 'Marco' && d.sentLastName === 'Rossi',
+      `imię i nazwisko jadą do sprawdzenia: „${d.sentFirstName} ${d.sentLastName}"`);
+    check(d.personLeadShown && !d.addressLeadShown,
+      `panel mówi o osobie, nie o adresie: „${d.personLeadText}…"`);
+    check(d.otherLabelPersonShown && !d.otherLabelAddressShown,
+      'przycisk wyjścia mówi „to inna osoba", nie „zapisuję kolejną"');
+    check(d.panelMarked && d.samePillMarked && d.badges === 1,
+      `wyróżniona jest dokładnie jedna osoba (plakietek: ${d.badges})`);
+    check(d.samePillSelected === 'true', 'trafiona osoba wybrana od razu, bez dodatkowego pytania');
+    check(d.stepAfterOverride === '2' && d.panelHiddenAfterOverride,
+      `„to inna osoba" przepuszcza dalej: krok → ${d.stepAfterOverride}`);
   }
 
   console.log(`\n${fails ? `${fails} niezaliczonych` : 'wszystko zaliczone'}`);

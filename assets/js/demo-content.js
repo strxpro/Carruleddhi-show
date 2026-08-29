@@ -86,3 +86,92 @@ export function demoRating() {
   const sum = comments.reduce((total, comment) => total + comment.rating, 0);
   return { average: sum / comments.length, votes: comments.length };
 }
+
+/* ===========================================================================
+   Głosowanie publiczności
+   ===========================================================================
+   Ta sekcja jest niewidoczna przez jedenaście miesięcy w roku i widoczna w jednym dniu, w
+   trzech różnych postaciach: odliczanie, otwarte głosowanie, podium. To najgorszy możliwy
+   układ do przeglądania projektu graficznego — nie da się zobaczyć żadnej z tych trzech
+   postaci bez wgranej bazy, ustawionej godziny i oddanych głosów, a ostatniej nie da się
+   zobaczyć wcale, dopóki ktoś nie zagłosuje.
+
+   W trybie demo faza jest przełączana z ekranu. Nie jest to obejście serwera: kiedy Worker
+   odpowiada, faza pochodzi wyłącznie od niego i przełącznika nie ma. Patrz voting.js.
+
+   ZDJĘCIA SĄ RYSUNKAMI Z TEGO REPOZYTORIUM
+     Reguła z góry tego pliku obowiązuje: żadnych zdjęć z banku, bo plaża udająca czyjś
+     carruleddhu wprowadza w błąd, zamiast ilustrować. Te pięć plików to własne SVG serwisu,
+     które na pierwszy rzut oka są rysunkami i nikt nie weźmie ich za zdjęcie pojazdu.
+   =========================================================================== */
+
+const RAW_PARTICIPANTS = [
+  { startNumber: 7, category: 'classic', firstName: 'Salvatore', lastName: 'Mannu',
+    projectName: 'Fulmine di Gallura', photo: '/assets/images/gallery-race.svg', votes: 34, average: 8.94 },
+  { startNumber: 12, category: 'classic', firstName: 'Giulia', lastName: 'Deiana',
+    projectName: 'Rena Bianca', photo: '/assets/images/gallery-start.svg', votes: 41, average: 9.12 },
+  { startNumber: 18, category: 'classic', firstName: 'Piero', lastName: 'Sanna',
+    projectName: '', photo: '', votes: 12, average: 7.25 },
+  { startNumber: 23, category: 'art', firstName: 'Elena', lastName: 'Corda',
+    projectName: 'Tonno Volante', photo: '/assets/images/gallery-craft.svg', votes: 38, average: 9.47 },
+  { startNumber: 31, category: 'art', firstName: 'Nicolò', lastName: 'Pinna',
+    projectName: 'Nuraghe Express', photo: '/assets/images/gallery-finish.svg', votes: 27, average: 8.11 },
+  { startNumber: 44, category: 'art', firstName: 'Marta', lastName: 'Bua',
+    projectName: 'Sirena a Pedali', photo: '/assets/images/gallery-crowd.svg', votes: 19, average: 8.63 }
+];
+
+/**
+ * Sześciu uczestników w dwóch kategoriach, dobranych po to, żeby zmęczyć układ, a nie mu
+ * pochlebić: jeden bez zdjęcia, jeden bez nazwy pojazdu, nazwisko z akcentem, liczba głosów
+ * od dwunastu do czterdziestu jeden i dwie średnie różniące się o setne — czyli remis, który
+ * musi rozstrzygnąć liczba głosów.
+ */
+export function demoParticipants(withScores) {
+  return RAW_PARTICIPANTS.map((row, index) => ({
+    id: `demo-participant-${index}`,
+    category: row.category,
+    startNumber: row.startNumber,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    projectName: row.projectName,
+    photo: row.photo,
+    // Przed zamknięciem średnie nie wychodzą publicznie — tak samo jak z prawdziwego Workera.
+    voteCount: withScores ? row.votes : 0,
+    averageScore: withScores ? row.average : 0,
+    demo: true
+  }));
+}
+
+/**
+ * Odpowiedź, którą dałby Worker w danej fazie.
+ *
+ * Ten sam kształt, te same nazwy pól i ta sama reguła: podium wychodzi wyłącznie po
+ * zamknięciu, a kolejność jest po średniej, przy remisie po liczbie głosów. Kształt inny niż
+ * prawdziwy dawałby przegląd projektu, który wygląda dobrze i nie odpowiada niczemu.
+ */
+export function demoVotingState(phase = 'scheduled') {
+  const closed = phase === 'closed';
+  const participants = demoParticipants(closed);
+  const now = Date.now();
+
+  return {
+    ok: true,
+    demo: true,
+    phase,
+    // Odliczanie ma coś odliczać: minuta do startu w fazie pierwszej.
+    raceStartsAt: new Date(phase === 'scheduled' ? now + 60000 : now - 300000).toISOString(),
+    votingEndsAt: new Date(closed ? now - 60000 : now + 15 * 60000).toISOString(),
+    durationMinutes: 20,
+    scoreMin: 3,
+    scoreMax: 10,
+    categories: [...new Set(participants.map((row) => row.category))],
+    participants,
+    podium: closed
+      ? [...participants]
+        .sort((a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount)
+        .slice(0, 3)
+      : [],
+    // Nikt nie zagłosował z tej przeglądarki, więc kafelki są klikalne i da się otworzyć okno.
+    myVotes: []
+  };
+}

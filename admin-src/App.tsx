@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   LayoutDashboard, Users, MessageSquare, StickyNote, BellRing,
-  Mail, Settings, LogOut, ExternalLink
+  Mail, Settings, LogOut, ExternalLink, Trophy
 } from 'lucide-react';
 import { Sidebar, SidebarBody, SidebarLink, type SidebarLinkItem } from '@/components/ui/sidebar';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { Login } from '@/components/Login';
 import { Registrations } from '@/components/Registrations';
+import { Voting } from '@/components/Voting';
 import { LocaleContext, useAuth, useDataKey, useLocaleState } from '@/hooks';
 import { fetchInbox, type InboxCounts } from '@/api';
 import type { Dict } from '@/i18n';
 
 type TabId =
   | 'dashboard' | 'registrations' | 'chat' | 'wall'
-  | 'reminders' | 'newsletter' | 'settings';
+  | 'reminders' | 'newsletter' | 'voting' | 'settings';
 
 const TABS: { id: TabId; labelKey: keyof Dict; icon: React.ReactNode; counter?: keyof InboxCounts }[] = [
   { id: 'dashboard', labelKey: 'nav.dashboard', icon: <LayoutDashboard size={20} /> },
@@ -23,6 +24,7 @@ const TABS: { id: TabId; labelKey: keyof Dict; icon: React.ReactNode; counter?: 
   { id: 'wall', labelKey: 'nav.wall', icon: <StickyNote size={20} />, counter: 'wall' },
   { id: 'reminders', labelKey: 'nav.reminders', icon: <BellRing size={20} />, counter: 'reminders' },
   { id: 'newsletter', labelKey: 'nav.newsletter', icon: <Mail size={20} />, counter: 'newsletter' },
+  { id: 'voting', labelKey: 'nav.voting', icon: <Trophy size={20} /> },
   { id: 'settings', labelKey: 'nav.settings', icon: <Settings size={20} /> }
 ];
 
@@ -149,6 +151,8 @@ export default function App() {
 
             {tab === 'registrations' && <Registrations dataKey={dataKey} setDataKey={setDataKey} />}
 
+            {tab === 'voting' && <Voting dataKey={dataKey} />}
+
             {tab === 'dashboard' && (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
@@ -172,7 +176,7 @@ export default function App() {
               </div>
             )}
 
-            {tab !== 'registrations' && tab !== 'dashboard' && (
+            {tab !== 'registrations' && tab !== 'dashboard' && tab !== 'voting' && (
               <p className="text-sm text-white/45">{t('dash.soon')}</p>
             )}
           </div>
