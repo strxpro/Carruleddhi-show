@@ -346,6 +346,60 @@ check(
   !sanitizeScalar(crlfMail).includes('\n')
 );
 
+/* --- szablony formularza wystawione funkcji -------------------------------
+   worker/print-templates.js powstaje w tools/build-pdfs.mjs i jest jedynym sposobem,
+   w jaki funkcja na Vercelu widzi szablony formularza — katalog emails/ istnieje tylko
+   na dysku autora. Jesli ten plik sie rozjedzie z szablonami, formularz z danymi
+   przestanie powstawac, a dowiemy sie o tym od uczestnika. */
+const printFile = resolve(root, 'worker/print-templates.js');
+check('worker/print-templates.js istnieje', readFileSync(printFile, 'utf8').length > 1000);
+
+const printSrc = read('worker/print-templates.js');
+const grab = (name) => JSON.parse(printSrc.slice(
+  printSrc.indexOf('=', printSrc.indexOf(`export const ${name}`)) + 1,
+  printSrc.indexOf(';\n', printSrc.indexOf(`export const ${name}`))
+));
+const PRINT_TEMPLATES = grab('PRINT_TEMPLATES');
+const PRINT_WORDING = grab('PRINT_WORDING');
+const PRINT_DATA_KEYS = grab('PRINT_DATA_KEYS');
+
+check('szablony: adult i minor', Boolean(PRINT_TEMPLATES.adult && PRINT_TEMPLATES.minor));
+check('slowa: 12 wariantow (6 jezykow x 2 rodzaje)', Object.keys(PRINT_WORDING).length === 12);
+
+/* Data w stopce ma byc data WYDRUKU, nie data ostatniego uruchomienia generatora.
+   Formularz z wczorajsza data wyglada jak pomylka dokladnie wtedy, gdy ktos pokazuje
+   go przy starcie. Pierwsza wersja tego eksportu miala ja juz podstawiona i wyszlo to
+   dopiero na pomiarze. */
+check(
+  'stopka zostawia %GENERATEDAT% do podstawienia w funkcji',
+  Object.values(PRINT_WORDING).every((w) => JSON.stringify(w).includes('%GENERATEDAT%'))
+);
+
+/* GUARDIAN_RELATION nie jest w EXAMPLE, bo zalezy od jezyka, ale szablon nieletniego
+   go uzywa. Lista bez niego to lista niekompletna i formularz nieletniego nie powstaje. */
+check('pola danych obejmuja GUARDIAN_RELATION', PRINT_DATA_KEYS.includes('GUARDIAN_RELATION'));
+
+/* Najwazniejsza z tej grupy: szablon + slowa + dane musza dac komplet w KAZDEJ
+   z dwunastu kombinacji. render() rzuca na nierozwiazanym placeholderze, wiec brak
+   jednego klucza w jednym jezyku to jeden jezyk bez formularza. */
+{
+  const fill = (template, values) => {
+    let html = template;
+    for (const [key, value] of Object.entries(values)) html = html.split(`{{${key}}}`).join(String(value));
+    return html;
+  };
+  const missing = [];
+  for (const kind of ['adult', 'minor']) {
+    for (const locale of ['it', 'pl', 'en', 'de', 'es', 'fr']) {
+      const data = Object.fromEntries(PRINT_DATA_KEYS.map((k) => [k, 'X']));
+      const html = fill(PRINT_TEMPLATES[kind], { ...PRINT_WORDING[`${locale}:${kind}`], ...data });
+      const left = [...new Set(html.match(/\{\{[A-Z_]+\}\}/g) || [])];
+      if (left.length) missing.push(`${locale}:${kind} -> ${left.join(',')}`);
+    }
+  }
+  check('12 kombinacji renderuje sie bez nierozwiazanych pol', missing.length === 0, missing.join(' | '));
+}
+
 /* --- slownik szesciu pytan: co ma trafiac, a co ma isc do czlowieka ------
    Ten slownik stoi PRZED modelem i jego odpowiedzi sa dosłownie tym, co napisal
    organizator — o kasku i o wpisowym. Falszywe trafienie jest tu gorsze niz brak
