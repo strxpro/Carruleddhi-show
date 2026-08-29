@@ -6,7 +6,20 @@
        before any module. Without it the intro overlay would cover the whole page
        for visitors whose JavaScript never runs. -->
   <script>document.documentElement.classList.replace('no-js', 'js');</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- `interactive-widget=resizes-visual` — klawiatura nie ma prawa zmieniać układu strony.
+       ---------------------------------------------------------------------------
+       Zmierzone na 390x844: zmniejszenie okna do 380 px, czyli tyle, ile zostaje po
+       otwarciu klawiatury, skraca dokument z 13540 do 9919 px — prawie każda sekcja tej
+       strony ma wysokość liczoną od wysokości ekranu. Przewinięcie zostaje wtedy
+       przycięte do nowego maksimum, z 10915 na 9539, i po zamknięciu klawiatury NIKT go
+       nie przywraca. Czytający traci 1376 px, czyli półtora ekranu, i ląduje w innej
+       sekcji niż ta, w której pisał. Sonda: tools/probe-c-touch-jump.mjs.
+
+       `resizes-visual` jest domyślne w dzisiejszym Chrome, więc na nim ta linia niczego
+       nie zmienia — i nie o to chodzi. Chodzi o to, żeby przeglądarka albo WebView
+       z innym domyślnym zachowaniem nie mogła tego zrobić. Wpisane jawnie, bo skutek
+       jest cichy: nic się nie psuje, strona jest tylko w innym miejscu niż była. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
   <title>Carruleddhi Show 2026 — Santa Teresa Gallura</title>
   <meta name="description" content="La corsa di carretti artigianali più spettacolare della Sardegna. 17 ottobre 2026, Santa Teresa Gallura.">
   <meta name="theme-color" content="#071a3d">
