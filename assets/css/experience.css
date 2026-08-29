@@ -232,8 +232,10 @@
     visibility .24s;
 }
 
-/* 292 -> 372: chip z procentem zostaje teraz w pigulce i potrzebuje miejsca. */
-.site-header.is-compact { width: min(372px, calc(100vw - 20px)); }
+/* 292 -> 560: w pigulce zostaja teraz flaga i pelny chip z nazwa sekcji, wiec
+   zwiniety pasek jest blizszy pelnemu niz kropce. To jest swiadomy wybor — kontrolki,
+   ktorych ktos szuka, maja byc na miejscu, a nie o jeden gest dalej. */
+.site-header.is-compact { width: min(560px, calc(100vw - 20px)); }
 .site-header.is-compact .nav-shell {
   min-height: 62px;
   gap: 7px;
@@ -258,7 +260,7 @@
    W pigulce zostaje kropka i procent; nazwa sekcji sie chowa, bo to ona zajmuje
    miejsce, a procent niesie te informacje, dla ktorej ten chip istnieje. */
 .site-header.is-compact .nav-current {
-  max-width: 92px;
+  max-width: 260px;
   min-width: 0;
   overflow: hidden;
   opacity: 1;
@@ -266,15 +268,17 @@
   transform: none;
   padding-inline: 0;
 }
+/* Nazwa sekcji zostaje. Bez niej procent mowi "ile", ale nie mowi "gdzie",
+   a to drugie jest tym, po co ktos patrzy w pasek w polowie dlugiej strony. */
 .site-header.is-compact .nav-current [data-current-section] {
-  display: none;
+  display: inline;
 }
 .site-header.is-compact .nav-current__progress {
   font-size: 11px;
   letter-spacing: .06em;
 }
-.site-header.is-compact .nav-attend,
-.site-header.is-compact .language-picker {
+/* Zwija sie juz tylko "Bede tam". Flaga zostaje — patrz nizej. */
+.site-header.is-compact .nav-attend {
   overflow: hidden;
   max-width: 0;
   min-width: 0;
@@ -283,6 +287,21 @@
   visibility: hidden;
   pointer-events: none;
   transform: translateY(-8px) scale(.92);
+}
+
+/* WYBOR JEZYKA WIDOCZNY ZAWSZE.
+
+   Wczesniej flaga znikala po 120 px przewijania i wracala dopiero po najechaniu myszka
+   albo przewinieciu w gore. Na stronie w szesciu jezykach to jest jedyna kontrolka,
+   ktorej ktos szuka natychmiast po wejsciu — a szukal jej w pasku, ktory wlasnie ja
+   schowal. Kosztuje 44 px szerokosci i jest tego warta. */
+.site-header.is-compact .language-picker {
+  max-width: 200px;
+  overflow: visible;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
 }
 .site-header.is-compact .nav-actions { gap: 0; }
 .site-header.is-compact .menu-toggle {
@@ -496,8 +515,13 @@ body.is-language-transitioning .nav-current__copy {
   }
   /* Byla tu regula display none. Postep na telefonie jest potrzebny bardziej niz na
      pulpicie, bo strona ma 12 sekcji i bez niego nie wiadomo, ile jeszcze zostalo. */
+  /* Na telefonie w pasku sa juz marka, flaga i menu — na nazwe sekcji nie ma miejsca
+     i jej wciskanie zrobiloby z paska scisk. Zostaje kropka i procent, czyli to,
+     czego nie da sie odczytac skadinad. */
   .site-header .nav-current { max-width: 78px; }
   .site-header .nav-current [data-current-section] { display: none; }
+  .site-header.is-compact .nav-current { max-width: 78px; }
+  .site-header.is-compact .nav-current [data-current-section] { display: none; }
   .site-header .nav-actions { gap: 6px; }
 
   /* The flag never collapses on a phone.

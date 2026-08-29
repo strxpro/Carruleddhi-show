@@ -519,7 +519,7 @@
 @media (hover: hover) and (pointer: fine) {
   .site-header.is-compact:hover,
   .site-header.is-compact:focus-within {
-    width: min(560px, calc(100vw - 28px));
+    width: min(720px, calc(100vw - 28px));
   }
   .site-header.is-compact:hover .nav-shell,
   .site-header.is-compact:focus-within .nav-shell {
@@ -540,13 +540,11 @@
   /* Chip zostaje widoczny takze po rozwinieciu — od kiedy nie zwija sie do zera,
      nie ma juz efektu "kropka bez etykiety", ktory kazal go tu chowac. Po
      rozwinieciu jest miejsce, wiec wraca tez nazwa sekcji. */
+  /* Chip i flaga sa widoczne takze bez najezdzania, wiec hover nie ma juz czego
+     przywracac — zostaje mu poszerzenie paska na "Bede tam". */
   .site-header.is-compact:hover .nav-current,
   .site-header.is-compact:focus-within .nav-current {
-    max-width: 200px;
-  }
-  .site-header.is-compact:hover .nav-current [data-current-section],
-  .site-header.is-compact:focus-within .nav-current [data-current-section] {
-    display: inline;
+    max-width: 260px;
   }
   .site-header.is-compact:hover .menu-toggle,
   .site-header.is-compact:focus-within .menu-toggle {
