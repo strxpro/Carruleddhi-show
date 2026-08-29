@@ -283,19 +283,25 @@
   backdrop-filter: blur(6px);
   box-shadow: var(--shadow-md);
 }
-/* Pigułka „DEMO" — zwinięty pasek to ona jedna.
+/* Przycisk „DEMO" — zwinięty pasek to on jeden, więc musi być widoczny sam z siebie.
    ---------------------------------------------------------------------------
-   Była tu wcześniej nieklikalna etykieta `<strong>`. Zastąpił ją przycisk, bo pasek jest
-   zwijany, a etykieta nie ma jak niczego rozwinąć. Wygląd zostaje ten sam: pisane wersalikami,
-   koralowe, drobne — czyli nadal czyta się jak znak wodny podglądu, a nie jak część serwisu. */
+   Była tu nieklikalna etykieta `<strong>` pisana dziesięciopunktowym drukiem na białym tle.
+   Zastąpił ją przycisk, bo pasek jest zwijany, a etykieta nie ma jak niczego rozwinąć — i przy
+   okazji przestał być szeptem: pełne koralowe tło, biały napis, własny cień. Zgłoszone jako
+   „nadal nic nie widzę na telefonie", i o drobny biały owal na jasnym tle nietrudno się
+   potknąć. Że to podglad, a nie serwis, mówi baner na górze strony i przerywana obwódka
+   paska — nie musi tego brać na siebie jeszcze rozmiar pisma. */
 .voting-demo__toggle {
   flex: 0 0 auto;
-  border-color: rgb(238 98 95 / .55) !important;
-  color: var(--coral, #ee625f) !important;
-  font: 900 10px/1 var(--font-meta) !important; letter-spacing: .18em !important;
+  border-color: transparent !important;
+  background: var(--coral, #ee625f) !important;
+  color: var(--white) !important;
+  font: 900 13px/1 var(--font-meta) !important; letter-spacing: .16em !important;
+  box-shadow: 0 8px 22px rgb(238 98 95 / .45);
 }
 .voting-demo__toggle::after {
-  content: '▾'; margin-left: 6px; display: inline-block;
+  content: '▾'; margin-left: 8px; display: inline-block;
+  font-size: 1.1em;
   transition: transform .2s;
 }
 .voting-demo.is-open .voting-demo__toggle::after { transform: rotate(180deg); }
@@ -346,24 +352,24 @@
    rośnie DO GÓRY i pigułka nie rusza się z miejsca przy rozwijaniu. Kciuk zostaje tam, gdzie
    nacisnął. */
 @media (max-width: 760px) {
+  /* `--demo-lift` przychodzi z pomiaru banera cookies — patrz `lift()` w voting.js. Zero, gdy
+     banera nie ma, więc pasek siedzi wtedy 10 px nad dolną krawędzią. */
   .voting-demo {
-    left: 10px; right: auto; bottom: 10px;
+    left: 10px; right: auto; top: auto;
+    bottom: calc(10px + var(--demo-lift, 0px));
     max-width: calc(100vw - 20px);
     flex-direction: column-reverse; flex-wrap: nowrap; align-items: stretch;
     padding: 8px;
+    transition: bottom .25s var(--ease-out, ease);
   }
-  .voting-demo button { min-height: 44px; padding: 12px 16px; font-size: 12px; }
-  .voting-demo__toggle { align-self: flex-start; }
-
-  /* Baner cookies zajmuje na telefonie całą szerokość nad dolną krawędzią. Dopóki wisi, pasek
-     demo przenosi się pod nagłówek — nie ma tu nic do wyboru między nimi, oba są przypięte do
-     tego samego róga. Selektor rodzeństwa działa, bo baner stoi w znaczniku, a pasek dokłada
-     się na końcu ciała dokumentu. Po zamknięciu banera pasek wraca na dół sam. */
-  .cookie-banner.is-visible ~ .voting-demo {
-    top: 74px; bottom: auto;
-    flex-direction: column; align-items: flex-start;
+  .voting-demo button { min-height: 48px; padding: 14px 18px; font-size: 13px; }
+  .voting-demo__toggle {
+    align-self: flex-start;
+    min-height: 56px; padding: 0 24px;
+    font-size: 15px !important;
   }
 }
+@media (prefers-reduced-motion: reduce) { .voting-demo { transition: none; } }
 
 /* ============================================================ zapisy wstrzymane */
 

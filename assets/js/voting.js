@@ -41,7 +41,8 @@ import { demoVotingState } from './demo-content.js';
    * zapomnieć, bo nie jest nigdzie zapisywany, a baner na górze strony mówi wprost, co widać.
    */
   const demoMode = new URLSearchParams(window.location.search).get('demo') === '1';
-  /** Ustawiane, gdy odczyt potwierdził, że Workera nie ma — wtedy demo ma czym zastąpić dane. */
+  /** Ustawiane, gdy dane na ekranie pochodzą z demo, a nie z serwera. Czyta to `watchStart` i
+      wysyłka głosu: w demo nie ma kogo zapytać ani gdzie zapisać, więc przechodzą lokalnie. */
   let demoDriven = false;
 
   const api = () => window.CARRULEDDHI_API || null;
@@ -148,37 +149,47 @@ import { demoVotingState } from './demo-content.js';
   }
 
   async function pull() {
-    const bridge = api();
-    const endpoint = config()?.endpoints?.voting;
-    if (!bridge || !endpoint) {
-      if (demoMode) paintDemo();
+    /* `?demo=1` WYGRYWA Z SERWEREM — i to jest poprawka błędu, nie upodobanie.
+       ---------------------------------------------------------------------------
+       Wcześniej demo wchodziło na ekran tylko wtedy, gdy odczyt się nie udał, a udany odczyt
+       zdejmował przełącznik faz. Brzmiało to rozsądnie („dwie prawdy o fazie to jedna za
+       dużo") i było sprawdzone lokalnie, gdzie Workera nie ma. Na produkcji Worker jest.
+
+       ZMIERZONE na www.carruleddhishow.com, POST na /api/carruleddhi/voting:
+         {"ok":true,"phase":"scheduled","participants":[],"podium":[],"categories":[]}
+
+       Czyli odczyt się udawał, przełącznik był natychmiast usuwany, a prawdziwa faza to
+       „przed startem" z zerem uczestników — więc sekcja głosowania zostawała ukryta. Na
+       stronie z `?demo=1` nie było DOKŁADNIE NIC do zobaczenia, a lokalna sonda pokazywała
+       pasek, bo lokalnie nie ma czego odpytać. Stąd „nadal nic nie widzę na telefonie".
+
+       Parametr w adresie wpisuje człowiek i wpisuje go po to, żeby zobaczyć demo. Nie ma tu
+       dwóch prawd do pogodzenia: jest prośba i jej spełnienie. Odczytu nie ma po co wysyłać,
+       więc nie jest wysyłany — demo działa też przy zerwanej sieci. */
+    if (demoMode) {
+      paintDemo();
       return;
     }
+
+    const bridge = api();
+    const endpoint = config()?.endpoints?.voting;
+    if (!bridge || !endpoint) return;
     try {
       const result = await bridge.post(endpoint, bridge.payload('voting', {
         action: 'state',
         deviceId: deviceId()
       }));
-      /* Brak Workera odpowiada `{ ok, demo }` bez fazy — patrz postJSON w app.js. Poza trybem
-         demo nie ma wtedy czego pokazywać i nie ma powodu niczego psuć: sekcje zostają ukryte,
-         dokładnie jak przed odczytem. W trybie demo to jest właśnie chwila, w której demo
-         przejmuje ekran. */
-      if (!result?.ok || !result.phase) {
-        if (demoMode) paintDemo();
-        return;
-      }
-      demoDriven = false;
+      /* Brak Workera odpowiada `{ ok, demo }` bez fazy — patrz postJSON w app.js. Nie ma wtedy
+         czego pokazywać i nie ma powodu niczego psuć: sekcje zostają ukryte, dokładnie jak
+         przed odczytem. */
+      if (!result?.ok || !result.phase) return;
       absorb(result);
-      // Prawdziwa odpowiedź zdejmuje przełącznik: dwie prawdy o fazie na jednym ekranie to
-      // jedna prawda za dużo.
-      $('[data-voting-demo]')?.remove();
     } catch (error) {
       /* Cicho. Nieudany odczyt zostawia stronę taką, jaka była — a przed pierwszym udanym
          odczytem znaczy to stronę bez sekcji głosowania, czyli dokładnie to, co widać przez
          cały rok poza dniem wyścigu. Komunikat o błędzie w tym miejscu byłby ostrzeżeniem o
          nieistnieniu czegoś, czego nikt jeszcze nie szukał. */
       console.warn('Voting state unavailable:', error);
-      if (demoMode) paintDemo();
     }
   }
 
@@ -310,6 +321,34 @@ import { demoVotingState } from './demo-content.js';
        a ten napis jest najdłuższy z wszystkich („Zakończ odliczanie") i sam zawinąłby pasek do
        dwóch rzędów. */
     phases.append(skip);
+
+    /**
+     * Podniesienie nad baner cookies, liczone z pomiaru.
+     * ---------------------------------------------------------------------------
+     * Baner cookies zajmuje na telefonie 375 px wysokości — 44% ekranu — i stoi w tym samym
+     * dolnym rogu. Nie da się tego rozstrzygnąć regułą CSS z wpisaną liczbą, bo wysokość
+     * banera zależy od języka i od tego, czy rozwinięto w nim ustawienia. Więc jest mierzona.
+     *
+     * Wcześniejsza wersja przenosiła pasek pod nagłówek. To był błąd: nagłówek na telefonie
+     * stoi od 30 do 94 px, a pasek trafiał na 74 px — czyli na nagłówek. Widać go tam było
+     * tyle, co nic.
+     */
+    const lift = () => {
+      const banner = document.querySelector('[data-cookie-banner]');
+      const shown = banner && getComputedStyle(banner).display !== 'none';
+      const height = shown ? Math.ceil(banner.getBoundingClientRect().height) + 12 : 0;
+      bar.style.setProperty('--demo-lift', `${height}px`);
+    };
+    lift();
+
+    const banner = document.querySelector('[data-cookie-banner]');
+    if (banner) {
+      /* Dwa różne zdarzenia, bo to dwie różne zmiany: klasa `is-visible` decyduje, CZY baner
+         jest, a rozmiar zmienia się przy rozwinięciu ustawień i przy zmianie języka. */
+      new MutationObserver(lift).observe(banner, { attributes: true, attributeFilter: ['class', 'style'] });
+      if (window.ResizeObserver) new ResizeObserver(lift).observe(banner);
+    }
+    window.addEventListener('resize', lift, { passive: true });
 
     paintOpen();
     document.body.append(bar);
