@@ -2,6 +2,11 @@ import { DEFAULT_SITE_CONFIG, getPublicSiteConfig } from './site-config.js';
 import { DEMO_SPONSORS, demoComments, demoRating } from './demo-content.js';
 import { ROUTE_VIEWBOX, buildDashPathData, buildRoutePathData } from './route-path.js';
 import { flagSvg } from './flags.js';
+/* Cztery rzeczy, które od wyniesienia głosowania na osobną podstronę mają jedną, wspólną
+   wersję: wysyłka, pasek komunikatów, odczyt ze słownika i przepisanie znaczników na język.
+   Stały tutaj i były podawane na zewnątrz przez window.CARRULEDDHI_API — patrz nagłówek
+   site-bridge.js, w którym opisane jest, dlaczego druga kopia `postJSON` byłaby błędem. */
+import { makeText, makePayload, postJSON, showToast, translateDom } from './site-bridge.js';
 
 (() => {
   'use strict';
@@ -82,9 +87,17 @@ import { flagSvg } from './flags.js';
     return all[state.lang] || all.it || {};
   }
 
+  /* Ze wspólnego szwu, z językiem podanym wprost. `state.lang`, nie atrybut w `<html>`:
+     applyLanguage ustawia jedno o kilkanaście linii wcześniej niż drugie, a w tym okienku dwa
+     napisy obok siebie wyszłyby w dwóch językach.
+
+     Deklaracja funkcji, nie `const` ze strzałką: `text` jest wołane z kilkudziesięciu miejsc
+     tego pliku, w tym z funkcji zdefiniowanych wyżej, a `const` nie jest wyciągane na górę
+     zasięgu. Zamiana na stałą dawała ReferenceError przy pierwszym wywołaniu z góry pliku. */
+  let translate = null;
   function text(key) {
-    const dict = dictionary();
-    return dict[key] || (window.CARRULEDDHI_I18N?.it || {})[key] || key;
+    if (!translate) translate = makeText(() => state.lang);
+    return translate(key);
   }
 
   function formatHeaderDate(value) {
@@ -140,131 +153,28 @@ import { flagSvg } from './flags.js';
     }
   }
 
-  /**
-   * Jeden pasek komunikatów, trzy odmiany.
-   *
-   * `tone` jest trzecim argumentem z wartością domyślną, więc wszystkie dotychczasowe
-   * wywołania — `showToast(text)` i `showToast(text, 7000)` — działają bez zmian i wyglądają
-   * jak dotąd. Odmiana zmienia kolor, ikonę i to, jak zachowa się czytnik ekranu:
-   *
-   *   info     zwykła informacja, czeka na przerwę w czytaniu
-   *   success  potwierdzenie czynności, też czeka
-   *   error    przerywa czytanie, bo mówi, że coś się NIE stało
-   *
-   * `assertive` tylko dla błędu z rozmyslu: gdyby każde potwierdzenie przerywało lektor,
-   * ktoś czytający stronę czytnikiem byłby przerywany za każdym kliknięciem.
-   */
-  function showToast(message, duration = 4200, tone = 'info') {
-    const toast = $('[data-toast]');
-    if (!toast) return;
-    const slot = $('[data-toast-text]', toast) || toast;
-    const icon = $('[data-toast-icon]', toast);
+  /* Pasek komunikatów i wysyłka przychodzą teraz ze wspólnego szwu — patrz import na górze
+     pliku. Wywołania w tym pliku (`showToast(text('…'))`, `postJSON(endpoint, …)`) zostają
+     dokładnie takie, jakie były; zmieniło się tylko to, że nie ma drugiej kopii. */
 
-    slot.textContent = message;
-    toast.dataset.toastTone = ['info', 'success', 'error'].includes(tone) ? tone : 'info';
-    // Znak, nie obrazek: trzy znaki Unicode zamiast trzech plików do wczytania.
-    if (icon) icon.textContent = { success: '✓', error: '!', info: 'i' }[toast.dataset.toastTone];
-    toast.setAttribute('role', tone === 'error' ? 'alert' : 'status');
-    toast.setAttribute('aria-live', tone === 'error' ? 'assertive' : 'polite');
-
-    /* Zdejmowane, wymuszony przeliczenie układu, dołożone z powrotem — i to wszystko w tej
-       samej klatce.
-       ---------------------------------------------------------------------------
-       Chodzi o to, żeby drugi komunikat pod rząd zagrał animacją od początku; bez tego dwa
-       błędy z rzędu wyglądają jak jeden, który się nie zmienił, i nikt nie zauważa, że treść
-       jest inna.
-
-       Pierwsza wersja robiła to przez requestAnimationFrame i sonda ją złapała: pasek nie
-       pojawiał się wcale. rAF nie jest gwarantowany — w karcie w tle nie odpala w ogóle, a w
-       przeglądarce bez odświeżania obrazu bywa głodzony. Uzależnianie od niego POKAZANIA
-       czegokolwiek znaczy komunikat, który czasem nie przychodzi.
-
-       Odczyt offsetWidth jest tu czynnością, nie pomiarem: wymusza przeliczenie układu, dzięki
-       któremu przeglądarka widzi stan bez klasy i traktuje jej dołożenie jako nowe przejście.
-       Działa synchronicznie i zawsze. */
-    toast.classList.remove('is-visible');
-    window.clearTimeout(showToast.timer);
-    void toast.offsetWidth;
-    toast.classList.add('is-visible');
-    showToast.timer = window.setTimeout(() => toast.classList.remove('is-visible'), duration);
-  }
-
-  async function postJSON(endpoint, payload) {
-    if (!endpoint) return { ok: true, demo: true };
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      mode: 'cors',
-      credentials: 'omit'
-    });
-    const raw = await response.text();
-    if (!response.ok) {
-      let parsed = null;
-      try { parsed = JSON.parse(raw); } catch (_) { /* not JSON — see below */ }
-
-      /**
-       * No backend at all, as opposed to a backend saying no.
-       *
-       * On `npm run dev` there is no Worker, so /api/carruleddhi/* falls through to
-       * Vite, which answers 404 with the SPA's HTML. Every form then threw and
-       * showed the contact form's "check the fields" toast — with the fields
-       * perfectly valid, on a page where filling the form in is the only thing
-       * there is to test. So the form looked broken while nothing was wrong with it.
-       *
-       * A 404 whose body is not JSON means nothing is listening on that path: the
-       * real Worker answers JSON for every outcome, including its own errors, and
-       * in production it claims /api/carruleddhi/* before static assets can
-       * (run_worker_first in wrangler.toml), so it cannot produce this shape.
-       * Treated as demo mode, exactly like an unconfigured endpoint, and logged so
-       * it is never silent.
-       */
-      if (response.status === 404 && !parsed) {
-        console.warn(`No API at ${endpoint} — running in demo mode. Deploy the Worker to store data for real.`);
-        return { ok: true, demo: true };
-      }
-
-      // Still a throw, because every existing caller treats a throw as failure and
-      // a returned object as success. But the body is carried along on the error, so
-      // callers that want to tell "rate limited" from "broken" can, and the ones
-      // that do not keep behaving exactly as before.
-      const error = new Error(`Webhook returned ${response.status}`);
-      error.status = response.status;
-      error.payload = parsed;
-      throw error;
-    }
-    if (!raw) return { ok: true };
-    try { return JSON.parse(raw); } catch (_) { return { ok: true, response: raw }; }
-  }
-
+  let payloadFor = null;
   function eventPayload(type, data = {}) {
-    return {
-      type,
-      event: config.eventName,
-      eventDate: config.eventDate,
-      locale: state.lang,
-      source: config.preview ? 'website-preview' : 'website',
-      submittedAt: new Date().toISOString(),
-      ...data
-    };
+    if (!payloadFor) {
+      payloadFor = makePayload({
+        eventName: config.eventName,
+        eventDate: config.eventDate,
+        preview: config.preview,
+        getLang: () => state.lang
+      });
+    }
+    return payloadFor(type, data);
   }
 
   /**
-   * Cztery rzeczy podane na zewnątrz, dla voting.js.
+   * Szew dla modułów głosowania: post, payload, text, toast.
    *
-   * Głosowanie mieszka w osobnym pliku, bo ten ma już 270 kB i doklejanie do niego kolejnej
-   * sekcji przestało być czytaniem, a stało się przewijaniem. Ale osobny plik potrzebuje
-   * dokładnie tych czterech rzeczy, a każda z nich napisana po raz drugi byłaby drugą wersją
-   * czegoś, co musi zachowywać się identycznie:
-   *
-   *   post     rozpoznaje „nie ma Workera" (404 bez JSON-a) i odpowiada trybem demo. To jest
-   *            kilkanaście linii rozumowania nad tym, czym różni się brak backendu od backendu
-   *            mówiącego „nie", i druga kopia rozjechałaby się przy pierwszej poprawce
-   *   payload  wspólny kształt żądania: język, źródło, znacznik czasu
-   *   text     ten sam słownik i ten sam mechanizm zapasowy na włoski
-   *   toast    jeden pasek komunikatów na całą stronę, nie dwa nachodzące na siebie
-   *
-   * Cztery funkcje, nie cały moduł: to jest szew, a nie drzwi na oścież.
+   * Cztery funkcje, nie cały moduł. Ta sama czwórka stoi na podstronie głosowania, tylko z
+   * innym źródłem języka — patrz installBridge w site-bridge.js.
    */
   window.CARRULEDDHI_API = Object.freeze({
     post: postJSON,
@@ -514,22 +424,10 @@ import { flagSvg } from './flags.js';
     state.lang = lang;
     const dict = dictionary();
 
-    $$('[data-i18n]').forEach((element) => {
-      const key = element.dataset.i18n;
-      if (typeof dict[key] === 'string') setTranslatedText(element, dict[key]);
-    });
-    const translatedAttributes = [
-      ['data-i18n-placeholder', 'placeholder'],
-      ['data-i18n-alt', 'alt'],
-      ['data-i18n-aria-label', 'aria-label'],
-      ['data-i18n-title', 'title']
-    ];
-    translatedAttributes.forEach(([dataAttribute, attribute]) => {
-      $$(`[${dataAttribute}]`).forEach((element) => {
-        const key = element.getAttribute(dataAttribute);
-        if (typeof dict[key] === 'string') element.setAttribute(attribute, dict[key]);
-      });
-    });
+    /* Przelot po znacznikach jest wspólny z podstroną głosowania; różni się tylko sposób
+       wpisania napisu. Tu z przelotem liter (`setTranslatedText`), tam zwykłym podstawieniem —
+       na podstronie nie ma efektów tekstowych, bo nie ma nagłówków, które by je nosiły. */
+    translateDom(dict, { setText: setTranslatedText });
 
     document.documentElement.lang = lang;
     document.title = dict['meta.title'] || config.eventName;
@@ -1860,9 +1758,16 @@ import { flagSvg } from './flags.js';
         window.setTimeout(relayout, 460);
 
         if (open) {
-          // Focus the first field, but only after the panel has somewhere to put it —
-          // focusing inside a zero-height box scrolls the page to the wrong place.
-          window.setTimeout(() => $('#wall-name', section)?.focus(), 260);
+          /* Focus the first field, but only after the panel has somewhere to put it —
+             focusing inside a zero-height box scrolls the page to the wrong place.
+
+             `preventScroll` z tego samego powodu, co przy czacie (ef2949a): sekcje na tej
+             stronie to przypięte panele, a `focus()` bez tej flagi przewija stronę do
+             elementu tak, jak liczy to przeglądarka — czyli nie tam, gdzie widzi go
+             człowiek. Ognisko ma postawić kursor w polu, a nie ruszać stroną; formularz
+             i tak jest w kadrze, bo właśnie się rozwinął pod przyciskiem, który ktoś
+             przed chwilą nacisnął. */
+          window.setTimeout(() => $('#wall-name', section)?.focus({ preventScroll: true }), 260);
         }
       });
     }
@@ -3655,7 +3560,9 @@ import { flagSvg } from './flags.js';
       if (codeError) codeError.textContent = '';
       if (code.length !== 6) {
         if (codeError) codeError.textContent = text('entry.codeShort') || '';
-        codeField?.focus();
+        /* preventScroll — pole jest tuż pod palcem, bo ktoś właśnie w nie wpisywał.
+           Bez tej flagi `focus()` w przypiętej sekcji przerzuca stronę gdzie indziej. */
+        codeField?.focus({ preventScroll: true });
         return;
       }
 
@@ -5619,7 +5526,10 @@ import { flagSvg } from './flags.js';
         }
         show('code');
         say('unsub.sent', '');
-        codeField?.focus();
+        /* preventScroll: krok z kodem odsłania się w tym samym miejscu, w którym stał
+           przycisk „wyślij kod", więc nie ma dokąd przewijać — a `focus()` bez tej flagi
+           i tak by przewinął, bo sekcja kontaktu jest przypięta. */
+        codeField?.focus({ preventScroll: true });
       } catch (_) {
         say('unsub.offline', '');
         sendButton.disabled = false;

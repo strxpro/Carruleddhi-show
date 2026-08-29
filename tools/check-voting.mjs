@@ -130,24 +130,59 @@ const leaks = responseBodies(voteHandler).filter((body) => /edit_?[Tt]oken/.test
 check('zeton edycji nie wraca w zadnej odpowiedzi na glos', leaks.length === 0, leaks.join(' | '));
 check('zeton edycji wychodzi mailem', voteHandler.includes('editUrl'));
 check('odsylacz do zmiany glosu jest we fragmencie, nie w zapytaniu',
-  worker.includes('/#vote=${editToken}'), 'fragment nie idzie do logow serwera ani w Referer');
+  /#vote=\$\{editToken\}/.test(worker) && !/[?&]vote=\$\{editToken\}/.test(worker),
+  'fragment nie idzie do logow serwera ani w Referer');
+/* Okno oceny stoi od migracji 0025 na podstronie, wiec odsylacz w mailu musi tam prowadzic.
+   Adres wskazujacy korzen otwieralby strone, na ktorej nie ma czym obsluzyc zetonu. */
+check('odsylacz do zmiany glosu prowadzi na podstrone glosowania',
+  worker.includes('votazione.html#vote=${editToken}'));
 
-/* Kategoria głosu bierze się z wiersza uczestnika, nie z żądania — inaczej da się oddać
-   dwa głosy w jednej kategorii, nazywając drugi inaczej. */
-check('kategoria glosu pochodzi od uczestnika, nie z zadania',
-  voteHandler.includes('category: participant.category') && !/category:\s*payload\.category/.test(voteHandler));
+/* --- dwanascie nagrod ---------------------------------------------------- */
+
+/* Nagroda przychodzi z zadania, bo jest wyborem czlowieka — wiec MUSI byc sprawdzona wzgledem
+   zamknietej listy. Bez tego wystarczy wysylac za kazdym razem inny wymyslony klucz, zeby
+   oddac dowolnie wiele glosow: indeks unikalny pilnuje pary (adres, nagroda), a „nagroda",
+   ktora mozna sobie wymyslic, nie jest zadnym limitem. */
+check('nagroda z zadania jest sprawdzana wzgledem zamknietej listy',
+  voteHandler.includes('isAward(award)') && voteHandler.includes('VOTING_BAD_AWARD'));
+check('glos zapisuje nagrode, nie kategorie pojazdu',
+  /category:\s*award/.test(voteHandler) && !/category:\s*participant\.category,\s*\n\s*voter_name/.test(voteHandler));
 check('ocena poza zakresem jest odrzucana, nie przycinana',
   voteHandler.includes('VOTING_BAD_SCORE') && !/clamp|Math\.min/.test(voteHandler));
 check('duplikat glosu rozpoznany po bazie, nie po zapytaniu wczesniej',
   voteHandler.includes('stored.duplicate') && voteHandler.includes('VOTING_ALREADY_VOTED'));
 
+/* Dwie listy nagrod — jedna w Workerze, druga w assets/js/awards.js, bo front nie ma jak
+   zaimportowac pliku Workera. Rozjazd znaczylby nagrode, na ktora da sie kliknac i nie da sie
+   zaglosowac, albo odwrotnie. Dlatego zgodnosc jest sprawdzana, a nie zakladana. */
+const workerAwards = JSON.parse(
+  `[${/const VOTE_AWARDS = \[([\s\S]*?)\];/.exec(worker)[1].replace(/'/g, '"').replace(/,\s*$/, '')}]`
+);
+const frontAwards = JSON.parse(
+  `[${/export const AWARDS = \[([\s\S]*?)\];/.exec(read('assets/js/awards.js'))[1].replace(/'/g, '"').replace(/,(\s*)$/, '$1')}]`
+);
+check('worker zna dokladnie dwanascie nagrod', workerAwards.length === 12, String(workerAwards.length));
+check('lista nagrod w Workerze i na froncie jest ta sama',
+  JSON.stringify(workerAwards) === JSON.stringify(frontAwards),
+  `${workerAwards.join(',')} vs ${frontAwards.join(',')}`);
+
 const stateHandler = extract('async function votingState');
 check('srednie nie wychodza publicznie w trakcie glosowania',
-  stateHandler.includes('closed ? await readRanking(env) : []'));
+  stateHandler.includes('? await Promise.all([readRanking(env), readTotals(env)])')
+  && stateHandler.includes(': [[], []]'));
+check('wyniki w podziale na nagrody tez dopiero po zamknieciu',
+  /results:\s*closed[\s\S]{0,40}\?/.test(stateHandler));
+check('podium liczone z sum na uczestnika, nie z jednej nagrody',
+  stateHandler.includes('new Map(totals.map('));
 
 const winners = extract('async function votingAdminWinners');
 check('listy do zwyciezcow tylko po zamknieciu', winners.includes('VOTING_STILL_OPEN'));
 check('zwyciezca bez zgloszenia trafia na liste nieosiagalnych', winners.includes('unreachable'));
+/* Ranking ma teraz do dwunastu wierszy na jednego uczestnika, wiec `new Map(ranking.map(...))`
+   zostawiloby z nich ostatni — czyli zwyciezca wylonilby sie ze sredniej z przypadkowo
+   wybranej nagrody. Zwyciezcy licza sie z sum na uczestnika. */
+check('zwyciezcy licza sie z sum na uczestnika, nie z jednej nagrody',
+  winners.includes('readTotals(env)') && !winners.includes('new Map(ranking.map('));
 
 /* --- wynik --------------------------------------------------------------- */
 

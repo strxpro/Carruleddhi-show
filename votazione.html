@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <!-- `interactive-widget=resizes-visual`: klawiatura ekranowa nie skraca dokumentu, więc
+       przewinięcie po jej otwarciu nie jest przycinane. Ta sama wartość co w index.html. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-visual">
+  <title>Vota il partecipante — Carruleddhi Show 2026</title>
+  <meta name="description" content="Voto del pubblico del Carruleddhi Show 2026: dodici premi, un voto per premio.">
+  <meta name="theme-color" content="#071a3d">
+  <!-- Bez indeksowania: strona żyje jeden dzień w roku, a przez pozostałe 364 wyszukiwarka
+       pokazywałaby wynik prowadzący do „głosowanie jeszcze się nie zaczęło". -->
+  <meta name="robots" content="noindex, follow">
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body class="vote-page">
+  <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
+  <div class="noise" aria-hidden="true"></div>
+
+  <!-- Nagłówek jednolinijkowy, jak na stronach prawnych: znak firmowy i powrót.
+       Ani menu, ani „zapisz się", ani „będę tam" — w chwili, gdy wózki jadą, żadna z tych
+       rzeczy nie jest już aktualna, a to była wprost zgłoszona potrzeba. -->
+  <header class="site-header">
+    <div class="nav-shell">
+      <a class="brand" href="index.html" data-vote-back>
+        <span class="brand__name">Carruleddhi</span><span class="brand__date">17 · 10 · 2026</span>
+      </a>
+      <a class="btn btn--small btn--yellow" href="index.html" data-vote-back>
+        <span data-i18n="voting.backToSite">← Torna al sito</span>
+      </a>
+    </div>
+  </header>
+
+  <main class="vote-main" id="main">
+    <div class="container">
+      <header class="vote-head">
+        <span class="eyebrow" data-i18n="voting.pageKicker">Voto del pubblico</span>
+        <h1 data-i18n="voting.pageTitle">Vota il partecipante.</h1>
+        <p class="lead" data-vote-lead data-i18n="voting.pageLead">Dodici premi. Un voto per premio, da 3 a 10 punti.</p>
+
+        <!-- Sześć języków. Ten sam rząd co na stronach prawnych, więc i te same style. -->
+        <nav class="legal-langs" data-vote-languages aria-label="Lingua"></nav>
+      </header>
+
+      <!-- Głosowanie zamknięte albo jeszcze nieotwarte: jedno zdanie zamiast pustej siatki.
+           Pusta siatka z zerem kafelków wygląda na stronę, która się nie wczytała. -->
+      <p class="vote-notice" data-vote-notice hidden aria-live="polite"></p>
+
+      <div class="vote-shell" data-vote-shell hidden>
+        <!-- Ile nagród już obsłużonych. Pierwsze pytanie po drugim głosie to „ile mi
+             zostało", a bez licznika odpowiedź wymaga przejrzenia dwunastu zakładek. -->
+        <p class="vote-progress">
+          <span data-i18n="voting.awardLabel">Premio</span>
+          <b data-vote-progress>0 / 12</b>
+        </p>
+
+        <!-- Dwanaście nagród. Zakładki, nie lista rozwijana: wybór nagrody jest tu głównym
+             ruchem, a lista rozwijana ukrywa jedenaście z dwunastu możliwości za jednym
+             dodatkowym naciśnięciem. Budowane z danych — nagrody przychodzą z Workera. -->
+        <div class="award-tabs" data-vote-awards role="group" aria-label="Premi"></div>
+
+        <div class="vote-grid" data-vote-grid></div>
+
+        <p class="vote-empty" data-vote-empty hidden data-i18n="voting.empty">La lista dei partecipanti non è ancora pubblicata.</p>
+
+        <!-- Doczytywanie porcjami. Czujka doczytuje sama, przycisk jest tym, co działa zawsze:
+             IntersectionObserver nie odpali, gdy ktoś skoczy na koniec klawiszem End. -->
+        <div class="vote-sentinel" data-vote-sentinel hidden aria-hidden="true"></div>
+        <div class="vote-more-row">
+          <button class="btn btn--outline" type="button" data-vote-more hidden>
+            <span data-vote-more-label data-i18n="voting.loadMore">Mostra altri</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Okno pojawia się raz, na to, co naprawdę wymaga pisania: adres.
+       Ocena zostaje przy pojeździe — zdjęcie nie otwiera niczego. -->
+  <dialog class="vote-dialog" id="vote-dialog" data-vote-dialog aria-labelledby="vote-dialog-title">
+    <div class="vote-dialog__surface">
+      <button class="vote-dialog__close" type="button" data-vote-close data-i18n-aria-label="a11y.close" aria-label="Chiudi"><span aria-hidden="true"></span></button>
+
+      <span class="eyebrow" data-vote-dialog-award></span>
+      <h2 id="vote-dialog-title" data-i18n="voting.identifyLead">Dove mandiamo la conferma?</h2>
+      <p class="vote-dialog__who" data-vote-dialog-who></p>
+      <p class="vote-dialog__score">
+        <span data-i18n="voting.scoreLabel">Il tuo voto</span>
+        <b data-vote-dialog-score>7</b>
+      </p>
+
+      <!-- Adres zapamiętany na tym urządzeniu. Widoczny w całości: „zagłosuj zapisanym
+           adresem" bez pokazania go jest prośbą o zaufanie w czymś, czego nie da się
+           sprawdzić. Z jednego telefonu głosuje cała rodzina, więc drugi przycisk jest
+           równie ważny jak pierwszy. -->
+      <div class="vote-known" data-vote-known hidden>
+        <p class="vote-known__email" data-vote-known-email></p>
+        <button class="btn btn--yellow" type="button" data-vote-known-send>
+          <span data-i18n="voting.voteAs">Vota con questo indirizzo</span><span aria-hidden="true">★</span>
+        </button>
+        <button class="vote-known__other" type="button" data-vote-known-other data-i18n="voting.otherEmail">Usa un altro indirizzo</button>
+      </div>
+
+      <form class="vote-identity" data-vote-form hidden>
+        <div class="form-grid">
+          <div class="field" data-field>
+            <input id="vote-name" name="name" type="text" autocomplete="given-name" placeholder=" " required>
+            <label for="vote-name" data-i18n="voting.name">Nome *</label>
+            <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+          </div>
+          <div class="field" data-field>
+            <input id="vote-email" name="email" type="email" autocomplete="email" placeholder=" " required>
+            <label for="vote-email" data-i18n="voting.email">E-mail *</label>
+            <span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span>
+          </div>
+        </div>
+        <p class="vote-dialog__note" data-i18n="voting.note">Ti mandiamo la conferma e un link per cambiare idea finché il voto è aperto.</p>
+        <button class="btn btn--yellow" type="submit">
+          <span data-i18n="voting.send">Invia il voto</span><span aria-hidden="true">★</span>
+        </button>
+      </form>
+
+      <!-- Zmiana oceny z odsyłacza w mailu. Bez adresu: żeton już mówi, czyj to głos, a
+           pytanie o adres dawałoby możliwość podania cudzego. -->
+      <div class="vote-edit" data-vote-edit hidden>
+        <div class="vote-picker__scores" data-vote-edit-scores role="group" data-i18n-aria-label="voting.pickScore" aria-label="Il tuo voto"></div>
+        <button class="btn btn--blue" type="button" data-vote-edit-send>
+          <span data-i18n="voting.confirm">Conferma</span>
+        </button>
+      </div>
+
+      <p class="vote-dialog__status" data-vote-status aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <!-- Ten sam pasek komunikatów co na stronie głównej, ta sama funkcja go obsługuje. -->
+  <div class="toast" data-toast role="status" aria-live="polite" data-toast-tone="info">
+    <span class="toast__icon" data-toast-icon aria-hidden="true"></span>
+    <span class="toast__text" data-toast-text></span>
+  </div>
+
+  <script type="module">
+    /* Kolejność ma znaczenie: voting-boot.js instaluje window.CARRULEDDHI_API i ustawia język,
+       a voting-page.js czyta jedno i drugie przy pierwszym odczycie stanu. Odwrotna kolejność
+       znaczy moduł, który nie ma czym wysłać żądania — i milczy o tym, bo brak szwu czyta jako
+       brak Workera. */
+    import './assets/js/voting-boot.js';
+    import './assets/js/voting-page.js';
+  </script>
+</body>
+</html>

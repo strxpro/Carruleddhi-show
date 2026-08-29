@@ -129,10 +129,10 @@
              i prowadzi do niczego, jest gorszy niż brak przycisku. Odsłania go voting.js po
              odczycie fazy z serwera — zegar przeglądarki nie decyduje o tym, kiedy trwa
              wyścig, bo bywa przestawiony. -->
-        <a class="btn btn--small nav-vote" href="#voting" data-vote-cta hidden>
+        <a class="btn btn--small nav-vote" href="votazione.html" data-vote-cta hidden>
           <span data-i18n="voting.cta">Vota il partecipante</span>
         </a>
-        <button class="btn btn--small nav-attend" type="button" data-open-reminder data-i18n="nav.attend">Ci sarò</button>
+        <button class="btn btn--small nav-attend" type="button" data-open-reminder data-race-hide data-i18n="nav.attend">Ci sarò</button>
         <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Apri il menu">
           <span class="menu-toggle__label">Menu</span>
           <span class="menu-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -222,13 +222,20 @@
           <p class="hero__tagline reveal" data-delay="2" data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</p>
           <div class="hero__actions reveal" data-delay="3">
             <!-- Pierwszy w kolejności i wyrazisty, bo w tych kilkudziesięciu minutach jest
-                 jedyną rzeczą, po którą ktokolwiek tu przychodzi. Reszta przycisków zostaje na
-                 miejscu, tylko zapisy są wtedy zablokowane — patrz voting.js. -->
-            <a class="btn btn--vote magnetic" href="#voting" data-vote-cta hidden>
+                 jedyną rzeczą, po którą ktokolwiek tu przychodzi. Prowadzi na osobną
+                 podstronę: tam nie ma licznika ani formularza, jest dwanaście nagród i lista
+                 pojazdów.
+
+                 Dwa przyciski poniżej mają `data-race-hide` i SCHODZĄ Z EKRANU na czas
+                 wyścigu — nie są wyszarzane. Wyłączony przycisk jest zaproszeniem, które nie
+                 działa, i człowiek naciska go dwa razy, zanim uwierzy. „Zapisz się" w chwili,
+                 gdy wózki już jadą, oraz „będę tam" w chwili, gdy trzeba już tam być, nie mają
+                 czego dotyczyć. Odsłania i chowa je voting.js po odczycie fazy z serwera. -->
+            <a class="btn btn--vote magnetic" href="votazione.html" data-vote-cta hidden>
               <span data-i18n="voting.cta">Vota il partecipante</span><span class="btn__icon" aria-hidden="true">★</span>
             </a>
-            <a class="btn magnetic" href="#signup" data-feature-link="registration"><span data-i18n="hero.signup">Iscriviti alla gara</span><span class="btn__icon" aria-hidden="true">↘</span></a>
-            <button class="btn btn--outline magnetic" type="button" data-open-reminder><span data-i18n="hero.attend">Ci sarò</span><span class="btn__icon" aria-hidden="true">＋</span></button>
+            <a class="btn magnetic" href="#signup" data-feature-link="registration" data-race-hide><span data-i18n="hero.signup">Iscriviti alla gara</span><span class="btn__icon" aria-hidden="true">↘</span></a>
+            <button class="btn btn--outline magnetic" type="button" data-open-reminder data-race-hide><span data-i18n="hero.attend">Ci sarò</span><span class="btn__icon" aria-hidden="true">＋</span></button>
           </div>
         </div>
         <aside class="hero__aside reveal" data-delay="2" aria-label="Event statistics">
@@ -316,95 +323,56 @@
           <ol class="podium__winners" data-podium-winners></ol>
         </div>
 
+        <!-- Reszta wyników, pod cokołem i zwinięta.
+             ==============================================================
+             Cokół odpowiada na jedno pytanie — kto wygrał — i dopóki na nie nie odpowie, nic
+             innego nie ma prawa go zasłaniać. Dwanaście nagród naraz to dwanaście list, w
+             których pierwsze miejsce ginie.
+
+             `details` zamiast własnego przycisku i klasy `is-open`: zwijanie to jedyna rzecz,
+             którą ten element robi, przeglądarka umie to sama, działa bez JavaScriptu i jest
+             dostępne z klawiatury bez ani jednego atrybutu aria. -->
+        <details class="podium-rest" data-podium-rest hidden>
+          <summary class="podium-rest__toggle">
+            <span data-i18n="voting.restToggle">Vedi il resto dei voti</span>
+            <span class="podium-rest__chevron" aria-hidden="true">↓</span>
+          </summary>
+          <p class="podium-rest__lead" data-i18n="voting.restLead">
+            Tutti e dodici i premi, con il primo di ciascuno.
+          </p>
+          <!-- Wypełnia voting.js z `results`. -->
+          <ol class="podium-rest__awards" data-podium-awards></ol>
+        </details>
+
         <div class="podium__actions">
-          <a class="btn btn--blue" href="#voting" data-podium-all>
+          <!-- Pełny ranking stoi na podstronie głosowania: tam jest podział na dwanaście
+               nagród, a „klasyfikacja" bez powiedzenia, której nagrody dotyczy, jest jedną
+               liczbą bez pytania. -->
+          <a class="btn btn--blue" href="votazione.html" data-podium-all>
             <span data-i18n="voting.seeAll">Classifica completa</span><span aria-hidden="true">↘</span>
           </a>
         </div>
       </div>
     </section>
 
+
     <!-- ==================================================================
-         Głosowanie
+         Głosowanie stoi na osobnej podstronie: votazione.html
          ==================================================================
-         Sekcja, nie osobna podstrona. Cała ta witryna jest jedną stroną z zakotwiczeniami, a
-         `#voting` w hero i w nagłówku prowadzi tu bez przeładowania — czyli bez utraty
-         wybranego języka i bez drugiego kompletu nagłówka i stopki do utrzymania.
+         Sekcja `#voting` i okno oceny były tutaj. Wyprowadzone, bo zgłoszone wprost: „to
+         jest w innej zakładce, podstronie". Rzecz nie jest kosmetyczna — w chwili, w której
+         ktoś głosuje, wózki już jadą, a wtedy licznik do dnia wydarzenia, formularz zapisów
+         i „będę tam" mówią o czymś, co się właśnie skończyło. Podstrona nie ma ani jednego
+         z nich; ma dwanaście nagród i listę pojazdów.
 
-         W fazie `voting` widać kafelki do oceniania. W fazie `closed` ta sama lista staje się
-         pełnym rankingiem, do którego prowadzi przycisk pod podium. -->
-    <section class="section section-card voting" id="voting" aria-labelledby="voting-title" data-voting hidden>
-      <div class="container">
-        <header class="section-head">
-          <span class="eyebrow" data-voting-kicker data-i18n="voting.kicker">Voto del pubblico</span>
-          <h2 id="voting-title" data-i18n="voting.title" data-text-effect="rise">Vota il partecipante.</h2>
-          <p class="section-lead" data-voting-lead data-i18n="voting.lead">Tocca un carretto e dagli da 3 a 10 punti. Un voto per categoria.</p>
-        </header>
+         Co z tego zostaje na tej stronie (patrz assets/js/voting.js):
+           — zaproszenie „Zagłosuj na uczestnika" w hero i w nagłówku, prowadzące tam;
+           — dwa pozostałe przyciski w hero, które na czas wyścigu SCHODZĄ z ekranu;
+           — podium pod hero po zamknięciu głosowania;
+           — wstrzymane zapisy na czas zjazdu.
 
-        <!-- Ile czasu zostało. aria-live, bo to jedyna informacja na tej stronie, która sama
-             się zmienia i której ktoś naprawdę czeka. -->
-        <p class="voting__clock" data-voting-clock aria-live="polite"></p>
-
-        <!-- Filtr kategorii. Budowany z danych, bo kategorie ustawia organizator w panelu i
-             wpisanie ich tutaj na sztywno znaczyłoby, że trzecia kategoria wymaga wdrożenia. -->
-        <div class="voting__filters" data-voting-filters role="group" aria-label="Categorie"></div>
-
-        <div class="voting__grid" data-voting-grid></div>
-
-        <p class="voting__empty" data-voting-empty hidden data-i18n="voting.empty">La lista dei partecipanti non è ancora pubblicata.</p>
-      </div>
-    </section>
-
-    <!-- Ocena jednego pojazdu. <dialog>, jak zgody: jedno miejsce, w którym przeglądarka sama
-         pilnuje ogniska klawiatury, klawisza Escape i bezwładności tła. -->
-    <dialog class="vote-dialog" id="vote-dialog" data-vote-dialog aria-labelledby="vote-dialog-title">
-      <form class="vote-dialog__surface" data-vote-form method="dialog">
-        <button class="vote-dialog__close" type="button" data-vote-close data-i18n-aria-label="a11y.close" aria-label="Chiudi"><span aria-hidden="true"></span></button>
-
-        <figure class="vote-dialog__cart">
-          <img data-vote-photo alt="" hidden>
-          <span class="vote-dialog__number" data-vote-number aria-hidden="true"></span>
-        </figure>
-
-        <div class="vote-dialog__body">
-          <span class="eyebrow" data-vote-category></span>
-          <h2 id="vote-dialog-title" data-vote-project></h2>
-          <p class="vote-dialog__rider" data-vote-rider></p>
-
-          <!-- Suwak, nie osiem przycisków: na telefonie osiem celów w rzędzie to osiem
-               sposobów na pomyłkę. Native <input type="range"> zamiast własnego — obsługuje
-               strzałki, Home i End oraz czytniki ekranu bez ani jednej linii kodu. -->
-          <div class="vote-score">
-            <label class="vote-score__label" for="vote-score" data-i18n="voting.scoreLabel">Il tuo voto</label>
-            <output class="vote-score__value" data-vote-score-value for="vote-score">7</output>
-            <input class="vote-score__slider" id="vote-score" name="score" type="range"
-                   min="3" max="10" step="1" value="7" data-vote-score
-                   data-i18n-aria-label="voting.scoreLabel" aria-label="Il tuo voto">
-            <div class="vote-score__scale" aria-hidden="true"><span>3</span><span>10</span></div>
-          </div>
-
-          <div class="form-grid">
-            <div class="field" data-field>
-              <input id="vote-name" name="name" type="text" autocomplete="given-name" placeholder=" " required>
-              <label for="vote-name" data-i18n="voting.name">Nome *</label>
-              <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
-            </div>
-            <div class="field" data-field>
-              <input id="vote-email" name="email" type="email" autocomplete="email" placeholder=" " required>
-              <label for="vote-email" data-i18n="voting.email">E-mail *</label>
-              <span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span>
-            </div>
-          </div>
-
-          <p class="vote-dialog__note" data-i18n="voting.note">Ti mandiamo la conferma e un link per cambiare idea finché il voto è aperto.</p>
-          <p class="vote-dialog__status" data-vote-status aria-live="polite"></p>
-
-          <button class="btn btn--yellow vote-dialog__send" type="submit" data-vote-send>
-            <span data-i18n="voting.send">Invia il voto</span><span aria-hidden="true">★</span>
-          </button>
-        </div>
-      </form>
-    </dialog>
+         Odsyłacz do zmiany oceny w mailu prowadzi na votazione.html#vote=<żeton> — patrz
+         `editUrl` w worker/index.js. -->
 
     <section class="section section-card story" id="story" aria-labelledby="story-title">
       <div class="container story__grid">
@@ -1933,6 +1901,97 @@
         document.querySelector('[data-language-menu] [aria-selected="true"]')?.dataset.languageOption
         || document.documentElement.lang
       );
+    }
+
+    /* Klawiatura, obrót i podzielony ekran nie zjadają miejsca, w którym ktoś czytał.
+       ---------------------------------------------------------------------------
+       Zmierzone na 390x844 (tools/probe-c-touch-jump.mjs): zmniejszenie okna do 380 px
+       skraca dokument z 13540 do 9919 px, bo prawie każda sekcja tej strony ma wysokość
+       liczoną od wysokości ekranu. Przewinięcie 10915 nie mieści się już w takim
+       dokumencie, więc przeglądarka przycina je do 9539 — a kiedy okno wraca do 844,
+       dokument wraca do 13540 i przewinięcie zostaje na 9539. Półtora ekranu w plecy,
+       bez żadnego sygnału, że coś się stało. Odtworzone dwa razy: przy polu komentarza
+       i przy bramie czatu.
+
+       Meta `interactive-widget=resizes-visual` w <head> zamyka drogę klawiaturze na
+       przeglądarkach, które ją respektują. To jest druga warstwa — na obrót ekranu,
+       podzielony ekran i WebView, gdzie tamta deklaracja nic nie da.
+
+       Warunek jest wąski z premedytacją: przywracamy pozycję TYLKO wtedy, gdy została
+       PRZYCIĘTA, czyli gdy po zmniejszeniu okna wylądowaliśmy niżej niż byliśmy
+       i dokładnie na nowym końcu dokumentu. To jedyny przypadek, w którym wiadomo na
+       pewno, że nikt tego nie chciał. Każde przewinięcie zrobione w międzyczasie kasuje
+       zamiar: jeśli ktoś przy otwartej klawiaturze przesunął stronę, jest tam celowo
+       i nie wolno go stamtąd zabierać. */
+    {
+      const doc = document.documentElement;
+
+      /* Ostatnia pozycja z czasu, gdy dokument miał jeszcze pełną wysokość.
+         ---------------------------------------------------------------------------
+         Pierwsza wersja czytała `window.scrollY` w chwili zdarzenia `resize` i to nie
+         działa: przeglądarka przycina przewinięcie razem z przeliczeniem układu, czyli
+         ZANIM dowiemy się o zmianie rozmiaru. W handlerze widać już tylko wartość po
+         przycięciu i nie ma czego porównać. Dlatego pozycja jest zapamiętywana na
+         bieżąco przy przewijaniu — ale tylko dopóki wysokość dokumentu się nie zmienia. */
+      let goodY = Math.round(window.scrollY);
+      let goodHeight = doc.scrollHeight;
+      /** Zapamiętana pozycja czekająca na powrót okna, albo null. */
+      let pending = null;
+      let resizeAt = 0;
+
+      window.addEventListener('scroll', () => {
+        const y = Math.round(window.scrollY);
+        if (pending) {
+          /* Przycięcie samo wywołuje `scroll`, więc pierwsze pół sekundy po zmianie
+             rozmiaru nie liczy się jako decyzja człowieka. Później — liczy się, i wtedy
+             zamiar przepada: ktoś jest tam, gdzie chciał być. */
+          if (performance.now() - resizeAt > 500 && Math.abs(y - pending.y) > 30) pending = null;
+          return;
+        }
+        if (doc.scrollHeight === goodHeight) goodY = y;
+        else goodHeight = doc.scrollHeight;
+      }, { passive: true });
+
+      window.addEventListener('resize', () => {
+        resizeAt = performance.now();
+        requestAnimationFrame(() => {
+          const height = doc.scrollHeight;
+          const y = Math.round(window.scrollY);
+          const max = Math.max(0, height - window.innerHeight);
+
+          if (!pending && height < goodHeight - 2 && y < goodY - 2 && Math.abs(y - max) <= 2) {
+            /* Dokument zmalał, wylądowaliśmy niżej niż byliśmy i dokładnie na jego nowym
+               końcu. To nie jest przewinięcie, to przycięcie. */
+            pending = { y: goodY, height: goodHeight };
+            return;
+          }
+          if (pending && height >= pending.height - 2) {
+            window.scrollTo(0, pending.y);
+            goodY = pending.y;
+            goodHeight = height;
+            pending = null;
+            return;
+          }
+          if (!pending) {
+            goodHeight = height;
+            goodY = y;
+          }
+        });
+      }, { passive: true });
+    }
+
+    /* Rejestrator przeskoków, tylko na żądanie: /?jump=1
+       ---------------------------------------------------------------------------
+       Import dynamiczny, więc bez tego znacznika w adresie plik nie jest nawet pobierany
+       — zwykły gość nie płaci za niego ani bajtem. Istnieje, bo przeskakiwanie przy
+       rzucie palcem to jedyna usterka tej strony, której nie da się zmierzyć z komputera:
+       syntetyczny gest dotykowy w headless Chrome nie działa (sprawdzone dwa razy, jest
+       o tym w tools/probe-scroll-live.js), a `window.scrollTo` omija bezwładność, na
+       której ten objaw stoi. Więc pomiar idzie na urządzenie. Szczegóły w samym pliku. */
+    if (new URLSearchParams(location.search).has('jump')) {
+      import('./assets/js/jump-recorder.js').catch((error) => {
+        console.error('Carruleddhi: rejestrator przeskoków się nie wczytał.', error);
+      });
     }
   </script>
 </body>

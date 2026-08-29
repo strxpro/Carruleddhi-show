@@ -38,91 +38,14 @@
    wysyłka. Blokowane jest jedno: przycisk, który wysyła. */
 .signup.is-race-locked button[type='submit'] { cursor: not-allowed; }
 
-/* ============================================================ sekcja głosowania */
-
-.voting__clock {
-  margin: 0 0 22px;
-  font: 900 clamp(15px, 2.4vw, 19px)/1 var(--font-meta);
-  letter-spacing: .06em; color: var(--blue-700);
-  /* Cyfry o stałej szerokości: bez tego licznik drga w poziomie przy każdej sekundzie. */
-  font-variant-numeric: tabular-nums;
-}
-.voting__clock:empty { display: none; }
-
-.voting__filters { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 24px; }
-.voting__filters[hidden] { display: none; }
-.voting-filter {
-  display: grid; gap: 2px; padding: 9px 18px;
-  border: 2px solid var(--line); border-radius: 999px;
-  background: var(--white); color: var(--blue-700); cursor: pointer;
-  text-align: center; transition: border-color .2s, background .2s, color .2s;
-}
-.voting-filter strong { font: 900 12.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase; }
-.voting-filter small { font: 800 9.5px/1 var(--font-meta); letter-spacing: .08em; opacity: .75; }
-.voting-filter:hover { border-color: var(--blue-500); }
-.voting-filter:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
-.voting-filter.is-active { border-color: var(--blue-600); background: var(--blue-600); color: var(--white); }
-
-/* auto-fill, nie auto-fit: przy dwóch uczestnikach auto-fit rozciąga dwa kafelki na całą
-   szerokość i wyglądają jak baner, a nie jak dwa z listy. */
-.voting__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; }
-.voting__empty { margin: 26px 0 0; color: var(--muted); font-size: 14.5px; }
-.voting__empty[hidden] { display: none; }
-
-/* ============================================================ kafelek pojazdu */
-
-.cart-card { position: relative; }
-.cart-card__open {
-  display: grid; width: 100%; padding: 0; overflow: hidden;
-  border: 2px solid var(--line); border-radius: 22px;
-  background: var(--white); color: inherit; cursor: pointer; text-align: left;
-  transition: transform .25s var(--ease-snap), border-color .2s, box-shadow .25s;
-}
-.cart-card__open:hover:not(:disabled) {
-  border-color: var(--blue-500); transform: translateY(-4px); box-shadow: var(--shadow-sm);
-}
-.cart-card__open:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
-/* Po zamknięciu głosowania kafelek nie jest już przyciskiem, więc przestaje udawać, że da się
-   go nacisnąć — ale zostaje w pełni czytelny, bo wtedy jest wierszem rankingu. */
-.cart-card__open:disabled { cursor: default; }
-
-.cart-card__photo {
-  position: relative; margin: 0; aspect-ratio: 4 / 3; overflow: hidden;
-  background: var(--blue-100);
-}
-.cart-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cart-card__blank {
-  display: grid; width: 100%; height: 100%; place-items: center;
-  color: rgb(18 35 61 / .16); font: 900 clamp(38px, 7vw, 62px)/1 var(--font-meta);
-}
-/* Numer startowy w rogu — tak jak jest przyklejony na prawdziwym carruleddhi. */
-.cart-card__number {
-  position: absolute; top: 10px; left: 10px;
-  padding: 5px 10px; border-radius: 999px;
-  background: var(--navy-950); color: var(--white);
-  font: 900 12px/1 var(--font-meta); letter-spacing: .08em;
-}
-.cart-card__rank {
-  position: absolute; top: 10px; right: 10px;
-  padding: 5px 10px; border-radius: 999px;
-  background: var(--yellow); color: var(--navy-950);
-  font: 900 12px/1 var(--font-meta); letter-spacing: .06em;
-}
-
-.cart-card__body { display: grid; gap: 4px; padding: 14px 16px 16px; }
-.cart-card__body > strong { font-size: 15.5px; line-height: 1.25; }
-.cart-card__rider { color: var(--muted); font: 800 10.5px/1.2 var(--font-meta); letter-spacing: .08em; text-transform: uppercase; }
-.cart-card__stats { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 0; }
-.cart-card__stats b { font: 900 22px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
-.cart-card__stats small { color: var(--muted); font: 800 10px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase; }
-.cart-card__yours { margin: 6px 0 0; color: #1f7a52; font: 800 11px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase; }
-.cart-card.is-voted .cart-card__open { border-color: rgb(31 169 113 / .6); }
-
-@media (prefers-reduced-motion: reduce) { .cart-card__open { transition: none; } }
-
 /* ============================================================ okno oceny */
 
-.vote-dialog { max-width: 720px; width: min(94vw, 720px); padding: 0; border: 0; background: transparent; }
+/* Wąskie, bo w środku jest adres i przycisk, a nie zdjęcie pojazdu.
+   Do wyniesienia ocen na podstronę okno miało 720 px i dwie kolumny: zdjęcie po lewej, suwak i
+   pola po prawej. Zdjęcie zostało przy pojeździe, ocena też — okno pojawia się teraz raz, na
+   to, co naprawdę wymaga pisania. Reguły zdjęcia, suwaka i drugiej kolumny usunięte razem ze
+   znacznikiem, który je nosił. */
+.vote-dialog { max-width: 460px; width: min(94vw, 460px); padding: 0; border: 0; background: transparent; }
 /* Rozmycie tła, nie tylko przygaszenie: modal ma odciąć od reszty strony, a nie położyć się
    na niej. ::backdrop jest jedynym miejscem, w którym da się to zrobić bez dodatkowej warstwy. */
 .vote-dialog::backdrop { background: rgb(7 26 61 / .62); backdrop-filter: blur(9px) saturate(.9); }
@@ -131,21 +54,16 @@
 @media (prefers-reduced-motion: reduce) { .vote-dialog[open] { animation: none; } }
 
 .vote-dialog__surface {
-  position: relative; display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  position: relative; display: grid; gap: 10px;
+  padding: 30px 24px 24px;
   overflow: hidden; border-radius: 26px; background: var(--white); box-shadow: var(--shadow-lg, 0 30px 80px rgb(7 26 61 / .35));
 }
-.vote-dialog__cart { position: relative; margin: 0; background: var(--blue-100); }
-.vote-dialog__cart img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vote-dialog__number {
-  position: absolute; top: 12px; left: 12px; padding: 6px 12px; border-radius: 999px;
-  background: var(--navy-950); color: var(--white); font: 900 13px/1 var(--font-meta); letter-spacing: .08em;
+.vote-dialog__surface h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 400; line-height: 1.05;
+  font-size: clamp(21px, 4.4vw, 28px);
 }
-.vote-dialog__body { display: grid; gap: 12px; padding: 26px 26px 24px; align-content: start; }
-.vote-dialog__body h2 { margin: 0; font-family: var(--font-display); font-size: clamp(24px, 4vw, 34px); font-weight: 400; line-height: 1.05; }
-.vote-dialog__rider { margin: 0; color: var(--muted); font: 800 11px/1 var(--font-meta); letter-spacing: .09em; text-transform: uppercase; }
 .vote-dialog__note { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 .vote-dialog__status { margin: 0; min-height: 18px; color: var(--coral, #ee625f); font: 800 12px/1.4 var(--font-meta); }
-.vote-dialog__send { justify-self: start; }
 .vote-dialog__close {
   position: absolute; top: 12px; right: 12px; z-index: 2;
   width: 38px; height: 38px; border: 0; border-radius: 50%;
@@ -157,30 +75,6 @@
 .vote-dialog__close::before { transform: rotate(45deg); }
 .vote-dialog__close::after { transform: rotate(-45deg); }
 .vote-dialog__close:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
-
-@media (max-width: 620px) {
-  .vote-dialog__surface { grid-template-columns: 1fr; }
-  .vote-dialog__cart { aspect-ratio: 16 / 9; }
-}
-
-/* ----------------------------------------------------------------- suwak oceny */
-
-.vote-score { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px; margin: 4px 0 2px; }
-.vote-score__label { font: 800 11px/1 var(--font-meta); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
-.vote-score__value {
-  grid-row: span 2; align-self: center;
-  min-width: 68px; padding: 8px 0; border-radius: 16px;
-  background: var(--navy-950); color: var(--yellow);
-  font: 900 30px/1 var(--font-meta); text-align: center; font-variant-numeric: tabular-nums;
-}
-.vote-score__slider { grid-column: 1; width: 100%; margin: 0; accent-color: var(--blue-600); }
-/* 44 px celu dotykowego na kciuk — mniejszy da się trafić myszą i nie da się palcem. */
-.vote-score__slider { height: 44px; }
-.vote-score__slider:focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; }
-.vote-score__scale {
-  grid-column: 1; display: flex; justify-content: space-between;
-  color: var(--muted); font: 800 10px/1 var(--font-meta); letter-spacing: .08em;
-}
 
 /* ============================================================ podium */
 
@@ -216,9 +110,20 @@
   @keyframes podium-fill { to { fill-opacity: 1; opacity: 1; } }
 }
 
+/* Cokół w perspektywie.
+   ---------------------------------------------------------------------------
+   `perspective` stoi na tym jednym kontenerze, a obracają się trzy karty — i to jest cała
+   głębia. Świadomie NIE ma tu `transform-style: preserve-3d` ani `will-change`: to one każą
+   przeglądarce trzymać całe poddrzewo jako warstwy GPU i to one są podejrzanym numer jeden o
+   wywalanie się telefonu w galerii 3D i talii nagród (patrz ZADANIA-ROWNOLEGLE.md). Bez nich
+   warstwy powstają na czas przejścia i znikają — trzy kafelki, nie pół strony.
+
+   Karty boczne są odchylone do środka, zwycięzca stoi prosto i bliżej patrzącego. To ten sam
+   układ co na rysunku pod spodem, tylko że kartami. */
 .podium__winners {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
   margin: 20px 0 0; padding: 0; list-style: none;
+  perspective: 1100px; perspective-origin: 50% 42%;
 }
 /* Kolejność w znaczniku to 1, 2, 3 — tak czyta to czytnik ekranu i tak wygląda wynik. Na
    ekranie zwycięzca ma stać w środku, jak na prawdziwym cokole, i to jest rola `order`:
@@ -230,10 +135,38 @@
 .podium-card {
   display: grid; gap: 10px; padding: 14px; overflow: hidden;
   border: 2px solid var(--line); border-radius: 22px; background: var(--white);
+  transition: transform .38s cubic-bezier(.2, .7, .3, 1), box-shadow .38s ease;
 }
 .podium-card[data-podium-place='1'] { border-color: rgb(233 161 27 / .75); background: rgb(255 215 94 / .1); }
 .podium-card[data-podium-place='2'] { border-color: rgb(169 184 205 / .8); }
 .podium-card[data-podium-place='3'] { border-color: rgb(192 116 64 / .6); }
+
+/* Odchylenie i wysokość. Zwycięzca wychodzi na patrzącego i stoi wyżej; srebro i brąz są
+   obrócone do środka, więc trzy karty czyta się jak jedną scenę, a nie trzy kafelki obok
+   siebie. Cień rośnie razem z wysokością — bez niego uniesienie wygląda na pomyłkę skali. */
+.podium-card[data-podium-place='1'] {
+  transform: translateZ(46px) translateY(-14px);
+  box-shadow: 0 26px 44px -22px rgb(18 35 61 / .5);
+}
+.podium-card[data-podium-place='2'] {
+  transform: rotateY(15deg) translateZ(-10px) translateY(4px);
+  box-shadow: 0 16px 30px -20px rgb(18 35 61 / .42);
+}
+.podium-card[data-podium-place='3'] {
+  transform: rotateY(-15deg) translateZ(-10px) translateY(10px);
+  box-shadow: 0 16px 30px -20px rgb(18 35 61 / .42);
+}
+
+/* Dotknięcie prostuje kartę i przysuwa ją.
+   Tylko tam, gdzie kursor naprawdę istnieje: na telefonie `:hover` zostaje wciśnięty po
+   stuknięciu i karta zostawałaby wysunięta do końca wizyty. */
+@media (hover: hover) {
+  .podium__winners:hover .podium-card { transform: rotateY(0) translateZ(-30px) translateY(6px); }
+  .podium__winners .podium-card:hover {
+    transform: rotateY(0) translateZ(70px) translateY(-16px);
+    box-shadow: 0 34px 56px -24px rgb(18 35 61 / .55);
+  }
+}
 
 .podium-card__photo { position: relative; margin: 0; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; background: var(--blue-100); }
 .podium-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -250,17 +183,79 @@
 .podium-card__body p b { font: 900 20px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
 .podium-card__body p small { color: var(--muted); font: 800 9.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase; }
 
-.podium__actions { margin: 26px 0 0; }
+/* ---------------------------------------------------- reszta głosów, zwinięta */
+
+.podium-rest { margin: 26px 0 0; border-top: 2px solid var(--line); padding: 14px 0 0; }
+.podium-rest[hidden] { display: none; }
+
+.podium-rest__toggle {
+  display: flex; align-items: center; gap: 8px; width: fit-content;
+  cursor: pointer; list-style: none;
+  font: 900 12px/1 var(--font-meta); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--blue-700);
+}
+/* Domyślny trójkącik znika w obu dialektach — mamy własną strzałkę, która się obraca. */
+.podium-rest__toggle::-webkit-details-marker { display: none; }
+.podium-rest__toggle::marker { content: ''; }
+.podium-rest__toggle:hover { color: var(--navy-950); }
+.podium-rest__chevron { transition: transform .25s ease; }
+.podium-rest[open] .podium-rest__chevron { transform: rotate(180deg); }
+
+.podium-rest__lead { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+
+.podium-rest__awards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;
+  margin: 14px 0 0; padding: 0; list-style: none;
+}
+
+.award-row {
+  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 2px solid var(--line); border-radius: 14px; background: var(--white);
+}
+.award-row__number {
+  display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px;
+  background: var(--blue-100); color: var(--blue-700);
+  font: 900 13px/1 var(--font-meta); font-variant-numeric: tabular-nums;
+}
+.award-row__body { display: grid; gap: 2px; min-width: 0; }
+.award-row__body strong { font-size: 13px; line-height: 1.2; }
+.award-row__body > span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--muted); font: 800 10px/1.2 var(--font-meta); letter-spacing: .07em; text-transform: uppercase;
+}
+.award-row__empty { color: rgb(18 35 61 / .35); }
+.award-row p { display: flex; align-items: baseline; gap: 5px; margin: 0; }
+.award-row p b { font: 900 15px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
+.award-row p small { color: var(--muted); font: 800 9px/1 var(--font-meta); letter-spacing: .06em; text-transform: uppercase; }
+
+.podium__actions { margin: 20px 0 0; }
 
 /* Na telefonie trzy karty w rzędzie to trzy nieczytelne karty. Jedna kolumna i kolejność
    wyniku, bez przestawiania — cokół i tak jest wtedy nad nimi, nie za nimi. */
 @media (max-width: 700px) {
-  .podium__winners { grid-template-columns: 1fr; }
+  .podium__winners { grid-template-columns: 1fr; perspective: none; }
   .podium-card[data-podium-place='1'],
   .podium-card[data-podium-place='2'],
   .podium-card[data-podium-place='3'] { order: 0; }
   .podium-card { grid-template-columns: 96px minmax(0, 1fr); align-items: center; }
   .podium-card__photo { aspect-ratio: 1; }
+
+  /* Kolumna kart pod sobą nie jest sceną, tylko listą — obracanie jej wygląda na usterkę,
+     a nie na cokół. Zdejmowana jest transformacja, nie tylko przesłonięta: karta bez
+     `transform` nie dostaje własnej warstwy GPU, a na telefonie to jest cały powód. */
+  .podium-card[data-podium-place='1'],
+  .podium-card[data-podium-place='2'],
+  .podium-card[data-podium-place='3'] { transform: none; }
+  .podium-card[data-podium-place='1'] { box-shadow: 0 14px 26px -20px rgb(18 35 61 / .45); }
+}
+
+/* Kto prosi o mniej ruchu, dostaje płaski cokół: te same karty, te same kolory, zero obrotu
+   i zero przejścia. */
+@media (prefers-reduced-motion: reduce) {
+  .podium__winners { perspective: none; }
+  .podium-card,
+  .podium__winners:hover .podium-card,
+  .podium__winners .podium-card:hover { transform: none; transition: none; }
 }
 
 /* ============================================================ przełącznik faz w demo */
@@ -381,4 +376,244 @@ a.is-race-locked {
   opacity: .5;
   text-decoration: line-through;
   text-decoration-thickness: 2px;
+}
+
+/* ============================================================================
+   Podstrona głosowania — votazione.html
+   ============================================================================ */
+
+.vote-page { background: var(--cream, #fbf7ef); }
+.vote-main { padding: clamp(96px, 14vh, 150px) 0 80px; }
+
+.vote-head { display: grid; gap: 12px; margin: 0 0 30px; }
+.vote-head h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 400; line-height: .98;
+  font-size: clamp(34px, 8vw, 68px);
+}
+.vote-head .lead { margin: 0; max-width: 62ch; }
+.vote-head .legal-langs { margin-top: 6px; }
+
+/* Jedno zdanie zamiast pustej siatki. Siatka z zerem kafelków wygląda na stronę, która się
+   nie wczytała — a to jest stan normalny przez 364 dni w roku. */
+.vote-notice {
+  margin: 0 0 30px; padding: 18px 20px;
+  border: 2px dashed var(--line); border-radius: 18px;
+  color: var(--muted); font-size: 15px; line-height: 1.5;
+}
+.vote-notice[hidden] { display: none; }
+.vote-notice:empty { display: none; }
+
+.vote-shell[hidden] { display: none; }
+
+.vote-progress {
+  display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px;
+  font: 800 10.5px/1 var(--font-meta); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted);
+}
+.vote-progress b {
+  font: 900 15px/1 var(--font-meta); color: var(--blue-700);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------- dwanaście nagród */
+
+/* Zakładki, nie lista rozwijana: wybór nagrody jest tu głównym ruchem, a lista rozwijana
+   ukrywa jedenaście z dwunastu możliwości za jednym dodatkowym naciśnięciem.
+
+   Przewijane w poziomie na telefonie, nie zawijane do sześciu rzędów: dwanaście nazw w kolumnie
+   zabiera cały ekran, zanim pokaże się pierwszy pojazd. `scroll-snap-type: x proximity`, a nie
+   `mandatory` — mandatory na tej stronie łapało rzut palcem i nie dawało minąć zakładki. */
+.award-tabs {
+  display: flex; gap: 8px; margin: 0 0 22px; padding: 2px 2px 12px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+.award-tab {
+  flex: 0 0 auto; scroll-snap-align: start;
+  display: grid; gap: 2px; padding: 10px 16px; min-height: 48px;
+  border: 2px solid var(--line); border-radius: 16px;
+  background: var(--white); color: var(--blue-700); cursor: pointer;
+  text-align: left; transition: border-color .2s, background .2s, color .2s;
+}
+.award-tab__number {
+  font: 900 9.5px/1 var(--font-meta); letter-spacing: .14em; color: var(--muted);
+}
+.award-tab strong {
+  font: 900 12.5px/1.15 var(--font-meta); letter-spacing: .04em; text-transform: uppercase;
+  max-width: 20ch;
+}
+.award-tab small {
+  font: 800 9.5px/1 var(--font-meta); letter-spacing: .08em; color: #1f7a52;
+}
+.award-tab:hover { border-color: var(--blue-500); }
+.award-tab:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.award-tab.is-active { border-color: var(--blue-600); background: var(--blue-600); color: var(--white); }
+.award-tab.is-active .award-tab__number { color: rgb(255 255 255 / .7); }
+.award-tab.is-active small { color: #9ff0c8; }
+.award-tab.is-done { border-color: rgb(31 169 113 / .55); }
+.award-tab.is-done.is-active { border-color: var(--blue-600); }
+@media (prefers-reduced-motion: reduce) { .award-tab { transition: none; } }
+
+/* ------------------------------------------------------------------- siatka */
+
+/* Dwie kolumny, tak jak zamówione — i ograniczona szerokość, żeby na monitorze dwa kafelki nie
+   zamieniły się w dwa banery po siedemset pikseli. */
+.vote-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
+  max-width: 900px;
+}
+.vote-empty { margin: 26px 0 0; color: var(--muted); font-size: 14.5px; }
+.vote-empty[hidden] { display: none; }
+
+.vote-sentinel { height: 1px; }
+.vote-sentinel[hidden] { display: none; }
+.vote-more-row { display: flex; justify-content: center; margin: 26px 0 0; }
+.vote-more-row button[hidden] { display: none; }
+
+/* --------------------------------------------------------------- kafelek */
+
+.vote-card {
+  display: grid; overflow: hidden;
+  border: 2px solid var(--line); border-radius: 20px;
+  background: var(--white);
+}
+.vote-card.is-voted { border-color: rgb(31 169 113 / .6); }
+
+/* Zdjęcie NIE jest przyciskiem — zgłoszone wprost. Kafelek pokazuje pojazd, a czynność ma
+   własny przycisk pod spodem. */
+.vote-card__photo {
+  position: relative; margin: 0; aspect-ratio: 4 / 3; overflow: hidden;
+  background: var(--blue-100);
+}
+.vote-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vote-card__blank {
+  display: grid; width: 100%; height: 100%; place-items: center;
+  color: rgb(18 35 61 / .16); font: 900 clamp(30px, 7vw, 56px)/1 var(--font-meta);
+}
+/* Numer startowy w rogu — tak jak jest przyklejony na prawdziwym carruleddhi. */
+.vote-card__number {
+  position: absolute; top: 8px; left: 8px;
+  padding: 5px 9px; border-radius: 999px;
+  background: var(--navy-950); color: var(--white);
+  font: 900 11px/1 var(--font-meta); letter-spacing: .08em;
+}
+.vote-card__rank {
+  position: absolute; top: 8px; right: 8px;
+  padding: 5px 9px; border-radius: 999px;
+  background: var(--yellow); color: var(--navy-950);
+  font: 900 11px/1 var(--font-meta); letter-spacing: .08em;
+}
+
+.vote-card__body { display: grid; gap: 4px; padding: 12px 13px 14px; align-content: start; }
+.vote-card__body > strong { font-size: 14.5px; line-height: 1.25; }
+.vote-card__rider {
+  color: var(--muted); font: 800 10px/1.2 var(--font-meta);
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.vote-card__stats { display: flex; align-items: baseline; gap: 7px; margin: 6px 0 0; }
+.vote-card__stats b {
+  font: 900 20px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums;
+}
+.vote-card__stats small {
+  color: var(--muted); font: 800 9.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase;
+}
+.vote-card__yours {
+  margin: 6px 0 0; color: #1f7a52;
+  font: 800 10.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase;
+}
+.vote-card__used {
+  margin: 6px 0 0; color: var(--muted);
+  font: 800 10px/1.3 var(--font-meta); letter-spacing: .05em;
+}
+
+/* ------------------------------------------------- dwa kroki przy pojeździe */
+
+.vote-card__act { margin: 10px 0 0; }
+.vote-card__start { width: 100%; justify-content: center; min-height: 44px; }
+
+.vote-picker { display: grid; gap: 8px; }
+.vote-picker[hidden] { display: none; }
+.vote-picker__label {
+  font: 800 9.5px/1 var(--font-meta); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Osiem ocen jako siatka 4×2, nie rząd: osiem celów w jednym rzędzie na kafelku szerokości
+   pół ekranu telefonu daje po 20 px na cel. W siatce 4×2 każdy ma 44 px i da się w niego
+   trafić kciukiem. */
+.vote-picker__scores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.vote-picker__score {
+  min-height: 44px; padding: 0;
+  border: 2px solid var(--line); border-radius: 12px;
+  background: var(--white); color: var(--blue-700); cursor: pointer;
+  font: 900 15px/1 var(--font-meta); font-variant-numeric: tabular-nums;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.vote-picker__score:hover { border-color: var(--blue-500); }
+.vote-picker__score:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.vote-picker__score.is-picked {
+  border-color: var(--blue-600); background: var(--blue-600); color: var(--white);
+}
+@media (prefers-reduced-motion: reduce) { .vote-picker__score { transition: none; } }
+
+.vote-picker__actions { display: grid; gap: 6px; }
+.vote-picker__confirm { width: 100%; justify-content: center; min-height: 44px; }
+.vote-picker__cancel {
+  min-height: 36px; border: 0; background: none; color: var(--muted); cursor: pointer;
+  font: 800 10px/1 var(--font-meta); letter-spacing: .08em; text-transform: uppercase;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.vote-picker__cancel:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+/* --------------------------------------------------------- okno z adresem */
+
+/* Reguły samego okna stoją wyżej, w sekcji „okno oceny" — nie ma sensu nadpisywać ich tutaj,
+   skoro po wyniesieniu ocen na podstronę to jest jedyne okno oceny w całym serwisie. */
+.vote-dialog__who {
+  margin: 0; color: var(--navy-950); font: 800 12.5px/1.35 var(--font-meta); letter-spacing: .03em;
+}
+.vote-dialog__score {
+  display: flex; align-items: baseline; gap: 9px; margin: 2px 0 6px;
+  font: 800 9.5px/1 var(--font-meta); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted);
+}
+.vote-dialog__score b {
+  font: 900 30px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums;
+}
+
+.vote-known { display: grid; gap: 9px; }
+.vote-known[hidden] { display: none; }
+/* Widoczny w całości: „zagłosuj zapisanym adresem" bez pokazania go jest prośbą o zaufanie w
+   czymś, czego nie da się sprawdzić. `break-all`, bo długi adres bez spacji rozpycha okno. */
+.vote-known__email {
+  margin: 0; padding: 11px 14px;
+  border: 2px solid var(--line); border-radius: 14px; background: var(--blue-100);
+  font: 800 13px/1.35 var(--font-meta); word-break: break-all;
+}
+.vote-known .btn { width: 100%; justify-content: center; min-height: 48px; }
+.vote-known__other {
+  min-height: 44px; border: 0; background: none; color: var(--blue-700); cursor: pointer;
+  font: 800 11px/1 var(--font-meta); letter-spacing: .06em;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.vote-known__other:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+.vote-identity { display: grid; gap: 12px; }
+.vote-identity[hidden] { display: none; }
+.vote-identity .form-grid { display: grid; gap: 12px; }
+.vote-identity .btn { width: 100%; justify-content: center; min-height: 48px; }
+
+.vote-edit { display: grid; gap: 12px; }
+.vote-edit[hidden] { display: none; }
+.vote-edit .btn { width: 100%; justify-content: center; min-height: 48px; }
+
+/* Na wąskim ekranie dwie kolumny zostają, ale kafelek dostaje ciaśniejsze wnętrze — inaczej
+   nazwa pojazdu i przycisk nie mieszczą się obok siebie w połowie 390 px. */
+@media (max-width: 480px) {
+  .vote-grid { gap: 11px; }
+  .vote-card__body { padding: 10px 10px 12px; }
+  .vote-card__body > strong { font-size: 13px; }
+  .vote-picker__scores { gap: 4px; }
+  .vote-picker__score { font-size: 14px; }
 }

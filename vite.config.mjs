@@ -44,7 +44,11 @@ export default defineConfig({
         admin: resolve(import.meta.dirname, 'admin.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
         cookies: resolve(import.meta.dirname, 'cookies.html'),
-        regolamento: resolve(import.meta.dirname, 'regolamento.html')
+        regolamento: resolve(import.meta.dirname, 'regolamento.html'),
+        // Podstrona głosowania. Bez tego wpisu Vite jej nie zbuduje, a odsyłacz „Zagłosuj"
+        // prowadziłby na produkcji w 404 — i tylko na produkcji, bo `npm run dev` podaje
+        // pliki z katalogu roboczego.
+        votazione: resolve(import.meta.dirname, 'votazione.html')
       }
     }
   }
