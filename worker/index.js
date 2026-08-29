@@ -254,6 +254,15 @@ const LONG_FIELDS = new Set(['photo']);
  * otwiera wstrzykiwanie nagłówków.
  */
 const MULTILINE_FIELDS = new Set(['text', 'message', 'cartNotes']);
+
+/**
+ * Pola, które przychodzą jako obiekt i mają własny, dokładniejszy walidator.
+ *
+ * Krótka lista i taka ma zostać: wpisanie tu czegoś, co nie ma po drugiej stronie
+ * porządnego sprawdzenia, znaczy wpuszczenie dowolnej struktury z internetu prosto
+ * do handlera. `settings` jest tu dlatego, że `cleanSettings()` bada go pole po polu.
+ */
+const OBJECT_FIELDS = new Set(['settings']);
 const RATE_LIMIT_MAX = 6;
 const RATE_LIMIT_WINDOW_SECONDS = 600;
 
@@ -4918,6 +4927,31 @@ function sanitizePayload(type, input) {
     // validated properly in wallPost, where the format is actually known.
     if (LONG_FIELDS.has(key)) {
       if (typeof value === 'string' && value) output[key] = value;
+      continue;
+    }
+    /* Pola, które są obiektem i mają własny walidator.
+       ---------------------------------------------------------------------------
+       TO BYŁ BŁĄD, KTÓRY UNIERUCHOMIŁ CAŁY ZAPIS USTAWIEŃ.
+
+       Ten sanitizer przepuszcza tekst, liczby, wartości logiczne i tablice. Obiekt
+       trafiał na `sanitizeScalar`, a ta zwraca `undefined` dla wszystkiego, co nie jest
+       stringiem — więc klucz wypadał z ładunku.
+
+       `settings` jest obiektem. Czyli `payload.settings` było ZAWSZE `undefined`,
+       a settingsAdmin ma gałąź „jeśli nie podano ustawień, oddaj bieżące i nic nie
+       zapisuj". Funkcja wchodziła w nią przy każdym zapisie i odpowiadała `ok: true` —
+       panel meldował sukces, baza stała nietknięta. Zmierzone: `updated_at`
+       w `site_settings` nie drgnęło od 25.08 mimo prób zapisu.
+
+       Nie działali przez to nie tylko sponsorzy: blokada strony i przełączniki sekcji
+       też były martwe i też twierdziły, że się zapisały.
+
+       Przepuszczamy obiekt w całości, bo `cleanSettings()` sprawdza go porządnie —
+       kształt, typy przełączników, liczbę sponsorów, protokół każdego adresu i ścieżkę
+       każdego logo. Dublowanie tego tutaj dałoby dwa miejsca do utrzymania i zero
+       dodatkowej ochrony. */
+    if (OBJECT_FIELDS.has(key)) {
+      if (typeof value === 'object' && !Array.isArray(value)) output[key] = value;
       continue;
     }
     if (Array.isArray(value)) {
