@@ -209,6 +209,30 @@ import { flagSvg } from './flags.js';
     };
   }
 
+  /**
+   * Cztery rzeczy podane na zewnątrz, dla voting.js.
+   *
+   * Głosowanie mieszka w osobnym pliku, bo ten ma już 270 kB i doklejanie do niego kolejnej
+   * sekcji przestało być czytaniem, a stało się przewijaniem. Ale osobny plik potrzebuje
+   * dokładnie tych czterech rzeczy, a każda z nich napisana po raz drugi byłaby drugą wersją
+   * czegoś, co musi zachowywać się identycznie:
+   *
+   *   post     rozpoznaje „nie ma Workera" (404 bez JSON-a) i odpowiada trybem demo. To jest
+   *            kilkanaście linii rozumowania nad tym, czym różni się brak backendu od backendu
+   *            mówiącego „nie", i druga kopia rozjechałaby się przy pierwszej poprawce
+   *   payload  wspólny kształt żądania: język, źródło, znacznik czasu
+   *   text     ten sam słownik i ten sam mechanizm zapasowy na włoski
+   *   toast    jeden pasek komunikatów na całą stronę, nie dwa nachodzące na siebie
+   *
+   * Cztery funkcje, nie cały moduł: to jest szew, a nie drzwi na oścież.
+   */
+  window.CARRULEDDHI_API = Object.freeze({
+    post: postJSON,
+    payload: eventPayload,
+    text,
+    toast: showToast
+  });
+
   const languageMeta = Object.freeze({
     it: { code: 'IT', name: 'Italiano' },
     pl: { code: 'PL', name: 'Polski' },
@@ -2395,10 +2419,17 @@ import { flagSvg } from './flags.js';
       pinnedOpen = false;
       window.clearTimeout(expandTimer);
       dock.classList.add('is-mini');
+      dock.setAttribute('aria-expanded', 'false');
     };
     const expand = (sticky) => {
+      const wasMini = dock.classList.contains('is-mini');
       dock.classList.remove('is-mini');
+      dock.setAttribute('aria-expanded', 'true');
       window.clearTimeout(expandTimer);
+      if (wasMini) {
+        dock.classList.add('is-expanding');
+        window.setTimeout(() => dock.classList.remove('is-expanding'), 460);
+      }
       if (!sticky) return;
       pinnedOpen = true;
       expandTimer = window.setTimeout(shrink, EXPANDED_FOR);
@@ -2413,6 +2444,9 @@ import { flagSvg } from './flags.js';
 
     // Keyboard users never get a mini dock they cannot read.
     dock.addEventListener('focusin', () => expand(true));
+    document.addEventListener('pointerdown', (event) => {
+      if (pinnedOpen && !dock.contains(event.target)) shrink();
+    }, { passive: true });
 
     /**
      * Shrinks only after you have been scrolling down for a while, not on the first
@@ -2435,11 +2469,12 @@ import { flagSvg } from './flags.js';
       if (y < MINI_AFTER || goingUp) {
         downSince = 0;
         dock.classList.remove('is-mini');
+        dock.setAttribute('aria-expanded', 'true');
         return;
       }
       if (!goingDown) return;
       if (!downSince) { downSince = performance.now(); return; }
-      if (performance.now() - downSince > SHRINK_DELAY) dock.classList.add('is-mini');
+      if (performance.now() - downSince > SHRINK_DELAY) shrink();
     };
     window.addEventListener('scroll', () => {
       if (!scrollFrame) scrollFrame = requestAnimationFrame(onScroll);
@@ -2518,6 +2553,7 @@ import { flagSvg } from './flags.js';
     const modal = $('[data-reminder-modal]');
     if (!modal) return;
     state.lastFocused = document.activeElement;
+    state.reminderScrollY = window.scrollY;
     const subscribed = storage.get('carruleddhi.reminder') === '1';
     $('[data-reminder-form-view]', modal)?.classList.toggle('is-hidden', subscribed);
     $('[data-reminder-success]', modal)?.classList.toggle('is-visible', subscribed);
@@ -2528,12 +2564,18 @@ import { flagSvg } from './flags.js';
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-locked', 'is-modal-open');
-    window.setTimeout(() => modalFocusable(modal)[0]?.focus(), 30);
+    window.setTimeout(() => {
+      modalFocusable(modal)[0]?.focus({ preventScroll: true });
+      if (Math.abs(window.scrollY - state.reminderScrollY) > 1) {
+        window.scrollTo({ top: state.reminderScrollY, behavior: 'auto' });
+      }
+    }, 30);
   }
 
   function closeReminder() {
     const modal = $('[data-reminder-modal]');
     if (!modal) return;
+    const savedY = Number.isFinite(state.reminderScrollY) ? state.reminderScrollY : window.scrollY;
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
     modalBackgroundElements(modal).forEach((element) => {
@@ -2546,7 +2588,10 @@ import { flagSvg } from './flags.js';
     const focusTarget = state.lastFocused?.closest?.('[data-mobile-menu]')
       ? $('[data-menu-toggle]')
       : state.lastFocused;
-    focusTarget?.focus?.();
+    focusTarget?.focus?.({ preventScroll: true });
+    if (Math.abs(window.scrollY - savedY) > 1) {
+      window.scrollTo({ top: savedY, behavior: 'auto' });
+    }
   }
 
   function focusControl(control) {
@@ -2919,6 +2964,104 @@ import { flagSvg } from './flags.js';
    */
   let openConsentDocuments = null;
 
+  /* ==========================================================================
+     Dokumenty prawne: sześć języków i pobieranie z wyprzedzeniem
+     ==========================================================================
+     Dwie rzeczy naprawiane tu naraz, bo obie dotyczą tego samego momentu.
+
+     JĘZYK. Dialog zgody wciągał `regolamento.html`, czyli jedną stronę po włosku, i pokazywał
+     ją tak samo komuś, kto przestawił serwis na polski. Regulamin przychodzi teraz z
+     `assets/legal/regolamento.json` — ten sam plik, z którego korzysta strona regulaminu — i
+     jest wybierany po `state.lang`. Włoski zostaje wersją oficjalną i każde tłumaczenie mówi
+     to w pierwszym akapicie; chodzi o to, żeby dało się je przeczytać, a nie o to, żeby
+     zastąpiły oryginał.
+
+     CZAS. Pobieranie startowało dopiero po naciśnięciu „Przeczytaj i zaakceptuj regulamin",
+     więc każdy widział „Wczytuję dokumenty…" i czekał na dwa żądania sieciowe w chwili, w
+     której już chciał czytać. Teraz startuje, gdy ktoś dotknie pierwszego pola formularza —
+     wtedy nikt nie czeka, bo nikt jeszcze nie patrzy. Do dialogu docierają obietnice, które
+     najczęściej są już rozwiązane, i spinner nie pojawia się w ogóle.
+
+     Obietnice w pamięci, nie wyniki: przełączenie języka ma przerysować ekran z tego, co już
+     jest, a nie sięgnąć po plik po raz drugi.
+     ======================================================================== */
+  const LEGAL_RULES_SOURCE = 'assets/legal/regolamento.json';
+  const legalCache = { rules: null, privacy: null };
+
+  /**
+   * Wycina z dokumentu wszystko, co mogłoby cokolwiek wykonać, i otwiera odsyłacze w nowej karcie.
+   *
+   * Oba dokumenty jadą z tego samego origin i z tego repozytorium, więc to nie jest bariera
+   * przed napastnikiem — to bariera przed przyszłością, w której regulamin zacznie być
+   * wklejany z panelu. Dokument prawny jest tekstem i nie ma powodu niczego uruchamiać.
+   */
+  function sanitizeLegal(root) {
+    root.querySelectorAll('script, style, iframe, form, object, embed, link, meta').forEach((node) => node.remove());
+    root.querySelectorAll('*').forEach((node) => {
+      [...node.attributes].forEach((attribute) => {
+        if (/^on/i.test(attribute.name)) node.removeAttribute(attribute.name);
+      });
+    });
+    root.querySelectorAll('a[href]').forEach((link) => {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+    });
+    return root;
+  }
+
+  /** Odrzucona obietnica nie zostaje w pamięci, bo zamieniłaby jedną awarię sieci w trwale zepsuty dialog. */
+  function legalOnce(slot, load) {
+    if (!legalCache[slot]) {
+      legalCache[slot] = load().catch((error) => {
+        legalCache[slot] = null;
+        throw error;
+      });
+    }
+    return legalCache[slot];
+  }
+
+  /** Regulamin we wszystkich sześciu językach, jeden plik JSON. */
+  const legalRules = () => legalOnce('rules', () => fetch(LEGAL_RULES_SOURCE, { credentials: 'same-origin' })
+    .then((response) => {
+      if (!response.ok) throw new Error(String(response.status));
+      return response.json();
+    }));
+
+  /* Polityka prywatności nadal jest zdejmowana z `privacy.html`, bo nie istnieje jej wersja
+     przetłumaczona — a wymyślanie tłumaczenia informacji RODO nie jest zadaniem tego pliku.
+     Gdy powstanie `assets/legal/privacy.json`, ta funkcja zmieni się w bliźniaka powyższej.
+
+     `same-origin`, nie `omit`: to strona tego samego serwisu, a `omit` znaczyło żądanie bez
+     ciasteczka, które czytelnik już trzyma — brama hasłem odpowiadała wtedy 401 i dialog
+     pokazywał „nie mogę wczytać dokumentu" dla obu dokumentów naraz. */
+  const legalPrivacy = () => legalOnce('privacy', () => fetch('privacy.html', { credentials: 'same-origin' })
+    .then((response) => {
+      if (!response.ok) throw new Error(String(response.status));
+      return response.text();
+    })
+    .then((markup) => {
+      const article = new DOMParser().parseFromString(markup, 'text/html').querySelector('.legal-content');
+      if (!article) throw new Error('no .legal-content');
+      return sanitizeLegal(article);
+    }));
+
+  let legalPrefetched = false;
+
+  /**
+   * Zaczyna pobierać oba dokumenty, nie czekając na nic.
+   *
+   * Wołane, gdy ktoś dotknie formularza — czyli kilkadziesiąt sekund przed tym, gdy dojdzie
+   * do zgód. Błędy są tu połykane celowo: to jest przygotowanie, a nie próba. Gdy coś nie
+   * wyjdzie, `legalOnce` zapomina o nieudanej obietnicy i dialog spróbuje jeszcze raz,
+   * tym razem mając komu pokazać komunikat.
+   */
+  function prefetchLegalDocuments() {
+    if (legalPrefetched) return;
+    legalPrefetched = true;
+    legalRules().catch(() => {});
+    legalPrivacy().catch(() => {});
+  }
+
   /**
    * Single consent gate.
    *
@@ -2945,7 +3088,8 @@ import { flagSvg } from './flags.js';
     const inputs = $$('[data-consent-input]');
     const label = $('[data-consent-gate-label]');
     const hint = $('[data-consent-gate-hint]');
-    let loaded = false;
+    /** Język, w którym zbudowano treść dialogu. Puste, dopóki nic nie zbudowano. */
+    let renderedLang = '';
     let unlocked = false;
 
     function accepted() {
@@ -2978,53 +3122,84 @@ import { flagSvg } from './flags.js';
       if (ratio >= 0.985 && !unlocked) setUnlocked(true);
     }
 
-    async function loadDocuments() {
-      if (loaded) return;
-      loaded = true;
-      const sources = [
-        ['consent.rulesHeading', 'regolamento.html'],
-        ['consent.privacyHeading', 'privacy.html']
-      ];
-      const parts = [];
-      for (const [headingKey, url] of sources) {
-        try {
-          /* `same-origin`, not `omit`.
-             These are two pages of this same site, and `omit` meant the request went
-             without the cookie the visitor is already holding — so the password gate
-             answered 401 and the dialogue showed "could not load the document, open it
-             in a new tab" for both. Omitting credentials is the right default for the
-             API, which is a public endpoint with its own authentication; it is the
-             wrong one for fetching a page of the site you are standing on. */
-          const response = await fetch(url, { credentials: 'same-origin' });
-          if (!response.ok) throw new Error(String(response.status));
-          const markup = await response.text();
-          const parsed = new DOMParser().parseFromString(markup, 'text/html');
-          const article = parsed.querySelector('.legal-content');
-          if (!article) throw new Error('no .legal-content');
-          article.querySelectorAll('script, style, iframe, form, object, embed').forEach((node) => node.remove());
-          article.querySelectorAll('a[href]').forEach((link) => {
-            link.setAttribute('target', '_blank');
-            link.setAttribute('rel', 'noopener noreferrer');
-          });
-          const block = document.createElement('section');
-          block.className = 'consent-doc';
-          const heading = document.createElement('h3');
-          heading.textContent = text(headingKey);
-          block.append(heading, article);
-          parts.push(block);
-        } catch (error) {
-          console.warn(`Consent document ${url} could not be inlined:`, error);
-          const fallback = document.createElement('p');
-          fallback.className = 'consent-doc__fallback';
-          fallback.innerHTML = `${text('consent.error')} <a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
-          parts.push(fallback);
-        }
+    function docBlock(headingKey, body) {
+      const block = document.createElement('section');
+      block.className = 'consent-doc';
+      const heading = document.createElement('h3');
+      heading.textContent = text(headingKey);
+      block.append(heading, body);
+      return block;
+    }
+
+    /** Nie udało się wciągnąć dokumentu: zostaje odsyłacz, który go otwiera osobno. */
+    function docFallback(url) {
+      const fallback = document.createElement('p');
+      fallback.className = 'consent-doc__fallback';
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = url;
+      fallback.append(`${text('consent.error')} `, link);
+      return fallback;
+    }
+
+    async function rulesBlock() {
+      const lang = state.lang;
+      try {
+        const all = await legalRules();
+        // Włoski, gdy tłumaczenia dla tego języka nie ma. Regulamin po włosku jest
+        // regulaminem; brak regulaminu nie jest niczym.
+        const doc = all[lang] || all.it;
+        if (!doc?.html) throw new Error(`no rules for ${lang}`);
+        const parsed = new DOMParser().parseFromString(`<article class="legal-content">${doc.html}</article>`, 'text/html');
+        return docBlock('consent.rulesHeading', sanitizeLegal(parsed.querySelector('.legal-content')));
+      } catch (error) {
+        console.warn('Consent rules could not be inlined:', error);
+        return docFallback(`regolamento.html?lang=${lang}`);
       }
-      if (loading) loading.remove();
+    }
+
+    async function privacyBlock() {
+      try {
+        /* Klon, nie oryginał. W pamięci leży jeden przetworzony artykuł, a wstawienie go do
+           dialogu przeniosłoby go tam — drugie otwarcie zastałoby pustą pamięć. */
+        return docBlock('consent.privacyHeading', (await legalPrivacy()).cloneNode(true));
+      } catch (error) {
+        console.warn('Consent privacy could not be inlined:', error);
+        return docFallback('privacy.html');
+      }
+    }
+
+    /**
+     * Buduje treść dialogu w aktualnym języku.
+     *
+     * `renderedLang` zamiast dawnego `loaded`: pytanie nie brzmi już „czy zbudowano", ale „w
+     * jakim języku zbudowano". Bez tego ktoś, kto otworzy dokumenty, zamknie je, przestawi
+     * serwis na inny język i otworzy ponownie, zostałby przy poprzednim tekście.
+     *
+     * Oba dokumenty równolegle. Dawna pętla `for` z `await` w środku ładowała je po kolei,
+     * czyli czekała na regulamin, żeby zacząć pobierać prywatność, bez żadnej zależności
+     * między nimi. Przy wcześniejszym pobraniu oba są zwykle już w pamięci i nie ma tu
+     * żadnego czekania.
+     */
+    async function loadDocuments() {
+      if (renderedLang === state.lang) return;
+      const lang = state.lang;
+      const parts = await Promise.all([rulesBlock(), privacyBlock()]);
+      // Język zmienił się jeszcze raz, kiedy te dwa były w drodze. Ekran należy do
+      // późniejszego wywołania, więc to jest już nieaktualna odpowiedź.
+      if (lang !== state.lang) return;
+      renderedLang = lang;
+      loading?.remove();
       if (content) {
         content.hidden = false;
-        content.append(...parts);
+        content.replaceChildren(...parts);
       }
+      /* Nowy tekst czyta się od początku, a pasek postępu musi mówić prawdę o tym, ile z
+         niego przeczytano. Bez tego przewinięcie zostaje na dole i podmieniony dokument
+         wygląda na przeczytany w całości. */
+      if (scroller) scroller.scrollTop = 0;
       requestAnimationFrame(trackScroll);
     }
 
@@ -3045,8 +3220,29 @@ import { flagSvg } from './flags.js';
       open();
     };
 
+    /**
+     * Odblokowanie tła po zamkniętych dokumentach.
+     *
+     * Wołane z `close()`, a nie tylko ze zdarzenia `close`. Sonda głosowania (probe-voting.mjs)
+     * pokazała `dialog.close()` wykonane raz, okno zamknięte i ani jednego zdarzenia `close` —
+     * a to zdarzenie było tu jedynym miejscem, w którym zdejmowana jest blokada przewijania.
+     * Skutkiem byłaby strona, której nie da się przewinąć, bez niczego na ekranie, co by to
+     * tłumaczyło: objaw wygląda dokładnie jak zawieszona witryna.
+     *
+     * Zdarzenie zostaje jako siatka na zamknięcia, których nie robi ten kod — Escape i
+     * kliknięcie w tło. Wywołanie dwa razy nic nie psuje.
+     *
+     * `toggle` z warunkiem, a nie `remove`: okno przypomnień jest zwykłym `.modal` i może stać
+     * otwarte pod tym dialogiem, więc blokada musi wtedy zostać.
+     */
+    function releaseDialog() {
+      externalAccept = null;
+      document.body.classList.toggle('is-locked', Boolean($('.modal.is-open')));
+    }
+
     function close() {
       if (dialog.open) dialog.close();
+      releaseDialog();
     }
 
     /**
@@ -3085,12 +3281,7 @@ import { flagSvg } from './flags.js';
       }, reducedMotion ? 0 : 520);
     });
 
-    dialog.addEventListener('close', () => {
-      externalAccept = null;
-      // The reminder pop-up is a `.modal`, and it is still open underneath, so the
-      // lock has to stay on when the dialog closes back onto it.
-      document.body.classList.toggle('is-locked', Boolean($('.modal.is-open')));
-    });
+    dialog.addEventListener('close', releaseDialog);
     dialog.addEventListener('cancel', (event) => {
       event.preventDefault();
       close();
@@ -3115,6 +3306,9 @@ import { flagSvg } from './flags.js';
      security decision, which is a worse place for it than a variable nobody else can reach.
      ======================================================================== */
   let entryIntent = '';
+  let selectedEntryId = '';
+  let selectedEntry = null;
+  let openEntryManager = null;
   /* Raised once somebody has said "yes, I know, I am adding another rider".
      Without it the gate opens again on every press of "Continue" with the same address in the
      field — it would be asking a question it has already had answered, and the only way past
@@ -3127,6 +3321,8 @@ import { flagSvg } from './flags.js';
     if (!panel) return;
 
     const choices = $('[data-entry-choices]', panel);
+    const personList = $('[data-entry-person-list]', panel);
+    const resultStep = $('[data-entry-result]', panel);
     const codeStep = $('[data-entry-code-step]', panel);
     const editStep = $('[data-entry-edit-step]', panel);
     const status = $('[data-entry-status]', panel);
@@ -3136,15 +3332,27 @@ import { flagSvg } from './flags.js';
 
     /* A different address is a different question, so the "I know, another rider" answer stops
        counting. Without this, changing the address after clearing the gate once would skip the
-       check for the new one — and that is the case where somebody really is entering twice. */
-    form.elements.namedItem('email')?.addEventListener('input', () => {
-      entryGateCleared = false;
+       check for the new one — and that is the case where somebody really is entering twice.
+
+       Imię i nazwisko są tu z tego samego powodu. Odkąd brama pyta „czy TA OSOBA jest już
+       zapisana", odpowiedź przestaje obowiązywać także wtedy, gdy ktoś zostawi adres i zmieni
+       nazwisko — a to jest dokładnie sposób, w jaki rodzic zapisuje drugie dziecko: cofa się,
+       przepisuje imię i naciska dalej. Bez tego drugie dziecko przechodziłoby bez sprawdzenia,
+       łącznie z sytuacją, w której zostało wpisane dwa razy. */
+    ['email', 'firstName', 'lastName'].forEach((field) => {
+      form.elements.namedItem(field)?.addEventListener('input', () => {
+        entryGateCleared = false;
+        selectedEntryId = '';
+        selectedEntry = null;
+      });
     });
 
     const show = (which) => {
       if (choices) choices.hidden = which !== 'choices';
+      if (personList) personList.hidden = which !== 'choices' || personList.childElementCount < 2;
       if (codeStep) codeStep.hidden = which !== 'code';
       if (editStep) editStep.hidden = which !== 'edit';
+      if (resultStep) resultStep.hidden = which !== 'result';
       // The panel changes height every time, and #signup is a sticky panel that sizes itself.
       window.dispatchEvent(new Event('carruleddhi:relayout'));
     };
@@ -3166,6 +3374,52 @@ import { flagSvg } from './flags.js';
       };
       return map[result?.code] || 'entry.failed';
     };
+
+    const paintSelection = () => {
+      $$('[data-entry-person]', personList).forEach((button) => {
+        const active = button.dataset.entryId === selectedEntryId;
+        button.classList.toggle('is-selected', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+      const blocked = !selectedEntry || selectedEntry.withdrawn || selectedEntry.minor;
+      $$('[data-entry-action]', panel).forEach((button) => {
+        if (button.dataset.entryAction === 'other') return;
+        button.hidden = Boolean(selectedEntry && blocked);
+        button.disabled = !selectedEntry;
+      });
+      say(selectedEntry?.withdrawn
+        ? 'entry.alreadyOut'
+        : (selectedEntry?.minor ? 'entry.minorHelp' : ''));
+    };
+
+    const finish = (mode, key) => {
+      const title = $('[data-entry-result-title]', resultStep);
+      const body = $('[data-entry-result-body]', resultStep);
+      if (resultStep) resultStep.dataset.resultMode = mode;
+      if (title) title.textContent = mode === 'withdrawn'
+        ? (text('entry.withdrawn') || '')
+        : (text('entry.saved') || '');
+      if (body) body.textContent = text(key) || '';
+      say('');
+      show('result');
+      resultStep?.focus?.({ preventScroll: true });
+    };
+
+    const afterConsent = (callback) => {
+      if (typeof openConsentDocuments === 'function') openConsentDocuments(callback);
+      else callback();
+    };
+
+    const selectEntry = (entry) => {
+      selectedEntry = entry || null;
+      selectedEntryId = entry?.id || '';
+      paintSelection();
+    };
+
+    personList?.addEventListener('click', (event) => {
+      const button = event.target.closest?.('[data-entry-person]');
+      if (button && personList.contains(button)) selectEntry(button.entryRecord);
+    });
 
     /* ------------------------------------------------------- another rider, same address
        The address stays. That is the whole change: since migration 0020 one inbox can hold
@@ -3189,6 +3443,11 @@ import { flagSvg } from './flags.js';
 
     /* ------------------------------------------------------- edit / withdraw: send code */
     const askForCode = async (intent, button) => {
+      if (!selectedEntryId) {
+        personList?.classList.add('is-nudged');
+        window.setTimeout(() => personList?.classList.remove('is-nudged'), 600);
+        return;
+      }
       entryIntent = intent;
       const email = emailOf();
       const original = button.textContent;
@@ -3201,7 +3460,8 @@ import { flagSvg } from './flags.js';
            so nobody types six digits without knowing what they are confirming. */
         const result = await postJSON(config.endpoints.entryCode, eventPayload('entry-code', {
           email,
-          intent
+          intent,
+          entryId: selectedEntryId
         }));
         if (!result?.ok) throw Object.assign(new Error('code'), { payload: result });
         const sent = $('[data-entry-sent]', panel);
@@ -3210,7 +3470,7 @@ import { flagSvg } from './flags.js';
         if (sent) sent.textContent = `${text('entry.codeSent') || ''} ${result.email || ''}`.trim();
         say('');
         show('code');
-        codeField?.focus();
+        codeField?.focus({ preventScroll: true });
       } catch (error) {
         say(explain(error.payload));
       } finally {
@@ -3248,42 +3508,55 @@ import { flagSvg } from './flags.js';
       button.disabled = true;
       say('entry.checking');
       try {
-        if (entryIntent === 'withdraw') {
-          const result = await postJSON(config.endpoints.entryManage, eventPayload('entry-manage', {
-            email: emailOf(),
-            code,
-            action: 'withdraw'
-          }));
-          if (!result?.ok) throw Object.assign(new Error('withdraw'), { payload: result });
-          show('choices');
-          if (choices) choices.hidden = true;
-          say('entry.withdrawn');
-          return;
-        }
-
-        /* Edit: fetch first, then show the fields filled in.
-           An empty form would be a form that silently blanks everything somebody does not
-           re-type — `view` returns the current values and they go straight into the inputs,
-           so leaving a field alone leaves the data alone. */
+        /* First verify and read the selected row. `view` does not consume the code, so the
+           same code can complete exactly the requested edit or withdrawal after the reader
+           accepts the regulations. */
         const result = await postJSON(config.endpoints.entryManage, eventPayload('entry-manage', {
           email: emailOf(),
           code,
-          action: 'view'
+          action: 'view',
+          entryId: selectedEntryId
         }));
         if (!result?.ok) throw Object.assign(new Error('view'), { payload: result });
         const entry = result.entry || {};
-        const put = (id, value) => {
-          const field = $(id, panel);
-          if (field) field.value = value || '';
-        };
-        put('#entry-phone', entry.phone);
-        put('#entry-postal', entry.postalCode);
-        put('#entry-address', entry.address);
-        put('#entry-cart', entry.cartName);
-        put('#entry-team', entry.teamName);
-        put('#entry-notes', entry.cartNotes);
-        say('entry.showing', entry.raceNumber ? ` ${entry.raceNumber}` : '');
-        show('edit');
+
+        if (entryIntent === 'withdraw') {
+          afterConsent(async () => {
+            say('entry.checking');
+            try {
+              const withdrawn = await postJSON(config.endpoints.entryManage, eventPayload('entry-manage', {
+                email: emailOf(),
+                code,
+                action: 'withdraw',
+                entryId: selectedEntryId
+              }));
+              if (!withdrawn?.ok) throw Object.assign(new Error('withdraw'), { payload: withdrawn });
+              finish('withdrawn', 'entry.withdrawn');
+            } catch (error) {
+              say(explain(error.payload));
+              show('code');
+            }
+          });
+          return;
+        }
+
+        /* The edit form is revealed only after the regulations/privacy reader has been
+           accepted. Fields are filled from the verified selected row, never from another
+           registration sharing the inbox. */
+        afterConsent(() => {
+          const put = (id, value) => {
+            const field = $(id, panel);
+            if (field) field.value = value || '';
+          };
+          put('#entry-phone', entry.phone);
+          put('#entry-postal', entry.postalCode);
+          put('#entry-address', entry.address);
+          put('#entry-cart', entry.cartName);
+          put('#entry-team', entry.teamName);
+          put('#entry-notes', entry.cartNotes);
+          say('entry.showing', entry.raceNumber ? ` ${entry.raceNumber}` : '');
+          show('edit');
+        });
       } catch (error) {
         const key = explain(error.payload);
         if (codeError && key.startsWith('entry.code')) codeError.textContent = text(key) || '';
@@ -3306,6 +3579,7 @@ import { flagSvg } from './flags.js';
           email: emailOf(),
           code: String(codeField?.value || '').replace(/\D/g, ''),
           action: 'update',
+          entryId: selectedEntryId,
           phone: $('#entry-phone', panel)?.value || '',
           postalCode: $('#entry-postal', panel)?.value || '',
           address: $('#entry-address', panel)?.value || '',
@@ -3314,18 +3588,34 @@ import { flagSvg } from './flags.js';
           cartNotes: $('#entry-notes', panel)?.value || ''
         }));
         if (!result?.ok) throw Object.assign(new Error('update'), { payload: result });
-        show('choices');
-        if (choices) choices.hidden = true;
-        /* Says the confirmation went out again, because it did — with the race number and the
-           forms attached. Worth saying: the copy already in their inbox is now the older of two
-           and they should print the new one. */
-        say(result.mailed ? 'entry.savedMailed' : 'entry.saved');
+        /* The final screen explicitly says that the corrected confirmation and PDFs have
+           been sent again, so the visitor knows which copy to print. */
+        finish('updated', result.mailed ? 'entry.savedMailed' : 'entry.saved');
       } catch (error) {
         say(explain(error.payload));
       } finally {
         button.disabled = false;
       }
     });
+
+    openEntryManager = async (email, intent, trigger) => {
+      const emailField = form.elements.namedItem('email');
+      if (!emailField || !email) return false;
+      emailField.value = email;
+      emailField.dispatchEvent(new Event('input', { bubbles: true }));
+      entryGateCleared = false;
+      setFormStep(1);
+      const signup = $('#signup');
+      signup?.scrollIntoView({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' });
+      const stopped = await existingEntryGate(form, trigger || $('[data-form-next]', form));
+      if (!stopped) return false;
+      /* A single rider is already selected. The visitor still presses the clearly-labelled
+         action button; with several riders they first choose the matching pill. */
+      if (intent && selectedEntryId) {
+        $('[data-entry-action="' + intent + '"]', panel)?.focus({ preventScroll: true });
+      }
+      return true;
+    };
   }
 
   /**
@@ -3343,41 +3633,124 @@ import { flagSvg } from './flags.js';
     // Already answered for this address. Asking again would be a button that does nothing.
     if (entryGateCleared) return false;
 
+    /* Imię i nazwisko jadą razem z adresem, bo bez nich nie da się powiedzieć „ta osoba jest
+       już zapisana" — a to jedyna wersja tego komunikatu, która kogoś zatrzymuje. Adres sam
+       jest prawdziwy przy każdym kolejnym dziecku w rodzinie. */
+    const firstName = String(form.elements.namedItem('firstName')?.value || '').trim();
+    const lastName = String(form.elements.namedItem('lastName')?.value || '').trim();
+
     const original = button.textContent;
     button.disabled = true;
     button.textContent = text('form.checking') || original;
     try {
-      const result = await postJSON(endpoint, eventPayload('entry-lookup', { email }));
+      const result = await postJSON(endpoint, eventPayload('entry-lookup', { email, firstName, lastName }));
       if (!result?.ok || !result.exists) return false;
 
+      const entries = Array.isArray(result.entries) && result.entries.length
+        ? result.entries
+        : [{
+            id: '',
+            initials: result.initials || '',
+            raceNumber: result.raceNumber || null,
+            withdrawn: Boolean(result.withdrawn),
+            minor: Boolean(result.minor),
+            samePerson: Boolean(result.duplicate)
+          }];
+
+      /* Ta sama osoba, czy tylko ta sama skrzynka.
+         ---------------------------------------------------------------------------
+         Od tego zależy, co panel mówi i co robi domyślny przycisk. Bez tego podziału
+         rodzina zapisująca czwarte dziecko czytała ostrzeżenie skierowane do kogoś, kto
+         zapisuje się drugi raz, a osoba zapisująca się drugi raz czytała zaproszenie do
+         zapisania kolejnego uczestnika. */
+      const samePerson = Boolean(result.duplicate) || entries.some((entry) => entry.samePerson);
+      panel.classList.toggle('is-same-person', samePerson);
+      $$('[data-entry-lead]', panel).forEach((lead) => {
+        lead.hidden = (lead.dataset.entryLead === 'person') !== samePerson;
+      });
+      $$('[data-entry-other-label]', panel).forEach((label) => {
+        label.hidden = (label.dataset.entryOtherLabel === 'person') !== samePerson;
+      });
+
+      selectedEntryId = '';
+      selectedEntry = null;
       const initials = $('[data-entry-initials]', panel);
       if (initials) {
-        // Two letters, not the name. Enough to tell "that is mine" from "somebody else uses
-        // this address"; not enough to be worth harvesting.
-        initials.textContent = result.initials
-          ? `${text('entry.initials') || ''} ${result.initials}`.trim()
+        initials.textContent = entries.length > 1
+          ? `${text('entry.initials') || ''} ${entries.length}`.trim()
           : '';
-        initials.hidden = !result.initials;
+        initials.hidden = entries.length < 2;
       }
 
-      /* An entry that is already withdrawn, or a minor's.
-         Both are dead ends for self-service and for different reasons: there is nothing to
-         withdraw from, and a minor's entry rests on a signed guardian authorisation that a
-         six-digit code cannot stand in for. Saying so and offering the other address is more
-         use than three buttons of which two will fail. */
-      const blocked = result.withdrawn || result.minor;
+      const personList = $('[data-entry-person-list]', panel);
+      if (personList) {
+        const buttons = entries.map((entry) => {
+          const choice = document.createElement('button');
+          choice.type = 'button';
+          choice.className = entry.samePerson ? 'entry-person is-same' : 'entry-person';
+          choice.dataset.entryPerson = '';
+          choice.dataset.entryId = entry.id || '';
+          choice.setAttribute('aria-pressed', 'false');
+          /* Inicjały dwóch braci wyglądają identycznie, więc przy trafionym duplikacie sam
+             kafelek musi powiedzieć, który to. W etykiecie, nie tylko w kolorze obwódki —
+             czytnik ekranu nie widzi klasy CSS. */
+          const sameNote = entry.samePerson ? `, ${text('entry.samePersonMark')}` : '';
+          choice.setAttribute('aria-label', `${entry.initials || '—'}${entry.raceNumber ? `, #${entry.raceNumber}` : ''}${sameNote}`);
+          choice.entryRecord = entry;
+
+          const avatar = document.createElement('span');
+          avatar.className = 'entry-person__avatar';
+          avatar.setAttribute('aria-hidden', 'true');
+          avatar.textContent = entry.initials || '—';
+          const copy = document.createElement('span');
+          copy.className = 'entry-person__copy';
+          const name = document.createElement('strong');
+          name.textContent = entry.initials || '—';
+          const number = document.createElement('small');
+          number.textContent = entry.raceNumber ? `#${entry.raceNumber}` : '—';
+          copy.append(name, number);
+          if (entry.samePerson) {
+            const badge = document.createElement('em');
+            badge.className = 'entry-person__same';
+            badge.textContent = text('entry.samePersonMark');
+            copy.append(badge);
+          }
+          const mark = document.createElement('span');
+          mark.className = 'entry-person__mark';
+          mark.setAttribute('aria-hidden', 'true');
+          mark.textContent = '✓';
+          choice.append(avatar, copy, mark);
+          return choice;
+        });
+        personList.replaceChildren(...buttons);
+        personList.hidden = entries.length < 2;
+      }
+
       const choices = $('[data-entry-choices]', panel);
-      $$('[data-entry-action]', panel).forEach((choice) => {
-        choice.hidden = blocked && choice.dataset.entryAction !== 'other';
-      });
       if (choices) choices.hidden = false;
+      $$('[data-entry-action]', panel).forEach((choice) => {
+        if (choice.dataset.entryAction === 'other') return;
+        choice.hidden = false;
+        choice.disabled = entries.length > 1;
+      });
       $('[data-entry-code-step]', panel).hidden = true;
       $('[data-entry-edit-step]', panel).hidden = true;
+      $('[data-entry-result]', panel).hidden = true;
       const status = $('[data-entry-status]', panel);
-      if (status) {
-        status.textContent = result.withdrawn
-          ? text('entry.alreadyOut') || ''
-          : (result.minor ? text('entry.minorHelp') || '' : '');
+      if (status) status.textContent = '';
+
+      /* One rider needs no extra question. More than one deliberately starts unselected, so
+         edit/withdraw cannot target whoever happened to be returned first.
+
+         Trafiony duplikat jest trzecim przypadkiem i też nie wymaga pytania: wiadomo, o kogo
+         chodzi, bo imię i nazwisko zgadzają się dokładnie. To nie „ten, który wrócił
+         pierwszy" — to ten, którego nazwisko właśnie wpisano. */
+      if (personList) {
+        const pills = $$('[data-entry-person]', personList);
+        const preselect = result.duplicateId
+          ? pills.find((pill) => pill.dataset.entryId === result.duplicateId)
+          : (entries.length === 1 ? pills[0] : null);
+        preselect?.click();
       }
 
       panel.hidden = false;
@@ -3417,6 +3790,25 @@ import { flagSvg } from './flags.js';
         paintFormFill();
       });
     });
+
+    /* Regulamin zaczyna się pobierać, gdy ktoś dotknie formularza.
+       ---------------------------------------------------------------------------
+       Zgody są w kroku trzecim, a to jest krok pierwszy — między jednym a drugim jest
+       kilkadziesiąt sekund pisania, w których sieć nie robi nic. Dwa dokumenty zdejmowane
+       właśnie wtedy nie kosztują nikogo ani chwili czekania, a naciśnięcie „Przeczytaj i
+       zaakceptuj regulamin" zastaje je gotowe i nie pokazuje już „Wczytuję dokumenty…".
+
+       `focusin` z `once`, nie `input`: liczy się moment, w którym ktoś zabiera się do
+       wypełniania, a nie chwila, w której wpisze pierwszą literę — a przy `input`
+       przygotowanie startowałoby ułamek sekundy później, po pierwszym naciśnięciu klawisza.
+       Jedno wywołanie na życie strony, resztą zajmuje się prefetchLegalDocuments. */
+    form.addEventListener('focusin', prefetchLegalDocuments, { once: true });
+    /* Druga furtka, dla kogoś, kto przewinął prosto do zgód i niczego nie wpisał — na
+       przykład wracającego zawodnika albo kogoś, kto chce tylko przeczytać regulamin.
+       `pointerenter` wyprzedza kliknięcie o tyle, ile trwa ruch palca do przycisku. */
+    const gateButton = $('[data-consent-gate]');
+    gateButton?.addEventListener('pointerenter', prefetchLegalDocuments, { once: true });
+    gateButton?.addEventListener('focus', prefetchLegalDocuments, { once: true });
 
     /**
      * The guardian block follows the birth date.
@@ -5193,9 +5585,14 @@ import { flagSvg } from './flags.js';
         if (identified()) {
           openThread();
           startPolling();
-          input?.focus();
+          /* preventScroll, bo #contact jest sekcja sticky z overflow:hidden.
+                       Bez tego przegladarka "przewija do elementu", ktory z jej punktu widzenia
+                       stoi gdzie indziej niz widzi go uzytkownik — i strona teleportuje sie do
+                       stopki albo do komentarzy. To jest zglaszane "klikam wyslij i przenosi mnie
+                       do komentarzy". Fokus ma ustawic kursor, nie ruszac strona. */
+          input?.focus({ preventScroll: true });
         } else {
-          $('#chat-gate-name', panel)?.focus();
+          $('#chat-gate-name', panel)?.focus({ preventScroll: true });
         }
       } else {
         stopPolling();
@@ -5228,7 +5625,7 @@ import { flagSvg } from './flags.js';
         const slot = holder ? $('[data-error]', holder) : null;
         if (slot) slot.textContent = text(key) || '';
         holder?.classList.add('is-invalid');
-        field?.focus();
+        field?.focus({ preventScroll: true });
       };
       $$('[data-field]', gate).forEach((holder) => {
         holder.classList.remove('is-invalid');
@@ -5248,7 +5645,7 @@ import { flagSvg } from './flags.js';
       applyGate();
       openThread();
       startPolling();
-      input?.focus();
+      input?.focus({ preventScroll: true });
       // The card disappearing changes the section's height, and #contact is a sticky panel
       // that decides whether to pin from its own height.
       window.dispatchEvent(new Event('carruleddhi:relayout'));
@@ -5490,11 +5887,17 @@ import { flagSvg } from './flags.js';
           : 'chat__chip';
         chip.dataset.chatAsk = key;
         chip.textContent = text(key) || '';
-        chip.addEventListener('click', () => {
+        chip.addEventListener('click', async () => {
           askedKeys.add(key);
-          // Sent as the question it reads as, so it takes the same path as anything typed.
-          send(chip.textContent.trim());
           setChipsOpen(false);
+          if ((key === 'chat.askChange' || key === 'chat.askCancel') && openEntryManager) {
+            /* The chat gate supplies the address, but it is not treated as authentication.
+               This opens the same selector and six-digit-code flow as the registration form;
+               no operation is possible until the inbox code is confirmed. */
+            await openEntryManager(visitor.email, key === 'chat.askChange' ? 'edit' : 'withdraw', chip);
+            return;
+          }
+          send(chip.textContent.trim());
         });
         chipsList.appendChild(chip);
       });
