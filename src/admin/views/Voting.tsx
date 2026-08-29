@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ImagePlus, ListPlus, Play, RefreshCw, Square, Trash2, Trophy } from 'lucide-react';
 import { cn, formatMoment } from '@/lib/utils';
+import { DateTimeField } from './DateTimeField';
 import type { TranslateKey } from '../i18n';
 import {
   ApiError,
@@ -288,11 +289,18 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
         <div className="mt-5 grid gap-4 sm:grid-cols-3">
           <label className="grid gap-1.5">
             <span className="text-[11px] uppercase tracking-wider text-white/45">{t('vote.raceStart')}</span>
-            <input
-              type="datetime-local"
+            <DateTimeField
               value={startAt}
-              onChange={(event) => setStartAt(event.target.value)}
+              onChange={setStartAt}
+              locale={t('locale.intl')}
               className={field}
+              labels={{
+                open: t('vote.pickMoment'),
+                clear: t('vote.pickClear'),
+                today: t('vote.pickToday'),
+                hour: t('vote.pickHour'),
+                minute: t('vote.pickMinute')
+              }}
             />
           </label>
           <label className="grid gap-1.5">

@@ -59,6 +59,14 @@ const votingState = {
 /* Tylko do zrzutów: `?openroster=1` rozwija listę samo, bo `cdp.mjs shot` nie umie kliknąć.
    Pod parametrem, żeby nie wchodzić w drogę sondzie — ta klika sama i podwójne kliknięcie
    zamknęłoby jej listę tuż przed pomiarem. */
+if (new URLSearchParams(location.search).has('openpicker')) {
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      document.querySelector('button[aria-haspopup="dialog"]')?.click();
+    }, 900);
+  });
+}
+
 if (new URLSearchParams(location.search).has('openroster')) {
   window.addEventListener('load', () => {
     setTimeout(() => {
