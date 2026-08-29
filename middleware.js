@@ -148,7 +148,7 @@ export default async function middleware(request) {
     const form = await request.formData().catch(() => null);
     const given = String(form?.get('password') || '');
     if (!same(await sha256(given), expected)) {
-      return new Response(page({ failed: true }), {
+      return new Response(page({ failed: true, next: String(form?.get('next') || '/') }), {
         status: 401,
         headers: { 'content-type': 'text/html; charset=utf-8' }
       });
@@ -156,7 +156,22 @@ export default async function middleware(request) {
     return new Response(null, {
       status: 303,
       headers: {
-        location: '/',
+        /* Z powrotem tam, gdzie ktoś chciał wejść — razem z parametrami adresu.
+           ---------------------------------------------------------------------------
+           Stało tu `location: '/'` na sztywno, i to była pułapka, która kosztowała pół dnia
+           szukania. Adres `/?demo=1` prowadził do bramy, brama po podaniu hasła odsyłała na
+           `/`, i tryb demo znikał razem z parametrem. Objaw: „wpisuję adres z demo i nic nie
+           widzę" — przy poprawnie działającym demo.
+
+           To samo dotyczyło każdego innego adresu z parametrem albo z zakotwiczeniem: linku
+           do panelu, linku z maila z `?lang=`, odsyłacza do zmiany głosu. Wszystkie kończyły
+           się na stronie głównej bez śladu tego, po co ktoś kliknął.
+
+           `sanitizeNext` niżej pilnuje, żeby to zostało adresem wewnątrz tej strony. Bez tego
+           pole `next` z formularza byłoby otwartym przekierowaniem: ktoś podsyła ofiarze
+           `/__gate` z `next` wskazującym cudzą domenę i brama tej strony wysyła ją tam po
+           zalogowaniu. */
+        location: sanitizeNext(form?.get('next')),
         'set-cookie': `${COOKIE}=${expected}; Path=/; Max-Age=${THIRTY_DAYS}; HttpOnly; Secure; SameSite=Lax`
       }
     });
@@ -166,7 +181,7 @@ export default async function middleware(request) {
   const held = cookie.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${COOKIE}=`));
   if (held && same(held.slice(COOKIE.length + 1), expected)) return;
 
-  return new Response(page({ failed: false }), {
+  return new Response(page({ failed: false, next: `${url.pathname}${url.search}` }), {
     status: 401,
     headers: {
       'content-type': 'text/html; charset=utf-8',
@@ -177,8 +192,37 @@ export default async function middleware(request) {
   });
 }
 
+/**
+ * Gdzie wolno odesłać po podaniu hasła.
+ *
+ * Wyłącznie ścieżka wewnątrz tej strony. Wszystko inne to `/`.
+ *
+ * Odrzucane są nie tylko adresy z domeną, ale też te zaczynające się od `//` i od `\` —
+ * przeglądarki czytają `//zla-domena.pl` jako adres bezwzględny z tym samym protokołem, a
+ * `\\zla-domena.pl` niektóre normalizują do tego samego. Sam warunek „zaczyna się od /" by
+ * tu nie wystarczył, a to jest różnica między przekierowaniem wewnętrznym i otwartym.
+ *
+ * `/__gate` też odpada: odesłanie na bramę po przejściu bramy to pętla.
+ */
+function sanitizeNext(value) {
+  const raw = String(value || '/');
+  if (!raw.startsWith('/')) return '/';
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return '/';
+  if (raw.startsWith('/__gate')) return '/';
+  // Znaki sterujące i nowa linia w nagłówku Location to wstrzykiwanie nagłówków.
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return '/';
+  return raw.slice(0, 300);
+}
+
 /** The gate itself. Inline, because it must not depend on the site it is hiding. */
-function page({ failed }) {
+function page({ failed, next = '/' }) {
+  /* Adres docelowy jedzie w ukrytym polu i musi być wyescapowany, bo trafia w atrybut HTML.
+     Bez tego cudzysłów w parametrze adresu zamyka atrybut i pozwala dopisać własny. */
+  const target = String(next || '/')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
   return `<!doctype html>
 <html lang="it">
 <head>
@@ -220,6 +264,7 @@ function page({ failed }) {
     <p>Il sito è in costruzione. Torna presto — oppure inserisci la password se ti è stata data.</p>
     <p class="small">Strona jest w budowie. Jeśli masz hasło, wpisz je poniżej.</p>
     <form method="POST" action="/__gate">
+      <input type="hidden" name="next" value="${target}">
       <input type="password" name="password" placeholder="Password" aria-label="Password"
              autocomplete="current-password" autofocus required>
       <button type="submit">Entra / Wejdź</button>
