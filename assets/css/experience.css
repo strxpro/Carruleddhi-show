@@ -25,7 +25,28 @@
   align-content: center;
   margin-top: 0;
   padding-block: var(--section-card-pad);
-  overflow: hidden;
+  /* `clip`, NIE `hidden` — i to jest naprawa teleportowania na telefonie.
+     ---------------------------------------------------------------------------
+     Oba ucinają to samo. Różnica jest niewidoczna na obrazku i decydująca w zachowaniu:
+     `overflow: hidden` TWORZY kontener przewijania z obszarem nadmiaru, który przeglądarka
+     może przewijać sama — przy ognisku klawiatury, przy `scrollIntoView`, przy kotwicy, i pod
+     palcem. `overflow: clip` nie tworzy go wcale; nie ma czego przewijać.
+
+     ZMIERZONE 390×844: `#hero` jest przypięty, ma pudełko 844 px i treść 945 px, czyli 101 px
+     nadmiaru. Ta sekcja była więc kontenerem przewijania o wysokości ekranu, z setką pikseli
+     do przewinięcia w środku — a takich sekcji jest czternaście. Przeciągnięcie palcem w
+     obrębie takiej sekcji przewija JĄ, nie stronę, i wraca; z zewnątrz wygląda to jak
+     przeskok do innego miejsca i powrót. „Najbardziej na dolnych sekcjach", bo tam nad
+     bieżącą stoi ich najwięcej.
+
+     Programowe przewijanie tego nie pokazywało: `window.scrollTo` rusza dokumentem i nigdy
+     nie trafia w wewnętrzny kontener. Dlatego sześćdziesiąt kroków sondy dawało zero dryfu
+     przy objawie zgłaszanym trzy razy.
+
+     Ten sam argument stoi już w carnival.css przy `html { overflow-x: clip }`: „hidden
+     zamieniłoby korzeń w kontener przewijania i każdy panel `position: sticky` przestałby
+     się przyklejać". Ta sama właściwość, ta sama pułapka, o jeden poziom niżej. */
+  overflow: clip;
   border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;
   box-shadow:
     0 -26px 70px rgba(7, 26, 61, .26),

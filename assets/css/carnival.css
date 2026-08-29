@@ -908,22 +908,44 @@ body { overflow-x: clip; }
    and it is a better idea than ours because it is the one every other app on the device uses.
    So above 760px the snap stays, because a wheel benefits from it. Below, the device's own
    physics wins. */
-@media (prefers-reduced-motion: no-preference) and (min-height: 600px) and (min-width: 761px) {
-  html { scroll-snap-type: y proximity; }
-  #main > section.section-card { scroll-snap-align: none; }
-  #main > section.section-card[data-panel='pinned'] {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-  }
-}
+/* ============================================================
+   PRZYCIĄGANIE WYŁĄCZONE WSZĘDZIE — czwarta i ostatnia wersja tej sekcji.
+   ============================================================
+   ZMIERZONE 1440×900, ZANIM TO POWSTAŁO
+     Siedem celów przyciągania, z czego SZEŚĆ z `scroll-snap-stop: always`: hero, story,
+     schedule, gallery, attendance, faq. Plus `#signup` ze `stop: normal`.
 
-/* Belt and braces for the phone: the rule above simply does not apply below 761px, but
-   experience.css has its own snap block from an earlier pass and specificity between two
-   files is not a thing worth relying on when the symptom is this hard to attribute. */
-@media (max-width: 760px) {
-  html { scroll-snap-type: none; }
-  #main > section.section-card,
-  .site-footer { scroll-snap-align: none; }
+     `scroll-snap-stop: always` znaczy dosłownie: rzut nie może minąć celu. Każda granica
+     panelu jest pełnym zatrzymaniem. Pod palcem albo pod kółkiem, gdzie jeden gest ma pokryć
+     kilka ekranów, to nie czyta się jako zdecydowanie — czyta się jako strona, która wyrywa
+     przewinięcie i przenosi w inne miejsce, a potem wraca. Dokładnie tak było zgłaszane, i
+     „najbardziej na dolnych sekcjach", bo tam te cele stoją jeden za drugim: schedule,
+     gallery, attendance, signup, faq.
+
+   DLACZEGO CAŁKOWICIE, A NIE TYLKO `stop: normal`
+     Poprzednia wersja tego bloku wyłączyła snap poniżej 761 px i zostawiła go wyżej, z
+     uzasadnieniem: „powyżej 760 px snap zostaje, bo kółko na tym korzysta". Kółko może i
+     korzysta, ale trzy zgłoszenia tego samego objawu z rzędu znaczą, że koszt jest wyższy niż
+     zysk. Zdjęcie samego `scroll-snap-stop` zostawiłoby przyciąganie proximity, które nadal
+     dosuwa pozycję po zakończeniu rzutu — czyli słabszą wersję tego samego objawu, trudniejszą
+     do zauważenia i do zgłoszenia.
+
+     Strona chodzi bez przyciągania poniżej 761 px od kilku wersji i nikt nie zgłosił jego
+     braku. Zatrzymywanie się paneli na krawędzi ekranu robi tu architektura `position: sticky`,
+     a nie snap — i to ona daje ten wygląd, dla którego snap kiedyś dodano.
+
+   Reguły `scroll-snap-align` zostają zdjęte tam, gdzie były nadawane, a nie tylko zgaszone
+   przez `scroll-snap-type: none` na `html`. Jedno bez drugiego znaczy, że wystarczy jedna
+   reguła `scroll-snap-type` dodana kiedyś gdziekolwiek, żeby wszystkie te cele odżyły naraz.
+   ============================================================ */
+html,
+body { scroll-snap-type: none; }
+#main > section.section-card,
+#main > section.section-card[data-panel='pinned'],
+#main > section.section-card#signup,
+.site-footer {
+  scroll-snap-align: none;
+  scroll-snap-stop: normal;
 }
 
 /* ============================================================
@@ -1793,11 +1815,18 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
    translation ever makes a step taller than the screen the overflow is still
    reachable. Snap alignment is independent of that, and it is what makes the
    section come to a stop under the thumb. */
-@media (prefers-reduced-motion: no-preference) and (min-height: 600px) {
-  #main > section.section-card#signup {
-    scroll-snap-align: start;
-    scroll-snap-stop: normal;
-  }
+/* Ta reguła nadawała `#signup` przyciąganie i została zdjęta razem z całym snapem.
+   ---------------------------------------------------------------------------
+   Zostawiona jako pusty ślad z powodem, bo inaczej wróci: intencja była dobra („sekcja
+   zatrzymuje się pod palcem"), a skutkiem było przewinięcie wyrywane w trakcie rzutu. To samo,
+   co zdjęte wyżej dla paneli. Zatrzymywanie się na krawędzi ekranu robi tu `position: sticky`,
+   nie scroll-snap.
+
+   Neutralizowana tym samym selektorem co pierwotna — ta sama waga, późniejsza pozycja w
+   pliku — więc nie da się jej przywrócić przez przypadek, dodając regułę gdzie indziej. */
+#main > section.section-card#signup {
+  scroll-snap-align: none;
+  scroll-snap-stop: normal;
 }
 
 /* ============================================================
