@@ -1015,27 +1015,42 @@ html {
    18. Bottom dock: two icons while reading, full size on tap.
    ============================================================ */
 .quick-actions {
+  --dock-nudge-x: 0px;
+  --dock-nudge-y: 0px;
   transition: width .32s var(--ease-out), padding .32s var(--ease-out),
-    transform .32s var(--ease-out), box-shadow .3s ease;
+    transform .38s var(--ease-snap), box-shadow .3s ease;
 }
 .quick-action {
+  position: relative;
   overflow: hidden;
   transition: width .32s var(--ease-out), padding .3s var(--ease-out),
-    transform .2s var(--ease-snap), background .25s ease;
+    transform .22s var(--ease-snap), background .25s ease, border-radius .3s var(--ease-out);
 }
-.quick-action__icon { flex: none; }
+.quick-action::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgb(255 255 255 / .22);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.quick-action__icon {
+  flex: none;
+  box-shadow: 0 3px 10px rgb(7 26 61 / .18);
+  transition: transform .36s var(--ease-snap), background .25s ease;
+}
+.quick-action:active { transform: scale(.94); }
+.quick-action:active .quick-action__icon { transform: rotate(-8deg) scale(.9); }
 
-/* Shrunken state. Width is driven from the dock so both pills collapse together
-   and the group stays centred — animating each label's width instead made the
-   two buttons arrive at different times and the dock visibly wobbled. */
+/* Shrunken state. First tap expands it; only the second tap executes an action. */
 .quick-actions.is-mini {
   width: auto;
   padding: 7px;
   gap: 7px;
 }
 .quick-actions.is-mini .quick-action {
-  width: 50px;
-  min-width: 50px;
+  width: 52px;
+  min-width: 52px;
   padding: 0;
   border-radius: 50%;
   justify-content: center;
@@ -1045,33 +1060,46 @@ html {
   overflow: hidden;
   opacity: 0;
 }
-/* One clear hint that a tap opens it rather than acting. */
 .quick-actions.is-mini::after {
   content: '';
   position: absolute;
-  top: -5px;
+  top: -6px;
   left: 50%;
-  width: 26px;
-  height: 3px;
+  width: 30px;
+  height: 4px;
   border-radius: 99px;
   background: var(--yellow);
-  opacity: .9;
+  box-shadow: 0 0 14px rgb(255 201 40 / .65);
   transform: translateX(-50%);
 }
-.quick-actions.is-mini .quick-action:active { transform: scale(.94); }
+.quick-actions.is-expanding .quick-action { animation: dock-open .44s var(--ease-snap) both; }
+.quick-actions.is-expanding .quick-action:nth-child(2) { animation-delay: .035s; }
+.quick-actions.is-held { transition-duration: 0s; }
+@keyframes dock-open {
+  0% { transform: scale(.78) translateY(7px); }
+  58% { transform: scale(1.055) translateY(-3px); }
+  100% { transform: scale(1) translateY(0); }
+}
 
-/* Centred on a phone whatever state it is in, and clear of the home bar. */
+/* Centred on a phone whatever state it is in, clear of the home bar. The nudge uses only
+   transform on this fixed layer, so pressing it cannot move the header or page layout. */
 @media (max-width: 760px) {
   .quick-actions {
     right: auto;
     left: 50%;
     width: max-content;
     max-width: calc(100vw - 20px);
-    transform: translateX(-50%);
     margin-bottom: env(safe-area-inset-bottom);
+    transform: translateX(calc(-50% + var(--dock-nudge-x))) translateY(var(--dock-nudge-y));
   }
-  .quick-actions.is-keyboard-hidden { transform: translateX(-50%) translateY(140%); }
-  .quick-action { min-height: 54px; }
+  .quick-actions.is-keyboard-hidden {
+    transform: translateX(calc(-50% + var(--dock-nudge-x))) translateY(140%);
+  }
+  .quick-action { min-height: 56px; padding-inline: 15px; }
+  .quick-action__icon { width: 28px; height: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-actions.is-expanding .quick-action { animation: none; }
 }
 
 /* ============================================================
@@ -2850,4 +2878,61 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   .consent-gate--compact { padding: 10px 11px; }
   .consent-gate--compact .consent-gate__copy strong { font-size: 12.5px; }
   .consent-gate--compact .consent-gate__copy small { font-size: 11px; }
+}
+
+/* ============================================================
+   Telefon: rozmycie tła znika tam, gdzie kosztuje przy każdej klatce.
+   ============================================================
+   OBJAW, KTÓREGO DOTYCZY
+     „Strona sama się odświeża w losowym momencie" — to nie jest przeskok przewijania,
+     tylko przeglądarka wyrzucająca kartę z pamięci i ładująca ją od nowa, kiedy do niej
+     wracasz. W kodzie nie ma ani jednego `location.reload()` ani service workera, więc
+     przeładowanie nie pochodzi stąd — pochodzi z wyczerpanej pamięci.
+
+   DLACZEGO AKURAT BACKDROP-FILTER
+     Każde `backdrop-filter` wymusza osobną warstwę kompozytora i przeliczenie tego, co
+     jest POD elementem, przy każdej klatce, w której cokolwiek się rusza. Na stronie,
+     której sekcje są `position: sticky` i przesuwają się przez całe przewijanie, „coś się
+     rusza" znaczy zawsze.
+
+     W arkuszach jest ich trzynaście. Osiem to okna modalne, zgody i lightboxy — te są
+     zamknięte i nie kosztują nic. Pięć poniżej jest widocznych przez cały czas i to one
+     płacą rachunek na każdej klatce:
+
+       .nav-shell          pasek nawigacji, zawsze na ekranie
+       .quick-actions      pływający dok, zawsze na ekranie
+       .stack-card::before etykieta na KAŻDEJ z dwunastu przypiętych kart
+       .hero-stat          kafelki liczb w hero
+       .sponsor-band       pas sponsorów
+
+     Dwanaście rozmytych etykiet na kartach, które przez całe przewijanie zmieniają
+     pozycję, to dwanaście warstw przeliczanych w kółko. Na pulpicie to niewidoczne,
+     na telefonie to jest ta pamięć, której potem brakuje.
+
+   CO ZAMIAST
+     Samo usunięcie rozmycia zrobiłoby tekst nieczytelnym nad zdjęciem, bo tła są
+     półprzezroczyste i liczyły na to, że rozmycie ujednolici to, co pod spodem. Dlatego
+     każdy element dostaje tu bardziej kryjące tło — wygląda niemal tak samo, a nie
+     kosztuje ani jednej warstwy.
+
+   TYLKO PONIŻEJ 760 px
+     Na pulpicie pamięci i mocy jest dość, a rozmycie jest częścią wyglądu tej strony.
+     Nie ma powodu go tam zabierać.
+   ============================================================ */
+@media (max-width: 760px) {
+  .nav-shell,
+  .quick-actions,
+  .stack-card::before,
+  .hero-stat,
+  .sponsor-band {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Tła kryjące zamiast rozmycia — kolejność odpowiada liście wyżej. */
+  .nav-shell { background: rgba(7, 26, 61, .97); }
+  .quick-actions { background: rgba(7, 26, 61, .97); }
+  .stack-card::before { background: rgba(255, 255, 255, .95); }
+  .hero-stat { background: rgba(255, 255, 255, .93); }
+  .sponsor-band { background: rgba(255, 255, 255, .95); }
 }
