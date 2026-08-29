@@ -1496,7 +1496,8 @@
   const chatEndExtras = {
     it: {
       'chat.end': 'Chiudi la conversazione',
-      'chat.endConfirm': 'Chiudere la conversazione? La prossima inizia da zero.',
+      /* Krótko, bo to jest teraz napis na przycisku, nie zdanie w okienku systemowym. */
+      'chat.endConfirm': 'Sicuro? Premi di nuovo',
       'chat.endedTitle': 'Conversazione chiusa.',
       'chat.endedLead': 'Grazie. Se serve altro, apri una nuova conversazione: ripartiamo da capo e ti richiediamo nome ed e-mail.',
       'chat.restart': 'Nuova conversazione',
@@ -1507,7 +1508,8 @@
     },
     pl: {
       'chat.end': 'Zakończ rozmowę',
-      'chat.endConfirm': 'Zakończyć rozmowę? Następna zacznie się od zera.',
+      /* Krótko, bo to jest teraz napis na przycisku, nie zdanie w okienku systemowym. */
+      'chat.endConfirm': 'Na pewno? Naciśnij ponownie',
       'chat.endedTitle': 'Rozmowa zakończona.',
       'chat.endedLead': 'Dziękujemy. Jeśli coś jeszcze, otwórz nową rozmowę — zaczynamy od czystej karty i pytamy ponownie o imię i e-mail.',
       'chat.restart': 'Nowa rozmowa',
@@ -1518,7 +1520,7 @@
     },
     en: {
       'chat.end': 'End the conversation',
-      'chat.endConfirm': 'End this conversation? The next one starts from scratch.',
+      'chat.endConfirm': 'Sure? Press again',
       'chat.endedTitle': 'Conversation closed.',
       'chat.endedLead': 'Thank you. If anything else comes up, start a new conversation — it begins fresh and asks for your name and e-mail again.',
       'chat.restart': 'New conversation',
@@ -1529,7 +1531,7 @@
     },
     de: {
       'chat.end': 'Gespräch beenden',
-      'chat.endConfirm': 'Gespräch beenden? Das nächste beginnt von vorn.',
+      'chat.endConfirm': 'Sicher? Nochmal drücken',
       'chat.endedTitle': 'Gespräch beendet.',
       'chat.endedLead': 'Danke. Wenn noch etwas ist, starte ein neues Gespräch — es beginnt von vorn und fragt Name und E-Mail erneut.',
       'chat.restart': 'Neues Gespräch',
@@ -1540,7 +1542,7 @@
     },
     es: {
       'chat.end': 'Cerrar la conversación',
-      'chat.endConfirm': '¿Cerrar la conversación? La siguiente empieza de cero.',
+      'chat.endConfirm': '¿Seguro? Pulsa otra vez',
       'chat.endedTitle': 'Conversación cerrada.',
       'chat.endedLead': 'Gracias. Si surge algo más, abre una conversación nueva: empieza de cero y te pedimos otra vez nombre y e-mail.',
       'chat.restart': 'Nueva conversación',
@@ -1551,7 +1553,7 @@
     },
     fr: {
       'chat.end': 'Terminer la conversation',
-      'chat.endConfirm': 'Terminer la conversation ? La suivante repart de zéro.',
+      'chat.endConfirm': 'Sûr ? Appuyez encore',
       'chat.endedTitle': 'Conversation terminée.',
       'chat.endedLead': 'Merci. S’il y a autre chose, ouvrez une nouvelle conversation : elle repart de zéro et redemande nom et e-mail.',
       'chat.restart': 'Nouvelle conversation',

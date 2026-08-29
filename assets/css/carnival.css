@@ -571,6 +571,10 @@
    that survives a keyboard opening. */
 @media (max-width: 760px) {
   .modal {
+    /* `flex-start`, nie `center` — i to jest celowe, mimo że chodzi o wyśrodkowanie.
+       `align-items: center` na kontenerze z przewijaniem UCINA górę elementu wyższego niż
+       kontener: nie da się doscrollować do jego początku, bo przepełnienie idzie w obie strony.
+       Centrowanie robi `margin: auto` na oknie, patrz niżej. */
     align-items: flex-start;
     justify-items: stretch;
     padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
@@ -581,7 +585,20 @@
     width: 100%;
     max-width: none;
     max-height: none;
-    margin: 0 auto;
+    /* `margin: auto`, nie `0 auto` — cała naprawa „pop-out nie jest wyśrodkowany, trzeba
+       przewijać".
+       ---------------------------------------------------------------------------
+       `0 auto` centruje tylko w poziomie, więc okno stało przyklejone do górnej krawędzi, za
+       zapasem 104 px na nagłówek (patrz `.modal { padding-top }` niżej w tym pliku). Krótkie
+       okno miało nad sobą dziurę, wysokie wychodziło poza ekran i trzeba je było przewijać,
+       żeby zobaczyć przyciski.
+
+       `auto` na wszystkich krawędziach w kontenerze `flex` z przewijaniem daje jedno i drugie:
+       gdy okno mieści się w widoku, wolne miejsce rozkłada się po równo i okno jest
+       wyśrodkowane; gdy nie mieści się, marginesy schodzą do zera i całość zostaje dostępna od
+       samej góry. To jest jedyny układ, który przeżywa też otwarcie klawiatury — a to był powód,
+       dla którego centrowanie kiedyś tu porzucono. */
+    margin: auto;
     padding: 20px 18px 22px;
     border-radius: 26px;
   }

@@ -5842,7 +5842,10 @@ import { flagSvg } from './flags.js';
 
     /** Etykiety przez słownik, więc przełączenie języka je przerysowuje. */
     function paintChatChrome() {
-      endButton.textContent = text('chat.end');
+      // Zbrojony przycisk nosi pytanie, nie własną nazwę — przełączenie języka nie może go
+      // rozbroić bez wiedzy człowieka, który właśnie na nie patrzy.
+      if (endButton.classList.contains('is-armed')) endButton.textContent = text('chat.endConfirm');
+      else endButton.textContent = text('chat.end');
       endedTitle.textContent = text('chat.endedTitle');
       endedLead.textContent = text('chat.endedLead');
       restartButton.textContent = text('chat.restart');
@@ -5932,9 +5935,31 @@ import { flagSvg } from './flags.js';
       nameField?.focus({ preventScroll: true });
     }
 
+    /* Potwierdzenie na samym przycisku, nie w okienku systemowym.
+       ---------------------------------------------------------------------------
+       Stało tu `window.confirm`. Zamknięcia nie da się cofnąć, więc pytanie jest na miejscu —
+       ale systemowe okno wygląda jak komunikat przeglądarki, nie jak część tej strony, na
+       telefonie zakrywa pół ekranu, i nie da się go przetłumaczyć ani ostylować.
+
+       Pierwsze naciśnięcie zbroi przycisk i zmienia jego napis na pytanie, drugie kończy
+       rozmowę. Cofnięcie samo po pięciu sekundach — kto nacisnął przez pomyłkę, nie musi nic
+       robić. To ta sama konstrukcja co „naciśnij dwa razy, żeby usunąć" i nie zabiera ekranu. */
+    let armedTimer = 0;
+    const disarm = () => {
+      window.clearTimeout(armedTimer);
+      armedTimer = 0;
+      endButton.classList.remove('is-armed');
+      endButton.textContent = text('chat.end');
+    };
     endButton.addEventListener('click', () => {
-      // Pytanie, bo zamknięcia nie da się cofnąć: nowa rozmowa startuje z pustym dziennikiem.
-      if (window.confirm(text('chat.endConfirm'))) void endConversation();
+      if (armedTimer) {
+        disarm();
+        void endConversation();
+        return;
+      }
+      endButton.classList.add('is-armed');
+      endButton.textContent = text('chat.endConfirm');
+      armedTimer = window.setTimeout(disarm, 5000);
     });
     restartButton.addEventListener('click', startFresh);
 
