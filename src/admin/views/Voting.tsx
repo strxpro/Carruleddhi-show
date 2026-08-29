@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ImagePlus, Play, RefreshCw, Square, Trash2, Trophy } from 'lucide-react';
+import { ImagePlus, ListPlus, Play, RefreshCw, Square, Trash2, Trophy } from 'lucide-react';
 import { cn, formatMoment } from '@/lib/utils';
 import type { TranslateKey } from '../i18n';
 import {
   ApiError,
   closeVoting,
+  fetchRoster,
   fetchVoting,
   mailWinners,
   openVoting,
@@ -13,6 +14,7 @@ import {
   scheduleVoting,
   uploadParticipantPhoto,
   type ParticipantEdit,
+  type RosterRow,
   type VotingParticipant,
   type VotingState,
   type VotingWinner
@@ -89,6 +91,15 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
   const [draftPhoto, setDraftPhoto] = useState<{ imagePath: string; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  /* Lista startowa, wczytywana dopiero przy otwarciu.
+     Zgłoszeń bywa kilkaset, a większość wejść w tę zakładkę dotyczy czasu albo wyników —
+     pobieranie ich przy każdym otwarciu panelu to transmisja komórkowa organizatora wydana
+     na dane, których zwykle nie ogląda. */
+  const [roster, setRoster] = useState<RosterRow[] | null>(null);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterBusy, setRosterBusy] = useState(false);
+  const [rosterQuery, setRosterQuery] = useState('');
 
   /** Tłumaczy kod z Workera na zdanie; nieznany kod zostaje kodem, bo lepszy niż milczenie. */
   const explain = useCallback(
@@ -170,6 +181,20 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
     [apiKey, absorb, explain]
   );
 
+  const loadRoster = useCallback(async () => {
+    setRosterBusy(true);
+    setError(null);
+    try {
+      const result = await fetchRoster(apiKey);
+      setRoster(result.rows ?? []);
+    } catch (problem) {
+      setError(explain(problem));
+      setRoster([]);
+    } finally {
+      setRosterBusy(false);
+    }
+  }, [apiKey, explain]);
+
   async function pickPhoto(file: File, participantId?: string) {
     setUploading(true);
     setError(null);
@@ -209,6 +234,26 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
     + 'focus-visible:outline-2 focus-visible:outline-yellow focus-visible:outline-offset-2';
   const chip =
     'rounded-full px-4 py-2 text-xs font-extrabold transition-colors disabled:opacity-45 disabled:cursor-not-allowed';
+
+  /* Zgłoszenia, których nie ma jeszcze wśród uczestników.
+     Odsiewane po `registrationId`, a nie po imieniu i nazwisku: dwoje kuzynów o tym samym
+     imieniu i nazwisku to na tej stronie normalna sytuacja, pod którą jest osobny indeks
+     w bazie (migracja 0023). Odsiewanie po nazwisku ukryłoby jednego z nich. */
+  const takenRegistrations = new Set(
+    (state?.participants ?? [])
+      .map((participant) => participant.registrationId)
+      .filter((value): value is string => Boolean(value))
+  );
+  const rosterNeedle = rosterQuery.trim().toLowerCase();
+  const rosterAvailable = (roster ?? [])
+    .filter((row) => !takenRegistrations.has(row.id))
+    .filter(
+      (row) =>
+        !rosterNeedle
+        || `${row.raceNumber ?? ''} ${row.firstName} ${row.lastName} ${row.cartName} ${row.category}`
+          .toLowerCase()
+          .includes(rosterNeedle)
+    );
 
   return (
     <div className="mx-auto grid max-w-5xl gap-6">
@@ -366,6 +411,85 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
       {/* ---------------------------------------------------- uczestnicy */}
       <section className="rounded-3xl border border-white/10 bg-navy-900 p-6">
         <h2 className="font-extrabold text-white">{t('vote.participants')}</h2>
+
+        {/* ------------------------------------------- wybór z listy startowej
+            Kto się zapisał, ten już podał numer, kategorię i nazwę wózka. Przepisywanie tego
+            z powrotem w pięć pól to nie tylko praca, ale i literówka w nazwisku, przez którą
+            list do zwycięzcy pójdzie w próżnię — zwycięzca bez zgłoszenia trafia na listę
+            `unreachable`.
+
+            Wysyłane jest samo `registrationId`, bez pozostałych pól. Worker uzupełnia je
+            z bazy WYŁĄCZNIE wtedy, gdy pole jest `undefined` (patrz votingAdminSave) — a
+            wysłanie pustego numeru startowego dałoby `VOTING_BAD_START_NUMBER`. */}
+        <div className="mt-4">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const next = !rosterOpen;
+              setRosterOpen(next);
+              if (next && roster === null) void loadRoster();
+            }}
+            className={cn(chip, 'inline-flex items-center gap-2 bg-white/10 text-white hover:bg-white/20')}
+          >
+            <ListPlus size={13} /> {rosterOpen ? t('vote.rosterHide') : t('vote.fromRoster')}
+          </button>
+
+          {rosterOpen ? (
+            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              {rosterBusy ? (
+                <p className="px-1 py-2 text-sm text-white/50">{t('vote.rosterLoading')}</p>
+              ) : rosterAvailable.length === 0 ? (
+                <p className="px-1 py-2 text-sm text-white/50">
+                  {(roster?.length ?? 0) === 0 ? t('vote.rosterEmpty') : t('vote.rosterAllAdded')}
+                </p>
+              ) : (
+                <>
+                  <input
+                    type="search"
+                    placeholder={t('vote.rosterSearch')}
+                    value={rosterQuery}
+                    onChange={(event) => setRosterQuery(event.target.value)}
+                    className={field}
+                  />
+                  <ul className="mt-2 max-h-72 divide-y divide-white/5 overflow-y-auto">
+                    {rosterAvailable.map((row) => (
+                      <li key={row.id} className="flex items-center gap-3 py-2">
+                        <span className="w-12 shrink-0 text-sm font-extrabold tabular-nums text-yellow">
+                          {row.raceNumber || '—'}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-white">
+                            {row.firstName} {row.lastName}
+                          </span>
+                          <span className="block truncate text-xs text-white/45">
+                            {[row.cartName, row.category].filter(Boolean).join(' · ')}
+                            {row.raceNumber ? '' : ` · ${t('vote.rosterNoNumber')}`}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () => saveParticipant(apiKey, null, { registrationId: row.id }),
+                              t('vote.saved')
+                            )
+                          }
+                          className={cn(chip, 'shrink-0 bg-yellow text-navy-950 hover:bg-white')}
+                        >
+                          {t('vote.rosterAdd')}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <p className="mt-5 text-[11px] uppercase tracking-wider text-white/35">{t('vote.manualAdd')}</p>
 
         {/* Dodawanie: pięć pól i zdjęcie, bez okna modalnego. Formularz wpisany w stronę
             znaczy, że da się dodać dziesięciu uczestników po kolei, nie zamykając niczego. */}
