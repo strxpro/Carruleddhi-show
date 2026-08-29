@@ -91,3 +91,86 @@ export const fetchCounts = () =>
   })
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null) as Promise<{ attendees?: number; pilots?: number } | null>;
+
+/* ------------------------------------------------------------------- voting */
+
+export type VotingPhase = 'scheduled' | 'voting' | 'closed';
+
+export interface VotingParticipant {
+  id: string;
+  registrationId: string | null;
+  category: string;
+  startNumber: number;
+  firstName: string;
+  lastName: string;
+  projectName: string;
+  /** Signed URL, good for an hour. Empty when there is no photo. */
+  photo: string;
+  /** The path in the private bucket. This is what gets saved, not the URL above. */
+  imagePath: string;
+  active: boolean;
+  voteCount: number;
+  averageScore: number;
+}
+
+export interface VotingState {
+  ok: boolean;
+  /** Worked out from the clock by the Worker. The panel never computes this itself. */
+  phase: VotingPhase;
+  /** What the organiser declared. Differs from `phase` when it was closed by hand. */
+  status: string;
+  raceStartsAt: string | null;
+  votingEndsAt: string | null;
+  durationMinutes: number;
+  scoreMin: number;
+  scoreMax: number;
+  participants: VotingParticipant[];
+  totalVotes: number;
+}
+
+export interface ParticipantDraft {
+  id?: string;
+  registrationId?: string;
+  category?: string;
+  startNumber?: number;
+  firstName?: string;
+  lastName?: string;
+  projectName?: string;
+  imagePath?: string;
+  active?: boolean;
+}
+
+export const fetchVoting = (key: string) =>
+  ask<VotingState>('voting-admin', key, { action: 'state' });
+
+export const saveParticipant = (key: string, draft: ParticipantDraft) =>
+  ask<{ participant?: unknown }>('voting-admin', key, { action: 'save', ...draft });
+
+export const removeParticipant = (key: string, id: string) =>
+  ask<{ removed?: string }>('voting-admin', key, { action: 'remove', id });
+
+/** Upload first, save second. A failed upload must leave the row exactly as it was. */
+export const uploadParticipantPhoto = (key: string, photo: string) =>
+  ask<{ imagePath: string; url: string }>('voting-admin', key, { action: 'photo', photo });
+
+export const scheduleVoting = (key: string, raceStartsAt: string, durationMinutes: number) =>
+  ask<VotingState>('voting-admin', key, { action: 'schedule', raceStartsAt, durationMinutes });
+
+export const openVotingNow = (key: string, durationMinutes: number) =>
+  ask<VotingState>('voting-admin', key, { action: 'open', durationMinutes });
+
+export const closeVotingNow = (key: string) =>
+  ask<VotingState>('voting-admin', key, { action: 'close' });
+
+export interface WinnerLetter {
+  place: number;
+  category: string;
+  startNumber: number;
+  projectName: string;
+  participantName: string;
+  averageScore: number;
+  voteCount: number;
+}
+
+export const mailWinners = (key: string) =>
+  ask<{ sent: WinnerLetter[]; unreachable: WinnerLetter[] }>('voting-admin', key, { action: 'winners' });

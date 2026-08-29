@@ -6,6 +6,7 @@ import {
   Bell,
   LayoutDashboard,
   ListChecks,
+  Loader2,
   LogOut,
   MessageSquare,
   PanelLeftClose,
@@ -14,7 +15,8 @@ import {
   Search,
   Send,
   Settings,
-  StickyNote
+  StickyNote,
+  Trophy
 } from 'lucide-react';
 import {
   CommandPalette,
@@ -30,6 +32,7 @@ import { useSession } from './useSession';
 import { Gate } from './Gate';
 import { Dashboard } from './views/Dashboard';
 import { Registrations } from './views/Registrations';
+import { Voting } from './views/Voting';
 import { Chat } from './views/Chat';
 import { Wall } from './views/Wall';
 import { Subscribers } from './views/Subscribers';
@@ -43,7 +46,15 @@ const TAB_KEY = 'carruleddhi.admin.tab';
  *  it is one indexed count per table, no rows returned. */
 const INBOX_INTERVAL_MS = 10_000;
 
-type TabId = 'dashboard' | 'registrations' | 'chat' | 'wall' | 'reminders' | 'newsletter' | 'settings';
+type TabId =
+  | 'dashboard'
+  | 'registrations'
+  | 'voting'
+  | 'chat'
+  | 'wall'
+  | 'reminders'
+  | 'newsletter'
+  | 'settings';
 
 export default function App() {
   const { state, unlock, lock } = useSession();
@@ -157,6 +168,10 @@ export default function App() {
             icon: ListChecks,
             badge: inbox?.counts.registrations
           },
+          /* No badge. Voting has no "new since you last looked" — it has a phase, and the
+             screen itself is where that is read. A number here would be votes arriving,
+             which is not something anyone needs to act on one at a time. */
+          { id: 'voting', title: t('nav.voting'), icon: Trophy },
           {
             id: 'audience',
             title: t('nav.audience'),
@@ -206,9 +221,17 @@ export default function App() {
   );
 
   if (state.status === 'checking' && !key) {
+    /* A spinner rather than the word, and no skeleton here: what follows is either the
+       password gate or the whole panel, and there is no shape this could hold still for.
+       The label stays for screen readers, which is the one audience the word served. */
     return (
-      <div className="grid min-h-dvh place-items-center bg-background text-sm text-muted-foreground">
-        {t('common.loading')}
+      <div
+        className="grid min-h-dvh place-items-center bg-background"
+        role="status"
+        aria-busy="true"
+        aria-label={t('common.loading')}
+      >
+        <Loader2 className="size-6 animate-spin text-muted-foreground" strokeWidth={1.5} />
       </div>
     );
   }
@@ -311,6 +334,7 @@ export default function App() {
           {tab === 'registrations' ? (
             <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} />
           ) : null}
+          {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
           {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'reminders' ? (

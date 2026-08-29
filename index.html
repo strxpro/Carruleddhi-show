@@ -111,6 +111,14 @@
             <button type="button" role="option" data-language-option="fr" aria-selected="false"><span aria-hidden="true">🇫🇷</span><strong>Français</strong><small>FR</small></button>
           </div>
         </div>
+        <!-- Pojawia się dopiero, gdy głosowanie jest otwarte, i znika, gdy się zamknie.
+             Ukryty w znaczniku, nie w CSS: przycisk „zagłosuj", który stoi tam przez cały rok
+             i prowadzi do niczego, jest gorszy niż brak przycisku. Odsłania go voting.js po
+             odczycie fazy z serwera — zegar przeglądarki nie decyduje o tym, kiedy trwa
+             wyścig, bo bywa przestawiony. -->
+        <a class="btn btn--small nav-vote" href="#voting" data-vote-cta hidden>
+          <span data-i18n="voting.cta">Vota il partecipante</span>
+        </a>
         <button class="btn btn--small nav-attend" type="button" data-open-reminder data-i18n="nav.attend">Ci sarò</button>
         <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Apri il menu">
           <span class="menu-toggle__label">Menu</span>
@@ -126,6 +134,35 @@
       <div class="menu-panel__heading">
         <span class="menu-panel__eyebrow" data-config-event-name>Carruleddhi Show 2026</span>
         <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
+
+        <!-- Wybór języka w rozwiniętym menu.
+             Zmierzone: panel miał zero elementów z wyborem języka. Jedyna droga do
+             zmiany była mała flaga w pasku, która przy otwartym menu leży NAD nakładką
+             — działa, ale trzeba wiedzieć, że tam jest, i celować w 46 px na telefonie.
+             Menu jest miejscem, gdzie szuka się nawigacji, więc język stoi w nim obok
+             reszty.
+
+             Podpis jest dwujęzyczny na stałe, a nie przez data-i18n: to jedyny napis na
+             stronie, który musi być zrozumiały także wtedy, gdy strona jest akurat w
+             języku, którego ktoś nie zna. Z tego samego powodu przyciski są kodami
+             ISO, nie tłumaczonymi nazwami.
+
+             Bez flag emoji — Windows nie ma dla nich kolorowych glifów, a inline SVG
+             maluje w app.js paintFlags(), które szuka [data-language-option]; te
+             przyciski celowo mają inny atrybut, żeby nie wejść w klawiaturową obsługę
+             listy w pasku. Klik jest przekazywany do tej listy, więc kod zmiany języka
+             pozostaje jeden. -->
+        <div class="menu-langs" data-menu-langs>
+          <span class="menu-langs__label">Lingua / Language</span>
+          <div class="menu-langs__row">
+            <button class="menu-lang" type="button" data-menu-language="it" aria-pressed="true">IT</button>
+            <button class="menu-lang" type="button" data-menu-language="pl" aria-pressed="false">PL</button>
+            <button class="menu-lang" type="button" data-menu-language="en" aria-pressed="false">EN</button>
+            <button class="menu-lang" type="button" data-menu-language="de" aria-pressed="false">DE</button>
+            <button class="menu-lang" type="button" data-menu-language="es" aria-pressed="false">ES</button>
+            <button class="menu-lang" type="button" data-menu-language="fr" aria-pressed="false">FR</button>
+          </div>
+        </div>
       </div>
 
       <div class="menu-panel__grid">
@@ -147,8 +184,9 @@
           <span class="menu-event__kicker" data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
           <strong data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</strong>
           <div class="menu-event__stats">
-            <span><b data-pilots-count>38</b><small data-i18n="hero.pilots">piloti iscritti</small></span>
-            <span><b data-attendee-count>412</b><small data-i18n="hero.people">persone ci saranno</small></span>
+            <!-- Kreska, nie liczba. Patrz komentarz przy liczniku w sekcji „ci sarò". -->
+            <span><b data-pilots-count>—</b><small data-i18n="hero.pilots">piloti iscritti</small></span>
+            <span><b data-attendee-count>—</b><small data-i18n="hero.people">persone ci saranno</small></span>
           </div>
           <a class="btn" href="#signup" data-feature-link="registration"><span data-i18n="nav.signup">Iscriviti</span><span aria-hidden="true">↘</span></a>
           <button class="btn btn--outline" type="button" data-open-reminder data-i18n="nav.attend">Ci sarò</button>
@@ -170,6 +208,12 @@
           </h1>
           <p class="hero__tagline reveal" data-delay="2" data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</p>
           <div class="hero__actions reveal" data-delay="3">
+            <!-- Pierwszy w kolejności i wyrazisty, bo w tych kilkudziesięciu minutach jest
+                 jedyną rzeczą, po którą ktokolwiek tu przychodzi. Reszta przycisków zostaje na
+                 miejscu, tylko zapisy są wtedy zablokowane — patrz voting.js. -->
+            <a class="btn btn--vote magnetic" href="#voting" data-vote-cta hidden>
+              <span data-i18n="voting.cta">Vota il partecipante</span><span class="btn__icon" aria-hidden="true">★</span>
+            </a>
             <a class="btn magnetic" href="#signup" data-feature-link="registration"><span data-i18n="hero.signup">Iscriviti alla gara</span><span class="btn__icon" aria-hidden="true">↘</span></a>
             <button class="btn btn--outline magnetic" type="button" data-open-reminder><span data-i18n="hero.attend">Ci sarò</span><span class="btn__icon" aria-hidden="true">＋</span></button>
           </div>
@@ -182,11 +226,11 @@
             <div class="countdown__unit"><strong class="countdown__number" data-seconds>00</strong><span class="countdown__label" data-i18n="count.seconds">secondi</span></div>
           </div>
           <div class="hero-stat">
-            <strong class="hero-stat__number" data-pilots-count>38</strong>
+            <strong class="hero-stat__number" data-pilots-count>—</strong>
             <span class="hero-stat__label" data-i18n="hero.pilots">piloti iscritti</span>
           </div>
           <div class="hero-stat">
-            <strong class="hero-stat__number" data-attendee-count>412</strong>
+            <strong class="hero-stat__number" data-attendee-count>—</strong>
             <span class="hero-stat__label" data-i18n="hero.people">persone ci saranno</span>
           </div>
         </aside>
@@ -202,11 +246,161 @@
 
     </section>
 
+    <!-- ==================================================================
+         Podium — po zamknięciu głosowania
+         ==================================================================
+         Pod hero, nie na końcu strony: w dniu po wyścigu to jest jedyna rzecz, po którą ktoś
+         tu wchodzi, i nie powinien jej szukać. Ukryte do czasu, gdy voting.js odczyta z
+         serwera fazę `closed` — pusty cokół przez cały rok byłby obietnicą, że coś się już
+         wydarzyło.
+
+         Rysunek jest jednym SVG i podnosi się animacją rysowania kreski. Trzy schodki są
+         nierówne z premedytacją: równe wyglądają jak wykres, a nie jak podium. -->
+    <section class="section section-card podium" id="podium" aria-labelledby="podium-title" data-podium hidden>
+      <div class="container">
+        <header class="section-head">
+          <span class="eyebrow" data-i18n="voting.podiumKicker">Risultato del pubblico</span>
+          <h2 id="podium-title" data-i18n="voting.podiumTitle" data-text-effect="jump">Il podio.</h2>
+          <p class="section-lead" data-i18n="voting.podiumLead">Media dei voti del pubblico. Tre carretti su tre gradini.</p>
+        </header>
+
+        <div class="podium__stage" data-podium-stage>
+          <!-- viewBox, brak width/height: skala idzie z CSS, więc rysunek jest ostry na
+               każdym ekranie i nie trzeba dla telefonu drugiego pliku. -->
+          <svg class="podium__art" viewBox="0 0 720 360" role="img" aria-labelledby="podium-art-title" data-podium-art>
+            <title id="podium-art-title" data-i18n="voting.podiumArt">Podio con tre gradini</title>
+            <defs>
+              <linearGradient id="podium-gold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ffd75e"/><stop offset="1" stop-color="#e9a11b"/>
+              </linearGradient>
+              <linearGradient id="podium-silver" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#e8eef7"/><stop offset="1" stop-color="#a9b8cd"/>
+              </linearGradient>
+              <linearGradient id="podium-bronze" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#f0b08a"/><stop offset="1" stop-color="#c07440"/>
+              </linearGradient>
+            </defs>
+            <!-- Ziemia pod cokołem, rysowana pierwsza. -->
+            <path class="podium__ground" d="M40 318 H680" pathLength="1"/>
+            <!-- Drugie miejsce po lewej, pierwsze w środku, trzecie po prawej — tak stoi
+                 prawdziwe podium i tak czyta je każdy bez podpisu. -->
+            <g class="podium__step" data-podium-step="2">
+              <path class="podium__block" d="M96 318 V214 H264 V318 Z" fill="url(#podium-silver)" pathLength="1"/>
+              <text class="podium__place" x="180" y="262">2</text>
+            </g>
+            <g class="podium__step" data-podium-step="1">
+              <path class="podium__block" d="M276 318 V158 H444 V318 Z" fill="url(#podium-gold)" pathLength="1"/>
+              <text class="podium__place" x="360" y="216">1</text>
+            </g>
+            <g class="podium__step" data-podium-step="3">
+              <path class="podium__block" d="M456 318 V246 H624 V318 Z" fill="url(#podium-bronze)" pathLength="1"/>
+              <text class="podium__place" x="540" y="288">3</text>
+            </g>
+          </svg>
+
+          <!-- Karty zwycięzców wstawia voting.js; leżą nad rysunkiem w gridzie o tej samej
+               kolejności co schodki. -->
+          <ol class="podium__winners" data-podium-winners></ol>
+        </div>
+
+        <div class="podium__actions">
+          <a class="btn btn--blue" href="#voting" data-podium-all>
+            <span data-i18n="voting.seeAll">Classifica completa</span><span aria-hidden="true">↘</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================================
+         Głosowanie
+         ==================================================================
+         Sekcja, nie osobna podstrona. Cała ta witryna jest jedną stroną z zakotwiczeniami, a
+         `#voting` w hero i w nagłówku prowadzi tu bez przeładowania — czyli bez utraty
+         wybranego języka i bez drugiego kompletu nagłówka i stopki do utrzymania.
+
+         W fazie `voting` widać kafelki do oceniania. W fazie `closed` ta sama lista staje się
+         pełnym rankingiem, do którego prowadzi przycisk pod podium. -->
+    <section class="section section-card voting" id="voting" aria-labelledby="voting-title" data-voting hidden>
+      <div class="container">
+        <header class="section-head">
+          <span class="eyebrow" data-voting-kicker data-i18n="voting.kicker">Voto del pubblico</span>
+          <h2 id="voting-title" data-i18n="voting.title" data-text-effect="rise">Vota il partecipante.</h2>
+          <p class="section-lead" data-voting-lead data-i18n="voting.lead">Tocca un carretto e dagli da 3 a 10 punti. Un voto per categoria.</p>
+        </header>
+
+        <!-- Ile czasu zostało. aria-live, bo to jedyna informacja na tej stronie, która sama
+             się zmienia i której ktoś naprawdę czeka. -->
+        <p class="voting__clock" data-voting-clock aria-live="polite"></p>
+
+        <!-- Filtr kategorii. Budowany z danych, bo kategorie ustawia organizator w panelu i
+             wpisanie ich tutaj na sztywno znaczyłoby, że trzecia kategoria wymaga wdrożenia. -->
+        <div class="voting__filters" data-voting-filters role="group" aria-label="Categorie"></div>
+
+        <div class="voting__grid" data-voting-grid></div>
+
+        <p class="voting__empty" data-voting-empty hidden data-i18n="voting.empty">La lista dei partecipanti non è ancora pubblicata.</p>
+      </div>
+    </section>
+
+    <!-- Ocena jednego pojazdu. <dialog>, jak zgody: jedno miejsce, w którym przeglądarka sama
+         pilnuje ogniska klawiatury, klawisza Escape i bezwładności tła. -->
+    <dialog class="vote-dialog" id="vote-dialog" data-vote-dialog aria-labelledby="vote-dialog-title">
+      <form class="vote-dialog__surface" data-vote-form method="dialog">
+        <button class="vote-dialog__close" type="button" data-vote-close data-i18n-aria-label="a11y.close" aria-label="Chiudi"><span aria-hidden="true"></span></button>
+
+        <figure class="vote-dialog__cart">
+          <img data-vote-photo alt="" hidden>
+          <span class="vote-dialog__number" data-vote-number aria-hidden="true"></span>
+        </figure>
+
+        <div class="vote-dialog__body">
+          <span class="eyebrow" data-vote-category></span>
+          <h2 id="vote-dialog-title" data-vote-project></h2>
+          <p class="vote-dialog__rider" data-vote-rider></p>
+
+          <!-- Suwak, nie osiem przycisków: na telefonie osiem celów w rzędzie to osiem
+               sposobów na pomyłkę. Native <input type="range"> zamiast własnego — obsługuje
+               strzałki, Home i End oraz czytniki ekranu bez ani jednej linii kodu. -->
+          <div class="vote-score">
+            <label class="vote-score__label" for="vote-score" data-i18n="voting.scoreLabel">Il tuo voto</label>
+            <output class="vote-score__value" data-vote-score-value for="vote-score">7</output>
+            <input class="vote-score__slider" id="vote-score" name="score" type="range"
+                   min="3" max="10" step="1" value="7" data-vote-score
+                   data-i18n-aria-label="voting.scoreLabel" aria-label="Il tuo voto">
+            <div class="vote-score__scale" aria-hidden="true"><span>3</span><span>10</span></div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field" data-field>
+              <input id="vote-name" name="name" type="text" autocomplete="given-name" placeholder=" " required>
+              <label for="vote-name" data-i18n="voting.name">Nome *</label>
+              <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+            </div>
+            <div class="field" data-field>
+              <input id="vote-email" name="email" type="email" autocomplete="email" placeholder=" " required>
+              <label for="vote-email" data-i18n="voting.email">E-mail *</label>
+              <span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span>
+            </div>
+          </div>
+
+          <p class="vote-dialog__note" data-i18n="voting.note">Ti mandiamo la conferma e un link per cambiare idea finché il voto è aperto.</p>
+          <p class="vote-dialog__status" data-vote-status aria-live="polite"></p>
+
+          <button class="btn btn--yellow vote-dialog__send" type="submit" data-vote-send>
+            <span data-i18n="voting.send">Invia il voto</span><span aria-hidden="true">★</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
     <section class="section section-card story" id="story" aria-labelledby="story-title">
       <div class="container story__grid">
         <div class="story__copy reveal">
           <span class="eyebrow" data-i18n="story.kicker">Una tradizione che corre</span>
-          <h2 class="section-title" id="story-title" data-i18n="story.title">Un paese intero in discesa.</h2>
+          <!-- `rise` na długich nagłówkach, `jump` na krótkich: `jump` idzie po słowach z
+               obrotem, więc na zdaniu z sześciu słów rozjeżdża się w kilka fal; `rise` idzie po
+               znakach i im dłuższy tekst, tym bardziej wygląda jak jedna fala. -->
+          <h2 class="section-title" id="story-title" data-i18n="story.title" data-text-effect="rise">Un paese intero in discesa.</h2>
           <p class="lead" data-i18n="story.p1">I Carruleddhi sono carretti costruiti a mano: legno, cuscinetti e molta fantasia. Nessun motore, nessuna propulsione — solo gravità, coraggio e il rumore delle ruote sulla strada.</p>
           <p class="lead" data-i18n="story.p2">Alcuni corrono per il tempo, altri per lo spettacolo. Qui vince la velocità, ma anche l’idea più folle.</p>
         </div>
@@ -225,6 +419,63 @@
           <a class="story-number story-number--link reveal" data-delay="2" href="#prizes"><strong>12</strong><span data-i18n="story.stat3">premi</span></a>
         </div>
       </div>
+
+      <!-- Sponsorzy, pod „Całe miasteczko jedzie w dół".
+           ==================================================================
+           Byli nad nagłówkiem trasy. Tu, na końcu sekcji, która opowiada czym to
+           wydarzenie jest, „a robią to razem z nami ci ludzie" czyta się jako ciąg
+           dalszy zdania, a nie jako pasek doklejony przed inną sekcją.
+
+           Same logotypy, bez nagłówka — wypełnia je app.js z ustawień panelu i trzyma
+           `hidden`, dopóki nie ma ani jednego (setupSponsors). Zaproszenie poniżej nie
+           jest w środku tego bloku właśnie dlatego: ono ma stać także wtedy, gdy
+           sponsorów jest zero, bo wtedy jest najbardziej potrzebne.
+
+           Uwaga przy oglądaniu: `?demo=1` w adresie podmienia listę na przykładową
+           z assets/js/demo-content.js. -->
+      <div class="container sponsor-zone">
+        <aside class="sponsor-band sponsor-band--inline" data-sponsor-band
+               data-i18n-aria-label="sponsors.label" aria-label="Sponsor" hidden>
+          <div class="sponsor-band__track" data-sponsor-track></div>
+        </aside>
+
+        <!-- Sześć wersji językowych wpisanych w znacznik, a przełączanych `lang` i CSS-em,
+             zamiast przez data-i18n.
+             ---------------------------------------------------------------------------
+             Słownik siedzi w assets/js/i18n.js, a ten plik jest wspólny z innymi torami
+             pracy — dopisanie do niego dwóch kluczy znaczyłoby edycję pliku, który w tej
+             samej chwili zmienia ktoś inny, i to jest dokładnie ta klasa kolizji, przed
+             którą ostrzega ZADANIA-ROWNOLEGLE.md. Dwa krótkie zdania mieszczą się tutaj,
+             a atrybut `lang` na każdym wariancie znaczy, że czytnik ekranu i tak dostaje
+             poprawny język — czego zwykły data-i18n nie daje.
+
+             Jeśli tekstu tu przybędzie, właściwym miejscem staje się słownik. Dwa zdania
+             to jeszcze nie słownik. -->
+        <aside class="sponsor-pitch">
+          <p class="sponsor-pitch__text">
+            <span lang="it">Vuoi essere sponsor del Carruleddhi Show? Bastano 100 euro.</span>
+            <span lang="pl">Chcesz zostać sponsorem Carruleddhi Show? To 100 euro.</span>
+            <span lang="en">Want to be a Carruleddhi Show sponsor? It costs 100 euro.</span>
+            <span lang="de">Sponsor der Carruleddhi Show werden? Das kostet 100 Euro.</span>
+            <span lang="es">¿Quieres patrocinar el Carruleddhi Show? Son 100 euros.</span>
+            <span lang="fr">Envie de sponsoriser le Carruleddhi Show ? C’est 100 euros.</span>
+          </p>
+          <!-- Zwykła kotwica, nie przycisk ze skryptem: obsługa odnośników w app.js daje
+               każdemu skokowi po stronie przejście z kurtyną, a bez JavaScriptu to nadal
+               jest działający odnośnik do sekcji kontaktu. Wpisanie pytania w okno czatu
+               dokłada skrypt niżej — jeśli go nie ma, zostaje sam skok, czyli mniej, ale
+               nie nic. -->
+          <a class="btn btn--small sponsor-pitch__cta" href="#contact" data-sponsor-ask>
+            <span lang="it">Scrivici in chat</span>
+            <span lang="pl">Napisz do nas na czacie</span>
+            <span lang="en">Ask us in the chat</span>
+            <span lang="de">Schreib uns im Chat</span>
+            <span lang="es">Escríbenos en el chat</span>
+            <span lang="fr">Écrivez-nous dans le chat</span>
+            <span class="btn__icon" aria-hidden="true">↘</span>
+          </a>
+        </aside>
+      </div>
     </section>
 
     <section class="section section-card stack-section" id="categories" aria-labelledby="categories-title">
@@ -232,7 +483,7 @@
         <div class="stack-intro reveal">
           <div>
             <span class="eyebrow" data-i18n="category.kicker">Mezzi ammessi</span>
-            <h2 class="section-title section-title--medium" id="categories-title" data-i18n="category.title">Le carte si sovrappongono. La sfida sale.</h2>
+            <h2 class="section-title section-title--medium" id="categories-title" data-i18n="category.title" data-text-effect="rise">Le carte si sovrappongono. La sfida sale.</h2>
           </div>
           <p class="lead" data-i18n="category.intro">Scorri: ogni carta mostra ciò che serve per prendere parte alla discesa.</p>
         </div>
@@ -313,19 +564,10 @@
     </section>
 
     <section class="section section-card route" id="route" aria-labelledby="route-title">
-      <!-- Sponsors, above the route heading.
-           They were at the foot of the hero, which is the first screen and the busiest: a
-           logo strip competing with the title, the date, two buttons and two counters, on a
-           panel that is already the tallest thing on the page. Here they are the first thing
-           after the categories and before "Giù verso il mare", which is a natural pause and
-           the place they were asked for.
-
-           Logos only, no heading. Filled by app.js from the settings the admin panel writes,
-           and hidden until there is at least one — see setupSponsors(). -->
-      <aside class="sponsor-band sponsor-band--route" data-sponsor-band
-             data-i18n-aria-label="sponsors.label" aria-label="Sponsor" hidden>
-        <div class="sponsor-band__track" data-sponsor-track></div>
-      </aside>
+      <!-- Pas sponsorów stał tutaj, nad nagłówkiem trasy. Przeniesiony na koniec sekcji
+           #story — tam był proszony i tam jest teraz razem z zaproszeniem „zostań
+           sponsorem". Jeden pas na stronie, jeden [data-sponsor-band], bo setupSponsors()
+           wypełnia pierwszy, jaki znajdzie. -->
 
       <div class="container route__grid">
         <!-- No `reveal` on this block, deliberately.
@@ -406,7 +648,7 @@
     <section class="section section-card schedule" id="schedule" aria-labelledby="schedule-title">
       <div class="container">
         <span class="eyebrow reveal" data-i18n="schedule.kicker">17 ottobre 2026</span>
-        <h2 class="section-title reveal" id="schedule-title" data-i18n="schedule.title">Un giorno. Tutto da ricordare.</h2>
+        <h2 class="section-title reveal" id="schedule-title" data-i18n="schedule.title" data-text-effect="rise">Un giorno. Tutto da ricordare.</h2>
         <div class="schedule-list">
           <div class="schedule-row reveal"><time datetime="2026-10-17T12:00">12.00</time><span data-i18n="schedule.item1">Presentazione dei carruleddhi in piazza</span></div>
           <div class="schedule-row reveal"><time datetime="2026-10-17T14:30">14.30</time><span data-i18n="schedule.item2">Partenza ufficiale della gara</span></div>
@@ -568,8 +810,18 @@
     <section class="section section-card attendance" id="attendance" aria-labelledby="attendance-title" data-feature="attendance">
       <div class="container">
         <span class="eyebrow reveal" data-i18n="attendance.kicker">La tribuna prende vita</span>
-        <h2 class="section-title section-title--medium attendance__title reveal" id="attendance-title" data-i18n="attendance.title">Premi il grande pulsante. Fai salire il contatore.</h2>
-        <div class="attendance__counter reveal" data-attendee-count aria-live="polite">412</div>
+        <h2 class="section-title section-title--medium attendance__title reveal" id="attendance-title" data-i18n="attendance.title" data-text-effect="rise">Premi il grande pulsante. Fai salire il contatore.</h2>
+        <!-- Kreska, nie liczba.
+             Stało tu „412". Bazy w konfiguracji są zerowe, więc ta liczba nie brała się z
+             niczego poza tym znacznikiem — i zostawała na ekranie, dopóki końcówka `counts` nie
+             odpowie. Bez wdrożonego Workera zostawała na zawsze: strona pokazywała czterystu
+             dwunastu ludzi, których nie ma.
+
+             To łamie zasadę obowiązującą w tym projekcie i zapisaną w assets/js/demo-content.js:
+             każda liczba na tej stronie jest prawdziwa, bez podkręcanych liczników. Kreska mówi
+             „jeszcze nie wiem" i jest zastępowana pierwszym prawdziwym odczytem — patrz
+             paintCounters w app.js. -->
+        <div class="attendance__counter reveal" data-attendee-count aria-live="polite">—</div>
         <div class="attendance__label" data-i18n="attendance.label">persone hanno detto “ci sarò”</div>
         <button class="attendance__press reveal" type="button" data-attendance-button><span data-i18n="attendance.press">CI SARÒ!</span></button>
         <p class="attendance__hint" data-i18n="attendance.hint">Un clic per persona. Salviamo la scelta solo in questo browser finché non colleghi il database.</p>
@@ -577,9 +829,14 @@
              asked for and it also divides the row evenly on a narrow phone.
              These five are placeholders so the row is never empty on first paint —
              paintAvatars() replaces them with the four most recent real riders as soon as
-             the counts endpoint answers. Only initials ever leave the database. -->
+             the counts endpoint answers. Only initials ever leave the database.
+
+             Reszta startuje ukryta i bez liczby. Stało tu „+407", czyli wymyślone czterysta
+             siedem osób widoczne do pierwszej odpowiedzi serwera — a bez wdrożonego Workera
+             widoczne zawsze. paintAvatars() odsłania to kółko dopiero, gdy ma co w nim
+             napisać, i chowa je z powrotem, gdy reszta wynosi zero. -->
         <div class="avatar-stack" aria-hidden="true">
-          <span class="avatar">AM</span><span class="avatar">LG</span><span class="avatar">SR</span><span class="avatar">FC</span><span class="avatar avatar--rest">+407</span>
+          <span class="avatar">AM</span><span class="avatar">LG</span><span class="avatar">SR</span><span class="avatar">FC</span><span class="avatar avatar--rest" hidden></span>
         </div>
         <button class="btn btn--yellow" type="button" data-open-reminder style="margin-top:28px" data-i18n="attendance.reminder">Vuoi anche un promemoria?</button>
       </div>
@@ -590,10 +847,21 @@
         <div class="signup__head reveal">
           <div>
             <span class="eyebrow" data-i18n="signup.kicker">Iscrizione gratuita</span>
-            <h2 class="section-title section-title--medium" id="signup-title" data-i18n="signup.title">Tre passi. Poi sei in gara.</h2>
+            <h2 class="section-title section-title--medium" id="signup-title" data-i18n="signup.title" data-text-effect="jump">Tre passi. Poi sei in gara.</h2>
           </div>
           <p class="lead" data-i18n="signup.intro">Un modulo nuovo, semplice e leggibile. Il numero di partenza appare subito dopo l’invio.</p>
         </div>
+
+        <!-- Wyścig już jedzie: zgłoszenie wysłane teraz nie ma jak wystartować.
+             Wstążka plus wyłączony przycisk wysyłki, bez ruszania samego formularza — wpisane
+             dane zostają na miejscu, a odsłania to voting.js wyłącznie na podstawie fazy
+             odczytanej z serwera. Nieudany odczyt nie blokuje niczego; awaria głosowania nie
+             ma prawa zamknąć zapisów. -->
+        <p class="signup__locked" data-signup-locked hidden>
+          <strong data-i18n="voting.signupLockedTitle">La gara è in corso.</strong>
+          <span data-i18n="voting.signupLockedLead">Le iscrizioni riaprono dopo la premiazione. Intanto puoi votare i carretti in pista.</span>
+          <a class="btn btn--small btn--yellow" href="#voting"><span data-i18n="voting.cta">Vota il partecipante</span></a>
+        </p>
 
         <div class="form-shell reveal" data-form-shell>
           <nav class="form-sidebar" data-form-stepper aria-labelledby="registration-steps-title">
@@ -760,17 +1028,35 @@
                      Everything here is hidden until it is needed; the panel is built into the
                      step rather than being a dialog so nobody loses what they have typed. -->
                 <div class="entry-found" data-entry-found hidden>
-                  <p class="entry-found__lead">
+                  <!-- Dwa nagłówki, nie jeden podmieniany z JS.
+                       „Ten adres jest zajęty" i „ta osoba jest już zapisana" to dwie różne
+                       wiadomości i tylko druga kogoś zatrzymuje. Trzymane jako dwa akapity z
+                       własnym data-i18n, bo tekst wstawiony z JS przepada przy zmianie
+                       języka — applyLanguage przepisuje wyłącznie to, co ma klucz. -->
+                  <p class="entry-found__lead" data-entry-lead="address">
                     <strong data-i18n="entry.foundTitle">Questo indirizzo è già iscritto.</strong>
                     <span data-i18n="entry.foundLead">Puoi usare un altro indirizzo, correggere l’iscrizione che hai già, o ritirarti dalla gara.</span>
                   </p>
+                  <p class="entry-found__lead entry-found__lead--same" data-entry-lead="person" hidden>
+                    <strong data-i18n="entry.samePersonTitle">Questa persona è già iscritta.</strong>
+                    <span data-i18n="entry.samePersonLead">Nome, cognome e indirizzo coincidono con un’iscrizione che c’è già. Se è la tua, correggila o ritirala. Se è un omonimo, continua.</span>
+                  </p>
                   <p class="entry-found__who" data-entry-initials hidden></p>
+
+                  <!-- One inbox can contain several riders. The visitor must choose the
+                       person before a code is sent, so an edit can never fall through to the
+                       newest registration by accident. -->
+                  <div class="entry-people" data-entry-person-list hidden role="group" aria-label="Scegli il partecipante"></div>
 
                   <div class="entry-found__choices" data-entry-choices>
                     <button class="btn btn--small btn--outline" type="button" data-entry-action="other">
                       <!-- "Add another rider", not "use another address". The address is the
-                           mechanism; a second person in the same household is the reason. -->
-                      <span data-i18n="entry.useOther">Iscrivo un altro partecipante</span>
+                           mechanism; a second person in the same household is the reason.
+                           Przy trafionym duplikacie ten sam przycisk mówi co innego: tam nie
+                           chodzi już o kolejną osobę w domu, a o „to nie ta osoba, jedźmy
+                           dalej", i to jest jedyne wyjście, którego nikt inny nie oferuje. -->
+                      <span data-entry-other-label="address" data-i18n="entry.useOther">Iscrivo un altro partecipante</span>
+                      <span data-entry-other-label="person" data-i18n="entry.differentPerson" hidden>È un’altra persona, continua</span>
                     </button>
                     <button class="btn btn--small btn--blue" type="button" data-entry-action="edit">
                       <span data-i18n="entry.editMine">Correggi la mia iscrizione</span>
@@ -813,8 +1099,8 @@
                     </div>
                     <div class="field" data-field><input id="entry-address" name="entryAddress" type="text" placeholder=" "><label for="entry-address" data-i18n="form.address">Indirizzo</label></div>
                     <div class="field" data-field><input id="entry-cart" name="entryCart" type="text" placeholder=" "><label for="entry-cart" data-i18n="form.cartName">Nome del carruleddhu</label></div>
-                    <div class="field" data-field><input id="entry-team" name="entryTeam" type="text" placeholder=" "><label for="entry-team" data-i18n="form.teamName">Squadra</label></div>
-                    <div class="field" data-field><textarea id="entry-notes" name="entryNotes" rows="2" placeholder=" "></textarea><label for="entry-notes" data-i18n="form.cartNotes">Note sul mezzo</label></div>
+                    <div class="field" data-field><input id="entry-team" name="entryTeam" type="text" placeholder=" "><label for="entry-team" data-i18n="form.team">Squadra</label></div>
+                    <div class="field" data-field><textarea id="entry-notes" name="entryNotes" rows="2" placeholder=" "></textarea><label for="entry-notes" data-i18n="form.notes">Note sul mezzo</label></div>
                     <div class="entry-found__choices">
                       <button class="btn btn--small btn--yellow" type="button" data-entry-save>
                         <span data-i18n="entry.save">Salva le modifiche</span>
@@ -822,6 +1108,14 @@
                       <button class="btn btn--small btn--outline" type="button" data-entry-cancel>
                         <span data-i18n="entry.back">Annulla</span>
                       </button>
+                    </div>
+                  </div>
+
+                  <div class="entry-result" data-entry-result hidden role="status" aria-live="polite" tabindex="-1">
+                    <span class="entry-result__icon" aria-hidden="true">✓</span>
+                    <div>
+                      <strong data-entry-result-title></strong>
+                      <p data-entry-result-body></p>
                     </div>
                   </div>
 
@@ -922,7 +1216,7 @@
                    just registered one person and is done needs to close this, and
                    the only alternative was waiting for a timer to take it away. -->
               <button class="form-success__close" type="button" data-form-success-close
-                      data-i18n-aria-label="success.close" aria-label="Chiudi">&times;</button>
+                      data-i18n-aria-label="a11y.close" aria-label="Chiudi">&times;</button>
               <div>
                 <div class="race-number"><div><span data-i18n="success.number">Il tuo numero</span><strong data-race-number>039</strong></div></div>
                 <span class="eyebrow" data-i18n="success.kicker">Iscrizione ricevuta</span>
@@ -1322,7 +1616,7 @@
       </div>
     </section>
 
-    <nav class="quick-actions" data-quick-actions aria-label="Azioni rapide" data-i18n-aria-label="quick.label">
+    <nav class="quick-actions" data-quick-actions aria-label="Azioni rapide" data-i18n-aria-label="quick.label" aria-expanded="true">
       <button class="quick-action quick-action--attend" type="button" data-quick-attend data-feature-link="attendance" aria-pressed="false">
         <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         <span data-attendance-quick-label data-i18n="quick.attend">Ci sarò</span>
@@ -1479,7 +1773,18 @@
     </div>
   </aside>
 
-  <div class="toast" data-toast role="status" aria-live="polite"></div>
+  <!-- Jeden pasek komunikatów na całą stronę.
+       Wyśrodkowany u góry, nie wsunięty z prawej krawędzi: komunikat po wysłaniu formularza
+       albo po oddaniu głosu jest odpowiedzią na czynność, a odpowiedź czyta się tam, gdzie
+       patrzy się po kliknięciu — na środku, nie w kącie ekranu.
+
+       Ikona i tekst jako osobne elementy, bo pasek ma trzy odmiany: potwierdzenie, ostrzeżenie
+       i błąd. `aria-live` jest przestawiane z JavaScriptu — błąd przerywa czytnik ekranu,
+       potwierdzenie czeka na przerwę w czytaniu. Patrz showToast w app.js. -->
+  <div class="toast" data-toast role="status" aria-live="polite" data-toast-tone="info">
+    <span class="toast__icon" data-toast-icon aria-hidden="true"></span>
+    <span class="toast__text" data-toast-text></span>
+  </div>
 
   <script>
     window.CARRULEDDHI_CONFIG = {
@@ -1532,6 +1837,90 @@
     import './assets/js/i18n.js';
     import './assets/js/form-experience.js';
     import './assets/js/app.js';
+    /* Po app.js, nie przed: voting.js korzysta z window.CARRULEDDHI_API, a ten szew powstaje
+       przy wykonaniu app.js. Odwrotna kolejność znaczy moduł, który nie ma czym wysłać
+       żądania i milczy o tym, bo brak API czyta jako tryb demo. */
+    import './assets/js/voting.js';
+
+    /* Rząd języków w rozwiniętym menu — podpięty pod listę w pasku, nie obok niej.
+       ---------------------------------------------------------------------------
+       Zmiana języka to w app.js changeLanguage(): zapis do localStorage, przelot liter
+       po całej stronie, zdarzenie `carruleddhi:language`, odświeżenie etykiet. Nic z
+       tego nie jest wystawione na zewnątrz — handler wisi na [data-language-menu] i
+       czyta event.target. Więc te przyciski nie próbują zmieniać języka same, tylko
+       naciskają odpowiednią pozycję tamtej listy. Jedna ścieżka kodu, zero szans na to,
+       że menu i pasek rozjadą się na dwie różne wersje „co się dzieje przy zmianie".
+
+       Klik programowy, mimo że lista jest `inert`, kiedy jest zwinięta: inert blokuje
+       wejście użytkownika, a nie dispatch z kodu — sprawdzone sondą, nie z pamięci.
+
+       Import app.js wyżej jest statyczny, więc do tego miejsca setupLanguage() już się
+       wykonało i lista istnieje. */
+    /* „Chcesz być sponsorem" — czat otwarty z gotowym pytaniem.
+       ---------------------------------------------------------------------------
+       Odnośnik zostaje odnośnikiem: skok do #contact obsługuje app.js razem z kurtyną,
+       więc tu nie ma preventDefault i bez tego skryptu przycisk nadal działa, tylko bez
+       wpisanego zdania.
+
+       Pytanie jest wpisywane, nie wysyłane. Czat pyta najpierw o imię i adres (brama
+       nad dziennikiem), więc wysłanie za kogoś albo poszłoby w próżnię, albo wymagałoby
+       drugiej ścieżki obok tej, którą i tak trzeba przejść. Wpisane zdanie znaczy
+       „zostaje nacisnąć wyślij", a to jest cały cel przycisku.
+
+       Fokus po czasie kurtyny i z preventScroll — sekcja kontaktu jest sticky
+       z overflow:hidden i ustawianie fokusu przed końcem przejścia teleportuje stronę
+       do stopki. Ten sam powód ma komentarz przy selectTab w app.js. */
+    const sponsorAsk = document.querySelector('[data-sponsor-ask]');
+    if (sponsorAsk) {
+      const sponsorQuestion = {
+        it: 'Vorrei diventare sponsor del Carruleddhi Show. Come funziona?',
+        pl: 'Chciałbym zostać sponsorem Carruleddhi Show. Jak to działa?',
+        en: 'I would like to become a Carruleddhi Show sponsor. How does it work?',
+        de: 'Ich möchte Sponsor der Carruleddhi Show werden. Wie funktioniert das?',
+        es: 'Me gustaría patrocinar el Carruleddhi Show. ¿Cómo funciona?',
+        fr: 'Je voudrais devenir sponsor du Carruleddhi Show. Comment ça marche ?'
+      };
+      sponsorAsk.addEventListener('click', () => {
+        const input = document.querySelector('[data-chat-input]');
+        if (!input) return;
+        input.value = sponsorQuestion[document.documentElement.lang] || sponsorQuestion.it;
+        /* Pole samo rośnie na zdarzeniu `input`; ustawienie `value` z kodu go nie wywołuje,
+           więc bez tego zdanie leżałoby w polu wysokości jednego wiersza. */
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+
+        const gate = document.querySelector('[data-chat-gate]');
+        const gateStillThere = Boolean(gate) && gate.getClientRects().length > 0;
+        const target = gateStillThere ? document.querySelector('#chat-gate-name') : input;
+        window.setTimeout(() => target?.focus({ preventScroll: true }), 900);
+      });
+    }
+
+    const menuLangs = document.querySelector('[data-menu-langs]');
+    if (menuLangs) {
+      menuLangs.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-menu-language]');
+        if (!button) return;
+        const option = document.querySelector(
+          `[data-language-menu] [data-language-option="${button.dataset.menuLanguage}"]`
+        );
+        /* Brak pozycji znaczy, że pasek i menu wymieniły listę języków — wtedy lepiej
+           nie robić nic, niż udawać, że coś się przełączyło. */
+        option?.click();
+      });
+
+      const markCurrent = (lang) => {
+        for (const button of menuLangs.querySelectorAll('[data-menu-language]')) {
+          button.setAttribute('aria-pressed', String(button.dataset.menuLanguage === lang));
+        }
+      };
+      window.addEventListener('carruleddhi:language', (event) => markCurrent(event.detail.lang));
+      /* Pierwszy stan: app.js ustawił język przed tym miejscem, więc zdarzenie już było.
+         Znacznik bierzemy z listy w pasku, która jest jedynym źródłem prawdy. */
+      markCurrent(
+        document.querySelector('[data-language-menu] [aria-selected="true"]')?.dataset.languageOption
+        || document.documentElement.lang
+      );
+    }
   </script>
 </body>
 </html>

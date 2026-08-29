@@ -82,6 +82,7 @@ const probe = `
   if (opener) {
     document.getElementById('attendance')?.scrollIntoView();
     await sleep(300);
+    const scrollBeforeModal = Math.round(window.scrollY);
     opener.click();
     await sleep(500);
     const dialog = document.querySelector('.modal__dialog');
@@ -98,7 +99,9 @@ const probe = `
       scale: matrix ? Number(matrix.a.toFixed(3)) : null,
       dialogTop: dRect ? Math.round(dRect.top) : null,
       headerBottom: header ? Math.round(header.getBoundingClientRect().bottom) : null,
-      animationName: dialog ? getComputedStyle(dialog).animationName : null
+      animationName: dialog ? getComputedStyle(dialog).animationName : null,
+      scrollBefore: scrollBeforeModal,
+      scrollOpen: Math.round(window.scrollY)
     };
 
     // Pastylki przypomnien w modalu: rowna szerokosc i wysokosc.
@@ -112,6 +115,28 @@ const probe = `
 
     document.querySelector('[data-modal-close], .modal__close')?.click();
     await sleep(350);
+    out.modal.scrollClosed = Math.round(window.scrollY);
+  }
+
+  // --- dolny dock: pierwszy tap tylko rozwija, drugi dopiero przechodzi do formularza
+  const dock = document.querySelector('[data-quick-actions]');
+  const quickSignup = document.querySelector('[data-quick-actions] a[href="#signup"]');
+  if (dock && quickSignup) {
+    dock.classList.remove('is-over-form', 'is-keyboard-hidden');
+    dock.classList.add('is-mini');
+    let actionClicks = 0;
+    quickSignup.addEventListener('click', () => { actionClicks += 1; });
+    history.replaceState(null, '', location.pathname + location.search);
+    quickSignup.click();
+    await sleep(120);
+    out.dock = {
+      firstExpanded: !dock.classList.contains('is-mini'),
+      hashAfterFirst: location.hash
+    };
+    quickSignup.click();
+    await sleep(350);
+    out.dock.hashAfterSecond = location.hash;
+    out.dock.actionClicks = actionClicks;
   }
 
   // --- formularz: kropka progresu nie na napisie
@@ -239,6 +264,16 @@ try {
       `modal dopasowany do ekranu: ${r.modal.dialogWidth} px na ${r.modal.viewport} px`);
     check((r.modal.dialogTop || 0) >= (r.modal.headerBottom || 0) - 4,
       `modal nie wchodzi pod header: góra ${r.modal.dialogTop} px, dół headera ${r.modal.headerBottom} px`);
+    check(r.modal.scrollBefore === r.modal.scrollOpen && r.modal.scrollBefore === r.modal.scrollClosed,
+      `modal nie przesuwa strony/headera: ${r.modal.scrollBefore} → ${r.modal.scrollOpen} → ${r.modal.scrollClosed} px`);
+  }
+
+  if (r.dock) {
+    console.log('');
+    check(r.dock.firstExpanded && r.dock.hashAfterFirst === '',
+      `pierwszy tap docka tylko rozwija (hash „${r.dock.hashAfterFirst || 'brak'}")`);
+    check(r.dock.actionClicks === 1,
+      `drugi tap wykonuje akcję (wywołania celu: ${r.dock.actionClicks})`);
   }
 
   if (r.chips?.length) {

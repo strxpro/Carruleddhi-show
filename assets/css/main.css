@@ -38,7 +38,12 @@
    move instead of doing it, so the wipe cleared while the page was still gliding
    and you watched the last third of the scroll. Anchor clicks that never reach the
    wipe were slow for the same reason. */
-html { scroll-behavior: auto; scrollbar-color: var(--blue-600) var(--blue-100); }
+html {
+  scroll-behavior: auto;
+  scrollbar-color: var(--blue-600) var(--blue-100);
+  /* Opening a modal no longer changes the layout width, so the centred header stays put. */
+  scrollbar-gutter: stable;
+}
 
 /* =========================================================================
    Jelly scrollbar.
@@ -847,8 +852,59 @@ html.has-custom-cursor * { cursor: none !important; }
 .switch input:checked + span::after { transform: translateX(21px); }
 .switch input:disabled + span { opacity: .7; cursor: not-allowed; }
 
-.toast { position: fixed; z-index: 1400; right: 20px; top: 100px; max-width: 390px; padding: 15px 20px; border-radius: 18px; background: var(--navy-950); color: var(--white); box-shadow: var(--shadow-md); transform: translateX(calc(100% + 40px)); transition: transform .5s var(--ease-out); }
-.toast.is-visible { transform: none; }
+/* Pasek komunikatów: wyśrodkowany u góry, trzy odmiany.
+   ---------------------------------------------------------------------------
+   Był wsuwany z prawej krawędzi pod nagłówkiem. Dwa problemy: na telefonie wchodził pod
+   przycisk menu, a jako odpowiedź na kliknięcie pojawiał się poza miejscem, w którym ktoś
+   właśnie patrzy — po naciśnięciu „Wyślij" wzrok jest na przycisku, nie w prawym górnym kącie.
+
+   `width: max-content` z górnym ograniczeniem: krótkie „Zapisane." nie rozciąga się na pół
+   ekranu, a długie zdanie zawija się i nie wychodzi za krawędź.
+
+   `visibility` obok `opacity`: samo `opacity: 0` zostawia niewidzialny prostokąt łapiący
+   kliknięcia przez środek ekranu. */
+.toast {
+  position: fixed; z-index: 1400;
+  left: 50%; top: 96px;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px;
+  width: max-content; max-width: min(92vw, 460px);
+  padding: 14px 20px 14px 16px;
+  border: 2px solid rgb(255 255 255 / .14);
+  border-radius: 16px;
+  background: var(--navy-950); color: var(--white);
+  box-shadow: var(--shadow-md);
+  font-size: 14px; line-height: 1.45;
+  opacity: 0; visibility: hidden;
+  transform: translate(-50%, -14px) scale(.97);
+  transition: opacity .26s var(--ease-out), transform .38s var(--ease-snap), visibility .26s;
+}
+.toast.is-visible { opacity: 1; visibility: visible; transform: translate(-50%, 0) scale(1); }
+
+.toast__icon {
+  display: grid; width: 26px; height: 26px; place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .16);
+  font: 900 14px/1 var(--font-meta);
+}
+.toast__text { min-width: 0; }
+
+/* Kolor tylko na obwódce i ikonie, nie na całym tle: biały tekst na zielonym albo czerwonym
+   polu czyta się gorzej niż na granatowym, a odmianę trzeba rozpoznać, nie przeczytać. */
+.toast[data-toast-tone='success'] { border-color: rgb(31 169 113 / .75); }
+.toast[data-toast-tone='success'] .toast__icon { background: #1fa971; color: var(--white); }
+.toast[data-toast-tone='error'] { border-color: rgb(238 98 95 / .8); }
+.toast[data-toast-tone='error'] .toast__icon { background: var(--coral, #ee625f); color: var(--white); }
+.toast[data-toast-tone='info'] .toast__icon { background: var(--yellow); color: var(--navy-950); }
+
+@media (max-width: 640px) {
+  /* Niżej niż nagłówek i wąsko: na telefonie pasek na całą szerokość z marginesem czyta się
+     lepiej niż wyśrodkowany prostokąt o przypadkowej szerokości. */
+  .toast { top: 78px; width: calc(100vw - 28px); max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: opacity .2s linear, visibility .2s linear; transform: translate(-50%, 0); }
+  .toast.is-visible { transform: translate(-50%, 0); }
+}
 
 .reveal { opacity: 0; transform: translateY(50px); transition: opacity .85s var(--ease-out), transform .85s var(--ease-out); }
 .reveal.is-visible { opacity: 1; transform: none; }
@@ -865,6 +921,23 @@ html.has-custom-cursor * { cursor: none !important; }
 .legal-content p, .legal-content li { color: #3c4e72; line-height: 1.75; }
 .legal-content a { color: var(--blue-700); }
 .legal-note { padding: 16px 20px; border-left: 5px solid var(--yellow); border-radius: 0 16px 16px 0; background: var(--blue-100); }
+
+/* Wybór języka regulaminu.
+   Nazwy własne, nie flagi ani kody: „Polski" czyta każdy, kto go szuka, a flaga to państwo,
+   nie język. Puste do czasu, gdy legal-doc.js wstawi przyciski — bez JavaScriptu nie ma tu
+   nic do klikania, więc pusty pasek nie zostawia po sobie dziury w układzie. */
+.legal-langs { display: flex; flex-wrap: wrap; gap: 8px; max-width: 850px; margin: -28px 0 22px; }
+.legal-langs:empty { display: none; }
+.legal-lang {
+  padding: 7px 14px; border: 2px solid var(--line); border-radius: 999px;
+  background: var(--white); color: var(--blue-700); cursor: pointer;
+  font: 800 12px/1 var(--font-meta); letter-spacing: .04em;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.legal-lang:hover { border-color: var(--blue-500); }
+.legal-lang:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.legal-lang.is-active { border-color: var(--blue-600); background: var(--blue-600); color: var(--white); }
+@media (prefers-reduced-motion: reduce) { .legal-lang { transition: none; } }
 
 @keyframes float-orb { 0%,100% { transform: translate(0,0) rotate(0); } 50% { transform: translate(-3vw,3vw) rotate(8deg); } }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1096,6 +1169,35 @@ html.has-custom-cursor * { cursor: none !important; }
   text-transform: uppercase;
 }
 .menu-panel__eyebrow { color: var(--yellow); font-weight: 700; }
+
+/* Wybór języka w rozwiniętym menu.
+   Sześć kodów w rzędzie zamiast rozwijanej listy: lista wewnątrz listy to jedno
+   kliknięcie więcej w miejscu, gdzie i tak wszystko jest już rozwinięte, a sześć
+   dwuznakowych pastylek mieści się w jednym rzędzie nawet na 320 px. */
+.menu-langs { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.menu-langs__label { flex: none; opacity: .72; }
+.menu-langs__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.menu-lang {
+  min-width: 42px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255,255,255,.78);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: .1em;
+  cursor: pointer;
+  transition: background .22s, color .22s, border-color .22s;
+}
+.menu-lang:hover { border-color: var(--yellow); color: var(--yellow); }
+/* Stan bieżący niesie aria-pressed, nie osobna klasa: znacznik i wygląd nie mogą się
+   rozjechać, bo są tą samą informacją. */
+.menu-lang[aria-pressed="true"] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--navy-950);
+}
 .menu-panel__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 340px); gap: clamp(34px, 6vw, 88px); align-items: start; }
 .menu-panel__links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,.14); }
 .menu-panel__links a {
@@ -1185,6 +1287,13 @@ html.has-custom-cursor * { cursor: none !important; }
   .menu-panel__links a.is-active { padding-left: 20px; }
   .menu-panel__event { display: flex; margin-top: 12px; }
   .menu-event__stats { width: 100%; }
+  /* Podpis nad rzędem, nie obok: sześć pastylek nie mieści się na 390 px w jednej linii
+     obok napisu, więc zawijały się w dwa rzędy, a podpis wisiał w połowie ich wysokości.
+     Rozłożone na całą szerokość dzielą się 3 + 3, co jest jedynym podziałem, który przy
+     tej szerokości wygląda jak wybór, a nie jak resztka. */
+  .menu-langs { width: 100%; flex-direction: column; align-items: flex-start; gap: 8px; margin-left: 0; }
+  .menu-langs__row { width: 100%; }
+  .menu-lang { flex: 1 1 auto; }
 }
 
 @media (max-width: 470px) {
@@ -1258,6 +1367,32 @@ html.has-custom-cursor * { cursor: none !important; }
 
 
 /* Final rhythm and responsive polish */
+/* ============================================================
+   Dolna granica rozmiaru czcionki w polach — przeciw samoczynnemu powiększaniu strony.
+   ============================================================
+   iOS Safari powiększa całą stronę, gdy ognisko klawiatury trafia w pole o wyliczonym
+   `font-size` mniejszym niż 16 px. Powiększenie zmienia widoczny obszar, więc strona
+   natychmiast po nim wygląda na przeskoczoną w losowe miejsce — i tak to było zgłaszane:
+   „chcę napisać, a strona się powiększa i przeskakuje". Jedna przyczyna, dwa objawy.
+
+   `max()`, nie `16px` na sztywno: reguła podnosi to, co jest za małe, i nie rusza niczego, co
+   już jest większe. Pole zaprojektowane na 18 px zostaje osiemnastopikselowe.
+
+   Bez `!important` i wcześnie w kaskadzie — to jest podłoga, nie nadpisanie. Konkretne pole
+   wolno zaprojektować inaczej, byle świadomie; `main.css` jest pierwszy w łańcuchu importów,
+   więc każdy późniejszy plik może to nadpisać.
+
+   Nie dotyczy `type=checkbox`, `radio`, `range` ani `color`: tam nie ma tekstu do wpisania,
+   więc nie ma czego powiększać, a rozmiar czcionki bywa użyty do wyliczenia wielkości pola.
+
+   Pilnowane pomiarem: tools/probe-touch-input.mjs przechodzi wszystkie pola na stronie i
+   wypisuje każde poniżej progu. */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+textarea,
+select {
+  font-size: max(16px, 1em);
+}
+
 main section[id] { scroll-margin-top: 96px; }
 .section { padding-block: clamp(112px, 12vw, 176px); }
 .section-card {

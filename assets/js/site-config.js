@@ -81,7 +81,15 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
          entryManage   with the code: show, correct, or withdraw */
     entryLookup: '/api/carruleddhi/entry-lookup',
     entryCode: '/api/carruleddhi/entry-code',
-    entryManage: '/api/carruleddhi/entry-manage'
+    entryManage: '/api/carruleddhi/entry-manage',
+
+    /* Głosowanie publiczności. Jedna ścieżka na odczyt stanu, oddanie głosu i zmianę
+       decyzji — `action` w ciele mówi, o którą z tych trzech rzeczy chodzi.
+
+       Domyślne, jak `chat` i `settings`, i z tego samego powodu: nie ma tu czego
+       konfigurować, a puste znaczyłoby stronę, która w dniu wyścigu nie otwiera
+       głosowania i wygląda przy tym dokładnie tak, jak wyglądała zawsze. */
+    voting: '/api/carruleddhi/voting'
   }
 });
 

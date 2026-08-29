@@ -155,7 +155,10 @@ const FIELD_WHITELIST = {
   /* Live chat, visitor side. `token` is the browser-held thread identifier; it is
      never generated here, because a token minted server-side and handed back would
      let anyone who omits it be given somebody else's fresh thread. */
-  chat: ['action', 'token', 'message', 'name', 'email', 'since'],
+  /* `photo` to data URL, zmniejszony w przeglądarce. Trafia do prywatnego bucketa
+     `chat-photos` (migracja 0024) i — gdy ustawiony jest AI_VISION_MODEL — pod podpisanym
+     adresem do modelu. Jest na liście LONG_FIELDS, więc nie zostaje przycięty do 3000 znaków. */
+  chat: ['action', 'token', 'message', 'name', 'email', 'since', 'photo'],
   // Organiser side. Same passphrase as the roster.
   'chat-admin': ['action', 'threadId', 'message', 'mode', 'limit'],
   /* Odpowiedź na maila, podana przez scenariusz IMAP w Make. `messageId` to Message-Id
@@ -481,7 +484,7 @@ async function chatThread(env, request, payload, create = false) {
 
 async function chatMessages(env, threadId, since = '') {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_messages`);
-  url.searchParams.set('select', 'id,created_at,author,body,source');
+  url.searchParams.set('select', 'id,created_at,author,body,source,image_path');
   url.searchParams.set('thread_id', `eq.${threadId}`);
   url.searchParams.set('order', 'created_at.asc');
   url.searchParams.set('limit', String(CHAT_MAX_MESSAGES));
@@ -489,11 +492,22 @@ async function chatMessages(env, threadId, since = '') {
   const response = await fetch(url, { headers: supabaseHeaders(env) });
   if (!response.ok) return null;
   const rows = await response.json();
+
+  /* Adresy podpisywane hurtem i tylko dla wierszy, które mają zdjęcie.
+     Rozmowa z dwudziestoma wypowiedziami i trzema zdjęciami to jedno żądanie do Storage, nie
+     dwadzieścia — a odpytywanie chodzi co cztery sekundy, więc pojedyncze podpisywanie byłoby
+     kosztem powtarzanym przez całą rozmowę. `signPhotos` zna wersję zbiorczą i schodzi do
+     pojedynczej, gdy ta odmówi. */
+  const signed = await signPhotos(env, rows.map((row) => row.image_path), 'chat-photos');
+
   return rows.map((row) => ({
     id: row.id,
     at: row.created_at,
     author: row.author,
     body: row.body,
+    /* Podpisany adres, nie ścieżka. Ścieżka w prywatnym buckecie jest przeglądarce niepotrzebna
+       i nic by jej nie dała, a podpis wygasa po godzinie — patrz migracja 0024. */
+    image: row.image_path ? (signed.get(row.image_path) || '') : '',
     /* Kanał, którym ta wypowiedź przyszła. Panel rysuje z tego etykietę „z e-maila", żeby
        organizator wiedział, czy odpowiedź wpisana w oknie czatu w ogóle dojdzie do
        adresata — człowiek piszący z Gmaila okna czatu nie widzi.
@@ -539,6 +553,16 @@ function chatSystemPrompt(deck) {
     'Formularz do podpisu jest po włosku — to jedyna wersja, którą organizator przyjmuje.'
       + ' Kto wybrał inny język, dostaje dodatkowo ten sam formularz w swoim języku.',
     'Przypomnienia: 7 dni, 1 dzień i 3 godziny przed startem, na życzenie.',
+    /* Sponsoring — jedyne wejście toru C do tego pliku, uzgodnione.
+       Do tej pory sponsoring był w całości na liście tematów do ESCALATE niżej, więc
+       pytanie „ile to kosztuje" czekało na człowieka. Na stronie stoi teraz zaproszenie
+       z ceną i przyciskiem, który otwiera czat z gotowym pytaniem o sponsoring — czyli
+       czat dostawał pytanie, które sam wywołał, i nie umiał na nie odpowiedzieć.
+
+       Tu jest tylko to, co i tak jest napisane na stronie: kwota i droga dalej. Umowa,
+       faktura, zakres ekspozycji — to nadal ESCALATE, patrz „współpraca” niżej. */
+    'Sponsoring: 100 euro. Logo sponsora trafia na stronę wydarzenia.'
+      + ` Szczegóły i płatność ustala organizator — kontakt: ${ev.email}, ${ev.phone}.`,
     `Kontakt: ${ev.email}, ${ev.phone}.`,
     `Organizatorzy są na czacie od ${CHAT_HOURS.from}:00 do ${CHAT_HOURS.to}:00 czasu włoskiego.`,
     // The six FAQ answers in the visitor's own language, so a matching question comes
@@ -569,8 +593,13 @@ function chatSystemPrompt(deck) {
     'Dotyczy to w szczególności: pogody i tego, czy wyścig się odbędzie; wyników i list',
     'startowych; danych konkretnej osoby, jej numeru startowego i statusu zgłoszenia;',
     'zmiany albo anulowania zgłoszenia; noclegów, parkingów, transportu, gastronomii;',
-    'ubezpieczenia, odpowiedzialności prawnej i kwestii medycznych; sponsoringu,',
-    'współpracy i mediów; czegokolwiek o edycjach innych niż 2026.',
+    /* „Sponsoringu" zeszło z tej listy, bo cena i droga dalej są teraz w faktach wyżej.
+       Wszystko poza tymi dwiema rzeczami zostaje przy człowieku — stąd wyliczenie
+       zamiast samego słowa „sponsoring", żeby zdjęcie tematu z listy nie oznaczało
+       zgody na wymyślanie warunków umowy. */
+    'ubezpieczenia, odpowiedzialności prawnej i kwestii medycznych; warunków umowy',
+    'sponsorskiej, faktur i tego, gdzie dokładnie pojawi się logo; współpracy i mediów;',
+    'czegokolwiek o edycjach innych niż 2026.',
     '',
     'CZEGO NIE ROBISZ',
     'Nie udzielasz porad prawnych ani medycznych. Pytanie, czy dziecko może startować z',
@@ -624,9 +653,34 @@ function noteWhatsappFailure(reason) {
   lastWhatsappFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
 }
 
-async function askModel(env, deck, history, question) {
+/**
+ * Pytanie do modelu, opcjonalnie ze zdjęciem.
+ *
+ * `imageUrl` to podpisany adres z prywatnego bucketa, ważny godzinę — czyli znacznie dłużej,
+ * niż trwa to wywołanie, i krócej, niż trwa cokolwiek innego.
+ *
+ * DLACZEGO OSOBNY MODEL DO OBRAZÓW
+ *   Model tekstowy, który dostanie treść w postaci tablicy z `image_url`, odpowiada 400 z nazwą
+ *   modelu w treści — i to jest ten rodzaj awarii, który już raz w tym projekcie wyglądał jak
+ *   „czat milczy" przy kompletnej konfiguracji. `openai/gpt-oss-120b`, ustawiony tu jako model
+ *   tekstowy, NIE przyjmuje obrazów. Na Groqu obrazy bierze rodzina Llama 4, na przykład
+ *   `meta-llama/llama-4-scout-17b-16e-instruct`.
+ *
+ *   Dlatego są dwie zmienne. `AI_MODEL` obsługuje tekst i nie zmienia się. `AI_VISION_MODEL`
+ *   jest opcjonalna i używana wyłącznie wtedy, gdy do wiadomości dołączono zdjęcie. Bez niej
+ *   wiadomość ze zdjęciem nie jedzie do modelu w ogóle — wraca `null`, czyli „nie wiem", a
+ *   `chatVisitor` przekazuje ją człowiekowi. To jest właściwa odpowiedź: lepiej, żeby zdjęcie
+ *   koła zobaczył organizator, niż żeby model tekstowy odpowiedział na nie z niczego.
+ */
+async function askModel(env, deck, history, question, imageUrl = '') {
   if (!env.AI_API_KEY) {
     noteModelFailure('brak AI_API_KEY');
+    return null;
+  }
+  if (imageUrl && !env.AI_VISION_MODEL) {
+    /* Zapisane w tym samym miejscu co inne awarie modelu, więc panel to pokaże. Nie jest to
+       błąd konfiguracji — to jej brak, i różnica ma być widoczna. */
+    noteModelFailure('zdjecie w wiadomosci, a brak AI_VISION_MODEL — oddaje czlowiekowi');
     return null;
   }
   const system = chatSystemPrompt(deck);
@@ -643,16 +697,33 @@ async function askModel(env, deck, history, question) {
         Authorization: `Bearer ${env.AI_API_KEY}`
       },
       body: JSON.stringify({
-        model: env.AI_MODEL || 'gpt-4o-mini',
-        max_tokens: 200,
+        model: imageUrl ? env.AI_VISION_MODEL : (env.AI_MODEL || 'gpt-4o-mini'),
+        /* Więcej miejsca na odpowiedź o zdjęciu: opis tego, co widać na kole, i wniosek, czy
+           przejdzie kontrolę, nie mieszczą się w dwustu tokenach. */
+        max_tokens: imageUrl ? 320 : 200,
         temperature: 0.2,
         messages: [
           { role: 'system', content: system },
+          /* Historia zawsze jako czysty tekst, także gdy niesie zdjęcia.
+             Wysłanie wszystkich wcześniejszych obrazów przy każdym pytaniu byłoby liczone i
+             płacone od nowa za każdą wiadomość w rozmowie, a model potrzebuje obrazu, o który
+             pyta się teraz — nie albumu. */
           ...history.slice(-6).map((m) => ({
             role: m.author === 'visitor' ? 'user' : 'assistant',
-            content: m.body
+            content: m.body || (m.image_path ? '[zdjęcie]' : '')
           })),
-          { role: 'user', content: question }
+          /* Treść jako tablica tylko wtedy, gdy naprawdę jest obraz. Tablica z jednym wpisem
+             tekstowym jest dla modeli tekstowych poprawna, ale nie każdy dostawca ją przyjmuje
+             — a tu nie ma powodu tego sprawdzać. */
+          imageUrl
+            ? {
+              role: 'user',
+              content: [
+                { type: 'text', text: question || (deck.chatPhotoAsk || 'Co widzisz na tym zdjęciu?') },
+                { type: 'image_url', image_url: { url: imageUrl } }
+              ]
+            }
+            : { role: 'user', content: question }
         ]
       }),
       signal: AbortSignal.timeout(12000)
@@ -1070,13 +1141,66 @@ async function chatVisitor(env, request, payload, cors, ctx) {
     }, 200, cors);
   }
 
+  /**
+   * Gość kończy rozmowę.
+   * ---------------------------------------------------------------------------
+   * TO NAPRAWIA OBJAW ZGŁASZANY JAKO „AI NIE ODPOWIADA".
+   *
+   * Nic nie było zepsute. Gdy organizator raz odpisze, wątek przechodzi na `mode: 'human'`, a
+   * bot od tej chwili celowo milczy — patrz gałąź `thread.mode === 'human'` niżej: odpowiadanie
+   * automatem po człowieku znaczyłoby mówienie mu przez ramię. Tylko że bez sposobu na
+   * zakończenie rozmowy wątek zostawał z człowiekiem na zawsze, a gość widział ciszę i uznawał,
+   * że automat przestał działać.
+   *
+   * Zmierzone 29.08: trzy wątki tego samego gościa miały `mode: human`, a świeży wątek z tym
+   * samym pytaniem dostawał poprawną odpowiedź modelu w 300 ms. Czyli objaw był po stronie
+   * cyklu życia rozmowy, nie modelu.
+   *
+   * `closed` jest w schemacie od 0005 i trigger `chat_touch_thread` otwiera taki wątek z
+   * powrotem na `human`, gdy gość znów w nim napisze. Dlatego nowa rozmowa musi dostać NOWY
+   * token — i robi to przeglądarka, nie ta funkcja. Token wydany przez serwer i oddany w
+   * odpowiedzi pozwoliłby każdemu, kto go pominie, dostać czyjś świeży wątek; ta zasada jest
+   * tu od początku (patrz FIELD_WHITELIST.chat) i zamykanie rozmowy jej nie zmienia.
+   *
+   * `unread_for_admin` zostaje nietknięte z rozmysłu. Gość mógł zadać pytanie i wyjść, a licznik
+   * przy dzwonku jest jedyną rzeczą, która mówi organizatorowi, że ktoś czeka. Zamknięcie
+   * rozmowy przez gościa nie jest odpowiedzią na jego pytanie.
+   */
+  if (action === 'close') {
+    const { thread, error } = await chatThread(env, request, payload, false);
+    /* Brak wątku to nie błąd. Gość, który nigdy nie napisał, a nacisnął „zakończ", ma dostać
+       to samo co każdy inny: rozmowa jest zakończona. Odmowa zostawiłaby na ekranie błąd o
+       nieistnieniu czegoś, czego i tak nie chciał. */
+    if (error || !thread) return json({ ok: true, closed: true, existed: false }, 200, cors);
+    await setThreadMode(env, thread.id, 'closed');
+    return json({ ok: true, closed: true, existed: true }, 200, cors);
+  }
+
   if (action !== 'send') return json({ ok: false, code: 'CHAT_UNKNOWN_ACTION' }, 400, cors);
 
   const body = String(payload.message || '').trim();
-  if (body.length < 1 || body.length > 2000) return json({ ok: false, code: 'CHAT_BAD_MESSAGE' }, 422, cors);
+  const hasPhoto = Boolean(payload.photo);
+  /* Zdjęcie bez podpisu jest normalną wiadomością — ktoś fotografuje koło i pyta jednym
+     obrazkiem. Warunek w bazie mówi to samo (chat_messages_body_or_image, migracja 0024), a tu
+     jest po to, żeby odmowa przyszła z sensownym kodem, nie jako 502 z naruszonego ograniczenia. */
+  if (body.length > 2000) return json({ ok: false, code: 'CHAT_BAD_MESSAGE' }, 422, cors);
+  if (body.length < 1 && !hasPhoto) return json({ ok: false, code: 'CHAT_BAD_MESSAGE' }, 422, cors);
 
   const { thread, error, status } = await chatThread(env, request, payload, true);
   if (error) return json({ ok: false, code: error }, status, cors);
+
+  /* Załącznik: ten sam dekoder i ta sama kolejność co przy zdjęciu na tablicy — najpierw
+     sprawdzenie formatu po deklarowanym typie ORAZ po pierwszych bajtach pliku, potem wgranie.
+
+     Nieudane wgranie zatrzymuje całą wiadomość, a nie zapisuje jej bez zdjęcia. Wiadomość
+     „popatrz na to" bez tego, na co patrzeć, jest gorsza niż błąd, który da się powtórzyć. */
+  let imagePath = '';
+  if (hasPhoto) {
+    const photo = decodePhoto(payload.photo);
+    if (photo.error) return json({ ok: false, code: photo.error }, 422, cors);
+    imagePath = await uploadPhoto(env, photo, 'chat', 'chat-photos');
+    if (!imagePath) return json({ ok: false, code: 'CHAT_PHOTO_UPLOAD_FAILED' }, 502, cors);
+  }
 
   /* `id,created_at` asked for explicitly, and the reason is a bug this caused.
      ---------------------------------------------------------------------------
@@ -1091,11 +1215,20 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   const stored = await insertRow(env, 'chat_messages', {
     thread_id: thread.id,
     author: 'visitor',
-    body
+    body,
+    image_path: imagePath || null
   }, 'id,created_at');
   if (!stored.ok) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
-  await notifyChatTelegram(env, request, ctx, thread, payload, body);
-  const echo = { messageId: stored.row?.id || null, messageAt: stored.row?.created_at || null };
+  /* Podpisany raz i użyty dwa razy: raz oddany przeglądarce, żeby dorysowała miniaturę do
+     bąbelka, który już postawiła, i raz podany modelowi niżej. Dwa podpisy tego samego pliku
+     byłyby dwoma żądaniami do Storage po to samo. */
+  const imageUrl = imagePath ? await signPhoto(env, imagePath, 'chat-photos') : '';
+  await notifyChatTelegram(env, request, ctx, thread, payload, body || '[zdjęcie]');
+  const echo = {
+    messageId: stored.row?.id || null,
+    messageAt: stored.row?.created_at || null,
+    image: imageUrl
+  };
 
   // A name or an address given mid-conversation is worth keeping, so the organiser
   // knows who they are talking to without asking twice.
@@ -1107,6 +1240,8 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   // Already with a person: nothing to answer automatically, and answering anyway
   // would talk over them.
   if (thread.mode === 'human') {
+    // Zdjęcie w wiadomości do człowieka nie zmienia niczego w tej gałęzi: organizator
+    // zobaczy je w panelu przy tym wierszu, tak jak treść.
     /* Awaited, nie waitUntil. Na Vercelu ctx.waitUntil nie ma czego trzymać przy życiu
        (patrz api/intake.js) — porzucony promise po prostu ginie razem z funkcją, więc
        „wyślemy w tle" znaczyłoby „czasem wyślemy". Ta gałąź nie woła modelu, więc nie ma
@@ -1116,10 +1251,16 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   }
 
   const deck = COPY_DECK[localeOf(thread.locale)] || COPY_DECK.it;
-  let reply = faqAnswer(deck, body);
+  /* Słownik pytań pomijany, gdy jest zdjęcie.
+     ---------------------------------------------------------------------------
+     faqAnswer dopasowuje po słowach kluczowych w treści, a „czy takie koło przejdzie?" trafi w
+     hasło o kołach i odpowie regułką z regulaminu — nie patrząc na zdjęcie, o które człowiek
+     właśnie zapytał. Gotowa odpowiedź obok zignorowanego obrazka jest gorsza niż brak
+     odpowiedzi, bo wygląda na odpowiedź. */
+  let reply = hasPhoto ? null : faqAnswer(deck, body);
   if (!reply) {
     const history = await chatMessages(env, thread.id) || [];
-    reply = await askModel(env, deck, history, body);
+    reply = await askModel(env, deck, history, body, imageUrl);
   }
 
   if (!reply) {
@@ -3757,7 +3898,7 @@ async function hashIp(env, request) {
  * rows get a signed link, valid for an hour: long enough for a visit, short enough
  * that a copied link stops working before it can be passed around.
  */
-const PRIVATE_PHOTO_BUCKETS = new Set(['wall-photos', 'participant-photos']);
+const PRIVATE_PHOTO_BUCKETS = new Set(['wall-photos', 'participant-photos', 'chat-photos']);
 
 async function signPhoto(env, path, bucket = 'wall-photos') {
   if (!path || !PRIVATE_PHOTO_BUCKETS.has(bucket)) return '';
@@ -3995,7 +4136,7 @@ async function uploadPhoto(env, photo, folder = '', bucket = 'wall-photos') {
   if (!PRIVATE_PHOTO_BUCKETS.has(bucket)) return '';
   // Random name, not the visitor's: a predictable path in a bucket is a directory
   // listing waiting to happen, and a caller-supplied one is a path traversal.
-  const fixedFolders = new Set(['sponsors', 'participants']);
+  const fixedFolders = new Set(['sponsors', 'participants', 'chat']);
   const prefix = fixedFolders.has(folder)
     ? `${folder}/`
     : `${new Date().toISOString().slice(0, 10)}/`;
@@ -5113,7 +5254,9 @@ export default {
        komunikat mówiłby o za dużym żądaniu, nie o za dużym zdjęciu. */
     const carriesImage = WALL_FAMILY.has(pathType)
       || pathType === 'settings-admin'
-      || pathType === 'voting-admin';
+      || pathType === 'voting-admin'
+      // Załącznik gościa w czacie — ta sama droga co zdjęcie na tablicy. Migracja 0024.
+      || pathType === 'chat';
     const bodyCeiling = carriesImage ? MAX_PHOTO_BODY_BYTES : MAX_BODY_BYTES;
 
     const raw = await request.text();

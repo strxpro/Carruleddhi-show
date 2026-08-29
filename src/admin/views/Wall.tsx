@@ -106,9 +106,28 @@ export function Wall({
 
       <ul className="mt-4 flex flex-col gap-3">
         {rows === null ? (
-          <li className="rounded-2xl border border-white/10 px-5 py-8 text-center text-sm text-white/40">
-            {t('common.loading')}
-          </li>
+          /* Shaped like the comment cards below — a header line, two lines of text and a row
+             of buttons — so the list does not jump from one centred word to a column of boxes
+             the moment the comments land. `li` rather than the shared SkeletonCards because
+             this list is a `ul`, and that component renders a `div`. */
+          Array.from({ length: 3 }).map((_, card) => (
+            <li
+              key={`skeleton-${card}`}
+              className="rounded-2xl border border-white/12 bg-white/4 p-4"
+              role="status"
+              aria-busy="true"
+              aria-label={t('common.loading')}
+            >
+              <div className="flex items-center gap-2">
+                <span className="block h-3.5 w-24 animate-skeleton rounded bg-white/10" />
+                <span className="block h-3 w-10 animate-skeleton rounded bg-white/10" />
+                <span className="ml-auto block h-3 w-20 animate-skeleton rounded bg-white/10" />
+              </div>
+              <span className="mt-3 block h-3.5 w-full animate-skeleton rounded bg-white/10" />
+              <span className="mt-1.5 block h-3.5 w-4/5 animate-skeleton rounded bg-white/10" />
+              <span className="mt-3.5 block h-7 w-28 animate-skeleton rounded-full bg-white/10" />
+            </li>
+          ))
         ) : visible.length === 0 ? (
           <li className="rounded-2xl border border-dashed border-white/15 px-5 py-8 text-center text-sm text-white/40">
             {t('wall.empty')}

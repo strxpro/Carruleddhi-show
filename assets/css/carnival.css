@@ -528,6 +528,9 @@
   }
   .site-header.is-compact:hover .nav-actions,
   .site-header.is-compact:focus-within .nav-actions { gap: 8px; }
+  /* `visibility` i `pointer-events` z tego samego powodu, co przy `is-peeked` nizej:
+     bez nich rozwiniety pasek robil miejsce na przycisk, ktory zostawal niewidoczny
+     i nieklikalny, bo stan zwiniety chowa go wlasnie tymi dwiema wlasciwosciami. */
   .site-header.is-compact:hover .nav-attend,
   .site-header.is-compact:hover .language-picker,
   .site-header.is-compact:focus-within .nav-attend,
@@ -535,6 +538,8 @@
     max-width: 200px;
     overflow: visible;
     opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
     transform: none;
   }
   /* Chip zostaje widoczny takze po rozwinieciu — od kiedy nie zwija sie do zera,
@@ -1048,9 +1053,21 @@ html {
   padding: 7px;
   gap: 7px;
 }
+/* Wysokosc musi byc wpisana razem z szerokoscia, inaczej `border-radius: 50%` rysuje
+   elipse, a nie kolo.
+   ---------------------------------------------------------------------------
+   Zmierzone na 390x844: przycisk „Bede tam" w zwinietym doku mial 52x56 px. Szerokosc
+   przychodzila stad, wysokosc z `@media (max-width: 760px) .quick-action { min-height:
+   56px }` czterdziesci linii nizej — regula o mniejszej specyficznosci, ale dotyczaca
+   innej wlasciwosci, wiec nic jej nie nadpisywalo. Cztery piksele roznicy wystarczaja,
+   zeby 50% zaokraglenia dalo jajko.
+
+   `min-height` obok `height`, bo to wlasnie `min-height` wygrywalo. */
 .quick-actions.is-mini .quick-action {
   width: 52px;
   min-width: 52px;
+  height: 52px;
+  min-height: 52px;
   padding: 0;
   border-radius: 50%;
   justify-content: center;
@@ -1107,15 +1124,33 @@ html {
    ============================================================
    There is no hover on a touchscreen, so the compact pill needed a tap. The class
    is toggled in app.js; this is what it looks like. */
+/* 1120 -> 720: tyle, ile trzeba na zawartosc, i tyle samo, co przy najechaniu myszka.
+   ---------------------------------------------------------------------------
+   `is-peeked` nie jest juz tylko gestem palca. app.js dodaje te klase przy KAZDYM ruchu
+   w gore wiekszym niz 3 px i zdejmuje przy ruchu w dol (updateScroll), wiec przy zwyklym
+   czytaniu z lekkim cofaniem pasek skakal 560 -> 1120 -> 560 px. Pelna szerokosc byla
+   przy tym pusta: rozwiniecie robilo miejsce na „Bede tam", ktore i tak sie nie
+   pokazywalo — patrz `visibility` nizej.
+
+   720 px to szerokosc, przy ktorej wszystko sie miesci, i ta sama, ktora ma rozwiniecie
+   pod kursorem. Jeden rozmiar rozwinietego paska zamiast dwoch. Na telefonie oba warianty
+   i tak schodza do `100vw - 20px`, wiec tam nic sie nie zmienia. */
 .site-header.is-peeked {
-  width: min(1120px, calc(100vw - 20px)) !important;
+  width: min(720px, calc(100vw - 20px)) !important;
 }
 .site-header.is-peeked .nav-shell { gap: 10px; }
+/* `visibility` i `pointer-events` musza tu byc wypisane.
+   Stan zwiniety ustawia `visibility: hidden` i `pointer-events: none`, a ta regula
+   podnosila tylko `max-width` i `opacity`. Zmierzone na 1440x900: po rozwinieciu
+   „Bede tam" zajmowalo 79 px w ukladzie, mialo `opacity: 1` i `visibility: hidden` —
+   czyli rezerwowalo miejsce i nie rysowalo nic. Dziura w rozwinietym pasku. */
 .site-header.is-peeked .nav-attend,
 .site-header.is-peeked .language-picker {
   max-width: 220px;
   overflow: visible;
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transform: none;
 }
 .site-header.is-peeked .brand { min-width: 132px; }
@@ -1357,6 +1392,9 @@ html {
   border-radius: 14px;
   background: var(--white);
   box-shadow: 3px 3px 0 rgb(7 26 61 / 0.1);
+  /* `0deg` domyślnie i nikt tego już nie nadpisuje — patrz komentarz przy wall-note w app.js.
+     Obrócona karteczka jest szersza i wyższa niż nieobrócona, więc jej rogi wychodziły za
+     kontener i były tam obcinane. Reguła zostaje, bo przywrócenie efektu ma być jedną linijką. */
   transform: rotate(var(--tilt, 0deg));
   transition: transform .28s var(--ease-snap), box-shadow .28s ease;
 }
@@ -1766,15 +1804,31 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
    28. Avatar row: real initials, and a remainder that can hide.
    ============================================================ */
 .avatar-stack .avatar[hidden] { display: none; }
+
+/* Reszta jest kółkiem, nie elipsą.
+   ---------------------------------------------------------------------------
+   Było tu `width: auto` z poziomym paddingiem. Przy `border-radius: 50%` i stałej wysokości
+   znaczy to elipsę, i to tym bardziej wyciągniętą, im dłuższa liczba: „+9" wychodziło okrągłe,
+   „+407" jajowate. Cztery okrągłe awatary i piąty owalny w jednym rzędzie czyta się jako
+   zepsuty układ, nie jako inny element.
+
+   `width` zostaje takie, jak u pozostałych — nie jest tu nadpisywane, więc kółko jest kółkiem
+   z definicji, a nie z obliczenia. Zamiast rozciągać pudełko do treści, treść jest skracana do
+   pudełka: paintAvatars() zamienia „+1240" na „+1,2k". Patrz komentarz przy `shortRest` w app.js.
+
+   `padding-inline: 0` jawnie, bo padding w gridzie o stałej szerokości zwężałby tylko obszar
+   dla tekstu i nic nie dawał. */
 .avatar-stack .avatar:last-child {
-  padding-inline: 10px;
-  width: auto;
-  min-width: 46px;
+  padding-inline: 0;
+  /* Cyfry o stałej szerokości: bez tego „+11" i „+47" mają różną szerokość i rząd drga przy
+     każdej aktualizacji licznika. */
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
+  /* Liczba jest dłuższa niż dwie litery inicjałów, więc mniejsza — nadal w tym samym kółku. */
+  font-size: 12.5px;
 }
 @media (max-width: 760px) {
-  .avatar-stack .avatar:last-child { min-width: 40px; font-size: 11px; }
+  .avatar-stack .avatar:last-child { font-size: 11px; }
 }
 
 /* ============================================================

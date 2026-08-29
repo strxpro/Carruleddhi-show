@@ -140,12 +140,52 @@ import { flagSvg } from './flags.js';
     }
   }
 
-  function showToast(message, duration = 4200) {
+  /**
+   * Jeden pasek komunikatów, trzy odmiany.
+   *
+   * `tone` jest trzecim argumentem z wartością domyślną, więc wszystkie dotychczasowe
+   * wywołania — `showToast(text)` i `showToast(text, 7000)` — działają bez zmian i wyglądają
+   * jak dotąd. Odmiana zmienia kolor, ikonę i to, jak zachowa się czytnik ekranu:
+   *
+   *   info     zwykła informacja, czeka na przerwę w czytaniu
+   *   success  potwierdzenie czynności, też czeka
+   *   error    przerywa czytanie, bo mówi, że coś się NIE stało
+   *
+   * `assertive` tylko dla błędu z rozmyslu: gdyby każde potwierdzenie przerywało lektor,
+   * ktoś czytający stronę czytnikiem byłby przerywany za każdym kliknięciem.
+   */
+  function showToast(message, duration = 4200, tone = 'info') {
     const toast = $('[data-toast]');
     if (!toast) return;
-    toast.textContent = message;
-    toast.classList.add('is-visible');
+    const slot = $('[data-toast-text]', toast) || toast;
+    const icon = $('[data-toast-icon]', toast);
+
+    slot.textContent = message;
+    toast.dataset.toastTone = ['info', 'success', 'error'].includes(tone) ? tone : 'info';
+    // Znak, nie obrazek: trzy znaki Unicode zamiast trzech plików do wczytania.
+    if (icon) icon.textContent = { success: '✓', error: '!', info: 'i' }[toast.dataset.toastTone];
+    toast.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    toast.setAttribute('aria-live', tone === 'error' ? 'assertive' : 'polite');
+
+    /* Zdejmowane, wymuszony przeliczenie układu, dołożone z powrotem — i to wszystko w tej
+       samej klatce.
+       ---------------------------------------------------------------------------
+       Chodzi o to, żeby drugi komunikat pod rząd zagrał animacją od początku; bez tego dwa
+       błędy z rzędu wyglądają jak jeden, który się nie zmienił, i nikt nie zauważa, że treść
+       jest inna.
+
+       Pierwsza wersja robiła to przez requestAnimationFrame i sonda ją złapała: pasek nie
+       pojawiał się wcale. rAF nie jest gwarantowany — w karcie w tle nie odpala w ogóle, a w
+       przeglądarce bez odświeżania obrazu bywa głodzony. Uzależnianie od niego POKAZANIA
+       czegokolwiek znaczy komunikat, który czasem nie przychodzi.
+
+       Odczyt offsetWidth jest tu czynnością, nie pomiarem: wymusza przeliczenie układu, dzięki
+       któremu przeglądarka widzi stan bez klasy i traktuje jej dołożenie jako nowe przejście.
+       Działa synchronicznie i zawsze. */
+    toast.classList.remove('is-visible');
     window.clearTimeout(showToast.timer);
+    void toast.offsetWidth;
+    toast.classList.add('is-visible');
     showToast.timer = window.setTimeout(() => toast.classList.remove('is-visible'), duration);
   }
 
@@ -831,6 +871,13 @@ import { flagSvg } from './flags.js';
     elements.forEach((element) => observer.observe(element));
   }
 
+  /* Dwa progi zwijania nagłówka, rozsunięte o 60 px — patrz komentarz przy ich użyciu
+     w updateScroll(). Nazwane stałe, a nie liczby w warunku, bo jedna z nich występuje
+     w dwóch miejscach i rozjechanie ich znaczyłoby pasek rozwijający się w innym punkcie
+     niż ten, w którym gaśnie „peek". */
+  const HEADER_COLLAPSE_Y = 150;
+  const HEADER_EXPAND_Y = 90;
+
   function setupNavigation() {
     const header = $('[data-header]');
     const menuToggle = $('[data-menu-toggle]');
@@ -911,7 +958,12 @@ import { flagSvg } from './flags.js';
       menu.inert = !open;
       backdrop?.classList.toggle('is-open', open);
       header?.classList.toggle('is-menu-open', open);
-      header?.classList.toggle('is-compact', !open && window.scrollY > 120);
+      /* Ten sam próg co w updateScroll, i to ten „wejściowy": przy otwartym menu pasek jest
+         rozwinięty, więc po zamknięciu obowiązuje warunek zwinięcia, nie utrzymania. Wpisana
+         tu wcześniej liczba 120 nie należała już do żadnego z dwóch progów — zamknięcie menu
+         na wysokości 100 px rozwijało pasek, a najbliższe przewinięcie natychmiast zwijało go
+         z powrotem, bo dla logiki przewijania 100 jest wciąż „zwinięte". Kolejne mignięcie. */
+      header?.classList.toggle('is-compact', !open && window.scrollY > HEADER_COLLAPSE_Y);
       menuToggle.classList.toggle('is-open', open);
       menuToggle.setAttribute('aria-expanded', String(open));
       menuToggle.setAttribute('aria-label', text(open ? 'a11y.close' : 'a11y.menu'));
@@ -947,13 +999,41 @@ import { flagSvg } from './flags.js';
         // `goingUp` compare y against y, which is never true, so the reference was
         // never written and the whole thing deadlocked at "not moving".
         if (updateHeaderPeek.lastY === undefined) updateHeaderPeek.lastY = y;
-        const goingUp = y < updateHeaderPeek.lastY - 3;
+        /* 24 px w gore, nie 3.
+           ---------------------------------------------------------------------------
+           To jest połowa naprawy mignięcia „Będę tam". Komentarz w experience.css opisywał
+           ten objaw i nazywał przyczynę: „przy najmniejszym ruchu kółkiem w górę (app.js
+           dodaje `is-peeked` już przy 3 px) cała sekwencja szła od nowa w drugą stronę".
+           Poprawiono wtedy czasy przejść, ale nie próg, który to wywołuje.
+
+           Trzy piksele to nie gest, to drgnienie: gaśnięcie bezwładności po rzucie palcem,
+           odbicie na końcu strony, mikroruch gładzika. Każde takie drgnienie rozwijało pasek
+           i po 900 ms zwijało go z powrotem — czyli mignięcie.
+
+           24 px to ruch, który ktoś wykonał świadomie. W dół nadal wystarczy 3 px, bo
+           zamknięcie paska w reakcji na czytanie w dół jest tanie w skutkach i nikt go nie
+           odbiera jako migotania. */
+        const goingUp = y < updateHeaderPeek.lastY - 24;
         const goingDown = y > updateHeaderPeek.lastY + 3;
         if (goingUp) header.classList.add('is-peeked');
-        else if (goingDown || y < 120) header.classList.remove('is-peeked');
+        else if (goingDown || y < HEADER_EXPAND_Y) header.classList.remove('is-peeked');
         if (goingUp || goingDown) updateHeaderPeek.lastY = y;
       }
-      header?.classList.toggle('is-compact', y > 120 && !menu?.classList.contains('is-open'));
+
+      /* Histereza na zwijaniu paska — druga połowa naprawy mignięcia.
+         ---------------------------------------------------------------------------
+         Stał tu jeden próg: `y > 120`. Jeden próg znaczy, że pozycja przewinięcia oscylująca
+         wokół niego przełącza stan tyle razy, ile razy go przekroczy — a wokół 120 px kręci
+         się każdy, kto zatrzymał się chwilę po zejściu z hero, i każde gaśnięcie bezwładności
+         po rzucie palcem. Za każdym przełączeniem „Będę tam" gra pełną animację pojawienia
+         się albo zniknięcia (0,42 s), więc jedna oscylacja to jedno widoczne mignięcie.
+
+         Dwa progi rozsunięte o 60 px: pasek zwija się po przekroczeniu 150 i rozwija dopiero
+         poniżej 90. Między nimi zostaje w stanie, w którym jest. To ta sama konstrukcja co w
+         termostacie i z tego samego powodu: żeby nie klekotał na granicy. */
+      const wasCompact = header?.classList.contains('is-compact');
+      const compactWanted = y > (wasCompact ? HEADER_EXPAND_Y : HEADER_COLLAPSE_Y);
+      header?.classList.toggle('is-compact', compactWanted && !menu?.classList.contains('is-open'));
       updateActiveSection();
       updateCardStack();
       ticking = false;
@@ -1351,20 +1431,65 @@ import { flagSvg } from './flags.js';
     const shown = initials.length ? Math.min(initials.length, slots) : slots;
     const rest = Math.max(0, pilotTotal() - shown);
     const last = circles[circles.length - 1];
-    last.textContent = `+${formatNumber(rest)}`;
+    /**
+     * Skrócone, żeby zmieściło się w kółku.
+     *
+     * To kółko było elipsą, bo rozciągało się do treści — cztery okrągłe awatary i piąty owalny
+     * w jednym rzędzie czytają się jako zepsuty układ. Kółko jest teraz kółkiem (patrz
+     * carnival.css, sekcja 28), więc to treść musi zmieścić się w pudełku, a nie odwrotnie.
+     *
+     * Do 999 pełna liczba. Wyżej tysiące z jedną cyfrą po przecinku: „+1,2k" zamiast „+1240".
+     * Przy pięćdziesięciu zawodnikach na wyścigu to gałąź, która się nie uruchomi — jest po to,
+     * żeby dzień, w którym ktoś wpisze do bazy tysiąc wierszy testowych, nie skończył się
+     * rozjechanym rzędem.
+     *
+     * `toLocaleString` dla separatora dziesiętnego: po polsku i po włosku jest to przecinek, po
+     * angielsku kropka, a to jest liczba widoczna na ekranie w sześciu językach.
+     */
+    const shortRest = rest < 1000
+      ? formatNumber(rest)
+      : `${(rest / 1000).toLocaleString(state.lang, { maximumFractionDigits: 1 })}k`;
+    last.textContent = `+${shortRest}`;
     last.hidden = rest <= 0;
   }
 
-  function paintCounters(animate = false, previousAttendance = attendeeTotal()) {
+  /**
+   * Oba liczniki, z opcjonalnym przebiegiem cyfr od poprzedniej wartości do nowej.
+   *
+   * `previous` MUSI być podane przez wołającego i nie ma tu wartości domyślnej. Wcześniej
+   * miało — `previousAttendance = attendeeTotal()` — i to był błąd, który sprawiał, że licznik
+   * nigdy nie tykał:
+   *
+   *   loadGlobalCounts() zapisywało nową liczbę do `state`, a POTEM wołało paintCounters(true).
+   *   Domyślny argument jest wyliczany w chwili wywołania, więc „poprzednia" wartość była już
+   *   nową. animateNumber(element, 42, 42) przebiega od czterdziestu dwóch do czterdziestu
+   *   dwóch, czyli nie robi nic — a wyglądało to jak działający kod z włączoną animacją.
+   *
+   * To ta sama klasa błędu, którą ten projekt złapał już pięć razy: funkcja zgłasza sukces i nic
+   * nie robi. Brak domyślnej wartości znaczy, że nie da się jej pominąć przez pomyłkę.
+   *
+   * Liczba zawodników przebiega tak samo jak liczba obecnych. Wcześniej była przypisywana na
+   * sztywno, więc „zapisał się kolejny" nie było niczym widoczne, choć liczba się zmieniała.
+   */
+  function paintCounters(animate = false, previous = null) {
+    const attendees = attendeeTotal();
+    const pilots = pilotTotal();
+    const fromAttendees = previous && Number.isFinite(previous.attendees) ? previous.attendees : attendees;
+    const fromPilots = previous && Number.isFinite(previous.pilots) ? previous.pilots : pilots;
+
     $$('[data-attendee-count]').forEach((element) => {
-      if (animate) animateNumber(element, previousAttendance, attendeeTotal());
-      else element.textContent = formatNumber(attendeeTotal());
+      if (animate && fromAttendees !== attendees) animateNumber(element, fromAttendees, attendees);
+      else element.textContent = formatNumber(attendees);
     });
     $$('[data-pilots-count]').forEach((element) => {
-      element.textContent = formatNumber(pilotTotal());
+      if (animate && fromPilots !== pilots) animateNumber(element, fromPilots, pilots);
+      else element.textContent = formatNumber(pilots);
     });
     paintAvatars();
   }
+
+  /** Obie liczby w jednej migawce — do przekazania jako `previous` po zmianie stanu. */
+  const countsSnapshot = () => ({ attendees: attendeeTotal(), pilots: pilotTotal() });
 
   function refreshAttendanceLabels() {
     const button = $('[data-attendance-button]');
@@ -1424,7 +1549,9 @@ import { flagSvg } from './flags.js';
    */
   function undoAttendance() {
     const button = $('[data-attendance-button]');
-    const previous = attendeeTotal();
+    // Migawka obu liczb, nie sama liczba obecnych: paintCounters przebiega teraz także licznik
+    // zawodników, a przekazanie liczby zamiast obiektu cicho wyłączyłoby oba przebiegi.
+    const previous = countsSnapshot();
     state.attended = false;
     if (Number.isFinite(state.remoteAttendees)) state.remoteAttendees = Math.max(0, state.remoteAttendees - 1);
     storage.remove('carruleddhi.attended');
@@ -1445,7 +1572,7 @@ import { flagSvg } from './flags.js';
       undoAttendance();
       return;
     }
-    const previous = attendeeTotal();
+    const previous = countsSnapshot();
     state.attended = true;
     if (Number.isFinite(state.remoteAttendees)) state.remoteAttendees += 1;
     storage.set('carruleddhi.attended', '1');
@@ -1464,7 +1591,7 @@ import { flagSvg } from './flags.js';
       attendeeId: storage.get('carruleddhi.visitorId') || createVisitorId()
     })).then((result) => {
       if (result.attendees !== null && result.attendees !== undefined && Number.isFinite(Number(result.attendees))) {
-        const optimistic = attendeeTotal();
+        const optimistic = countsSnapshot();
         state.remoteAttendees = Number(result.attendees);
         // The attendance answer carries the fresh totals and initials too, so the
         // row of faces updates on the press rather than on the next page load.
@@ -1485,7 +1612,7 @@ import { flagSvg } from './flags.js';
       console.warn('Attendance sync failed, keeping the local count:', error);
     });
 
-    showToast(text('attendance.seeYou'));
+    showToast(text('attendance.seeYou'), 4200, 'success');
 
     // Straight after the press, not a second later. The old 1050 ms delay felt
     // like the click had been ignored; 260 ms is just long enough for the button
@@ -1503,6 +1630,9 @@ import { flagSvg } from './flags.js';
 
   async function loadGlobalCounts() {
     if (!config.endpoints.counts) return;
+    /* Zdjęte PRZED zapisem nowych wartości. To jest cała naprawa tykającego licznika —
+       patrz komentarz nad paintCounters. */
+    const before = countsSnapshot();
     try {
       const result = await postJSON(config.endpoints.counts, eventPayload('counts'));
       const attendees = Number(result.attendees);
@@ -1518,7 +1648,7 @@ import { flagSvg } from './flags.js';
           .map((value) => value.trim().toUpperCase().slice(0, 2))
           .filter(Boolean);
       }
-      paintCounters(true);
+      paintCounters(true, before);
     } catch (error) {
       console.warn('Global counters are temporarily unavailable:', error);
     }
@@ -1529,15 +1659,27 @@ import { flagSvg } from './flags.js';
    *
    * Polling only runs while a counter is actually on screen and the tab is in
    * the foreground. That keeps the numbers current without hammering the
-   * backend: every poll costs Make credits, so an always-on 5 second timer
-   * would drain a free plan in a day.
+   * backend.
+   *
+   * PIĘTNAŚCIE SEKUND, NIE CZTERDZIEŚCI PIĘĆ
+   *   Czterdzieści pięć wzięło się z uzasadnienia, które przestało obowiązywać: „każde
+   *   odpytanie kosztuje kredyty Make, więc stały licznik co pięć sekund wyczerpałby darmowy
+   *   plan w ciągu dnia". To była prawda, gdy `counts` szło do Make'a. Dziś nie idzie —
+   *   `counts` jest w SUPABASE_FIRST i odpowiada na nie Worker jednym zapytaniem do widoku
+   *   `public_counts`, a nie zewnętrzna automatyka. Zostawiony argument o kredytach trzymał
+   *   licznik trzy razy wolniejszym, niż musiał być.
+   *
+   *   Piętnaście, a nie pięć: to nadal jest widok agregujący, a różnica między „na żywo" i
+   *   „co piętnaście sekund" jest dla człowieka patrzącego na licznik zapisów żadna. Odpytywanie
+   *   chodzi tylko wtedy, gdy licznik jest na ekranie i karta jest z przodu, więc koszt
+   *   ponosi wyłącznie ten, kto na to patrzy.
    */
   function setupLiveCounts() {
     if (!config.endpoints.counts) return;
     const targets = $$('[data-attendee-count], [data-pilots-count]');
     if (!targets.length) return;
 
-    const intervalMs = 45000;
+    const intervalMs = 15000;
     let timer = 0;
     let visibleCount = 0;
     let lastFetch = 0;
@@ -2023,7 +2165,20 @@ import { flagSvg } from './flags.js';
       for (const comment of comments) {
         const item = document.createElement('li');
         item.className = 'wall-note';
-        item.style.setProperty('--tilt', `${(Math.random() * 2.4 - 1.2).toFixed(2)}deg`);
+        /* Karteczki stoją prosto.
+           ---------------------------------------------------------------------------
+           Był tu losowy kąt od -1,2° do +1,2°, żeby wyglądały jak przypięte do korkowej
+           tablicy. Zgłoszone jako „komentarze są krzywe i ucięte" — i oba objawy pochodzą
+           stąd. Krzywe, bo taki był zamiar. Ucięte, bo obrócony prostokąt jest szerszy i
+           wyższy niż nieobrócony, więc jego rogi wychodzą za kontener i tam znikają.
+
+           Przekrzywienie zostawało już wcześniej wyłączane na telefonie osobną regułą, co
+           samo w sobie było przyznaniem, że efekt przeszkadza. Teraz nie ma go nigdzie i nie
+           ma czego wyłączać — pinezka nad karteczką wystarcza, żeby to była tablica
+           ogłoszeniowa, a nie lista.
+
+           Zmienna zostaje w CSS z wartością domyślną `0deg`, więc nic nie trzeba zmieniać w
+           arkuszu, a przywrócenie efektu to jedna linijka tutaj. */
 
         if (comment.rating) item.appendChild(starRow(comment.rating));
 
@@ -2722,7 +2877,7 @@ import { flagSvg } from './flags.js';
         if (result.demo) showToast(text('common.webhookDemo'));
       } catch (error) {
         console.error('Reminder webhook failed:', error);
-        showToast(text('contact.error'));
+        showToast(text('contact.error'), 4200, 'error');
       } finally {
         submit.disabled = false;
         submit.textContent = original;
@@ -3277,7 +3432,7 @@ import { flagSvg } from './flags.js';
         close();
         if (external) external();
         else gate.focus({ preventScroll: true });
-        showToast(text('consent.savedToast'));
+        showToast(text('consent.savedToast'), 4200, 'success');
       }, reducedMotion ? 0 : 520);
     });
 
@@ -3905,6 +4060,11 @@ import { flagSvg } from './flags.js';
       submit.textContent = text('form.sending');
       try {
         const result = await postJSON(config.endpoints.registration, eventPayload('registration', data));
+        /* Zdjęte przed inkrementacją, żeby licznik zawodników przebiegł cyframi do nowej
+           wartości. Dotąd stało tu `paintCounters(false)`, czyli podmiana liczby bez ruchu —
+           a to jest jedyna chwila na całej stronie, w której ten licznik rośnie z powodu
+           czynności odwiedzającego, i najlepszy moment, żeby to było widać. */
+        const beforeEntry = countsSnapshot();
         const proposed = Number(config.pilotsBase) + state.registrations + 1;
         const raceNumber = String(result.raceNumber || proposed).padStart(3, '0');
         state.registrations += 1;
@@ -3915,7 +4075,7 @@ import { flagSvg } from './flags.js';
         if (number) number.textContent = raceNumber;
         form.hidden = true;
         $('[data-form-success]')?.classList.add('is-active');
-        paintCounters(false);
+        paintCounters(true, beforeEntry);
         createBurst($('[data-race-number]')?.closest('.race-number'));
         if (result.demo) showToast(text('common.webhookDemo'));
         startSuccessReturn();
@@ -3931,7 +4091,9 @@ import { flagSvg } from './flags.js';
         const key = error.payload?.code === 'ALREADY_REGISTERED'
           ? 'form.duplicate'
           : (error.status === 429 ? 'form.tooMany' : 'form.sendError');
-        showToast(text(key), 7000);
+        /* Duplikat to nie awaria: ta osoba jest już na liście i to jest fakt, nie usterka.
+           Ostrzeżenie, nie czerwony błąd — a „nie udało się wysłać" i „za dużo prób" tak. */
+        showToast(text(key), 7000, key === 'form.duplicate' ? 'info' : 'error');
         if (key === 'form.duplicate') {
           const emailField = form.elements.namedItem('email');
           setFormStep(1, { focus: false });
@@ -4398,7 +4560,23 @@ import { flagSvg } from './flags.js';
        clipped and there was nothing to scroll to. The list grows with every message, grows
        again when somebody attaches a picture, and grows a third time when "show more" is
        pressed, so measuring it once was never going to hold. */
-    const alwaysFlow = new Set(['categories', 'prizes', 'signup', 'contact', 'wall']);
+    /* `voting` i `podium` są tu z trzeciego powodu: w chwili pomiaru są ukryte.
+       ---------------------------------------------------------------------------
+       Obie sekcje startują z atrybutem `hidden` i pokazuje je dopiero odczyt fazy z serwera.
+       Ukryta sekcja ma zerową wysokość, więc pomiar orzekał „mieści się na jednym ekranie" i
+       nadawał jej tryb `pinned` — a `pinned` znaczy `position: sticky` plus `overflow: hidden`
+       i jeden ekran wysokości. Kilkadziesiąt kafelków uczestników zostałoby wtedy ucięte
+       dokładnie tak, jak wcześniej były ucinane komentarze, i z tego samego powodu.
+
+       Podium na telefonie też: trzy karty zwycięzców układają się w kolumnę, więc razem z
+       rysunkiem cokołu wychodzi więcej niż ekran.
+
+       Deklaracja, nie pomiar — jak `contact` i `wall`. Jeden werdykt podjęty raz jest tu wart
+       więcej niż trafny werdykt podejmowany wielokrotnie, bo przełączenie trybu w trakcie
+       przesuwa stronę pod palcem. */
+    const alwaysFlow = new Set([
+      'categories', 'prizes', 'signup', 'contact', 'wall', 'voting', 'podium'
+    ]);
 
     /* On a phone the route section gets its own scroll length.
        ---------------------------------------------------------------------------
@@ -5538,6 +5716,29 @@ import { flagSvg } from './flags.js';
     if (!panel || !tabs.length) return;
 
     const formPanel = $('[data-contact-panel="form"]');
+
+    /* ------------------------------------------- A3: jeden czat zamiast dwóch dróg */
+    /**
+     * Zakładka „szybka wiadomość" schodzi z ekranu.
+     *
+     * Formularz kontaktowy i czat robiły to samo — zostawiały wiadomość, na którą organizator
+     * odpisuje mailem — a czat robi to lepiej: odpowiada od razu na pytania, które wracają
+     * codziennie, i przekazuje człowiekowi dopiero to, czego nie wie. Dwie drogi do tej samej
+     * rzeczy znaczą wybór, którego nikt nie umie podjąć, i dwa miejsca, w których wiadomość
+     * może się zgubić.
+     *
+     * Ukrywane stąd, a nie usuwane ze znacznika, i to jest świadome:
+     *
+     *   — trasa `contact` w Make i handler w Workerze zostają nietknięte, bo z nich korzysta
+     *     mailhook. Kasowanie znacznika nie miałoby na nie wpływu, ale zostawienie go czyni
+     *     oczywistym, że ta droga nadal istnieje po stronie serwera;
+     *   — bez JavaScriptu nie ma czatu, bo czat jest w całości obsługiwany stąd. Wtedy
+     *     zakładki zostają widoczne i formularz kontaktowy jest jedyną drogą — czyli
+     *     dokładnie tym, czym był. Ukrycie z JS znaczy „ukryte tam, gdzie jest zamiennik".
+     */
+    const tabStrip = $('[data-contact-tabs]');
+    if (tabStrip) tabStrip.hidden = true;
+    if (formPanel) formPanel.hidden = true;
     const log = $('[data-chat-log]', panel);
     const form = $('[data-chat-form]', panel);
     const input = $('[data-chat-input]', panel);
@@ -5551,11 +5752,16 @@ import { flagSvg } from './flags.js';
     const chipsToggle = $('[data-chat-chips-toggle]', panel);
     const chipsLabel = $('[data-chat-chips-label]', panel);
 
-    const token = chatToken();
+    /* `let`, nie `const`: „nowa rozmowa" wymienia token na świeży.
+       Wątek zamknięty i zapisany tym samym tokenem wróciłby na `human` przez trigger z
+       migracji 0005 — czyli dokładnie do stanu, z którego chcemy wyjść. */
+    let token = chatToken();
     let opened = false;
     let polling = 0;
     let lastAt = '';
     let mode = 'ai';
+    /** Rozmowa zakończona przez gościa. Trzeci stan panelu, obok bramy i rozmowy. */
+    let ended = false;
     const seen = new Set();
 
     /* Who we are talking to.
@@ -5585,10 +5791,14 @@ import { flagSvg } from './flags.js';
         if (identified()) {
           openThread();
           startPolling();
-          /* preventScroll, bo #contact jest sekcja sticky z overflow:hidden.
-                       Bez tego przegladarka "przewija do elementu", ktory z jej punktu widzenia
-                       stoi gdzie indziej niz widzi go uzytkownik — i strona teleportuje sie do
-                       stopki albo do komentarzy. To jest zglaszane "klikam wyslij i przenosi mnie
+          /* preventScroll, bo #contact jest sekcja sticky z overflow:hidden.
+
+                       Bez tego przegladarka "przewija do elementu", ktory z jej punktu widzenia
+
+                       stoi gdzie indziej niz widzi go uzytkownik — i strona teleportuje sie do
+
+                       stopki albo do komentarzy. To jest zglaszane "klikam wyslij i przenosi mnie
+
                        do komentarzy". Fokus ma ustawic kursor, nie ruszac strona. */
           input?.focus({ preventScroll: true });
         } else {
@@ -5599,16 +5809,134 @@ import { flagSvg } from './flags.js';
       }
     };
 
+    /* ------------------------------------------------- koniec rozmowy i nowa rozmowa */
+    /**
+     * Dwa elementy dobudowane tutaj, a nie wpisane w index.html.
+     *
+     * Pasek z „zakończ rozmowę" nad dziennikiem i karta „rozmowa zakończona" z przyciskiem
+     * „nowa rozmowa". Budowane z JavaScriptu, bo bez niego nie ma czatu w ogóle — panel czatu
+     * jest w całości obsługiwany stąd, więc przycisk zamykający rozmowę w statycznym znaczniku
+     * byłby przyciskiem widocznym u kogoś, kto nie ma czym go obsłużyć.
+     */
+    const tools = document.createElement('div');
+    tools.className = 'chat__tools';
+    tools.dataset.chatTools = '';
+    tools.hidden = true;
+    const endButton = document.createElement('button');
+    endButton.type = 'button';
+    endButton.className = 'chat__end';
+    endButton.dataset.chatEnd = '';
+    tools.append(endButton);
+
+    const endedCard = document.createElement('div');
+    endedCard.className = 'chat-ended';
+    endedCard.dataset.chatEnded = '';
+    endedCard.hidden = true;
+    const endedTitle = document.createElement('strong');
+    const endedLead = document.createElement('p');
+    const restartButton = document.createElement('button');
+    restartButton.type = 'button';
+    restartButton.className = 'btn btn--small btn--yellow';
+    restartButton.dataset.chatRestart = '';
+    endedCard.append(endedTitle, endedLead, restartButton);
+
+    /** Etykiety przez słownik, więc przełączenie języka je przerysowuje. */
+    function paintChatChrome() {
+      endButton.textContent = text('chat.end');
+      endedTitle.textContent = text('chat.endedTitle');
+      endedLead.textContent = text('chat.endedLead');
+      restartButton.textContent = text('chat.restart');
+    }
+    paintChatChrome();
+    window.addEventListener('carruleddhi:language', paintChatChrome);
+
+    // Pasek nad dziennikiem, karta na jego miejscu — oba wewnątrz panelu czatu.
+    if (log) {
+      log.before(tools);
+      log.after(endedCard);
+    } else {
+      panel.append(tools, endedCard);
+    }
+
     /* ---------------------------------------------------------------- gate */
-    /** Shows either the two fields or the conversation, never both. */
+    /** Shows the two fields, the conversation, or the closing card — never two at once. */
     function applyGate() {
       const done = identified();
-      if (gate) gate.hidden = done;
-      if (log) log.hidden = !done;
-      if (form) form.hidden = !done;
-      if (chips) chips.hidden = !done;
-      panel.dataset.chatReady = done ? 'yes' : 'no';
+      const live = done && !ended;
+      if (gate) gate.hidden = done || ended;
+      if (log) log.hidden = !live;
+      if (form) form.hidden = !live;
+      if (chips) chips.hidden = !live;
+      tools.hidden = !live;
+      endedCard.hidden = !ended;
+      panel.dataset.chatReady = ended ? 'ended' : (done ? 'yes' : 'no');
     }
+
+    /**
+     * Zakończenie rozmowy.
+     *
+     * Odpytywanie zatrzymywane pierwsze, żeby odpowiedź w drodze nie dorysowała wiadomości do
+     * dziennika, który właśnie schodzi z ekranu. Żądanie nie jest warunkiem: gdy padnie, po
+     * stronie gościa rozmowa i tak jest skończona, bo o tym decyduje on, a nie sieć. Serwer
+     * dowie się przy następnej okazji, a wątek bez zamknięcia to wątek widoczny w panelu —
+     * czyli błąd po bezpiecznej stronie.
+     */
+    async function endConversation() {
+      stopPolling();
+      try {
+        await postJSON(endpoint, eventPayload('chat', { action: 'close', token }));
+      } catch (error) {
+        console.warn('Chat close failed; ending locally anyway:', error);
+      }
+      ended = true;
+      applyGate();
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+      restartButton.focus({ preventScroll: true });
+    }
+
+    /**
+     * Nowa rozmowa: nowy token, nowa tożsamość, czysty dziennik.
+     *
+     * Imię i adres są pytane ponownie z rozmysłu. Przycisk „nowa rozmowa" naciska też ktoś, kto
+     * podaje komuś telefon albo pisze w innej sprawie z innego adresu — a odpowiedź organizatora
+     * poszłaby wtedy pod adres poprzedniej osoby. Jedno pytanie jest tańsze niż odpowiedź
+     * wysłana nie tam.
+     */
+    function startFresh() {
+      storage.remove(CHAT_TOKEN_KEY);
+      storage.remove('carruleddhi.chat.name');
+      storage.remove('carruleddhi.chat.email');
+      // chatToken() nie znajdzie zapisanego i wygeneruje nowy, zapisując go po drodze.
+      token = chatToken();
+      visitor.name = '';
+      visitor.email = '';
+      ended = false;
+      opened = false;
+      lastAt = '';
+      mode = 'ai';
+      seen.clear();
+      // Załącznik wybrany, ale niewysłany, należał do poprzedniej rozmowy.
+      dropAttachment();
+      if (log) log.replaceChildren();
+      $$('[data-field]', gate).forEach((holder) => {
+        holder.classList.remove('is-invalid');
+        const slot = $('[data-error]', holder);
+        if (slot) slot.textContent = '';
+      });
+      const nameField = $('#chat-gate-name', panel);
+      const emailField = $('#chat-gate-email', panel);
+      if (nameField) nameField.value = '';
+      if (emailField) emailField.value = '';
+      applyGate();
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+      nameField?.focus({ preventScroll: true });
+    }
+
+    endButton.addEventListener('click', () => {
+      // Pytanie, bo zamknięcia nie da się cofnąć: nowa rozmowa startuje z pustym dziennikiem.
+      if (window.confirm(text('chat.endConfirm'))) void endConversation();
+    });
+    restartButton.addEventListener('click', startFresh);
 
     gateForm?.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -5656,9 +5984,10 @@ import { flagSvg } from './flags.js';
     });
 
     /* -------------------------------------------------------------- render */
-    const bubble = (author, body, pending) => {
+    const bubble = (author, body, pending, image = '') => {
       const row = document.createElement('div');
       row.className = `chat-msg chat-msg--${author}${pending ? ' is-pending' : ''}`;
+      if (image) row.classList.add('has-photo');
       const who = document.createElement('span');
       who.className = 'chat-msg__who';
       who.textContent = author === 'visitor'
@@ -5666,12 +5995,33 @@ import { flagSvg } from './flags.js';
         : author === 'organiser'
           ? (text('chat.them') || 'Organizator')
           : (text('chat.bot') || 'Automat');
-      const said = document.createElement('p');
-      said.className = 'chat-msg__body';
-      // textContent, not innerHTML: this string came from a stranger, and the organiser's
-      // half came out of a database that a stranger can write to.
-      said.textContent = body;
-      row.append(who, said);
+      row.append(who);
+
+      /* Zdjęcie nad tekstem, bo tekst je zwykle komentuje: „to koło" pod obrazkiem czyta się,
+         a nad nim wisi w powietrzu. Adres jest podpisany przez workera i wygasa po godzinie —
+         patrz migracja 0024; przeglądarka nigdy nie widzi ścieżki w buckecie. */
+      if (image) {
+        const figure = document.createElement('figure');
+        figure.className = 'chat-msg__photo';
+        const picture = document.createElement('img');
+        picture.src = image;
+        picture.alt = text('chat.photoAlt');
+        picture.loading = 'lazy';
+        picture.decoding = 'async';
+        figure.append(picture);
+        row.append(figure);
+      }
+
+      /* Akapit tylko wtedy, gdy jest co w nim napisać. Puste `<p>` pod zdjęciem to pasek
+         odstępu bez powodu, a zdjęcie bez podpisu jest normalną wiadomością. */
+      if (body) {
+        const said = document.createElement('p');
+        said.className = 'chat-msg__body';
+        // textContent, not innerHTML: this string came from a stranger, and the organiser's
+        // half came out of a database that a stranger can write to.
+        said.textContent = body;
+        row.append(said);
+      }
       return row;
     };
 
@@ -5685,7 +6035,7 @@ import { flagSvg } from './flags.js';
       if (message.id && seen.has(message.id)) return null;
       if (message.id) seen.add(message.id);
       const stick = atBottom();
-      const node = bubble(message.author, message.body, pending);
+      const node = bubble(message.author, message.body, pending, message.image || '');
       log.appendChild(node);
       if (stick) toBottom();
       if (message.at && message.at > lastAt) lastAt = message.at;
@@ -5753,9 +6103,111 @@ import { flagSvg } from './flags.js';
     /* ---------------------------------------------------------------- send */
     let sending = false;
 
+    /* ------------------------------------------------------------ załącznik */
+    /**
+     * Zdjęcie zmniejszone w przeglądarce, zanim gdziekolwiek pojedzie.
+     *
+     * Telefon robi dziś dwanaście megapikseli, a bąbelek w czacie ma dwieście pikseli
+     * szerokości. Wysłanie oryginału to kilka megabajtów przez transmisję komórkową po to, żeby
+     * serwer i tak je pomniejszył — a limit ciała żądania odrzuciłby je wcześniej, pokazując
+     * błąd o za dużym żądaniu zamiast o za dużym zdjęciu.
+     *
+     * 1400 px po dłuższej krawędzi i JPEG 0.8: mniej niż przy zgłoszeniach, bo tu nikt nie
+     * drukuje tego zdjęcia — ma być czytelne w rozmowie i wystarczające dla modelu.
+     */
+    async function shrinkPhoto(file) {
+      const bitmap = await createImageBitmap(file);
+      const longest = Math.max(bitmap.width, bitmap.height);
+      const scale = longest > 1400 ? 1400 / longest : 1;
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('no 2d context');
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      return canvas.toDataURL('image/jpeg', 0.8);
+    }
+
+    /* Wybrane zdjęcie czeka tutaj do wysłania razem z wiadomością — jako data URL, bo to jest
+       postać, w której workera to przyjmuje, i sprawdzona już raz przy wyborze pliku. */
+    let attached = null;
+
+    const fileField = document.createElement('input');
+    fileField.type = 'file';
+    fileField.accept = 'image/jpeg,image/png,image/webp';
+    fileField.hidden = true;
+    fileField.dataset.chatFile = '';
+
+    const attachButton = document.createElement('button');
+    attachButton.type = 'button';
+    attachButton.className = 'chat__attach';
+    attachButton.dataset.chatAttach = '';
+    attachButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+      + '<path d="M9 12.5V7a3 3 0 0 1 6 0v9a5 5 0 0 1-10 0V8" fill="none" stroke="currentColor"'
+      + ' stroke-width="2.2" stroke-linecap="round"/></svg>';
+
+    /* Podgląd nad polem tekstowym: kto dołączył zdjęcie, ma je widzieć przed wysłaniem, i mieć
+       jak je zdjąć. Bez tego jedyną drogą wycofania się jest wysłanie i żałowanie. */
+    const preview = document.createElement('div');
+    preview.className = 'chat__preview';
+    preview.dataset.chatPreview = '';
+    preview.hidden = true;
+    const previewImage = document.createElement('img');
+    previewImage.alt = '';
+    const previewDrop = document.createElement('button');
+    previewDrop.type = 'button';
+    previewDrop.className = 'chat__preview-drop';
+    previewDrop.innerHTML = '<span aria-hidden="true">×</span>';
+    preview.append(previewImage, previewDrop);
+
+    function paintAttach() {
+      attachButton.setAttribute('aria-label', text('chat.attach'));
+      attachButton.title = text('chat.attach');
+      previewDrop.setAttribute('aria-label', text('chat.attachDrop'));
+      preview.hidden = !attached;
+      attachButton.classList.toggle('is-set', Boolean(attached));
+      if (attached) previewImage.src = attached;
+    }
+
+    const dropAttachment = () => {
+      attached = null;
+      fileField.value = '';
+      paintAttach();
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
+    };
+
+    attachButton.addEventListener('click', () => fileField.click());
+    previewDrop.addEventListener('click', dropAttachment);
+    fileField.addEventListener('change', async () => {
+      const file = fileField.files?.[0];
+      if (!file) return;
+      try {
+        attached = await shrinkPhoto(file);
+        paintAttach();
+        window.dispatchEvent(new Event('carruleddhi:relayout'));
+        input?.focus({ preventScroll: true });
+      } catch (error) {
+        console.warn('Chat attachment could not be prepared:', error);
+        dropAttachment();
+        note('chat.attachFailed');
+      }
+    });
+
+    if (form) {
+      form.prepend(attachButton);
+      form.append(fileField);
+      form.before(preview);
+    }
+    paintAttach();
+    window.addEventListener('carruleddhi:language', paintAttach);
+
     async function send(body) {
       const message = String(body || '').trim();
-      if (!message) return;
+      /* Samo zdjęcie wystarczy. Ktoś fotografuje koło i pyta jednym obrazkiem — a wymuszanie
+         podpisu znaczyłoby, że przeglądarka dopisuje zdanie za użytkownika i w wątku
+         organizatora pojawia się treść, której nikt nie napisał. */
+      if (!message && !attached) return;
       /* One in flight at a time.
          The submit handler and the Enter handler both call this, and a fast double press —
          or a click on the button while Enter is still being processed — used to start two
@@ -5766,7 +6218,16 @@ import { flagSvg } from './flags.js';
 
       // Shown before the round trip, greyed until it lands. A chat that waits for the
       // server before showing what you typed feels broken on a slow connection.
-      const pending = append({ author: 'visitor', body: message, at: '' }, true);
+      /* Zdjęcie zdejmowane z podglądu od razu, ale trzymane w zmiennej do końca wysyłki:
+         inaczej drugie naciśnięcie Enter dołączyłoby je po raz drugi, a to samo zdjęcie
+         wysłane dwa razy to dwa pliki w buckecie i dwa bąbelki. */
+      const photo = attached;
+      attached = null;
+      fileField.value = '';
+      paintAttach();
+
+      // Miniatura w bąbelku od razu, z lokalnego data URL — bez czekania na podpisany adres.
+      const pending = append({ author: 'visitor', body: message, at: '', image: photo || '' }, true);
       if (input) input.value = '';
       sizeInput();
       if (sendButton) sendButton.disabled = true;
@@ -5777,6 +6238,7 @@ import { flagSvg } from './flags.js';
           action: 'send',
           token,
           message,
+          ...(photo ? { photo } : {}),
           // Sent every time, ignored by the server once the thread already has them.
           name: visitor.name,
           email: visitor.email
@@ -5808,6 +6270,13 @@ import { flagSvg } from './flags.js';
       } catch (_) {
         pending?.classList.add('is-failed');
         note('chat.sendFailed');
+        /* Zdjęcie wraca do podglądu, gdy wysyłka padła. Zniknięcie razem z nieudaną wiadomością
+           znaczyłoby, że po zerwanym połączeniu trzeba je wybrać z galerii jeszcze raz — a to
+           jest jedyna część tej wiadomości, której nie da się szybko odtworzyć. */
+        if (photo) {
+          attached = photo;
+          paintAttach();
+        }
       } finally {
         hideTyping();
         sending = false;
@@ -5957,9 +6426,17 @@ import { flagSvg } from './flags.js';
     applyGate();
     paintChips();
 
-    /* Somebody arriving at #contact from the chat link in an e-mail wants the chat, not the
-       form. Also how the unsubscribe card hands over once that flow moves in here. */
-    if (/(?:^|[#&])chat\b/.test(window.location.hash)) selectTab('chat');
+    /* Czat jest teraz jedyną drogą, więc jest widoczny od razu.
+       ---------------------------------------------------------------------------
+       Dotąd stała tu jedna linijka: przełącz na czat, jeśli w adresie jest `#chat` — bo
+       domyślną zakładką był formularz. Odkąd formularz zszedł z ekranu (patrz A3 na górze tej
+       funkcji), warunek zostawiłby pustą kartę: panel czatu ma w znaczniku atrybut `hidden`,
+       a zdejmuje go dopiero selectTab.
+
+       `selectTab` zostaje jedyną drogą do tego stanu — także dlatego, że robi resztę: bramę
+       tożsamości, otwarcie wątku i uruchomienie odpytywania. Odsłonięcie panelu przez samo
+       `hidden = false` pominęłoby wszystkie trzy. */
+    selectTab('chat');
   }
 
   /**
@@ -6033,20 +6510,38 @@ import { flagSvg } from './flags.js';
       const height = section.offsetHeight;
       const y = window.scrollY || window.pageYOffset || 0;
 
-      /* Two thirds of the travel happens while the section is arriving, the rest while it is
-         pinned. `end` stops short of the point where the next panel begins covering this
-         one, so the photograph has finished growing before anything slides over it —
-         a picture still expanding under an incoming card reads as two animations arguing. */
-      /* Measured: with this layout the section is exactly one viewport tall, so `height -
-         viewport` is zero and the whole animation has to happen on the way in. Starting a
-         screen and a tenth early gives it enough scroll to be seen; finishing as the panel
-         pins means the photograph is already at rest when the next card begins sliding over
-         it, which is the order asked for. */
-      const start = top - viewport * 1.1;
-      const end = top + Math.max(height - viewport, 0) * 0.55;
+      /* Efekt zaczyna się, gdy sekcja wypełnia ekran — nie wcześniej.
+         ---------------------------------------------------------------------------
+         Stało tu `start = top - viewport * 1.1`, czyli powiększanie startowało ekran i jedną
+         dziesiątą PRZED pojawieniem się sekcji. Nie było to niedopatrzenie, a konieczność:
+         zmierzone na 1440×900 sekcja miała dokładnie jeden ekran wysokości i zapas przewijania
+         przy pełnej widoczności równy zeru. W chwili, gdy wypełniała ekran, nie było już czego
+         przewijać, więc cały przebieg musiał zmieścić się na drodze do niej.
+
+         Teraz sekcja ma dwa ekrany na każdej szerokości (route-zoom.css, blok „ten sam zapas
+         przewijania na szerokim ekranie"), a treść jest przypięta w jej środku. Dzięki temu
+         `start` to moment, w którym panel wypełnia ekran, a cały przebieg dzieje się na oczach.
+
+         `end` przy 85% zapasu, nie przy 100%: ostatnie piętnaście procent to czas, w którym
+         zdjęcie stoi już nieruchomo, zanim następna karta zacznie wjeżdżać. Zdjęcie wciąż
+         rosnące pod nadjeżdżającą kartą czyta się jako dwie kłócące się animacje.
+
+         Zapas mierzony, nie zakładany: gdyby arkusz nie doszedł albo ktoś włączył `prefers-
+         reduced-motion` (wtedy blok CSS nie obowiązuje), zapas jest zerowy i wracamy do
+         poprzedniego sposobu. Bez tego efekt przeskakiwałby z 0 na 1 w jednym pikselu. */
+      const slack = Math.max(height - viewport, 0);
+      const roomy = slack > viewport * 0.3;
+      const start = roomy ? top : top - viewport * 1.1;
+      const end = roomy ? top + slack * 0.85 : top + slack * 0.55;
       const span = Math.max(end - start, 1);
 
-      const progress = clamp((y - start) / span, 0, 1);
+      const linear = clamp((y - start) / span, 0, 1);
+      /* Wygładzenie krzywą smoothstep, nie easeOut.
+         Symetryczna: łagodnie startuje i łagodnie dochodzi, a w środku przebiegu ma nachylenie
+         bliskie liniowemu — czyli nie odkleja obrazu od palca. easeOut wygląda płynnie na
+         wykresie i pod palcem czyta się jak opóźnienie, bo najszybsza jest na początku ruchu,
+         w którym człowiek jeszcze nie zdążył spojrzeć. */
+      const progress = linear * linear * (3 - 2 * linear);
       frame.style.setProperty('--route-progress', progress.toFixed(3));
       /* And on the root, for everything outside the frame that follows the same number — the
          heading and the facts beside the photograph.

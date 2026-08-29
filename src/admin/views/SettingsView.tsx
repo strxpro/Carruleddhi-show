@@ -212,7 +212,25 @@ export function SettingsView({
     !logo ? '' : logo.startsWith('/') || logo.startsWith('http') ? logo : preview[logo] || '';
 
   if (!loaded) {
-    return <div className="p-2 text-sm text-white/50">{t('common.loading')}</div>;
+    /* The heading and lead are real, not placeholders — they are the same two lines whether
+       the settings have arrived or not, so drawing them straight away means only the panels
+       below them appear, instead of the whole screen materialising at once. */
+    return (
+      <div className="mx-auto max-w-3xl pb-10" role="status" aria-busy="true" aria-label={t('common.loading')}>
+        <h2 className="text-2xl font-bold tracking-tight text-white">{t('set.title')}</h2>
+        <p className="mt-1.5 text-sm text-white/55">{t('set.lead')}</p>
+        {Array.from({ length: 3 }).map((_, card) => (
+          <section key={card} className="mt-6 rounded-2xl border border-white/10 bg-white/4 p-5">
+            <div className="flex items-center gap-3">
+              <span className="block size-9 shrink-0 animate-skeleton rounded-full bg-white/10" />
+              <span className="block h-4 w-40 animate-skeleton rounded bg-white/10" />
+            </div>
+            <span className="mt-3.5 block h-3.5 w-full animate-skeleton rounded bg-white/10" />
+            <span className="mt-1.5 block h-3.5 w-2/3 animate-skeleton rounded bg-white/10" />
+          </section>
+        ))}
+      </div>
+    );
   }
 
   return (
