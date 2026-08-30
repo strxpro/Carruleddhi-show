@@ -245,6 +245,30 @@
             <div class="countdown__unit"><strong class="countdown__number" data-minutes>00</strong><span class="countdown__label" data-i18n="count.minutes">minuti</span></div>
             <div class="countdown__unit"><strong class="countdown__number" data-seconds>00</strong><span class="countdown__label" data-i18n="count.seconds">secondi</span></div>
           </div>
+
+          <!-- Zegar głosowania, w miejsce odliczania do wydarzenia.
+               ==========================================================================
+               W dniu zjazdu odliczanie do wydarzenia pokazuje same zera i przestaje być
+               informacją — a to najbardziej widoczna liczba na stronie. Więc w chwili, gdy
+               głosowanie rusza, odliczanie do wydarzenia znika, a na jego miejscu staje to,
+               co jest wtedy pilne: ile zostało do końca głosowania.
+
+               Po zamknięciu zostaje jedno zdanie i odsyłacz na cokół — bo pytanie zmienia się
+               z „ile mam czasu" na „kto wygrał".
+
+               Podmiana, a nie dodanie obok: dwa zegary jeden pod drugim kazałyby czytającemu
+               zgadywać, który z nich go dotyczy. -->
+          <div class="hero-vote" data-hero-vote hidden aria-live="polite">
+            <span class="hero-vote__label" data-hero-vote-label></span>
+            <strong class="hero-vote__time" data-hero-vote-time></strong>
+            <a class="btn btn--yellow hero-vote__go" href="votazione.html" data-hero-vote-go hidden>
+              <span data-i18n="voting.cta">Vota ora</span><span aria-hidden="true">★</span>
+            </a>
+            <a class="btn btn--blue hero-vote__go" href="#podium" data-hero-vote-podium hidden>
+              <span data-i18n="voting.seeWinners">Guarda i vincitori</span><span aria-hidden="true">↘</span>
+            </a>
+          </div>
+
           <div class="hero-stat">
             <strong class="hero-stat__number" data-pilots-count>—</strong>
             <span class="hero-stat__label" data-i18n="hero.pilots">piloti iscritti</span>
@@ -324,17 +348,36 @@
         </div>
 
         <div class="podium__actions">
-          <!-- Pełna klasyfikacja nagrody publiczności stoi na podstronie głosowania: cokół
-               odpowiada na jedno pytanie — kto wygrał — i dopóki na nie nie odpowie, lista
-               kilkudziesięciu wyników nie ma prawa go zasłaniać.
+          <!-- Pełna klasyfikacja rozwija się TUTAJ, pod cokołem — nie prowadzi na podstronę.
+               ==========================================================================
+               Cokół odpowiada na jedno pytanie: kto wygrał. Następne pytanie brzmi „a gdzie
+               jest mój wóz" i jest zadawane w tym samym miejscu, tą samą sekundę. Przeskok na
+               osobną podstronę gubił kontekst i kazał wracać przyciskiem wstecz.
+
+               Porcjami po pięć, bo pełna stawka to kilkadziesiąt wierszy i rozwinięta naraz
+               spycha stopkę poza ekran — czyli odpowiada na pytanie, którego nikt nie zadał,
+               kosztem tego, co było widać.
 
                Stała tu wcześniej zwijana lista zwycięzców dwunastu nagród. Zdjęta razem z
                przejściem na jedną nagrodę publiczności: tamtych dwanaście rozstrzyga jury i
                stoper, więc lista „zwycięzców" wyliczona z głosów publiczności mówiłaby o nich
                coś, czego nie da się z tych głosów wyliczyć. -->
-          <a class="btn btn--blue" href="votazione.html" data-podium-all>
-            <span data-i18n="voting.seeAll">Classifica completa</span><span aria-hidden="true">↘</span>
-          </a>
+          <button class="btn btn--blue" type="button" data-podium-toggle
+                  aria-expanded="false" aria-controls="podium-standings">
+            <span data-podium-toggle-label data-i18n="voting.seeAll">Classifica completa</span>
+            <span class="podium__chev" aria-hidden="true">↓</span>
+          </button>
+        </div>
+
+        <!-- Lista dorysowywana przez voting.js z tej samej odpowiedzi serwera, co cokół —
+             ani jednego żądania więcej. `hidden` do pierwszego naciśnięcia. -->
+        <div class="podium__standings" id="podium-standings" data-podium-standings hidden>
+          <ol class="standings" data-standings-list></ol>
+          <div class="standings__more">
+            <button class="btn btn--outline" type="button" data-standings-more hidden>
+              <span data-standings-more-label data-i18n="voting.loadMore">Mostra altri</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -561,7 +604,7 @@
         </div>
         <figure class="route__map reveal" data-delay="1">
           <div class="route__frame" data-route-frame>
-            <img data-route-image src="/assets/images/zjazd.png" alt="La discesa di via Giuseppe Verdi verso la Rena Bianca" data-i18n-alt="route.imageAlt" width="1672" height="940" decoding="async">
+            <img data-route-image src="/assets/images/zjazd.webp" alt="La discesa di via Giuseppe Verdi verso la Rena Bianca" data-i18n-alt="route.imageAlt" width="1672" height="940" decoding="async" loading="lazy">
             <svg class="route__overlay" data-route-svg viewBox="0 0 1000 562" preserveAspectRatio="none" aria-hidden="true" focusable="false">
               <defs>
                 <!-- The reveal mask is a thick stroke drawn with dashoffset, so a filled
@@ -1774,7 +1817,7 @@
       },
       contact: { email: 'info@carruleddhishow.com', phone: '+39 328 498 1574' },
       media: {
-        routeImage: '/assets/images/zjazd.png',
+        routeImage: '/assets/images/zjazd.webp',
         galleryImages: [
           '/assets/images/gallery-start.svg',
           '/assets/images/gallery-race.svg',
@@ -1923,6 +1966,26 @@
       let pending = null;
       let resizeAt = 0;
 
+      /* WYSOKOŚĆ DOKUMENTU CZYTANA RAZ NA KLATKĘ, NIE RAZ NA ZDARZENIE.
+         ---------------------------------------------------------------------------
+         `doc.scrollHeight` WYMUSZA przeliczenie układu: przeglądarka musi porzucić to, co ma w
+         kolejce, i policzyć pozycje wszystkiego od nowa, żeby oddać liczbę. Ten dokument ma
+         trzynaście tysięcy pikseli i czternaście przypiętych paneli, więc jedno takie
+         przeliczenie nie jest tanie — a stało w handlerze `scroll` bez żadnego throttlingu,
+         czyli działo się kilkadziesiąt razy na sekundę dokładnie wtedy, gdy wątek główny jest
+         najbardziej potrzebny do składania klatek: w trakcie rzutu palcem.
+
+         Zdarzenie zapamiętuje więc tylko pozycję (`window.scrollY` nie wymusza układu) i zamawia
+         jeden odczyt wysokości w rAF-ie. Logika zostaje ta sama, bo pytanie „czy dokument zmienił
+         wysokość" i tak dotyczy stanu po przeliczeniu układu, a nie stanu w połowie zdarzenia. */
+      let heightFrame = 0;
+      const syncHeight = () => {
+        heightFrame = 0;
+        const height = doc.scrollHeight;
+        if (height === goodHeight) goodY = Math.round(window.scrollY);
+        else goodHeight = height;
+      };
+
       window.addEventListener('scroll', () => {
         const y = Math.round(window.scrollY);
         if (pending) {
@@ -1932,8 +1995,7 @@
           if (performance.now() - resizeAt > 500 && Math.abs(y - pending.y) > 30) pending = null;
           return;
         }
-        if (doc.scrollHeight === goodHeight) goodY = y;
-        else goodHeight = doc.scrollHeight;
+        if (!heightFrame) heightFrame = requestAnimationFrame(syncHeight);
       }, { passive: true });
 
       window.addEventListener('resize', () => {

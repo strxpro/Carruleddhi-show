@@ -17,17 +17,41 @@
   <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
   <div class="noise" aria-hidden="true"></div>
 
-  <!-- Nagłówek jednolinijkowy, jak na stronach prawnych: znak firmowy i powrót.
-       Ani menu, ani „zapisz się", ani „będę tam" — w chwili, gdy wózki jadą, żadna z tych
-       rzeczy nie jest już aktualna, a to była wprost zgłoszona potrzeba. -->
+  <!-- Nagłówek: ten sam pasek co na stronie głównej, z tym samym przełącznikiem języka.
+       ==========================================================================
+       Wcześniej stał tu rząd sześciu przycisków z nazwami języków — czyli coś, czego nie ma
+       na żadnej innej stronie serwisu i co wyglądało na prowizorkę. Ten sam znacznik co w
+       index.html znaczy te same style i to samo zachowanie: flaga, skrót, lista rozwijana.
+
+       Bez menu, bez „zapisz się" i bez „będę tam" — w chwili, gdy wózki jadą, żadna z tych
+       rzeczy nie jest już aktualna. Zostaje powrót na stronę. -->
   <header class="site-header">
     <div class="nav-shell">
-      <a class="brand" href="index.html" data-vote-back>
-        <span class="brand__name">Carruleddhi</span><span class="brand__date">17 · 10 · 2026</span>
+      <a class="brand" href="index.html" data-vote-back aria-label="Carruleddhi Show">
+        <span class="brand__name">Carruleddhi</span>
+        <span class="brand__date">17 · 10 · 2026</span>
       </a>
-      <a class="btn btn--small btn--yellow" href="index.html" data-vote-back>
-        <span data-i18n="voting.backToSite">← Torna al sito</span>
-      </a>
+
+      <div class="nav-actions">
+        <div class="language-picker" data-language-picker>
+          <button class="language-picker__trigger" type="button" data-language-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="language-options" aria-label="Lingua / Language">
+            <span class="language-picker__flag" data-language-flag aria-hidden="true">🇮🇹</span>
+            <span class="language-picker__code" data-language-code>IT</span>
+            <svg viewBox="0 0 12 8" aria-hidden="true"><path d="m1 1 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <div class="language-picker__menu" id="language-options" data-language-menu role="listbox" aria-label="Lingua" aria-hidden="true">
+            <button type="button" role="option" data-language-option="it" aria-selected="true"><span aria-hidden="true">🇮🇹</span><strong>Italiano</strong><small>IT</small></button>
+            <button type="button" role="option" data-language-option="pl" aria-selected="false"><span aria-hidden="true">🇵🇱</span><strong>Polski</strong><small>PL</small></button>
+            <button type="button" role="option" data-language-option="en" aria-selected="false"><span aria-hidden="true">🇬🇧</span><strong>English</strong><small>EN</small></button>
+            <button type="button" role="option" data-language-option="de" aria-selected="false"><span aria-hidden="true">🇩🇪</span><strong>Deutsch</strong><small>DE</small></button>
+            <button type="button" role="option" data-language-option="es" aria-selected="false"><span aria-hidden="true">🇪🇸</span><strong>Español</strong><small>ES</small></button>
+            <button type="button" role="option" data-language-option="fr" aria-selected="false"><span aria-hidden="true">🇫🇷</span><strong>Français</strong><small>FR</small></button>
+          </div>
+        </div>
+        <a class="btn btn--small btn--yellow" href="index.html" data-vote-back>
+          <span data-i18n="voting.backToSite">← Torna al sito</span>
+        </a>
+      </div>
     </div>
   </header>
 
@@ -44,9 +68,6 @@
           <span class="vote-rule__mark" aria-hidden="true">★</span>
           <span data-i18n="voting.oneVote">Un voto a persona. Puoi cambiarlo dal link nella mail finché il voto è aperto.</span>
         </p>
-
-        <!-- Sześć języków. Ten sam rząd co na stronach prawnych, więc i te same style. -->
-        <nav class="legal-langs" data-vote-languages aria-label="Lingua"></nav>
       </header>
 
       <!-- Głosowanie zamknięte albo jeszcze nieotwarte: jedno zdanie zamiast pustej siatki.
@@ -152,6 +173,47 @@
       <p class="vote-dialog__status" data-vote-status aria-live="polite"></p>
     </div>
   </dialog>
+
+  <!-- Stopka: ta sama co na stronie głównej, bez odsyłaczy do sekcji, których tu nie ma.
+       ==========================================================================
+       Wcześniej strona kończyła się siatką kafelków i pustką. Odsyłacze do sekcji wskazują
+       `index.html#…`, a nie same zakotwiczenia: na tej stronie nie ma ani „La gara", ani
+       „Percorso", więc `#route` prowadziłby w nicość.
+
+       Dokumenty prawne dostają `?lang=` z JavaScriptu, żeby regulamin otwierał się w tym
+       języku, w którym ktoś właśnie głosował — patrz applyLanguage w voting-boot.js. -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer__top">
+        <div class="footer__brandwrap">
+          <div class="footer__brand">CARRULEDDHI<br><span>SHOW 2026</span></div>
+          <p class="footer__copy" data-i18n="footer.copy">Una discesa, un paese, una storia costruita a mano.</p>
+        </div>
+        <div class="footer__group">
+          <h3 data-i18n="footer.explore">Esplora</h3>
+          <div class="footer__links">
+            <a href="index.html#story" data-i18n="nav.race">La gara</a>
+            <a href="index.html#categories" data-i18n="nav.categories">Categorie</a>
+            <a href="index.html#prizes" data-i18n="nav.prizes">Premi</a>
+            <a href="index.html#route" data-i18n="nav.route">Percorso</a>
+            <a href="index.html#contact" data-i18n="nav.contact">Contatti</a>
+          </div>
+        </div>
+        <div class="footer__group">
+          <h3 data-i18n="footer.legal">Informazioni legali</h3>
+          <div class="footer__links">
+            <a href="privacy.html" data-legal-link data-i18n="footer.privacy">Privacy policy</a>
+            <a href="cookies.html" data-legal-link data-i18n="footer.cookies">Cookie policy</a>
+            <a href="regolamento.html" data-legal-link data-i18n="footer.rules">Regolamento evento</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <span>© <span data-current-year>2026</span> Carruleddhi Show · Santa Teresa Gallura</span>
+        <span data-i18n="footer.credit">Progetto digitale Carruleddhi Show</span>
+      </div>
+    </div>
+  </footer>
 
   <!-- Ten sam pasek komunikatów co na stronie głównej, ta sama funkcja go obsługuje. -->
   <div class="toast" data-toast role="status" aria-live="polite" data-toast-tone="info">

@@ -291,3 +291,42 @@ export function paintDemoBar({ phase, onPhase, onSkip }) {
   document.body.append(bar);
   paintDemoBar({ phase, onPhase, onSkip });
 }
+
+/* ===========================================================================
+   Zastępcze zdjęcie uczestnika
+   ===========================================================================
+   Nie każdy wóz ma fotografię: organizator dopisuje ludzi w dniu zawodów z telefonu na
+   zboczu i zdjęcie bywa ostatnią rzeczą, na którą jest czas. Pusty prostokąt w liście
+   wyników wygląda jak błąd wczytywania, a nie jak brak zdjęcia.
+
+   RYSUNEK, NIE FOTOGRAFIA Z BANKU
+   Ta sama reguła co w demo: plaża udająca czyjś carruleddhu wprowadza w błąd. To jest
+   jawnie rysowany kafelek z numerem startowym — nikt nie weźmie go za zdjęcie.
+
+   „LOSOWY", ALE STAŁY
+   Kolor bierze się z numeru startowego, nie z Math.random(). Losowy przy każdym rysowaniu
+   znaczyłby inny awatar po każdym doczytaniu listy i przy przejściu z siatki na cokół —
+   czyli migotanie tam, gdzie ma być rozpoznawalność. Ten sam wóz ma zawsze ten sam kafelek.
+
+   Mnożnik 137 to liczba obrotów blisko złotego kąta: kolejne numery startowe dostają przez
+   to kolory odległe na kole barw, więc 007 i 008 nie są dwoma odcieniami tego samego. */
+export function avatarFor(row) {
+  const number = String(row?.startNumber ?? '').padStart(3, '0');
+  const hue = (Number(row?.startNumber) || 0) * 137 % 360;
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90">',
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">',
+    `<stop offset="0" stop-color="hsl(${hue} 72% 82%)"/>`,
+    `<stop offset="1" stop-color="hsl(${hue} 58% 64%)"/>`,
+    '</linearGradient></defs>',
+    '<rect width="120" height="90" fill="url(#g)"/>',
+    /* Wózek jednym konturem: buda, dwa koła. Tyle wystarczy, żeby kafelek czytał się jako
+       carruleddhu, a nie jako brakujący obrazek. */
+    `<path d="M26 58h68l-8-18H34z" fill="hsl(${hue} 45% 32%)" opacity=".28"/>`,
+    `<circle cx="40" cy="64" r="8" fill="hsl(${hue} 45% 32%)" opacity=".38"/>`,
+    `<circle cx="80" cy="64" r="8" fill="hsl(${hue} 45% 32%)" opacity=".38"/>`,
+    `<text x="60" y="40" text-anchor="middle" font-family="system-ui,sans-serif" font-size="30" font-weight="900" fill="hsl(${hue} 50% 26%)" opacity=".55">${number}</text>`,
+    '</svg>'
+  ].join('');
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}

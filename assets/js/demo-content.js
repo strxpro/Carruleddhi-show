@@ -99,11 +99,62 @@ export function demoRating() {
    W trybie demo faza jest przełączana z ekranu. Nie jest to obejście serwera: kiedy Worker
    odpowiada, faza pochodzi wyłącznie od niego i przełącznika nie ma. Patrz voting.js.
 
-   ZDJĘCIA SĄ RYSUNKAMI Z TEGO REPOZYTORIUM
+   ZDJĘCIA SĄ RYSOWANE TUTAJ, PO JEDNYM NA WÓZ
      Reguła z góry tego pliku obowiązuje: żadnych zdjęć z banku, bo plaża udająca czyjś
-     carruleddhu wprowadza w błąd, zamiast ilustrować. Te pięć plików to własne SVG serwisu,
-     które na pierwszy rzut oka są rysunkami i nikt nie weźmie ich za zdjęcie pojazdu.
+     carruleddhu wprowadza w błąd, zamiast ilustrować.
+
+     Wcześniej osiemnaście kafelków dzieliło między siebie PIĘĆ plików z galerii. Zmierzone:
+     16 wczytanych obrazków, `distinctSources: 5`. Wszystko działało, a lista wyglądała jak
+     jeden wóz powtórzony kilka razy — czyli nie dawała obejrzeć tego, po co się na nią patrzy.
+
+     Teraz każdy wóz ma własny rysunek składany w `cartArt()`: inny kolor, inna buda, numer
+     startowy na burcie. Rysunek, nie zdjęcie — nikt nie weźmie tego za fotografię, a
+     osiemnaście kafelków wygląda jak osiemnaście różnych pojazdów.
    =========================================================================== */
+
+/**
+ * Rysunek jednego carruleddhu, składany z numeru startowego.
+ * ---------------------------------------------------------------------------
+ * Data URI, nie plik: osiemnaście plików w repozytorium po to, żeby obejrzeć siatkę, to
+ * osiemnaście plików do utrzymania i osiemnaście żądań przy wejściu na stronę. SVG w adresie
+ * jest częścią odpowiedzi, którą i tak trzeba wysłać.
+ *
+ * Kolor liczony z numeru startowego, nie losowany: ten sam wóz ma zawsze ten sam rysunek, więc
+ * po przerysowaniu listy nic nie zmienia barwy, a zrzut ekranu da się porównać z poprzednim.
+ * Krok 47 stopni na numer — liczba pierwsza względem 360, więc kolejne wozy nie wpadają w te
+ * same odcienie.
+ *
+ * Napis DEMO na burcie jest częścią rysunku. Nie polega na tym, że stronę otwarto z `?demo=1`:
+ * gdyby ten obrazek kiedykolwiek trafił do zrzutu ekranu w oderwaniu od strony, nadal mówi,
+ * czym jest.
+ */
+function cartArt(startNumber, index) {
+  const hue = (index * 47 + 18) % 360;
+  const body = `hsl(${hue} 68% 52%)`;
+  const dark = `hsl(${hue} 72% 32%)`;
+  const sky = `hsl(${(hue + 186) % 360} 42% 88%)`;
+  const number = String(startNumber).padStart(3, '0');
+
+  /* Bez apostrofów i bez `#` w środku: pierwsze psują atrybut, drugie ucina adres na
+     kotwicy. Kolory są zapisane przez hsl(), więc `#` nie występuje wcale. */
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+    <rect width="400" height="300" fill="${sky}"/>
+    <path d="M0 232h400v68H0z" fill="${dark}" opacity=".18"/>
+    <path d="M64 210h272l-26-58H90z" fill="${body}"/>
+    <path d="M120 152h96l-10-40h-76z" fill="${dark}"/>
+    <rect x="150" y="120" width="36" height="24" rx="4" fill="${sky}" opacity=".85"/>
+    <circle cx="118" cy="222" r="30" fill="${dark}"/>
+    <circle cx="118" cy="222" r="12" fill="${sky}"/>
+    <circle cx="290" cy="222" r="30" fill="${dark}"/>
+    <circle cx="290" cy="222" r="12" fill="${sky}"/>
+    <text x="200" y="196" fill="#ffffff" font-family="system-ui, sans-serif" font-size="42"
+          font-weight="800" text-anchor="middle">${number}</text>
+    <text x="376" y="286" fill="${dark}" font-family="system-ui, sans-serif" font-size="19"
+          font-weight="800" letter-spacing="3" text-anchor="end" opacity=".75">DEMO</text>
+  </svg>`;
+
+  return `data:image/svg+xml,${encodeURIComponent(svg.replace(/\s+/g, ' ').trim())}`;
+}
 
 /**
  * Osiemnastu uczestników, nie sześciu.
@@ -157,8 +208,12 @@ const RAW_PARTICIPANTS = [
 /**
  * Sześciu uczestników w dwóch kategoriach, dobranych po to, żeby zmęczyć układ, a nie mu
  * pochlebić: jeden bez zdjęcia, jeden bez nazwy pojazdu, nazwisko z akcentem, liczba głosów
- * od dwunastu do czterdziestu jeden i dwie średnie różniące się o setne — czyli remis, który
- * musi rozstrzygnąć liczba głosów.
+ * od dwunastu do czterdziestu jeden i dwie średnie różniące się o setne.
+ *
+ * Po przejściu na sumę punktów ta sama lista sprawdza dwie rzeczy naraz. Najwyższa średnia
+ * (Tonno Volante, 9.47 z 38 głosów) NIE wygrywa — bierze ją Rena Bianca, 9.12 z 41 głosów, czyli
+ * 374 punkty przeciw 360. A dwa wozy schodzą się na 304 punktach co do jednego (34 × 8.94 i
+ * 33 × 9.21), więc remis rozstrzyga liczba głosów i widać, że dogrywka w ogóle działa.
  */
 export function demoParticipants(withScores) {
   return RAW_PARTICIPANTS.map((row, index) => ({
@@ -168,10 +223,18 @@ export function demoParticipants(withScores) {
     firstName: row.firstName,
     lastName: row.lastName,
     projectName: row.projectName,
-    photo: row.photo,
+    /* Własny rysunek na każdy wóz — patrz cartArt wyżej. Pole `photo` w tablicy powyżej jest
+       od teraz TYLKO znacznikiem „ten wóz ma zdjęcie": dwa wozy mają je puste z rozmysłu, żeby
+       kafelek bez zdjęcia też był widoczny w siatce i żeby dało się sprawdzić, że nie rozjeżdża
+       układu. Ścieżka, która tam stoi, nie jest już nigdzie wczytywana. */
+    photo: row.photo ? cartArt(row.startNumber, index) : '',
     // Przed zamknięciem średnie nie wychodzą publicznie — tak samo jak z prawdziwego Workera.
     voteCount: withScores ? row.votes : 0,
     averageScore: withScores ? row.average : 0,
+    /* Suma, tak jak liczy ją widok w bazie: tam to `sum(score)` po całkowitych ocenach, więc i
+       tu musi być liczbą całkowitą. Bez zaokrąglenia 34 × 8.94 dałoby 303.96, a 33 × 9.21
+       303.93 — remis, który miał pokazać dogrywkę, rozjechałby się o trzy setne. */
+    totalScore: withScores ? Math.round(row.votes * row.average) : 0,
     demo: true
   }));
 }
@@ -180,8 +243,9 @@ export function demoParticipants(withScores) {
  * Odpowiedź, którą dałby Worker w danej fazie.
  *
  * Ten sam kształt, te same nazwy pól i ta sama reguła: podium wychodzi wyłącznie po
- * zamknięciu, a kolejność jest po średniej, przy remisie po liczbie głosów. Kształt inny niż
- * prawdziwy dawałby przegląd projektu, który wygląda dobrze i nie odpowiada niczemu.
+ * zamknięciu, a kolejność jest po sumie punktów, przy remisie po liczbie głosów, na końcu po
+ * średniej. Kształt inny niż prawdziwy dawałby przegląd projektu, który wygląda dobrze i nie
+ * odpowiada niczemu.
  */
 export function demoVotingState(phase = 'scheduled') {
   const closed = phase === 'closed';
@@ -204,7 +268,10 @@ export function demoVotingState(phase = 'scheduled') {
     participants,
     podium: closed
       ? [...participants]
-        .sort((a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount)
+        .sort((a, b) =>
+          b.totalScore - a.totalScore ||
+          b.voteCount - a.voteCount ||
+          b.averageScore - a.averageScore)
         .slice(0, 3)
       : [],
     // Nikt nie zagłosował z tej przeglądarki, więc kafelki są klikalne i da się oddać głos.

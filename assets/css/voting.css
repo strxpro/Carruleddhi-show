@@ -338,6 +338,9 @@ a.is-race-locked {
    ============================================================================ */
 
 .vote-page { background: var(--cream, #fbf7ef); }
+/* Baner DEMO zajmuje trzydzieści pikseli u góry i zsuwa nagłówek o tyle samo (demo.css), więc
+   treść musi zejść razem z nim — inaczej pierwszy wiersz nagłówka wchodzi pod pasek. */
+html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh) * 0.14 + 30px), 180px); }
 .vote-main { padding: clamp(96px, calc(var(--screen-h, 100svh) * 0.14), 150px) 0 80px; }
 
 .vote-head { display: grid; gap: 12px; margin: 0 0 30px; }
@@ -608,4 +611,151 @@ a.is-race-locked {
   .vote-card__body > strong { font-size: 13px; }
   .vote-picker__scores { gap: 4px; }
   .vote-picker__score { font-size: 14px; }
+}
+
+/* ===========================================================================
+   Zegar głosowania w hero
+   ===========================================================================
+   Stoi dokładnie tam, gdzie odliczanie do wydarzenia, i wygląda jak ono: ten sam granat,
+   ten sam promień, ten sam żółty na liczbie. To nie jest ozdoba — te dwa elementy nigdy nie
+   są widoczne naraz, więc muszą zajmować to samo miejsce i tę samą wagę, inaczej hero
+   podskakuje w chwili przejścia z odliczania na głosowanie.
+
+   `min-height` dobrane pod wysokość odliczania (dwie linijki plus przycisk), żeby podmiana
+   nie przesuwała tego, co stoi pod spodem. */
+.hero-vote {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 18px 16px;
+  border-radius: 24px;
+  background: var(--navy-950);
+  color: var(--white);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.hero-vote__label {
+  color: var(--blue-200);
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+/* `tabular-nums`: bez tego sekundy zmieniają szerokość przy każdym tyknięciu i cały zegar
+   drga w poziomie — najbardziej widoczne akurat na ostatniej minucie głosowania. */
+.hero-vote__time {
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: clamp(26px, 4.4vw, 42px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero-vote__go { margin-top: 2px; }
+
+@media (max-width: 640px) {
+  .hero-vote { padding: 14px 12px; gap: 8px; }
+  .hero-vote__time { font-size: clamp(22px, 8vw, 32px); }
+}
+
+/* ===========================================================================
+   Tło cokołu — sekcja przewija się NAD przypiętym hero
+   ===========================================================================
+   `.section-card` daje ujemny `margin-top`, zaokrąglony wierzch i cień, czyli celowo
+   nasuwa sekcję na poprzednią. Zakłada przy tym, że sekcja ma własne, kryjące tło —
+   i każda inna je ma (`.gallery` paper, `.contact` blue-700, `.prizes` navy-900).
+
+   Cokół go nie miał: `background-color` wychodziło `rgba(0,0,0,0)`. A hero jest
+   `position: sticky` z gradientem, więc przy `z-index: 2` nad nim przejeżdżała sekcja
+   przezroczysta i widać było przez nią tytuł, przyciski i odliczanie naraz. Zmierzone:
+   hero sticky z-1, podium relative z-2, oba widoczne w tym samym miejscu ekranu.
+
+   Stąd tło. Nie jest ozdobą — jest tym, co oddziela dwie sekcje przy przewijaniu. */
+.podium { background: var(--paper); }
+
+/* ============================================ numer startowy i podskok zwycięzcy */
+
+/* Miejsce na cokole jest w lewym rogu, numer startowy w prawym. Dwie różne liczby o tym
+   samym kroju w jednym rogu czytałoby się jako jedną. */
+.podium-card__start {
+  position: absolute; top: 8px; right: 8px;
+  padding: 5px 9px; border-radius: 999px;
+  background: rgb(7 26 61 / .82); color: var(--white);
+  font: 800 11px/1 var(--font-meta); letter-spacing: .06em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zdjęcie zwycięzcy unosi się w kółko.
+   Tylko pierwsze miejsce i tylko zdjęcie — nie cała karta: karta ma już `translateZ` z
+   perspektywy cokołu, a dokładanie do niej drugiej animacji transformu kazałoby tym dwóm
+   walczyć o ten sam `transform`. */
+@media (prefers-reduced-motion: no-preference) {
+  .podium-card[data-podium-place='1'] .podium-card__photo img,
+  .podium-card[data-podium-place='1'] .podium-card__photo > span[aria-hidden] {
+    animation: podium-hover 2.6s ease-in-out infinite;
+  }
+  @keyframes podium-hover {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-7px); }
+  }
+}
+
+/* Zdjęcie odjeżdża w górę, więc pod spodem musi być czym wypełnić — inaczej przy każdym
+   uniesieniu mignąłby pasek tła kafelka. */
+.podium-card[data-podium-place='1'] .podium-card__photo img { height: calc(100% + 8px); }
+
+/* ============================================ pełna klasyfikacja pod cokołem */
+
+.podium__standings { margin: 16px 0 0; }
+.podium__chev { display: inline-block; transition: transform .25s ease; }
+[data-podium-toggle][aria-expanded='true'] .podium__chev { transform: rotate(180deg); }
+
+.standings { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+/* Cztery kolumny: miejsce, zdjęcie, kto, wynik. Zdjęcie ma stałą szerokość, bo kolumna,
+   która zmienia szerokość razem z proporcjami fotografii, rozjeżdża wszystkie wiersze
+   względem siebie i lista przestaje się czytać w pionie. */
+.standings__row {
+  display: grid;
+  grid-template-columns: 30px 56px minmax(0, 1fr) auto;
+  gap: 12px; align-items: center;
+  padding: 8px 12px;
+  border: 2px solid var(--line); border-radius: 16px; background: var(--white);
+}
+/* Pierwsza trójka w tych samych barwach co karty na cokole — ten sam wóz, ten sam kolor. */
+.standings__row[data-standings-top='1'] { border-color: rgb(233 161 27 / .75); background: rgb(255 215 94 / .12); }
+.standings__row[data-standings-top='2'] { border-color: rgb(169 184 205 / .8); }
+.standings__row[data-standings-top='3'] { border-color: rgb(192 116 64 / .6); }
+
+.standings__rank {
+  text-align: center; color: var(--muted);
+  font: 900 15px/1 var(--font-meta); font-variant-numeric: tabular-nums;
+}
+.standings__photo {
+  display: block; width: 56px; aspect-ratio: 4 / 3;
+  object-fit: cover; border-radius: 10px; background: var(--blue-100);
+}
+.standings__who { display: grid; gap: 2px; min-width: 0; }
+/* `min-width: 0` wyżej plus obcinanie tutaj: bez tego długa nazwa pojazdu rozpycha kolumnę
+   i wypycha wynik poza kartę, zamiast się skrócić. */
+.standings__who strong { font-size: 14px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.standings__who span {
+  color: var(--muted); font: 800 10px/1.2 var(--font-meta);
+  letter-spacing: .06em; text-transform: uppercase;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.standings__score { display: grid; justify-items: end; gap: 2px; }
+.standings__score b { font: 900 18px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
+.standings__score small { color: var(--muted); font: 800 9px/1 var(--font-meta); letter-spacing: .06em; text-transform: uppercase; }
+
+.standings__more { display: flex; justify-content: center; margin: 12px 0 0; }
+
+/* Na wąskim ekranie wynik schodzi pod nazwisko zamiast ściskać obie kolumny do nieczytelności. */
+@media (max-width: 560px) {
+  .standings__row { grid-template-columns: 26px 44px minmax(0, 1fr); gap: 10px; row-gap: 6px; padding: 8px 10px; }
+  .standings__photo { width: 44px; }
+  .standings__score { grid-column: 2 / -1; justify-items: start; }
+  .standings__score b { font-size: 16px; }
 }

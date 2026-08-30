@@ -24,7 +24,7 @@
  */
 import {
   $, $$, reducedMotion, demoMode, text, toast,
-  stamp, remaining, readState, paintDemoBar
+  stamp, remaining, readState, paintDemoBar, avatarFor
 } from './voting-core.js';
 
 (function () {
@@ -35,8 +35,14 @@ import {
     raceStartsAt: null,
     votingEndsAt: null,
     podium: [],
+    participants: [],
+    /** Ile wierszy klasyfikacji jest już narysowanych. Zero znaczy „lista zwinięta". */
+    shown: 0,
     loaded: false
   };
+
+  /** Porcja klasyfikacji. Pięć, bo tyle mieści się pod cokołem bez spychania stopki z ekranu. */
+  const STANDINGS_BATCH = 5;
 
   /** Faza wybrana ręcznie w trybie demo. Poza demo nie ma na to żadnej drogi. */
   let demoPhase = 'scheduled';
@@ -51,6 +57,9 @@ import {
       raceStartsAt: result.raceStartsAt || null,
       votingEndsAt: result.votingEndsAt || null,
       podium: Array.isArray(result.podium) ? result.podium : [],
+      /* Pełna stawka, nie tylko trójka z cokołu. Potrzebna do rozwijanej klasyfikacji pod
+         przyciskiem — ta sama odpowiedź serwera, więc ani jednego żądania więcej. */
+      participants: Array.isArray(result.participants) ? result.participants : [],
       loaded: true
     });
     paint();
@@ -88,6 +97,148 @@ import {
     paintPhase();
     paintPodium();
     paintClock();
+    paintHeroVote();
+    paintStandings();
+  }
+
+  /**
+   * Pełna klasyfikacja pod cokołem, porcjami po pięć.
+   *
+   * Kolejność jest DOKŁADNIE ta sama co na cokole i w Workerze: suma punktów, przy remisie
+   * liczba głosów, potem średnia, na końcu numer startowy. Gdyby lista sortowała inaczej niż
+   * cokół, pierwsze trzy wiersze nie zgadzałyby się z trzema kartami tuż nad nimi — i nikt by
+   * tego nie umiał wytłumaczyć.
+   *
+   * Rysowana wyłącznie po zamknięciu: w trakcie głosowania byłaby tablicą wyników na żywo,
+   * czyli zaproszeniem do dopisania się do lidera zamiast do oceniania wozów.
+   */
+  function standingsRows() {
+    return [...state.participants]
+      .filter((row) => row.voteCount > 0)
+      .sort((a, b) =>
+        b.totalScore - a.totalScore ||
+        b.voteCount - a.voteCount ||
+        b.averageScore - a.averageScore ||
+        a.startNumber - b.startNumber);
+  }
+
+  function paintStandings() {
+    const box = $('[data-podium-standings]');
+    const list = $('[data-standings-list]');
+    const more = $('[data-standings-more]');
+    const toggle = $('[data-podium-toggle]');
+    if (!box || !list || !toggle) return;
+
+    // Przycisk pojawia się tylko wtedy, gdy jest co rozwinąć.
+    const all = standingsRows();
+    toggle.hidden = all.length === 0;
+    if (!state.shown) {
+      box.hidden = true;
+      toggle.setAttribute('aria-expanded', 'false');
+      return;
+    }
+
+    box.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+
+    const visible = all.slice(0, state.shown);
+    list.replaceChildren(...visible.map((row, index) => {
+      const item = document.createElement('li');
+      item.className = 'standings__row';
+      if (index < 3) item.dataset.standingsTop = String(index + 1);
+
+      const rank = document.createElement('span');
+      rank.className = 'standings__rank';
+      rank.textContent = String(index + 1);
+
+      /* Zdjęcie w rogu wiersza; brak zdjęcia dostaje rysowany kafelek z numerem, a nie pustkę
+         — ten sam awatar co na cokole, więc ten sam wóz wygląda tak samo w obu miejscach. */
+      const photo = document.createElement('img');
+      photo.className = 'standings__photo';
+      photo.src = row.photo || avatarFor(row);
+      photo.alt = '';
+      photo.loading = 'lazy';
+
+      const who = document.createElement('span');
+      who.className = 'standings__who';
+      const name = document.createElement('strong');
+      name.textContent = row.projectName || text('voting.noProject');
+      const meta = document.createElement('span');
+      meta.textContent = `${String(row.startNumber).padStart(3, '0')} · `
+        + `${`${row.firstName} ${row.lastName}`.trim()} · ${row.category}`;
+      who.append(name, meta);
+
+      const score = document.createElement('span');
+      score.className = 'standings__score';
+      const points = document.createElement('b');
+      points.textContent = String(row.totalScore);
+      const note = document.createElement('small');
+      note.textContent = `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+        + ` · ${text('voting.avgShort')} ${row.averageScore.toFixed(1)}`;
+      score.append(points, note);
+
+      item.append(rank, photo, who, score);
+      return item;
+    }));
+
+    if (more) {
+      const left = all.length - visible.length;
+      more.hidden = left === 0;
+      const label = $('[data-standings-more-label]', more) || more;
+      label.textContent = `${text('voting.loadMore')} (${left})`;
+    }
+  }
+
+  /**
+   * Zegar w hero: odliczanie do wydarzenia albo zegar głosowania, nigdy oba naraz.
+   *
+   * Trzy stany, bo trzy różne pytania zadaje w tych chwilach człowiek patrzący na stronę:
+   *   przed startem — „ile zostało do zjazdu" (odliczanie zostaje bez zmian);
+   *   głosowanie    — „ile mam czasu, żeby zagłosować";
+   *   po zamknięciu — „kto wygrał".
+   *
+   * Odliczanie do wydarzenia jest CHOWANE, nie zerowane: w dniu zjazdu pokazywałoby same zera
+   * w najbardziej widocznym miejscu strony, czyli zajmowałoby ekran, nie mówiąc niczego.
+   *
+   * Odsyłacz na cokół pojawia się wyłącznie wtedy, gdy cokół faktycznie ma co pokazać —
+   * `state.podium.length`. Przycisk „zobacz zwycięzców" prowadzący do pustej sekcji byłby
+   * gorszy niż brak przycisku.
+   */
+  function paintHeroVote() {
+    const voting = state.phase === 'voting';
+    const closed = state.phase === 'closed';
+    const hasPodium = closed && state.podium.length > 0;
+
+    const countdown = $('[data-countdown]');
+    const box = $('[data-hero-vote]');
+    if (countdown) countdown.hidden = voting || hasPodium;
+    if (box) box.hidden = !(voting || hasPodium);
+
+    const go = $('[data-hero-vote-go]');
+    if (go) go.hidden = !voting;
+    const toPodium = $('[data-hero-vote-podium]');
+    if (toPodium) toPodium.hidden = !hasPodium;
+
+    const label = $('[data-hero-vote-label]');
+    const time = $('[data-hero-vote-time]');
+    if (!label || !time) return;
+
+    if (hasPodium) {
+      label.textContent = text('voting.podiumKicker');
+      time.textContent = text('voting.closed');
+      return;
+    }
+    if (!voting) return;
+
+    const ends = stamp(state.votingEndsAt);
+    const left = ends ? ends - Date.now() : 0;
+    if (ends && left > 0) {
+      label.textContent = text('voting.timeLeft');
+      time.textContent = remaining(left);
+    } else {
+      label.textContent = text('voting.pageKicker');
+      time.textContent = text('voting.openNoLimit');
+    }
   }
 
   function paintPhase() {
@@ -180,22 +331,25 @@ import {
 
       const figure = document.createElement('figure');
       figure.className = 'podium-card__photo';
-      if (row.photo) {
-        const image = document.createElement('img');
-        image.src = row.photo;
-        image.alt = row.projectName || `${row.firstName} ${row.lastName}`.trim();
-        image.loading = 'lazy';
-        figure.append(image);
-      } else {
-        const blank = document.createElement('span');
-        blank.setAttribute('aria-hidden', 'true');
-        blank.textContent = String(row.startNumber).padStart(3, '0');
-        figure.append(blank);
-      }
+      /* Brak zdjęcia dostaje rysowany kafelek z numerem, nie pusty prostokąt — patrz
+         avatarFor() w voting-core.js. Na cokole widać to najmocniej: to trzy jedyne karty,
+         na które tego dnia patrzy cały plac. */
+      const image = document.createElement('img');
+      image.src = row.photo || avatarFor(row);
+      image.alt = row.projectName || `${row.firstName} ${row.lastName}`.trim();
+      image.loading = 'lazy';
+      figure.append(image);
+
       const place = document.createElement('span');
       place.className = 'podium-card__place';
       place.textContent = String(index + 1);
       figure.append(place);
+
+      // Numer startowy w prawym rogu; miejsce na cokole zostaje w lewym.
+      const start = document.createElement('span');
+      start.className = 'podium-card__start';
+      start.textContent = String(row.startNumber).padStart(3, '0');
+      figure.append(start);
 
       const body = document.createElement('div');
       body.className = 'podium-card__body';
@@ -210,8 +364,12 @@ import {
       const points = document.createElement('b');
       points.textContent = row.voteCount ? String(row.totalScore) : '—';
       const count = document.createElement('small');
+      /* Średnia do JEDNEGO miejsca po przecinku. 9.47 obok 9.12 to dwie liczby, których
+         nikt nie porównuje w biegu — a to i tak nie ona ustawia kolejność, tylko suma
+         punktów obok. Setne udawały precyzję, której ten wynik nie ma. */
       count.textContent = row.voteCount
         ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+          + ` · ${text('voting.avgShort')} ${row.averageScore.toFixed(1)}`
         : text('voting.noVotes');
       stats.append(points, count);
       body.append(project, rider, stats);
@@ -281,6 +439,27 @@ import {
     if (!$('[data-podium]') && !$('[data-vote-cta]')) return;
     guardSignupLinks();
 
+    /* Rozwijanie klasyfikacji.
+       `shown` trzyma liczbę wierszy, nie flagę „otwarte": zwinięcie to zero, otwarcie to
+       pierwsza porcja, a „pokaż więcej" dokłada kolejną. Jedna liczba zamiast flagi i licznika
+       znaczy, że nie da się doprowadzić do stanu „zwinięte, ale z ośmioma wierszami". */
+    $('[data-podium-toggle]')?.addEventListener('click', () => {
+      state.shown = state.shown ? 0 : STANDINGS_BATCH;
+      paintStandings();
+      /* Po rozwinięciu sekcja jest wyższa. Przewijamy do listy dopiero po przerysowaniu,
+         inaczej cel skoku liczony jest ze starej wysokości. */
+      if (state.shown) {
+        requestAnimationFrame(() => {
+          $('[data-podium-standings]')?.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+        });
+      }
+    });
+
+    $('[data-standings-more]')?.addEventListener('click', () => {
+      state.shown += STANDINGS_BATCH;
+      paintStandings();
+    });
+
     /* Jeden tik na sekundę dla licznika i jeden odczyt na trzydzieści sekund dla fazy — i oba
        tylko wtedy, gdy karta jest z przodu. Odliczanie w karcie schowanej za innymi to praca,
        której nikt nie widzi, a przeglądarki i tak dławią takie liczniki do raz na minutę. */
@@ -296,7 +475,7 @@ import {
     };
     const go = () => {
       if (ticker) return;
-      ticker = window.setInterval(() => { paintClock(); watchStart(); }, 1000);
+      ticker = window.setInterval(() => { paintClock(); paintHeroVote(); watchStart(); }, 1000);
       poller = window.setInterval(() => {
         if (!demoDriven) pull();
       }, 30000);
