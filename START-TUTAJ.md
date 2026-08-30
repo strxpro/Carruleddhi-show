@@ -96,8 +96,22 @@ Settings → Environment Variables. Po każdej zmianie **Redeploy**.
 | `EVENT_DATE` | opcjonalne, domyślnie `2026-10-17T14:30:00+02:00` | nic |
 | `AI_API_KEY` | `console.groq.com` → API Keys | czat odpowiada tylko na sześć pytań ze słownika, resztę oddaje człowiekowi |
 | `AI_API_URL` | `https://api.groq.com/openai/v1/chat/completions` | jak wyżej — bez tego leci do OpenAI, a tam klucz Groq nie zadziała |
-| `AI_MODEL` | `llama-3.3-70b-versatile` | domyślnie `gpt-4o-mini`, czyli model, którego Groq nie ma |
-| `AI_VISION_MODEL` | `meta-llama/llama-4-scout-17b-16e-instruct` (Groq) albo `gpt-4o-mini` (OpenAI) | wiadomość ze **zdjęciem** idzie prosto do organizatora — model tekstowy obrazów nie przyjmuje |
+| `AI_MODEL` | nazwa z listy w konsoli Groqa — dziś `openai/gpt-oss-120b` | domyślnie `gpt-4o-mini`, czyli model, którego Groq nie ma |
+| `AI_VISION_MODEL` | **opcjonalne** — nazwa modelu, który przyjmuje obrazy, jeśli Twoje konto taki ma | wiadomość ze **zdjęciem** idzie prosto do organizatora; to jest zamierzone zachowanie, nie awaria |
+
+> **Nazwy modeli wygasają — i to już raz zepsuło ten czat.**
+> Groq wycofał `llama-3.3-70b-versatile` 17 czerwca 2026 i od tej pory każde wywołanie
+> modelu kończyło się błędem, a czat oddawał *każde* pytanie człowiekowi. Wyglądało to na
+> „AI się zablokowało", a było martwą nazwą w jednej zmiennej.
+>
+> Dlatego w tabeli nie ma już wpisanych na sztywno nazw. Aktualną listę bierz z
+> **console.groq.com → Models** albo z rozwijanego menu w Playground — to, co tam widzisz,
+> to dokładnie to, co Twój klucz może wywołać.
+>
+> Kiedy to znów się zdarzy, rozpoznasz to w jednym miejscu: panel admina → diagnostyka →
+> `ai.lastFailure`. Odróżnia „klucz unieważniony" (HTTP 401) od „nie ma takiego modelu"
+> (HTTP 404 albo 400 z nazwą modelu w treści) od „za wolno" (TimeoutError). Bez tego
+> wszystkie trzy wyglądają identycznie: jak „przekazuję organizatorom".
 | `WHATSAPP_ALERTS` | `48665626101:2990681:pl,393284981574:3364881:it` | o nowej wiadomości na czacie dowiesz się tylko mailem, nie na telefon |
 
 `WHATSAPP_ALERTS` to trójki `numer:klucz:język` po przecinku, numer bez plusa. Język jest
