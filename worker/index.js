@@ -217,7 +217,7 @@ const FIELD_WHITELIST = {
     'entryId',
     'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes'
   ],
-  voting: ['action', 'participantId', 'award', 'name', 'email', 'deviceId', 'score', 'editToken'],
+  voting: ['action', 'participantId', 'name', 'email', 'deviceId', 'score', 'editToken'],
   'voting-admin': [
     'action', 'id', 'registrationId', 'category', 'startNumber', 'firstName', 'lastName',
     'projectName', 'imagePath', 'active', 'raceStartsAt', 'durationMinutes', 'status', 'photo'
@@ -4283,26 +4283,24 @@ const VOTE_MIN = 3;
 const VOTE_MAX = 10;
 
 /**
- * Dwanaście nagród. Zamknięta lista, bo nagrodę wybiera głosujący.
+ * Nagroda publiczności — jedna, jedyna kategoria głosowania publicznego.
  * ===========================================================================
  *
- * Do migracji 0025 `votes.category` trzymało kategorię uczestnika i brało się z jego wiersza —
- * właśnie po to, żeby wartość z przeglądarki nie mogła o niczym decydować. Teraz kolumna
- * trzyma klucz nagrody, a nagroda JEST wyborem człowieka, więc musi przyjść z żądania.
+ * Publiczność przyznaje własną nagrodę i tylko ją: jeden głos na osobę i na urządzenie, na cały
+ * konkurs. Dwanaście nagród z sekcji „Dodici modi per vincere" rozstrzyga jury i stoper —
+ * publiczność nie wybiera najszybszego, bo najszybszego pokazuje pomiar czasu.
  *
- * Zamknięta lista jest tym, co zastępuje starą ochronę: bez niej dowolny napis stałby się
- * trzynastą nagrodą, a limit „jeden głos na nagrodę" dałby się obejść wysyłając za każdym
- * razem inny wymyślony klucz. Sprawdzenie jest tu, nie w bazie — baza pilnuje unikalności,
- * a co jest nagrodą, wie serwis.
+ * STAŁA, NIE POLE Z ŻĄDANIA — i to jest własność bezpieczeństwa, nie oszczędność.
+ *   Wartość z przeglądarki nie ma żadnego wpływu na to, w której kategorii wyląduje głos.
+ *   Gdyby kategoria przychodziła z żądania, limit „jeden głos" dałby się obejść wysyłając za
+ *   każdym razem inny napis: indeks unikalny pilnuje pary (adres, kategoria), więc kategoria,
+ *   którą można sobie wymyślić, nie jest żadnym limitem.
  *
- * Bliźniacza lista stoi w assets/js/awards.js (front nie ma jak zaimportować tego pliku).
- * Zgodność obu sprawdza tools/check-voting.mjs.
+ *   Migracja 0025 na krótko to poświęciła (dwanaście nagród do wyboru wymagało wyboru z
+ *   żądania, sprawdzanego względem zamkniętej listy). 0026 przywraca stan, w którym nie ma
+ *   czego sprawdzać, bo nie ma czego wybierać.
  */
-const VOTE_AWARDS = [
-  'prize-1', 'prize-2', 'prize-3', 'prize-4', 'prize-5', 'prize-6',
-  'prize-7', 'prize-8', 'prize-9', 'prize-10', 'prize-11', 'prize-12'
-];
-const isAward = (value) => VOTE_AWARDS.includes(String(value || ''));
+const PUBLIC_AWARD = 'public-choice';
 const PARTICIPANT_COLUMNS =
   'id,registration_id,category,start_number,first_name,last_name,project_name,image_path,active';
 
@@ -4410,34 +4408,14 @@ async function readParticipants(env, { activeOnly = true } = {}) {
 }
 
 /**
- * Ranking w podziale na nagrody — same agregaty, ani jednego głosującego.
+ * Ranking nagrody publiczności z widoku voting_ranking — same agregaty, ani jednego głosującego.
  *
- * Limit 4800, nie 400: wierszem jest para uczestnik–nagroda, więc czterystu uczestników przy
- * dwunastu nagrodach daje do 4800 wierszy. Stary limit 400 uciąłby ranking po trzydziestu
- * czterech uczestnikach i zrobiłby to bez żadnego błędu.
+ * Jeden wiersz na uczestnika. Widok sam odsiewa głosy z kategorii innej niż `public-choice`,
+ * czyli wiersze z prób sprzed migracji 0026 — patrz warunek w samym widoku.
  */
 async function readRanking(env) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_ranking`);
-  url.searchParams.set('select', 'participant_id,award,average_score,vote_count,total_score');
-  url.searchParams.set('order', 'award.asc,average_score.desc,vote_count.desc');
-  url.searchParams.set('limit', '4800');
-  const response = await fetch(url, { headers: supabaseHeaders(env) });
-  if (!response.ok) return [];
-  const rows = await response.json().catch(() => []);
-  return Array.isArray(rows) ? rows : [];
-}
-
-/**
- * Agregaty na uczestnika w całym głosowaniu, bez podziału na nagrody.
- *
- * Osobny odczyt, a nie zsumowanie rankingu w pamięci: podium i listy do zwycięzców idą po
- * średniej, a średnia z dwunastu średnich nie jest średnią z głosów — nagroda z trzema
- * głosami ważyłaby tyle samo co nagroda z czterdziestoma. Widok liczy avg() po pojedynczych
- * głosach, więc waga jest prawdziwa. Patrz migracja 0025.
- */
-async function readTotals(env) {
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_totals`);
-  url.searchParams.set('select', 'participant_id,average_score,vote_count,total_score,award_count');
+  url.searchParams.set('select', 'participant_id,average_score,vote_count,total_score');
   url.searchParams.set('order', 'average_score.desc,vote_count.desc');
   url.searchParams.set('limit', '400');
   const response = await fetch(url, { headers: supabaseHeaders(env) });
@@ -4502,16 +4480,14 @@ async function votingState(env, payload, cors) {
 
   const phase = votingPhase(settings);
   const closed = phase === 'closed';
-  const [ranking, totals] = closed
-    ? await Promise.all([readRanking(env), readTotals(env)])
-    : [[], []];
-  const tally = new Map(totals.map((row) => [row.participant_id, row]));
+  const ranking = closed ? await readRanking(env) : [];
+  const tally = new Map(ranking.map((row) => [row.participant_id, row]));
   const signed = await signPhotos(env, participants.map((row) => row.image_path));
 
   const shaped = participants.map((row) => participantShape(row, signed, tally));
   const categories = [...new Set(shaped.map((row) => row.category))];
 
-  /* Podium liczone po średniej z całego głosowania, przy remisie po liczbie głosów.
+  /* Podium liczone po średniej, przy remisie po liczbie głosów.
      Sama średnia stawiałaby jedną dziesiątkę od jednej osoby nad ośmioma dziewiątkami, co
      nikomu nie wygląda na wynik konkursu. */
   const podium = closed
@@ -4531,31 +4507,16 @@ async function votingState(env, payload, cors) {
     durationMinutes: settings?.duration_minutes ?? 30,
     scoreMin: VOTE_MIN,
     scoreMax: VOTE_MAX,
-    /** Dwanaście nagród, w kolejności. Nazwy tłumaczy strona ze słownika. */
-    awards: VOTE_AWARDS,
-    /* Kategorie uczestników (`classic` / `art`) zostają w odpowiedzi, ale nie są już
-       kategoriami głosowania — służą tylko do opisania pojazdu na kafelku. */
+    /* Kategorie uczestników (`classic` / `art`) opisują pojazd na kafelku i pozwalają odsiać
+       listę. Nie są kategoriami głosowania — ta jest jedna i nazywa się nagrodą publiczności. */
     categories,
     participants: shaped,
-    /* Wyniki w podziale na nagrody, dopiero po zamknięciu — tak samo jak średnie. Płasko, bo
-       strona i tak buduje z tego mapę, a zagnieżdżenie po nagrodzie powtarzałoby klucz
-       dwanaście razy w JSON-ie. */
-    results: closed
-      ? ranking.map((row) => ({
-        award: row.award,
-        participantId: row.participant_id,
-        voteCount: Number(row.vote_count) || 0,
-        averageScore: Number(row.average_score) || 0
-      }))
-      : [],
     podium,
-    /* Nagroda, nie kategoria uczestnika — kolumna w bazie nazywa się `category` z powodów
-       opisanych w migracji 0025, ale znaczy nagrodę. */
-    myVotes: mine.map((row) => ({
-      participantId: row.participant_id,
-      award: row.category,
-      score: row.score
-    }))
+    /* Co najwyżej jeden wiersz: jeden głos na urządzenie. Tablica, a nie pojedynczy obiekt, bo
+       stare wiersze z prób sprzed 0026 też tu wejdą, a strona ma je umieć pominąć. */
+    myVotes: mine
+      .filter((row) => row.category === PUBLIC_AWARD)
+      .map((row) => ({ participantId: row.participant_id, score: row.score }))
   }, 200, cors);
 }
 
@@ -4573,17 +4534,12 @@ async function findParticipant(env, id) {
 }
 
 /**
- * Oddanie głosu w jednej z dwunastu nagród.
+ * Oddanie głosu w nagrodzie publiczności.
  *
- * NAGRODA PRZYCHODZI Z ŻĄDANIA, I DLATEGO JEST SPRAWDZANA WZGLĘDEM LISTY
- *   Do migracji 0025 w tym miejscu stał komentarz odwrotny: kategoria brała się z wiersza
- *   uczestnika, bo wartość z przeglądarki pozwoliłaby oddać dwa głosy w Classic, nazywając
- *   drugi ART. Przy nagrodach ta ochrona nie ma zastosowania — nagroda to wybór człowieka,
- *   nie cecha pojazdu, więc nie ma jej skąd wziąć poza żądaniem.
- *
- *   Zastępuje ją zamknięta lista VOTE_AWARDS. Bez niej wystarczyłoby wysyłać za każdym razem
- *   inny wymyślony klucz, żeby oddać dowolnie wiele głosów: indeks unikalny pilnuje pary
- *   (adres, nagroda), więc „nagroda", którą można sobie wymyślić, nie jest żadnym limitem.
+ * KATEGORIA NIE PRZYCHODZI Z ŻĄDANIA. Jest stałą — patrz PUBLIC_AWARD u góry pliku. Gdyby
+ * przychodziła, limit „jeden głos" dałby się obejść wysyłając za każdym razem inny napis:
+ * indeks unikalny pilnuje pary (adres, kategoria), więc kategoria do wymyślenia nie jest
+ * żadnym limitem.
  */
 async function votingVote(env, payload, cors) {
   const settings = await readVotingSettings(env);
@@ -4594,9 +4550,7 @@ async function votingVote(env, payload, cors) {
   const name = trimmed(payload.name, '');
   const deviceId = String(payload.deviceId || '').trim().toLowerCase();
   const score = Number(payload.score);
-  const award = String(payload.award || '').trim();
 
-  if (!isAward(award)) return json({ ok: false, code: 'VOTING_BAD_AWARD' }, 422, cors);
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'VOTING_BAD_EMAIL' }, 422, cors);
   if (!name || name.length > 120) return json({ ok: false, code: 'VOTING_BAD_NAME' }, 422, cors);
   // 32–36 znaków, tak jak wymaga tego baza: crypto.randomUUID() z kreskami albo bez.
@@ -4614,8 +4568,8 @@ async function votingVote(env, payload, cors) {
 
   const stored = await insertRow(env, 'votes', {
     participant_id: participant.id,
-    // Nagroda, nie kategoria pojazdu — patrz migracja 0025.
-    category: award,
+    // Stała, nie wartość z żądania — patrz PUBLIC_AWARD i migracja 0026.
+    category: PUBLIC_AWARD,
     voter_name: name,
     voter_email: email,
     device_id: deviceId,
@@ -4626,9 +4580,9 @@ async function votingVote(env, payload, cors) {
     /* Dwa indeksy unikalne, jedna odpowiedź. Rozróżnianie „już głosowałeś z tego adresu" od
        „już głosowałeś z tego urządzenia" wymagałoby czytania nazwy naruszonego indeksu z
        tekstu błędu i mówiłoby komuś, czy jego adres jest w bazie. Dla głosującego to i tak
-       jedno zdanie: w tej nagrodzie masz już oddany głos. */
+       jedno zdanie: głos jest już oddany. */
     if (stored.duplicate) {
-      return json({ ok: false, code: 'VOTING_ALREADY_VOTED', award }, 409, cors);
+      return json({ ok: false, code: 'VOTING_ALREADY_VOTED' }, 409, cors);
     }
     return json({ ok: false, code: 'VOTING_STORE_FAILED', detail: stored.detail || null }, 502, cors);
   }
@@ -4643,9 +4597,8 @@ async function votingVote(env, payload, cors) {
     locale: localeOf(payload.locale),
     name,
     email,
-    award,
-    // Kategoria pojazdu zostaje w liście: „Classic nr 12" mówi czytającemu, o który wóz
-    // chodziło, a sama nazwa nagrody tego nie mówi.
+    // Kategoria pojazdu, nie kategoria głosu: „Classic nr 12" mówi czytającemu, o który wóz
+    // chodziło.
     category: participant.category,
     startNumber: participant.start_number,
     projectName: participant.project_name || '',
@@ -4659,7 +4612,6 @@ async function votingVote(env, payload, cors) {
 
   return json({
     ok: true,
-    award,
     category: participant.category,
     score,
     // Sygnał dla strony, że list poszedł; nigdy sam żeton.
@@ -4689,8 +4641,6 @@ async function votingEdit(env, payload, cors) {
 
   const participant = await findParticipant(env, vote.participant_id);
   const shape = {
-    // `vote.category` trzyma klucz nagrody — patrz migracja 0025.
-    award: vote.category,
     // Kategoria pojazdu, dla podpisu „Classic nr 12" w oknie zmiany oceny.
     category: participant?.category || '',
     score: vote.score,
@@ -4762,18 +4712,14 @@ async function patchVotingSettings(env, patch) {
  * przychodzą, w chwili, w której jeszcze da się z tym cokolwiek zrobić.
  */
 async function votingAdminState(env, cors) {
-  const [settings, participants, ranking, totals] = await Promise.all([
+  const [settings, participants, ranking] = await Promise.all([
     readVotingSettings(env),
     readParticipants(env, { activeOnly: false }),
-    readRanking(env),
-    readTotals(env)
+    readRanking(env)
   ]);
   if (participants === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
 
-  /* Z sum na uczestnika, nie z rankingu po nagrodach. Ranking ma teraz do dwunastu wierszy na
-     jednego uczestnika, więc `new Map(ranking.map(...))` zostawiłoby z nich ostatni — czyli
-     panel pokazywałby średnią z przypadkowo wybranej nagrody jako średnią uczestnika. */
-  const tally = new Map(totals.map((row) => [row.participant_id, row]));
+  const tally = new Map(ranking.map((row) => [row.participant_id, row]));
   const signed = await signPhotos(env, participants.map((row) => row.image_path));
 
   const phase = votingPhase(settings);
@@ -4796,17 +4742,6 @@ async function votingAdminState(env, cors) {
     scoreMin: VOTE_MIN,
     scoreMax: VOTE_MAX,
     participants: rows,
-    /* Dwa pola dołożone przy przejściu na dwanaście nagród. Dołożone, nie zamienione: panel
-       czyta `participants[].averageScore` i `voteCount` i ma je dalej dostawać. */
-    awards: VOTE_AWARDS,
-    results: ranking.map((row) => ({
-      award: row.award,
-      participantId: row.participant_id,
-      voteCount: Number(row.vote_count) || 0,
-      averageScore: Number(row.average_score) || 0
-    })),
-    // Suma po rankingu nagród, bo każdy głos należy do dokładnie jednej nagrody i do jednego
-    // uczestnika — więc żaden nie jest tu policzony dwa razy.
     totalVotes: ranking.reduce((sum, row) => sum + (Number(row.vote_count) || 0), 0)
   }, 200, cors);
 }
@@ -5016,15 +4951,13 @@ async function votingAdminWinners(env, cors) {
     return json({ ok: false, code: 'VOTING_STILL_OPEN' }, 409, cors);
   }
 
-  const [participants, totals] = await Promise.all([
+  const [participants, ranking] = await Promise.all([
     readParticipants(env, { activeOnly: true }),
-    readTotals(env)
+    readRanking(env)
   ]);
   if (participants === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
 
-  /* Z sum na uczestnika, nie z rankingu po nagrodach — inaczej podium liczyłoby się ze
-     średniej z jednej, przypadkowo ostatniej nagrody. */
-  const tally = new Map(totals.map((row) => [row.participant_id, row]));
+  const tally = new Map(ranking.map((row) => [row.participant_id, row]));
   const podium = participants
     .map((row) => ({ row, stats: tally.get(row.id) }))
     .filter((entry) => entry.stats && Number(entry.stats.vote_count) > 0)

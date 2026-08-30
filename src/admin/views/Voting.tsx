@@ -236,6 +236,26 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
   const chip =
     'rounded-full px-4 py-2 text-xs font-extrabold transition-colors disabled:opacity-45 disabled:cursor-not-allowed';
 
+  /* Klasyfikacja i trzy liczby nad nią.
+     ---------------------------------------------------------------------------
+     Liczone tu, a nie na serwerze: serwer i tak odsyła każdemu uczestnikowi jego średnią i
+     liczbę głosów, więc osobna końcówka na tę samą sumę byłaby drugim źródłem tej samej
+     liczby — i pierwszym miejscem, w którym panel pokazałby coś innego niż strona.
+
+     Tylko uczestnicy w głosowaniu: wyłączony wóz nie jest w klasyfikacji, bo nie startuje.
+     Kolejność to średnia, przy remisie liczba głosów — inaczej jedna dziesiątka od jednej
+     osoby biłaby osiem dziewiątek. */
+  const activeParticipants = (state?.participants ?? []).filter((row) => row.active);
+  const rated = activeParticipants.filter((row) => row.voteCount > 0);
+  const standings = [...rated].sort(
+    (a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount || a.startNumber - b.startNumber
+  );
+  /* Ważona liczbą głosów, nie średnia ze średnich: wóz z dwoma głosami nie może ważyć tyle co
+     wóz z czterdziestoma. */
+  const totalWeighted = rated.reduce((sum, row) => sum + row.averageScore * row.voteCount, 0);
+  const totalRatedVotes = rated.reduce((sum, row) => sum + row.voteCount, 0);
+  const overallAverage = totalRatedVotes > 0 ? totalWeighted / totalRatedVotes : null;
+
   /* Zgłoszenia, których nie ma jeszcze wśród uczestników.
      Odsiewane po `registrationId`, a nie po imieniu i nazwisku: dwoje kuzynów o tym samym
      imieniu i nazwisku to na tej stronie normalna sytuacja, pod którą jest osobny indeks
@@ -371,7 +391,10 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
       {/* --------------------------------------------------------- wyniki */}
       <section className="rounded-3xl border border-white/10 bg-navy-900 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-extrabold text-white">{t('vote.results')}</h2>
+          <div>
+            <h2 className="font-extrabold text-white">{t('vote.results')}</h2>
+            <p className="mt-1 max-w-lg text-xs leading-relaxed text-white/45">{t('vote.resultsLead')}</p>
+          </div>
           <button
             type="button"
             disabled={busy || state?.phase !== 'closed'}
@@ -393,8 +416,98 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             <Trophy size={13} /> {t('vote.winnersSend')}
           </button>
         </div>
-        <div className="mt-4 text-4xl font-extrabold tabular-nums text-yellow">{state?.totalVotes ?? '—'}</div>
-        <div className="mt-1 text-xs uppercase tracking-wider text-white/45">{t('vote.totalVotes')}</div>
+
+        {/* Trzy liczby, nie jedna.
+            „Oddanych głosów: 0" nie mówi, czy nikt nie zagłosował, czy nie ma jeszcze
+            uczestników — a to dwa różne kłopoty i dwie różne czynności. Ocenione pojazdy
+            odpowiadają na drugie pytanie, a średnia mówi, czy publiczność w ogóle rozróżnia
+            wozy, czy wszystkim stawia dziesiątki. */}
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {[
+            { value: state ? String(state.totalVotes ?? 0) : '—', label: t('vote.totalVotes'), strong: true },
+            { value: state ? `${rated.length} / ${activeParticipants.length}` : '—', label: t('vote.rated') },
+            { value: overallAverage === null ? '—' : overallAverage.toFixed(2), label: t('vote.average') }
+          ].map((box) => (
+            <div key={box.label} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+              <div
+                className={cn(
+                  'text-3xl font-extrabold tabular-nums',
+                  box.strong ? 'text-yellow' : 'text-white'
+                )}
+              >
+                {box.value}
+              </div>
+              <div className="mt-1 text-[11px] uppercase tracking-wider text-white/45">{box.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ------------------------------------------------- klasyfikacja
+            Średnie były do tej pory rozsypane po liście uczestników uporządkowanej numerami
+            startowymi — czyli „kto prowadzi" wymagało przejrzenia kilkudziesięciu wierszy i
+            porównania liczb w głowie. To jest jedyne pytanie, które organizator zadaje w
+            trakcie głosowania, więc ma własne miejsce i własną kolejność.
+
+            Ta sama reguła co na cokole: średnia, przy remisie liczba głosów. Inaczej jedna
+            dziesiątka od jednej osoby biłaby osiem dziewiątek. */}
+        <div className="mt-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-sm font-extrabold text-white">{t('vote.standings')}</h3>
+            <p className="text-[11px] text-white/40">
+              {state?.phase === 'closed' ? t('vote.standingsFinal') : t('vote.standingsLive')}
+            </p>
+          </div>
+
+          {standings.length === 0 ? (
+            <p className="mt-3 rounded-2xl border border-dashed border-white/15 px-4 py-3 text-sm text-white/45">
+              {t('vote.standingsEmpty')}
+            </p>
+          ) : (
+            <ol className="mt-3 grid gap-1.5">
+              {standings.map((row, index) => {
+                const place = index + 1;
+                return (
+                  <li
+                    key={row.id}
+                    className={cn(
+                      'grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border px-3 py-2',
+                      place === 1
+                        ? 'border-yellow/60 bg-yellow/10'
+                        : place <= 3
+                          ? 'border-white/20 bg-white/[0.05]'
+                          : 'border-white/10 bg-transparent'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'grid h-8 w-8 place-items-center rounded-xl text-sm font-extrabold tabular-nums',
+                        place === 1 ? 'bg-yellow text-navy-950' : 'bg-white/10 text-white'
+                      )}
+                    >
+                      {place}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold text-white">
+                        {row.projectName || `${row.firstName} ${row.lastName}`.trim()}
+                      </span>
+                      <span className="block truncate text-[11px] uppercase tracking-wider text-white/45">
+                        {String(row.startNumber).padStart(3, '0')} · {row.firstName} {row.lastName} · {row.category}
+                      </span>
+                    </span>
+                    <span className="flex items-baseline gap-1.5">
+                      <b className="text-lg font-extrabold tabular-nums text-yellow">
+                        {row.averageScore.toFixed(2)}
+                      </b>
+                      <small className="text-[10px] uppercase tracking-wider text-white/45">
+                        {row.voteCount} {t('vote.votes')}
+                      </small>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
 
         {winners ? (
           <div className="mt-4 grid gap-1.5 text-sm text-white">

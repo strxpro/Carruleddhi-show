@@ -5,8 +5,8 @@
   <!-- `interactive-widget=resizes-visual`: klawiatura ekranowa nie skraca dokumentu, więc
        przewinięcie po jej otwarciu nie jest przycinane. Ta sama wartość co w index.html. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-visual">
-  <title>Vota il partecipante — Carruleddhi Show 2026</title>
-  <meta name="description" content="Voto del pubblico del Carruleddhi Show 2026: dodici premi, un voto per premio.">
+  <title>Premio del pubblico — Carruleddhi Show 2026</title>
+  <meta name="description" content="Premio del pubblico del Carruleddhi Show 2026: un voto a persona, da 3 a 10 punti.">
   <meta name="theme-color" content="#071a3d">
   <!-- Bez indeksowania: strona żyje jeden dzień w roku, a przez pozostałe 364 wyszukiwarka
        pokazywałaby wynik prowadzący do „głosowanie jeszcze się nie zaczęło". -->
@@ -34,9 +34,16 @@
   <main class="vote-main" id="main">
     <div class="container">
       <header class="vote-head">
-        <span class="eyebrow" data-i18n="voting.pageKicker">Voto del pubblico</span>
-        <h1 data-i18n="voting.pageTitle">Vota il partecipante.</h1>
-        <p class="lead" data-vote-lead data-i18n="voting.pageLead">Dodici premi. Un voto per premio, da 3 a 10 punti.</p>
+        <span class="eyebrow" data-vote-kicker data-i18n="voting.pageKicker">Voto del pubblico</span>
+        <h1 data-i18n="voting.pageTitle">Premio del pubblico.</h1>
+        <p class="lead" data-vote-lead data-i18n="voting.pageLead">Un premio, assegnato da chi guarda. Tocca “Vota”, dai da 3 a 10 punti e lascia la mail.</p>
+
+        <!-- Reguła powiedziana wprost, nie ukryta w regulaminie: jeden głos na osobę.
+             Znika po zamknięciu głosowania, bo obietnica bez czego dotyczyć jest tylko hałasem. -->
+        <p class="vote-rule" data-vote-rule>
+          <span class="vote-rule__mark" aria-hidden="true">★</span>
+          <span data-i18n="voting.oneVote">Un voto a persona. Puoi cambiarlo dal link nella mail finché il voto è aperto.</span>
+        </p>
 
         <!-- Sześć języków. Ten sam rząd co na stronach prawnych, więc i te same style. -->
         <nav class="legal-langs" data-vote-languages aria-label="Lingua"></nav>
@@ -47,17 +54,28 @@
       <p class="vote-notice" data-vote-notice hidden aria-live="polite"></p>
 
       <div class="vote-shell" data-vote-shell hidden>
-        <!-- Ile nagród już obsłużonych. Pierwsze pytanie po drugim głosie to „ile mi
-             zostało", a bez licznika odpowiedź wymaga przejrzenia dwunastu zakładek. -->
-        <p class="vote-progress">
-          <span data-i18n="voting.awardLabel">Premio</span>
-          <b data-vote-progress>0 / 12</b>
-        </p>
+        <!-- Panel „Twój głos".
+             Bez niego jedyną informacją o oddanym głosie była plakietka na jednym z
+             kilkudziesięciu kafelków — czyli trzeba było go najpierw znaleźć. Głos jest jeden na
+             cały konkurs, więc odpowiedź na „czy ja już głosowałem" należy na górę strony. -->
+        <section class="vote-mine" data-vote-mine hidden aria-live="polite">
+          <figure class="vote-mine__photo">
+            <img data-vote-mine-photo alt="" hidden>
+            <span data-vote-mine-blank aria-hidden="true"></span>
+          </figure>
+          <div class="vote-mine__body">
+            <span class="eyebrow" data-i18n="voting.yourVoteTitle">Il tuo voto</span>
+            <strong data-vote-mine-cart></strong>
+            <span class="vote-mine__rider" data-vote-mine-rider></span>
+            <p class="vote-mine__note" data-vote-mine-note hidden></p>
+          </div>
+          <p class="vote-mine__score"><b data-vote-mine-score>—</b></p>
+        </section>
 
-        <!-- Dwanaście nagród. Zakładki, nie lista rozwijana: wybór nagrody jest tu głównym
-             ruchem, a lista rozwijana ukrywa jedenaście z dwunastu możliwości za jednym
-             dodatkowym naciśnięciem. Budowane z danych — nagrody przychodzą z Workera. -->
-        <div class="award-tabs" data-vote-awards role="group" aria-label="Premi"></div>
+        <!-- Filtr kategorii POJAZDU, nie kategorii głosowania: głos jest jeden. To sposób na
+             znalezienie wózka w liście, która w dniu zawodów ma kilkadziesiąt pozycji.
+             Budowany z danych — kategorie ustawia organizator przy uczestniku. -->
+        <div class="vote-filters" data-vote-filters role="group" aria-label="Categorie" hidden></div>
 
         <div class="vote-grid" data-vote-grid></div>
 
@@ -81,9 +99,11 @@
     <div class="vote-dialog__surface">
       <button class="vote-dialog__close" type="button" data-vote-close data-i18n-aria-label="a11y.close" aria-label="Chiudi"><span aria-hidden="true"></span></button>
 
-      <span class="eyebrow" data-vote-dialog-award></span>
+      <span class="eyebrow" data-i18n="voting.pageTitle">Premio del pubblico.</span>
       <h2 id="vote-dialog-title" data-i18n="voting.identifyLead">Dove mandiamo la conferma?</h2>
+
       <p class="vote-dialog__who" data-vote-dialog-who></p>
+      <p class="vote-dialog__rider" data-vote-dialog-rider></p>
       <p class="vote-dialog__score">
         <span data-i18n="voting.scoreLabel">Il tuo voto</span>
         <b data-vote-dialog-score>7</b>

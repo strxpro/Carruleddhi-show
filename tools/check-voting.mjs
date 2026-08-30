@@ -137,52 +137,52 @@ check('odsylacz do zmiany glosu jest we fragmencie, nie w zapytaniu',
 check('odsylacz do zmiany glosu prowadzi na podstrone glosowania',
   worker.includes('votazione.html#vote=${editToken}'));
 
-/* --- dwanascie nagrod ---------------------------------------------------- */
+/* --- nagroda publicznosci ------------------------------------------------ */
 
-/* Nagroda przychodzi z zadania, bo jest wyborem czlowieka — wiec MUSI byc sprawdzona wzgledem
-   zamknietej listy. Bez tego wystarczy wysylac za kazdym razem inny wymyslony klucz, zeby
-   oddac dowolnie wiele glosow: indeks unikalny pilnuje pary (adres, nagroda), a „nagroda",
-   ktora mozna sobie wymyslic, nie jest zadnym limitem. */
-check('nagroda z zadania jest sprawdzana wzgledem zamknietej listy',
-  voteHandler.includes('isAward(award)') && voteHandler.includes('VOTING_BAD_AWARD'));
-check('glos zapisuje nagrode, nie kategorie pojazdu',
-  /category:\s*award/.test(voteHandler) && !/category:\s*participant\.category,\s*\n\s*voter_name/.test(voteHandler));
+/* Kategoria glosu jest STALA po stronie serwera, nie polem z zadania. To jest wlasnosc
+   bezpieczenstwa: gdyby przychodzila z zadania, limit „jeden glos" dalby sie obejsc wysylajac
+   za kazdym razem inny napis — indeks unikalny pilnuje pary (adres, kategoria), a kategoria do
+   wymyslenia nie jest zadnym limitem. Migracja 0025 na krotko to poswiecila, 0026 przywraca. */
+check('jest dokladnie jedna kategoria glosowania publicznego',
+  /const PUBLIC_AWARD = 'public-choice';/.test(worker) && !/VOTE_AWARDS/.test(worker));
+check('kategoria glosu nie pochodzi z zadania',
+  voteHandler.includes('category: PUBLIC_AWARD')
+  && !/category:\s*(payload|award)/.test(voteHandler));
+check('nagroda nie jest juz polem w zadaniu',
+  !/'award'/.test(/voting: \[[^\]]*\]/.exec(worker)?.[0] || ''));
 check('ocena poza zakresem jest odrzucana, nie przycinana',
   voteHandler.includes('VOTING_BAD_SCORE') && !/clamp|Math\.min/.test(voteHandler));
 check('duplikat glosu rozpoznany po bazie, nie po zapytaniu wczesniej',
   voteHandler.includes('stored.duplicate') && voteHandler.includes('VOTING_ALREADY_VOTED'));
 
-/* Dwie listy nagrod — jedna w Workerze, druga w assets/js/awards.js, bo front nie ma jak
-   zaimportowac pliku Workera. Rozjazd znaczylby nagrode, na ktora da sie kliknac i nie da sie
-   zaglosowac, albo odwrotnie. Dlatego zgodnosc jest sprawdzana, a nie zakladana. */
-const workerAwards = JSON.parse(
-  `[${/const VOTE_AWARDS = \[([\s\S]*?)\];/.exec(worker)[1].replace(/'/g, '"').replace(/,\s*$/, '')}]`
-);
-const frontAwards = JSON.parse(
-  `[${/export const AWARDS = \[([\s\S]*?)\];/.exec(read('assets/js/awards.js'))[1].replace(/'/g, '"').replace(/,(\s*)$/, '$1')}]`
-);
-check('worker zna dokladnie dwanascie nagrod', workerAwards.length === 12, String(workerAwards.length));
-check('lista nagrod w Workerze i na froncie jest ta sama',
-  JSON.stringify(workerAwards) === JSON.stringify(frontAwards),
-  `${workerAwards.join(',')} vs ${frontAwards.join(',')}`);
-
 const stateHandler = extract('async function votingState');
 check('srednie nie wychodza publicznie w trakcie glosowania',
-  stateHandler.includes('? await Promise.all([readRanking(env), readTotals(env)])')
-  && stateHandler.includes(': [[], []]'));
-check('wyniki w podziale na nagrody tez dopiero po zamknieciu',
-  /results:\s*closed[\s\S]{0,40}\?/.test(stateHandler));
-check('podium liczone z sum na uczestnika, nie z jednej nagrody',
-  stateHandler.includes('new Map(totals.map('));
+  stateHandler.includes('closed ? await readRanking(env) : []'));
+check('oddany glos wraca tylko dla nagrody publicznosci',
+  stateHandler.includes("row.category === PUBLIC_AWARD"));
+check('nie ma juz drugiego widoku agregatow',
+  !/readTotals|voting_totals/.test(worker));
 
 const winners = extract('async function votingAdminWinners');
 check('listy do zwyciezcow tylko po zamknieciu', winners.includes('VOTING_STILL_OPEN'));
 check('zwyciezca bez zgloszenia trafia na liste nieosiagalnych', winners.includes('unreachable'));
-/* Ranking ma teraz do dwunastu wierszy na jednego uczestnika, wiec `new Map(ranking.map(...))`
-   zostawiloby z nich ostatni — czyli zwyciezca wylonilby sie ze sredniej z przypadkowo
-   wybranej nagrody. Zwyciezcy licza sie z sum na uczestnika. */
-check('zwyciezcy licza sie z sum na uczestnika, nie z jednej nagrody',
-  winners.includes('readTotals(env)') && !winners.includes('new Map(ranking.map('));
+check('zwyciezcy licza sie z rankingu nagrody publicznosci',
+  winners.includes('readRanking(env)'));
+
+/* --- migracja pod jedna nagrode ------------------------------------------ */
+
+const award = read('supabase/migrations/0026_public_award.sql');
+/* Widok MUSI odsiewac glosy z innej kategorii. Bez warunku do rankingu weszlyby wiersze z
+   `classic`, `art` i `prize-N`, czyli glosy z prob sprzed tej migracji — i zrobilyby to bez
+   zadnego bledu, tylko z zawyzonym wynikiem. */
+check('widok rankingu odsiewa glosy z innej kategorii',
+  /and v\.category = 'public-choice'/.test(award));
+check('drugi widok agregatow jest zdejmowany',
+  /drop view if exists public\.voting_totals/.test(award));
+check('migracja jest powtarzalna', (award.match(/drop view if exists/g) || []).length >= 2
+  && /create index if not exists/.test(award));
+check('migracja nie kasuje glosow',
+  !/^\s*delete from/m.test(award.replace(/\/\*[\s\S]*?\*\//g, '')));
 
 /* --- wynik --------------------------------------------------------------- */
 

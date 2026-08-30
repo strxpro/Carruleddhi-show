@@ -114,19 +114,29 @@ const p = probe('tools/probe-voting-page.js', '/votazione.html?demo=1&lang=pl', 
 console.log(`\n\nPODSTRONA (390x844) — bledy konsoli: ${p.consoleErrors?.length ? p.consoleErrors.join(' | ') : 'brak'}\n`);
 check((p.consoleErrors || []).length === 0, 'zero bledow JavaScriptu');
 
-console.log('\n--- naglowek i dwanascie nagrod');
+console.log('\n--- naglowek: jedna nagroda publicznosci');
 const head = p.head;
 check(head.lang === 'pl', `jezyk z adresu: ${head.lang}`);
-check(head.awardTabs === 12, `dwanascie zakladek nagrod: ${head.awardTabs}`);
-check(head.awardLabels.every((label) => label && !label.startsWith('prize.')),
-  `nazwy nagrod przetlumaczone, nie klucze: ${head.awardLabels.slice(0, 2).join(' | ')}`);
-check(new Set(head.awardLabels).size === 12, 'dwanascie roznych nazw');
+check(/nagroda publiczno/i.test(head.h1), `naglowek mowi, o co chodzi: „${head.h1}"`);
+check(head.awardTabs === 0, `nie ma zakladek nagrod (publicznosc przyznaje jedna): ${head.awardTabs}`);
+check(head.ruleShown && /jeden g/i.test(head.rule), `regula powiedziana wprost: „${head.rule.slice(0, 54)}…"`);
 check(head.languageButtons === 6, `szesc jezykow do wyboru: ${head.languageButtons}`);
-check(head.progress.includes('/ 12'), `licznik nagrod: ${head.progress}`);
 check(head.clock === false, 'na podstronie NIE ma licznika czasu');
 check(head.signupLinks === 0, 'na podstronie NIE ma odsylacza „Zapisz sie"');
 check(head.attendButtons === 0, 'na podstronie NIE ma przycisku „Bede tam"');
 check(head.photoIsButton === false, 'zdjecie nie jest przyciskiem');
+check(head.mineShown === false, 'panel „Twoj glos" ukryty, dopoki nie ma glosu');
+
+console.log('\n--- filtr kategorii pojazdu');
+const f = p.filters;
+check(f.shown, 'filtr widoczny przy wiecej niz jednej kategorii');
+check(f.labels.length >= 3, `pierwszy przycisk to „wszystkie" plus kategorie: ${f.labels.join(' | ')}`);
+check(f.activeFirst, '„wszystkie" jest wybrane na wejsciu');
+check(f.smallestTarget >= 44, `cel dotykowy filtra: ${f.smallestTarget} px`);
+check(f.afterPick.cards > 0 && f.afterPick.cards < p.batch.after,
+  `wybor kategorii zawezil liste: ${p.batch.after} -> ${f.afterPick.cards}`);
+check(f.afterPick.allSameCategory, `w liscie zostaly tylko „${f.afterPick.label}"`);
+check(f.afterReset >= f.afterPick.cards, 'powrot na „wszystkie" przywraca liste');
 
 console.log('\n--- siatka i doczytywanie porcjami');
 const g = p.batch;
@@ -151,8 +161,8 @@ console.log('\n--- okno z adresem');
 const s3 = p.step3;
 check(s3.open, 'okno otwiera sie dopiero po potwierdzeniu oceny');
 check(s3.bodyLocked, 'tlo zablokowane, gdy okno jest otwarte');
-check(s3.award.length > 0, `okno mowi, o ktora nagrode chodzi: „${s3.award}"`);
 check(s3.who.length > 0, `okno mowi, o ktory pojazd chodzi: „${s3.who}"`);
+check(s3.rider.length > 0, `okno mowi, czyj to pojazd: „${s3.rider}"`);
 check(s3.score === '8', `okno niesie wybrana ocene: ${s3.score}`);
 check(s3.formShown && s3.knownShown === false, 'bez zapamietanego adresu widac pola');
 check(s3.blockedWhenEmpty, 'puste imie i adres zatrzymuja wysylke');
@@ -165,34 +175,29 @@ check(v.dialogClosed, 'okno zamkniete po wyslaniu');
    zdejmowana była blokada przewijania. Na ekranie wygląda to jak zawieszona strona: nic nie
    widać i nie da się przewinąć. */
 check(v.bodyUnlocked, `tlo odblokowane, strona da sie przewijac (klasy body: „${v.bodyClasses}")`);
-check(v.progress.startsWith('1 /'), `licznik nagrod przeskoczyl: ${v.progress}`);
-check(v.doneTabs === 1, `dokladnie jedna zakladka odhaczona: ${v.doneTabs}`);
+check(v.mineShown, 'panel „Twoj glos" pojawia sie nad lista');
+check(v.mineScore === '8', `panel niesie ocene: ${v.mineScore}`);
+check(v.mineCart.length > 0, `panel mowi, na kogo poszedl glos: „${v.mineCart}"`);
+check(v.mineNoteShown, 'panel tlumaczy, ze zmiana idzie odsylaczem z maila');
 check(v.votedCards === 1, `dokladnie jeden kafelek oznaczony jako oceniony: ${v.votedCards}`);
+check(v.mineBadges === 1, `plakietka „twoj glos" na jednym zdjeciu: ${v.mineBadges}`);
 check(v.yourScore.includes('8'), `kafelek pokazuje wlasna ocene: „${v.yourScore}"`);
-check(v.usedOnOthers > 0, `pozostale kafelki mowia, ze glos w tej nagrodzie jest oddany (${v.usedOnOthers})`);
-check(v.startButtonsLeft === 0, 'w tej nagrodzie nie ma juz na co kliknac');
+check(v.usedOnOthers > 0, `pozostale kafelki mowia, ze glos jest juz oddany (${v.usedOnOthers})`);
+/* Jeden glos na osobe, wiec po oddaniu nie ma juz na co kliknac NIGDZIE na stronie. To jest
+   rdzen zmiany zglaszanej jako „publicznosc glosuje tylko na jedna kategorie". */
+check(v.startButtonsLeft === 0, `nie ma na co kliknac po oddaniu glosu: ${v.startButtonsLeft}`);
 check(v.toastTone === 'success', `pasek w odmianie potwierdzenia: ${v.toastTone}`);
 
-console.log('\n--- druga nagroda jest osobnym glosem');
-const sa = p.secondAward;
-check(sa.startButtons > 0, `w drugiej nagrodzie znowu da sie glosowac (${sa.startButtons})`);
-check(sa.usedNotes === 0, 'druga nagroda nie jest oznaczona jako wykorzystana');
-check(sa.activeLabel.length > 0, `wybrana zakladka: „${sa.activeLabel}"`);
-
-console.log('\n--- zapamietany adres');
-const r = p.remembered;
-check(r.open && r.knownShown, 'okno proponuje zapamietany adres');
-check(r.email === 'marco@example.com', `adres pokazany w calosci: ${r.email}`);
-check(r.formShown === false, 'pola ukryte, dopoki propozycja stoi');
-check(r.afterOtherFormShown && r.afterOtherKnownShown === false, '„Uzyj innego adresu" odslania pola');
-
-console.log('\n--- faza 3: ranking nagrody');
+console.log('\n--- faza 3: klasyfikacja nagrody publicznosci');
 const cl = p.closed;
 check(cl.startButtons === 0, 'po zamknieciu nie da sie glosowac');
+check(cl.ruleShown === false, '„jeden glos na osobe" znika, gdy nie ma czego obiecywac');
 check(cl.stats === cl.cards && cl.cards > 0, `srednie przy kazdym kafelku (${cl.stats}/${cl.cards})`);
 check(cl.ranks === cl.cards, 'kazdy kafelek ma miejsce w rankingu');
 check(cl.firstRank === '#1', `pierwszy kafelek to pierwsze miejsce: ${cl.firstRank}`);
-check(cl.ordersDiffer, 'kazda nagroda ma wlasny ranking, a nie ten sam dwanascie razy');
+check(cl.firstPlaceMarked, 'pierwsze miejsce wyroznione');
+check(cl.sorted, `kolejnosc jest wynikiem: ${cl.averages.join(' > ')}`);
+check(cl.kicker.length > 0, `naglowek mowi, ze to wynik: „${cl.kicker}"`);
 
 console.log(`\n${fails ? `${fails} niezaliczonych` : 'wszystko zaliczone'}`);
 process.exitCode = fails ? 1 : 0;

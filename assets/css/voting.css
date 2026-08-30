@@ -183,51 +183,6 @@
 .podium-card__body p b { font: 900 20px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
 .podium-card__body p small { color: var(--muted); font: 800 9.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase; }
 
-/* ---------------------------------------------------- reszta głosów, zwinięta */
-
-.podium-rest { margin: 26px 0 0; border-top: 2px solid var(--line); padding: 14px 0 0; }
-.podium-rest[hidden] { display: none; }
-
-.podium-rest__toggle {
-  display: flex; align-items: center; gap: 8px; width: fit-content;
-  cursor: pointer; list-style: none;
-  font: 900 12px/1 var(--font-meta); letter-spacing: .09em; text-transform: uppercase;
-  color: var(--blue-700);
-}
-/* Domyślny trójkącik znika w obu dialektach — mamy własną strzałkę, która się obraca. */
-.podium-rest__toggle::-webkit-details-marker { display: none; }
-.podium-rest__toggle::marker { content: ''; }
-.podium-rest__toggle:hover { color: var(--navy-950); }
-.podium-rest__chevron { transition: transform .25s ease; }
-.podium-rest[open] .podium-rest__chevron { transform: rotate(180deg); }
-
-.podium-rest__lead { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
-
-.podium-rest__awards {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;
-  margin: 14px 0 0; padding: 0; list-style: none;
-}
-
-.award-row {
-  display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px;
-  padding: 10px 12px; border: 2px solid var(--line); border-radius: 14px; background: var(--white);
-}
-.award-row__number {
-  display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px;
-  background: var(--blue-100); color: var(--blue-700);
-  font: 900 13px/1 var(--font-meta); font-variant-numeric: tabular-nums;
-}
-.award-row__body { display: grid; gap: 2px; min-width: 0; }
-.award-row__body strong { font-size: 13px; line-height: 1.2; }
-.award-row__body > span {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: var(--muted); font: 800 10px/1.2 var(--font-meta); letter-spacing: .07em; text-transform: uppercase;
-}
-.award-row__empty { color: rgb(18 35 61 / .35); }
-.award-row p { display: flex; align-items: baseline; gap: 5px; margin: 0; }
-.award-row p b { font: 900 15px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
-.award-row p small { color: var(--muted); font: 800 9px/1 var(--font-meta); letter-spacing: .06em; text-transform: uppercase; }
-
 .podium__actions { margin: 20px 0 0; }
 
 /* Na telefonie trzy karty w rzędzie to trzy nieczytelne karty. Jedna kolumna i kolejność
@@ -383,7 +338,7 @@ a.is-race-locked {
    ============================================================================ */
 
 .vote-page { background: var(--cream, #fbf7ef); }
-.vote-main { padding: clamp(96px, 14vh, 150px) 0 80px; }
+.vote-main { padding: clamp(96px, calc(var(--screen-h, 100svh) * 0.14), 150px) 0 80px; }
 
 .vote-head { display: grid; gap: 12px; margin: 0 0 30px; }
 .vote-head h1 {
@@ -405,55 +360,73 @@ a.is-race-locked {
 
 .vote-shell[hidden] { display: none; }
 
-.vote-progress {
-  display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px;
-  font: 800 10.5px/1 var(--font-meta); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--muted);
+/* Reguła powiedziana wprost, nie ukryta w regulaminie: jeden głos na osobę.
+   Wygląda jak plakietka, nie jak ostrzeżenie — bo to nie ostrzeżenie, tylko zasada konkursu. */
+.vote-rule {
+  display: flex; align-items: flex-start; gap: 9px; margin: 4px 0 0;
+  max-width: 56ch; padding: 11px 15px;
+  border: 2px solid rgb(255 201 40 / .55); border-radius: 14px;
+  background: rgb(255 201 40 / .12);
+  font-size: 13.5px; line-height: 1.45;
 }
-.vote-progress b {
-  font: 900 15px/1 var(--font-meta); color: var(--blue-700);
-  font-variant-numeric: tabular-nums;
+.vote-rule[hidden] { display: none; }
+.vote-rule__mark { flex: none; color: #b07d00; font-size: 15px; line-height: 1.3; }
+
+/* ------------------------------------------------------------- panel „Twój głos" */
+
+/* Nad listą, nie w liście. Głos jest jeden na cały konkurs, więc odpowiedź na „czy ja już
+   głosowałem" nie może wymagać znalezienia jednego kafelka wśród kilkudziesięciu. */
+.vote-mine {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center; gap: 14px;
+  margin: 0 0 22px; padding: 14px;
+  border: 2px solid rgb(31 169 113 / .5); border-radius: 20px;
+  background: rgb(31 169 113 / .08);
+}
+.vote-mine[hidden] { display: none; }
+.vote-mine__photo {
+  position: relative; margin: 0; aspect-ratio: 1; overflow: hidden;
+  border-radius: 14px; background: var(--blue-100);
+}
+.vote-mine__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vote-mine__photo span {
+  display: grid; width: 100%; height: 100%; place-items: center;
+  color: rgb(18 35 61 / .2); font: 900 22px/1 var(--font-meta);
+}
+.vote-mine__photo span[hidden] { display: none; }
+.vote-mine__body { display: grid; gap: 3px; min-width: 0; }
+.vote-mine__body .eyebrow { color: #1f7a52; }
+.vote-mine__body strong { font-size: 16px; line-height: 1.2; }
+.vote-mine__rider {
+  color: var(--muted); font: 800 10px/1.2 var(--font-meta);
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.vote-mine__note { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.vote-mine__note[hidden] { display: none; }
+.vote-mine__score { margin: 0; }
+.vote-mine__score b {
+  display: grid; min-width: 62px; padding: 10px 0; place-items: center;
+  border-radius: 16px; background: var(--navy-950); color: var(--yellow);
+  font: 900 28px/1 var(--font-meta); font-variant-numeric: tabular-nums;
 }
 
-/* ----------------------------------------------------------- dwanaście nagród */
+/* ------------------------------------------------------- filtr kategorii pojazdu */
 
-/* Zakładki, nie lista rozwijana: wybór nagrody jest tu głównym ruchem, a lista rozwijana
-   ukrywa jedenaście z dwunastu możliwości za jednym dodatkowym naciśnięciem.
-
-   Przewijane w poziomie na telefonie, nie zawijane do sześciu rzędów: dwanaście nazw w kolumnie
-   zabiera cały ekran, zanim pokaże się pierwszy pojazd. `scroll-snap-type: x proximity`, a nie
-   `mandatory` — mandatory na tej stronie łapało rzut palcem i nie dawało minąć zakładki. */
-.award-tabs {
-  display: flex; gap: 8px; margin: 0 0 22px; padding: 2px 2px 12px;
-  overflow-x: auto; overscroll-behavior-x: contain;
-  scroll-snap-type: x proximity;
-  scrollbar-width: thin;
-}
-.award-tab {
-  flex: 0 0 auto; scroll-snap-align: start;
-  display: grid; gap: 2px; padding: 10px 16px; min-height: 48px;
-  border: 2px solid var(--line); border-radius: 16px;
+/* To NIE są kategorie głosowania — głos jest jeden. To sposób na znalezienie wozu w liście,
+   która w dniu zawodów ma kilkadziesiąt pozycji. */
+.vote-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.vote-filters[hidden] { display: none; }
+.vote-filter {
+  min-height: 44px; padding: 0 18px;
+  border: 2px solid var(--line); border-radius: 999px;
   background: var(--white); color: var(--blue-700); cursor: pointer;
-  text-align: left; transition: border-color .2s, background .2s, color .2s;
+  font: 900 11.5px/1 var(--font-meta); letter-spacing: .08em; text-transform: uppercase;
+  transition: border-color .2s, background .2s, color .2s;
 }
-.award-tab__number {
-  font: 900 9.5px/1 var(--font-meta); letter-spacing: .14em; color: var(--muted);
-}
-.award-tab strong {
-  font: 900 12.5px/1.15 var(--font-meta); letter-spacing: .04em; text-transform: uppercase;
-  max-width: 20ch;
-}
-.award-tab small {
-  font: 800 9.5px/1 var(--font-meta); letter-spacing: .08em; color: #1f7a52;
-}
-.award-tab:hover { border-color: var(--blue-500); }
-.award-tab:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
-.award-tab.is-active { border-color: var(--blue-600); background: var(--blue-600); color: var(--white); }
-.award-tab.is-active .award-tab__number { color: rgb(255 255 255 / .7); }
-.award-tab.is-active small { color: #9ff0c8; }
-.award-tab.is-done { border-color: rgb(31 169 113 / .55); }
-.award-tab.is-done.is-active { border-color: var(--blue-600); }
-@media (prefers-reduced-motion: reduce) { .award-tab { transition: none; } }
+.vote-filter:hover { border-color: var(--blue-500); }
+.vote-filter:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.vote-filter.is-active { border-color: var(--blue-600); background: var(--blue-600); color: var(--white); }
+@media (prefers-reduced-motion: reduce) { .vote-filter { transition: none; } }
 
 /* ------------------------------------------------------------------- siatka */
 
@@ -504,6 +477,21 @@ a.is-race-locked {
   background: var(--yellow); color: var(--navy-950);
   font: 900 11px/1 var(--font-meta); letter-spacing: .08em;
 }
+/* Plakietka „twój głos" na zdjęciu, na dole: kafelek z oddanym głosem ma być rozpoznawalny z
+   odległości rzutu okiem po siatce, a nie po przeczytaniu podpisu. */
+.vote-card__mine {
+  position: absolute; right: 8px; bottom: 8px;
+  padding: 5px 10px; border-radius: 999px;
+  background: #1fa971; color: var(--white);
+  font: 900 9.5px/1 var(--font-meta); letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* Trzy pierwsze miejsca po zamknięciu. Obwódka i cień, nie inne tło: kafelek zostaje kafelkiem,
+   a wyróżnienie ma się czytać jako miejsce, nie jako inny rodzaj rzeczy. */
+.vote-card.is-place-1 { border-color: #e9a11b; box-shadow: 0 10px 26px -18px rgb(233 161 27 / .8); }
+.vote-card.is-place-2 { border-color: #a9b8cd; }
+.vote-card.is-place-3 { border-color: #c07440; }
+.vote-card.is-place-1 .vote-card__rank { background: #e9a11b; color: var(--white); }
 
 .vote-card__body { display: grid; gap: 4px; padding: 12px 13px 14px; align-content: start; }
 .vote-card__body > strong { font-size: 14.5px; line-height: 1.25; }
@@ -571,7 +559,11 @@ a.is-race-locked {
 /* Reguły samego okna stoją wyżej, w sekcji „okno oceny" — nie ma sensu nadpisywać ich tutaj,
    skoro po wyniesieniu ocen na podstronę to jest jedyne okno oceny w całym serwisie. */
 .vote-dialog__who {
-  margin: 0; color: var(--navy-950); font: 800 12.5px/1.35 var(--font-meta); letter-spacing: .03em;
+  margin: 0; color: var(--navy-950); font: 800 14px/1.3 var(--font-meta); letter-spacing: .02em;
+}
+.vote-dialog__rider {
+  margin: 0; color: var(--muted);
+  font: 800 10.5px/1.2 var(--font-meta); letter-spacing: .09em; text-transform: uppercase;
 }
 .vote-dialog__score {
   display: flex; align-items: baseline; gap: 9px; margin: 2px 0 6px;

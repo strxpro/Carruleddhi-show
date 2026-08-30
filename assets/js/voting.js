@@ -8,12 +8,17 @@
  *   1. odsłania zaproszenie „Zagłosuj na uczestnika" i CHOWA dwa pozostałe przyciski w hero —
  *      w trakcie wyścigu zapisy i „będę tam" nie mają czego dotyczyć, a trzy przyciski obok
  *      siebie znaczą trzy równorzędne propozycje w chwili, gdy sensowna jest jedna;
- *   2. pokazuje podium pod hero po zamknięciu głosowania;
+ *   2. pokazuje podium nagrody publiczności pod hero po zamknięciu głosowania;
  *   3. wstrzymuje zapisy na czas zjazdu.
  *
  * Samo ocenianie stoi na podstronie, bo tam nie ma licznika do dnia wydarzenia, formularza
- * zapisów ani czternastu innych sekcji — jest dwanaście nagród i lista pojazdów. To była
- * wprost zgłoszona potrzeba: „to jest w innej zakładce, podstronie".
+ * zapisów ani czternastu innych sekcji — jest lista pojazdów i jedna nagroda.
+ *
+ * JEDNA NAGRODA, NIE DWANAŚCIE
+ *   Publiczność przyznaje własną nagrodę i tylko ją. Stała tu wcześniej zwijana lista
+ *   zwycięzców dwunastu nagród; zdjęta razem z przejściem na nagrodę publiczności (migracja
+ *   0026), bo tamtych dwanaście rozstrzyga jury i stoper — lista „zwycięzców" wyliczona z
+ *   głosów publiczności mówiłaby o nich coś, czego z tych głosów wyliczyć nie można.
  *
  * O FAZIE DECYDUJE SERWER. Patrz voting-core.js.
  */
@@ -21,7 +26,6 @@ import {
   $, $$, reducedMotion, demoMode, text, toast,
   stamp, remaining, readState, paintDemoBar
 } from './voting-core.js';
-import { AWARDS, awardLabelKey, awardNumber } from './awards.js';
 
 (function () {
   'use strict';
@@ -31,11 +35,6 @@ import { AWARDS, awardLabelKey, awardNumber } from './awards.js';
     raceStartsAt: null,
     votingEndsAt: null,
     podium: [],
-    /* Trzy pola pod „resztę głosów". Serwer odsyłał je od początku — ten plik po prostu
-       czytał z odpowiedzi wyłącznie podium i wyrzucał resztę. */
-    awards: [],
-    results: [],
-    participants: [],
     loaded: false
   };
 
@@ -52,11 +51,6 @@ import { AWARDS, awardLabelKey, awardNumber } from './awards.js';
       raceStartsAt: result.raceStartsAt || null,
       votingEndsAt: result.votingEndsAt || null,
       podium: Array.isArray(result.podium) ? result.podium : [],
-      /* Starszy Worker odpowie bez `awards` — wtedy lokalna lista, tak samo jak na podstronie
-         głosowania. Strona bez nazw nagród jest stroną, na której nie widać, co się wygrało. */
-      awards: Array.isArray(result.awards) && result.awards.length ? result.awards : [...AWARDS],
-      results: Array.isArray(result.results) ? result.results : [],
-      participants: Array.isArray(result.participants) ? result.participants : [],
       loaded: true
     });
     paint();
@@ -93,7 +87,6 @@ import { AWARDS, awardLabelKey, awardNumber } from './awards.js';
   function paint() {
     paintPhase();
     paintPodium();
-    paintRest();
     paintClock();
   }
 
@@ -103,15 +96,6 @@ import { AWARDS, awardLabelKey, awardNumber } from './awards.js';
 
     const podium = $('[data-podium]');
     if (podium) podium.hidden = !(closed && state.podium.length > 0);
-
-    /* Reszta głosów chowa się razem z cokołem, ale ma własny warunek: bez `results` nie ma
-       czego rozwijać, a zwijka otwierająca się na pustkę jest gorsza niż jej brak. */
-    const rest = $('[data-podium-rest]');
-    if (rest) {
-      rest.hidden = !(closed && state.results.length > 0);
-      // Zamknięta przy każdym wejściu w tę fazę: pierwsze, co ma być widać, to zwycięzca.
-      if (rest.hidden) rest.open = false;
-    }
 
     // Zaproszenie do głosowania — w nagłówku i w hero. Prowadzi na podstronę.
     $$('[data-vote-cta]').forEach((cta) => { cta.hidden = !voting; });
@@ -232,72 +216,6 @@ import { AWARDS, awardLabelKey, awardNumber } from './awards.js';
     }));
 
     if (!reducedMotion) $('[data-podium-art]')?.classList.add('is-drawn');
-  }
-
-  /**
-   * Reszta głosów: dwanaście nagród, w każdej zwycięzca.
-   *
-   * Zwycięzca nagrody, nie pełna lista. Pełna stoi na `votazione.html` i tam ma zakładki —
-   * tutaj chodzi o to, żeby ktoś, kto zobaczył cokół, zobaczył też, że nagród było dwanaście,
-   * a nie jedna. Dwanaście list po dziesięć pozycji pod podium to strona, na której podium
-   * przestaje być widoczne.
-   *
-   * Liczy się z `results` (średnia i liczba głosów na nagrodę) złączonych z `participants`
-   * (nazwa i zdjęcie). Serwer nie skleja tego za nas, bo płaska lista nie powtarza uczestnika
-   * dwanaście razy — patrz komentarz przy `results` w workerze.
-   */
-  function paintRest() {
-    const list = $('[data-podium-awards]');
-    if (!list) return;
-
-    const byId = new Map(state.participants.map((row) => [row.id, row]));
-
-    list.replaceChildren(...state.awards.map((award) => {
-      const item = document.createElement('li');
-      item.className = 'award-row';
-
-      const number = document.createElement('span');
-      number.className = 'award-row__number';
-      number.textContent = awardNumber(award);
-
-      const body = document.createElement('div');
-      body.className = 'award-row__body';
-      const name = document.createElement('strong');
-      name.textContent = text(awardLabelKey(award));
-      body.append(name);
-
-      /* Najlepszy w tej nagrodzie. Ta sama reguła co na cokole: średnia, a przy remisie liczba
-         głosów — inaczej jedna dziesiątka od jednej osoby biłaby osiem dziewiątek. */
-      const best = state.results
-        .filter((row) => row.award === award && row.voteCount > 0)
-        .sort((a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount)[0];
-
-      if (!best) {
-        const empty = document.createElement('span');
-        empty.className = 'award-row__empty';
-        empty.textContent = text('voting.restEmpty');
-        body.append(empty);
-        item.append(number, body);
-        return item;
-      }
-
-      const winner = byId.get(best.participantId);
-      const who = document.createElement('span');
-      who.textContent = winner
-        ? (winner.projectName || text('voting.noProject'))
-        : text('voting.noProject');
-      body.append(who);
-
-      const stats = document.createElement('p');
-      const average = document.createElement('b');
-      average.textContent = best.averageScore ? best.averageScore.toFixed(2) : '—';
-      const count = document.createElement('small');
-      count.textContent = `${best.voteCount} ${text('voting.votes')}`;
-      stats.append(average, count);
-
-      item.append(number, body, stats);
-      return item;
-    }));
   }
 
   /* ------------------------------------------------------------------------- odliczanie */

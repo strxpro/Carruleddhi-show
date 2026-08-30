@@ -323,31 +323,15 @@
           <ol class="podium__winners" data-podium-winners></ol>
         </div>
 
-        <!-- Reszta wyników, pod cokołem i zwinięta.
-             ==============================================================
-             Cokół odpowiada na jedno pytanie — kto wygrał — i dopóki na nie nie odpowie, nic
-             innego nie ma prawa go zasłaniać. Dwanaście nagród naraz to dwanaście list, w
-             których pierwsze miejsce ginie.
-
-             `details` zamiast własnego przycisku i klasy `is-open`: zwijanie to jedyna rzecz,
-             którą ten element robi, przeglądarka umie to sama, działa bez JavaScriptu i jest
-             dostępne z klawiatury bez ani jednego atrybutu aria. -->
-        <details class="podium-rest" data-podium-rest hidden>
-          <summary class="podium-rest__toggle">
-            <span data-i18n="voting.restToggle">Vedi il resto dei voti</span>
-            <span class="podium-rest__chevron" aria-hidden="true">↓</span>
-          </summary>
-          <p class="podium-rest__lead" data-i18n="voting.restLead">
-            Tutti e dodici i premi, con il primo di ciascuno.
-          </p>
-          <!-- Wypełnia voting.js z `results`. -->
-          <ol class="podium-rest__awards" data-podium-awards></ol>
-        </details>
-
         <div class="podium__actions">
-          <!-- Pełny ranking stoi na podstronie głosowania: tam jest podział na dwanaście
-               nagród, a „klasyfikacja" bez powiedzenia, której nagrody dotyczy, jest jedną
-               liczbą bez pytania. -->
+          <!-- Pełna klasyfikacja nagrody publiczności stoi na podstronie głosowania: cokół
+               odpowiada na jedno pytanie — kto wygrał — i dopóki na nie nie odpowie, lista
+               kilkudziesięciu wyników nie ma prawa go zasłaniać.
+
+               Stała tu wcześniej zwijana lista zwycięzców dwunastu nagród. Zdjęta razem z
+               przejściem na jedną nagrodę publiczności: tamtych dwanaście rozstrzyga jury i
+               stoper, więc lista „zwycięzców" wyliczona z głosów publiczności mówiłaby o nich
+               coś, czego nie da się z tych głosów wyliczyć. -->
           <a class="btn btn--blue" href="votazione.html" data-podium-all>
             <span data-i18n="voting.seeAll">Classifica completa</span><span aria-hidden="true">↘</span>
           </a>

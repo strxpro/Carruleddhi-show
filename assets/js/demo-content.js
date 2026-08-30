@@ -17,13 +17,9 @@
  *   politeness — it is the difference between a preview and a lie. If a screenshot of this
  *   ever leaves your machine, the word DEMO is in it.
  *
- * Lista nagród przychodzi z awards.js, a nie jest tu przepisana: demo ma udawać odpowiedź
- * Workera, a nie mieć własne zdanie o tym, ile jest nagród.
- *
  * The sponsor logos are the four SVGs already in public/assets/images/sponsors/, so this
  * file adds no assets and nothing to download.
  */
-import { AWARDS } from './awards.js';
 
 export const DEMO_SPONSORS = [
   { name: 'Cantina Gallura', url: 'https://example.com', image: '/assets/images/sponsors/demo-1.svg' },
@@ -192,22 +188,6 @@ export function demoVotingState(phase = 'scheduled') {
   const participants = demoParticipants(closed);
   const now = Date.now();
 
-  /* Wyniki w podziale na nagrody — udawane, ale nie losowe.
-     Każda nagroda dostaje inną kolejność (przesunięcie o numer nagrody), bo cała rzecz w tym,
-     żeby dało się zobaczyć, że „Premio 03" ma innego zwycięzcę niż „Premio 07". Losowe liczby
-     zmieniałyby się przy każdym przerysowaniu i nie dałoby się na nich nic zmierzyć. */
-  const results = closed
-    ? AWARDS.flatMap((award, awardIndex) => participants.map((row, index) => {
-      const shift = (index + awardIndex * 5) % participants.length;
-      return {
-        award,
-        participantId: row.id,
-        voteCount: 8 + ((shift * 3) % 27),
-        averageScore: Number((6.4 + ((shift * 7) % 34) / 10).toFixed(2))
-      };
-    }))
-    : [];
-
   return {
     ok: true,
     demo: true,
@@ -218,12 +198,10 @@ export function demoVotingState(phase = 'scheduled') {
     durationMinutes: 20,
     scoreMin: 3,
     scoreMax: 10,
-    /** Dwanaście nagród — ta sama lista i ta sama kolejność co u Workera. */
-    awards: [...AWARDS],
-    // Kategorie pojazdów, nie kategorie głosowania. Opisują wóz na kafelku.
+    /* Kategorie POJAZDÓW, nie kategorie głosowania: głos jest jeden, w nagrodzie publiczności.
+       Służą do odsiania listy i do opisania wozu na kafelku. */
     categories: [...new Set(participants.map((row) => row.category))],
     participants,
-    results,
     podium: closed
       ? [...participants]
         .sort((a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount)
