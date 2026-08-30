@@ -216,10 +216,17 @@ import {
     const list = state.participants.filter((row) => !state.category || row.category === state.category);
     if (state.phase !== 'closed') return list;
     /* Po zamknięciu ta sama siatka jest rankingiem, więc kolejność jest wynikiem. W trakcie
-       głosowania zostaje numer startowy: sortowanie po średniej pokazywałoby, kto prowadzi, a to
-       zamienia ocenianie pojazdów w dopisywanie się do lidera pierwszej godziny. */
+       głosowania zostaje numer startowy: sortowanie po wyniku pokazywałoby, kto prowadzi, a to
+       zamienia ocenianie pojazdów w dopisywanie się do lidera pierwszej godziny.
+
+       Suma punktów, nie średnia — ta sama kolejność, którą Worker liczy dla podium. Gdyby siatka
+       sortowała inaczej niż cokół, pierwszy kafelek na liście nie byłby zwycięzcą i nikt by tego
+       nie umiał wytłumaczyć. */
     return [...list].sort((a, b) =>
-      b.averageScore - a.averageScore || b.voteCount - a.voteCount || a.startNumber - b.startNumber);
+      b.totalScore - a.totalScore ||
+      b.voteCount - a.voteCount ||
+      b.averageScore - a.averageScore ||
+      a.startNumber - b.startNumber);
   }
 
   function paintGrid() {
@@ -334,11 +341,17 @@ import {
     if (state.phase === 'closed') {
       const stats = document.createElement('p');
       stats.className = 'vote-card__stats';
-      const average = document.createElement('b');
-      average.textContent = row.averageScore ? row.averageScore.toFixed(2) : '—';
+      /* Dużą liczbą jest suma punktów, bo to ona ustawia kolejność kafelków i cokół. Wcześniej
+         stała tu średnia — czyli kafelek numer jeden pokazywał liczbę, po której wcale nie był
+         pierwszy, i przy dwóch sąsiednich kafelkach 9.47 nad 9.12 kolejność wyglądała na błąd. */
+      const points = document.createElement('b');
+      points.textContent = row.voteCount ? String(row.totalScore) : '—';
       const count = document.createElement('small');
-      count.textContent = `${row.voteCount} ${text('voting.votes')}`;
-      stats.append(average, count);
+      /* Bez „punktów" gołe 374 nie znaczy nic — ani to ocena, ani liczba głosujących. */
+      count.textContent = row.voteCount
+        ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+        : text('voting.noVotes');
+      stats.append(points, count);
       body.append(stats);
     } else if (isMine) {
       const yours = document.createElement('p');

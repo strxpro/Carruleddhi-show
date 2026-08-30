@@ -204,11 +204,16 @@ import {
       const rider = document.createElement('span');
       rider.textContent = `${row.firstName} ${row.lastName}`.trim();
       const stats = document.createElement('p');
-      const average = document.createElement('b');
-      average.textContent = row.averageScore ? row.averageScore.toFixed(2) : '—';
+      /* Suma punktów, bo to ona ustawiła kolejność na cokole. Ze średnią na pierwszym planie
+         zwycięzca pokazywałby 9.12 obok 9.47 u wicemistrza i cokół czytałoby się jako pomyłka
+         — a to jedyne trzy kafelki, na które tego dnia patrzy cały plac. */
+      const points = document.createElement('b');
+      points.textContent = row.voteCount ? String(row.totalScore) : '—';
       const count = document.createElement('small');
-      count.textContent = `${row.voteCount} ${text('voting.votes')}`;
-      stats.append(average, count);
+      count.textContent = row.voteCount
+        ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+        : text('voting.noVotes');
+      stats.append(points, count);
       body.append(project, rider, stats);
 
       item.append(figure, body);

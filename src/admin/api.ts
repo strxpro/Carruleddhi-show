@@ -303,6 +303,8 @@ export interface VotingParticipant {
   photo: string;
   voteCount: number;
   averageScore: number;
+  /** Suma punktów od publiczności. To ona ustawia klasyfikację i podium, nie średnia. */
+  totalScore: number;
   /** Set when this participant was picked from the start list rather than typed in. */
   registrationId: string | null;
   /** The bucket path. What `save` wants back; `photo` above is only for showing. */

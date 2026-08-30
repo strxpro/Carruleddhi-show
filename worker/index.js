@@ -4412,11 +4412,21 @@ async function readParticipants(env, { activeOnly = true } = {}) {
  *
  * Jeden wiersz na uczestnika. Widok sam odsiewa głosy z kategorii innej niż `public-choice`,
  * czyli wiersze z prób sprzed migracji 0026 — patrz warunek w samym widoku.
+ *
+ * KOLEJNOŚĆ TO SUMA PUNKTÓW, NIE ŚREDNIA
+ * Głos jest jeden na osobę i niesie ze sobą ocenę 3–10, więc suma to dokładnie „ile punktów
+ * dała pojazdowi publiczność" — rośnie i od liczby głosujących, i od tego, jak wysoko ocenili.
+ * Średnia mierzy tylko to drugie i przy okazji wywraca wynik: jedna dziesiątka od jednej osoby
+ * daje 10.00 i staje nad czterdziestoma dziewiątkami, które dają 9.00. Przy sumie to 10 kontra
+ * 360 i podium wygląda tak, jak ludzie na placu spodziewają się, że wygląda.
+ *
+ * Średnia zostaje w odczycie jako ostatnie kryterium remisu i jako liczba do pokazania — przy
+ * równej sumie wyżej stoi ten, kogo oceniono lepiej, a nie ten, kto ma niższy numer startowy.
  */
 async function readRanking(env) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_ranking`);
   url.searchParams.set('select', 'participant_id,average_score,vote_count,total_score');
-  url.searchParams.set('order', 'average_score.desc,vote_count.desc');
+  url.searchParams.set('order', 'total_score.desc,vote_count.desc,average_score.desc');
   url.searchParams.set('limit', '400');
   const response = await fetch(url, { headers: supabaseHeaders(env) });
   if (!response.ok) return [];
@@ -4459,7 +4469,10 @@ function participantShape(row, signed, tally) {
     projectName: row.project_name || '',
     photo: signed.get(row.image_path) || '',
     voteCount: stats ? Number(stats.vote_count) || 0 : 0,
-    averageScore: stats ? Number(stats.average_score) || 0 : 0
+    averageScore: stats ? Number(stats.average_score) || 0 : 0,
+    /* Suma punktów, czyli wynik. Widok liczył ją od 0025, ale nigdy nie wychodziła z Workera,
+       więc strona i panel sortowały po jedynym, co dostawały — po średniej. Stąd tu jest. */
+    totalScore: stats ? Number(stats.total_score) || 0 : 0
   };
 }
 
@@ -4487,13 +4500,21 @@ async function votingState(env, payload, cors) {
   const shaped = participants.map((row) => participantShape(row, signed, tally));
   const categories = [...new Set(shaped.map((row) => row.category))];
 
-  /* Podium liczone po średniej, przy remisie po liczbie głosów.
-     Sama średnia stawiałaby jedną dziesiątkę od jednej osoby nad ośmioma dziewiątkami, co
-     nikomu nie wygląda na wynik konkursu. */
+  /* Podium liczone po sumie punktów, przy remisie po liczbie głosów, a dopiero na końcu po
+     średniej — ta sama kolejność co w readRanking() i w votingAdminWinners(), bo to musi być
+     jeden wynik, nie trzy.
+
+     Poprzednia wersja obiecywała w komentarzu, że „sama średnia stawiałaby jedną dziesiątkę nad
+     ośmioma dziewiątkami", po czym sortowała właśnie po samej średniej: liczba głosów wchodziła
+     dopiero przy remisie, a 10.00 i 9.00 remisem nie są. Suma zamyka tę dziurę bez żadnego
+     progu typu „minimum pięć głosów", który trzeba by wymyślić i potem tłumaczyć. */
   const podium = closed
     ? [...shaped]
       .filter((row) => row.voteCount > 0)
-      .sort((a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount)
+      .sort((a, b) =>
+        b.totalScore - a.totalScore ||
+        b.voteCount - a.voteCount ||
+        b.averageScore - a.averageScore)
       .slice(0, 3)
     : [];
 
@@ -4958,12 +4979,16 @@ async function votingAdminWinners(env, cors) {
   if (participants === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
 
   const tally = new Map(ranking.map((row) => [row.participant_id, row]));
+  /* Ta sama kolejność co w stanie strony: suma punktów, liczba głosów, średnia. Rozjazd tutaj
+     znaczyłby list z gratulacjami do kogoś, kto na stronie stoi na czwartym miejscu — a to jest
+     błąd, którego nie da się odwołać, bo poszedł mailem. */
   const podium = participants
     .map((row) => ({ row, stats: tally.get(row.id) }))
     .filter((entry) => entry.stats && Number(entry.stats.vote_count) > 0)
     .sort((a, b) =>
-      Number(b.stats.average_score) - Number(a.stats.average_score) ||
-      Number(b.stats.vote_count) - Number(a.stats.vote_count))
+      Number(b.stats.total_score) - Number(a.stats.total_score) ||
+      Number(b.stats.vote_count) - Number(a.stats.vote_count) ||
+      Number(b.stats.average_score) - Number(a.stats.average_score))
     .slice(0, 3);
 
   if (!podium.length) return json({ ok: false, code: 'VOTING_NO_RESULTS' }, 409, cors);
@@ -4992,7 +5017,10 @@ async function votingAdminWinners(env, cors) {
       projectName: entry.row.project_name || '',
       participantName: `${entry.row.first_name} ${entry.row.last_name}`.trim(),
       averageScore: Number(entry.stats.average_score) || 0,
-      voteCount: Number(entry.stats.vote_count) || 0
+      voteCount: Number(entry.stats.vote_count) || 0,
+      /* Wynik, którym rozstrzygnięto miejsce. W liście jest po to, żeby gratulacje mówiły to
+         samo, co cokół na stronie; scenariusz w Make może go użyć albo pominąć. */
+      totalScore: Number(entry.stats.total_score) || 0
     };
     if (!contact?.email) {
       unreachable.push(shared);
