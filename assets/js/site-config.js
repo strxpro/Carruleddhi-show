@@ -30,7 +30,7 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
     phone: '+39 328 498 1574'
   },
   media: {
-    routeImage: '/assets/images/zjazd.png',
+    routeImage: '/assets/images/zjazd.webp',
     galleryImages: [
       '/assets/images/gallery-start.svg',
       '/assets/images/gallery-race.svg',

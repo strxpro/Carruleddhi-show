@@ -152,7 +152,7 @@ html.is-demo .wall-note { position: relative; }
   background: rgb(255 255 255 / 0.94);
 }
 /* Oddech nad pasem daje karta, bo pas musi zostać przy swojej twardej wysokości. */
-.sponsor-zone > .sponsor-band--inline { margin: 10px 0; }
+.sponsor-zone > .sponsor-band--inline { margin: 14px 0; }
 
 .sponsor-pitch {
   display: flex;
@@ -215,7 +215,7 @@ html.is-demo .wall-note { position: relative; }
   width: fit-content;
   align-items: center;
   gap: 10px;
-  margin: clamp(18px, 3svh, 30px) auto 0;
+  margin: clamp(18px, calc(var(--screen-h, 100svh) * 0.03), 30px) auto 0;
   padding: 13px 20px;
   border: 2px solid #ffc928;
   border-radius: 999px;
@@ -405,7 +405,9 @@ html.is-demo .wall-note { position: relative; }
   padding: 0 4px;
   color: var(--navy-900, #0a2454);
   font-family: var(--font-display, inherit);
-  font-size: clamp(15px, 2.4vw, 22px);
+  /* Scaled with the strip, which is now roughly twice as tall. A wordmark set at 22 px in a
+     130 px band reads as a caption under a missing image rather than as somebody's name. */
+  font-size: clamp(21px, 3.4vw, 34px);
   font-weight: 400;
   letter-spacing: 0.01em;
   line-height: 1;

@@ -118,11 +118,39 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
     [t]
   );
 
+  /**
+   * Świeżo dodani uczestnicy, wyróżnieni na kilka sekund.
+   *
+   * Bez tego dodanie z listy startowej wyglądało tak: lista przeskakuje, bo doszedł jeden
+   * wiersz, i trzeba go odnaleźć wzrokiem między kilkudziesięcioma innymi uporządkowanymi
+   * numerami startowymi. Wyróżnienie odpowiada na pytanie „czy się zapisał" bez szukania.
+   *
+   * Liczone z RÓŻNICY zbiorów identyfikatorów, nie z odpowiedzi na zapis: `saveParticipant`
+   * oddaje samo `ok`, a poza tym ten sam sposób łapie też uczestnika dopisanego z drugiego
+   * urządzenia w trakcie odpytywania.
+   */
+  const [freshIds, setFreshIds] = useState<string[]>([]);
+  const knownIds = useRef<Set<string> | null>(null);
+  const freshTimer = useRef(0);
+
   const absorb = useCallback((next: VotingState) => {
+    const incoming = new Set(next.participants.map((row) => row.id));
+    if (knownIds.current) {
+      const added = [...incoming].filter((id) => !knownIds.current?.has(id));
+      if (added.length) {
+        setFreshIds(added);
+        window.clearTimeout(freshTimer.current);
+        freshTimer.current = window.setTimeout(() => setFreshIds([]), 6000);
+      }
+    }
+    knownIds.current = incoming;
+
     setState(next);
     setStartAt(toLocalInput(next.raceStartsAt));
     setDuration(next.durationMinutes || 30);
   }, []);
+
+  useEffect(() => () => window.clearTimeout(freshTimer.current), []);
 
   const load = useCallback(async () => {
     if (!apiKey) return;
@@ -142,10 +170,16 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
     void load();
   }, [load]);
 
-  /* Wyniki na żywo, co piętnaście sekund i tylko gdy głosowanie trwa i karta jest z przodu.
-     Odpytywanie zamkniętego głosowania odświeżałoby liczby, które już się nie zmieniają. */
+  /* Odczyt co piętnaście sekund, gdy karta jest z przodu.
+     ---------------------------------------------------------------------------
+     Nie tylko w fazie `voting`, jak było wcześniej: przed startem dwie osoby przygotowują
+     listę na dwóch telefonach — jedna dopisuje uczestników, druga wgrywa im zdjęcia — i bez
+     odpytywania druga nie widzi pracy pierwszej, dopóki czegoś sama nie kliknie.
+
+     Po zamknięciu odpytywanie ustaje: liczby już się nie zmieniają, a lista uczestników po
+     ogłoszeniu wyniku nie jest edytowana. */
   useEffect(() => {
-    if (!apiKey || state?.phase !== 'voting') return;
+    if (!apiKey || (state?.phase !== 'voting' && state?.phase !== 'scheduled')) return;
     const timer = window.setInterval(() => {
       if (document.hidden) return;
       fetchVoting(apiKey)
@@ -211,6 +245,9 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
       }
     } catch (problem) {
       setError(explain(problem));
+      // Podgląd zdjęcia w wierszu musi zniknąć, gdy wgranie się nie udało — inaczej organizator
+      // widzi zdjęcie, którego nie ma na serwerze, i nie ma powodu próbować ponownie.
+      throw problem;
     } finally {
       setUploading(false);
     }
@@ -243,18 +280,26 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
      liczby — i pierwszym miejscem, w którym panel pokazałby coś innego niż strona.
 
      Tylko uczestnicy w głosowaniu: wyłączony wóz nie jest w klasyfikacji, bo nie startuje.
-     Kolejność to średnia, przy remisie liczba głosów — inaczej jedna dziesiątka od jednej
-     osoby biłaby osiem dziewiątek. */
+
+     Kolejność to suma punktów, przy remisie liczba głosów, na końcu średnia — dokładnie ta,
+     którą Worker liczy dla podium i dla listów do zwycięzców. Poprzednia wersja sortowała po
+     średniej i obiecywała w tym samym komentarzu, że „jedna dziesiątka nie pobije ośmiu
+     dziewiątek": pobijała, bo liczba głosów wchodziła dopiero przy remisie średnich, a 10.00
+     i 9.00 remisem nie są. */
   const activeParticipants = (state?.participants ?? []).filter((row) => row.active);
   const rated = activeParticipants.filter((row) => row.voteCount > 0);
   const standings = [...rated].sort(
-    (a, b) => b.averageScore - a.averageScore || b.voteCount - a.voteCount || a.startNumber - b.startNumber
+    (a, b) =>
+      b.totalScore - a.totalScore ||
+      b.voteCount - a.voteCount ||
+      b.averageScore - a.averageScore ||
+      a.startNumber - b.startNumber
   );
-  /* Ważona liczbą głosów, nie średnia ze średnich: wóz z dwoma głosami nie może ważyć tyle co
-     wóz z czterdziestoma. */
-  const totalWeighted = rated.reduce((sum, row) => sum + row.averageScore * row.voteCount, 0);
+  /* Suma prosto z sum punktów, a nie z `średnia × liczba głosów`: średnia przychodzi
+     zaokrąglona do dwóch miejsc, więc mnożenie jej z powrotem odtwarzało sumę z błędem. */
+  const totalPoints = rated.reduce((sum, row) => sum + row.totalScore, 0);
   const totalRatedVotes = rated.reduce((sum, row) => sum + row.voteCount, 0);
-  const overallAverage = totalRatedVotes > 0 ? totalWeighted / totalRatedVotes : null;
+  const overallAverage = totalRatedVotes > 0 ? totalPoints / totalRatedVotes : null;
 
   /* Zgłoszenia, których nie ma jeszcze wśród uczestników.
      Odsiewane po `registrationId`, a nie po imieniu i nazwisku: dwoje kuzynów o tym samym
@@ -494,12 +539,17 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                         {String(row.startNumber).padStart(3, '0')} · {row.firstName} {row.lastName} · {row.category}
                       </span>
                     </span>
+                    {/* Na żółto wynik, po którym stoi to miejsce — suma punktów. Średnia obok,
+                        drobnym drukiem: jest ciekawa, ale nie ona rozstrzyga, a postawiona na
+                        pierwszym planie kazałaby czytać klasyfikację jako pomyłkę, bo drugi wiersz
+                        bywa wyżej oceniony od pierwszego. */}
                     <span className="flex items-baseline gap-1.5">
                       <b className="text-lg font-extrabold tabular-nums text-yellow">
-                        {row.averageScore.toFixed(2)}
+                        {row.totalScore}
                       </b>
                       <small className="text-[10px] uppercase tracking-wider text-white/45">
-                        {row.voteCount} {t('vote.votes')}
+                        {t('vote.points')} · {row.voteCount} {t('vote.votes')} · {t('vote.avgShort')}{' '}
+                        {row.averageScore.toFixed(2)}
                       </small>
                     </span>
                   </li>
@@ -827,12 +877,17 @@ function ParticipantRow({
             {row.firstName} {row.lastName} · {row.category}
           </span>
         </div>
+        {/* Ta sama para liczb co w klasyfikacji wyżej i w tej samej kolejności: punkty na
+            pierwszym planie, reszta drobnym drukiem. Dwa różne porządki na jednym ekranie
+            czytałoby się jako dwa różne wyniki. */}
         <p className="flex items-baseline gap-1.5 sm:justify-end">
           <b className="text-lg font-extrabold tabular-nums text-yellow">
-            {row.averageScore ? row.averageScore.toFixed(2) : '—'}
+            {row.voteCount ? row.totalScore : '—'}
           </b>
           <small className="text-[10px] uppercase tracking-wider text-white/45">
-            {row.voteCount} {t('vote.votes')}
+            {row.voteCount
+              ? `${t('vote.points')} · ${row.voteCount} ${t('vote.votes')}`
+              : t('vote.noVotes')}
           </small>
         </p>
       </div>

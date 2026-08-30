@@ -542,7 +542,35 @@ function chatSystemPrompt(deck) {
     `Data: ${ev.date}. Prezentacja wózków ${ev.presentation}, start ${ev.start}.`,
     `Miejsce: ${ev.place}.`,
     'Wpisowe: zero, zapisy są bezpłatne.',
+    /* Wszystko od tego miejsca do „Kategorie" stoi na stronie, w sekcjach trasy, programu,
+       kategorii i nagród. Tu jest z jednego powodu: dopóki tego nie było, czat oddawał
+       człowiekowi pytania, na które strona odpowiada dwa przewinięcia wyżej. Zgłoszone jako
+       „AI od razu przekazuje do człowieka", zmierzone na pytaniu „co mogę wygrać?" — dwanaście
+       nagród wypisanych na stronie, a odpowiedzią było ESCALATE.
+
+       Nie jest to poluzowanie reguły „nigdy nie zmyślaj". Reguła zostaje co do słowa; zmienia
+       się to, ile czat wie, a nie ile mu wolno domyślać. */
+    'Trasa: około 250 m zjazdu na Rena Bianca, wzdłuż via Giuseppe Verdi. Prezentacja na'
+      + ' placu, wejście pod górę pieszo, meta w miasteczku. Odsyłacz do mapy jest na stronie'
+      + ' w sekcji trasy.',
+    'Program dnia: prezentacja carruleddhi na placu, oficjalny start wyścigu, wieczorem'
+      + ' wręczenie nagród i finałowa zabawa. Kanapka i napój dla każdego uczestnika.',
     'Kategorie: klasyczna i artystyczna.',
+    'Kategoria A, Carruleddhi Classic: ręcznie wykonana drewniana rama, cztery koła pełne'
+      + ' albo z łożyskami, sterowanie stopami lub liną, hamulec nożny albo dźwignia.',
+    'Kategoria B, Carruleddhi ART: dowolne materiały i dowolna forma, od czterech do dziesięciu'
+      + ' kół, dowolne hamulce. Jedna zasada: pojazd musi być wykonany ręcznie.',
+    /* Nazwy kategorii nagród — tak, jak stoją na kartach w sekcji nagród. Co konkretnie
+       dostaje zwycięzca, zostaje przy człowieku: patrz „nagrody rzeczowe" w ESCALATE niżej. */
+    'Nagrody: dwanaście kategorii — Najszybszy Classic, Najszybszy ART, Carruleddhi Show 2026,'
+      + ' Największy Carruleddhu, Najzabawniejszy Carruleddhu, Pokaz specjalny, Show Classic,'
+      + ' Najmłodszy kierowca, Najstarszy kierowca, Najbardziej technologiczny, Najwolniejszy,'
+      + ' Najbardziej Shardana. Nie trzeba być najszybszy, żeby wygrać.',
+    'Głos publiczności: gdy głosowanie jest otwarte, na stronie pojawia się podstrona'
+      + ' głosowania. Wybiera się pojazd i daje mu od 3 do 10 punktów, jeden głos na kategorię;'
+      + ' potwierdzenie przychodzi mailem, razem z odsyłaczem do zmiany decyzji.',
+    'Przycisk „Będę tam" na stronie podbija licznik widzów i pozwala zapisać się na'
+      + ' przypomnienie. Nie jest to zapis do wyścigu.',
     'Wiek: 18+ z podpisanym formularzem i dokumentem tożsamości. Osoby niepełnoletnie'
       + ' wyłącznie za pisemną zgodą rodzica lub opiekuna prawnego, obecnego na starcie.',
     'Napęd: żaden. Bez silnika, bez pedałów, bez popychania po starcie. Tylko grawitacja.',
@@ -581,6 +609,10 @@ function chatSystemPrompt(deck) {
     'TON',
     'Krótko. Dwa, maksymalnie trzy zdania. Ciepło, bez korporacyjnego żargonu, bez',
     'wykrzykników. Nie zaczynaj od „Oczywiście" ani „Świetne pytanie".',
+    /* Wyjątek dopisany razem z listą nagród. Dwanaście nazw nie wchodzi w trzy zdania, a bez
+       tego pozwolenia model albo urywał listę w połowie, albo wolał ESCALATE. */
+    'Wyjątek: pytanie o listę — nagrody, kategorie, program dnia — wolno wyliczyć w jednym',
+    'zdaniu po przecinkach, nawet jeśli wyjdzie dłuższe.',
     '',
     'CO WIESZ — to jest cała Twoja wiedza',
     facts,
@@ -599,12 +631,23 @@ function chatSystemPrompt(deck) {
        zgody na wymyślanie warunków umowy. */
     'ubezpieczenia, odpowiedzialności prawnej i kwestii medycznych; warunków umowy',
     'sponsorskiej, faktur i tego, gdzie dokładnie pojawi się logo; współpracy i mediów;',
+    /* „Nagrody" rozdzielone na dwie rzeczy, bo to dwa różne pytania. Kategorie nagród są
+       wypisane na stronie i są w faktach wyżej; co dokładnie dostaje zwycięzca — nie jest
+       nigdzie napisane, więc zostaje przy człowieku. Bez tego rozdzielenia całe „nagrody"
+       leciały do ESCALATE i pytanie „co mogę wygrać?" nie dostawało odpowiedzi. */
+    'tego, co konkretnie dostaje zwycięzca w nagrodę — sama lista kategorii jest w faktach,',
+    'ale przedmiotów, kwot ani pucharów nie obiecujesz;',
     'czegokolwiek o edycjach innych niż 2026.',
+    '',
+    'ZANIM ODDASZ ROZMOWĘ — SPRAWDŹ LISTĘ FAKTÓW',
+    'ESCALATE jest na to, czego nie wiesz, nie na to, co wolisz oddać. Jeśli odpowiedź stoi w',
+    'faktach wyżej, odpowiadasz Ty, także wtedy, gdy pytanie brzmi ogólnie albo gdy wcześniej',
+    'w tej rozmowie coś już oddałeś człowiekowi. Jedno oddane pytanie nie kończy rozmowy.',
     '',
     'CZEGO NIE ROBISZ',
     'Nie udzielasz porad prawnych ani medycznych. Pytanie, czy dziecko może startować z',
     'jakimś schorzeniem — ESCALATE. Nie obiecujesz niczego, czego nie ma na liście. Nie',
-    'mówisz o nagrodach rzeczowych ani liczbie uczestników. Nie prosisz o dane osobowe;',
+    'mówisz o liczbie uczestników. Nie prosisz o dane osobowe;',
     'jeśli gość sam poda imię albo e-mail, nie powtarzaj ich. Nie podajesz linków innych',
     'niż carruleddhishow.com.',
     '',
@@ -816,8 +859,10 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
      powodu tam zaglądać. Gość po pięciu pytaniach do AI miałby licznik na pięciu i
      szósta wiadomość, ta z ESCALATE, poszłaby w ciszy.
 
-     Przekazanie zdarza się raz na wątek — mode idzie z 'ai' na 'human' i nie wraca —
-     więc „zawsze" nie może się tu zamienić w spam. */
+     `handedOver` jest podnoszone tylko przy PIERWSZYM przekazaniu wątku (mode idzie z 'ai'
+     na 'human'), więc „zawsze" nie może się tu zamienić w spam. Kolejne pytania bez
+     odpowiedzi w tym samym wątku wołają tę funkcję z `handedOver === false` i podlegają
+     warunkowi niżej — patrz chatVisitor, gałąź `if (!reply)`. */
   if (!handedOver && Number(thread.unread_for_admin || 0) > 0) return;
 
   const who = thread.display_name || thread.email || 'gość';
@@ -1237,9 +1282,32 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   if (payload.email && !thread.email) details.email = String(payload.email).trim().toLowerCase();
   if (Object.keys(details).length) await setThreadMode(env, thread.id, thread.mode, details);
 
-  // Already with a person: nothing to answer automatically, and answering anyway
-  // would talk over them.
-  if (thread.mode === 'human') {
+  /**
+   * ORGANIZATOR PISZE WŁAŚNIE TERAZ — TYLKO WTEDY AUTOMAT MILCZY.
+   * ---------------------------------------------------------------------------
+   * Stał tu warunek `thread.mode === 'human'`: raz przekazany wątek nie dostawał już żadnej
+   * automatycznej odpowiedzi, nigdy. A `mode` idzie na `'human'` przy pierwszym pytaniu, na
+   * które model nie umiał odpowiedzieć — więc jedno pytanie o pogodę wyłączało czat do końca
+   * rozmowy. Gość, który potem pytał o kask, dostawał ciszę na pytanie z listy FAQ, mimo że
+   * odpowiedź stała w słowniku. To jest ta „blokada", nie awaria modelu.
+   *
+   * Powód pierwotny był dobry i zostaje: nie mówić człowiekowi przez ramię. Ale „człowiek jest
+   * w tej rozmowie" to nie to samo co „człowiek pisze w tej sekundzie". Do tego drugiego jest
+   * `admin_typing_at` (migracja 0019) — kolumna odświeżana, dopóki organizator trzyma
+   * klawiaturę, i gasnąca sama, gdy zamknie kartę. Sześć sekund to ta sama stała, z której
+   * panel rysuje kropki „pisze…", więc jedno źródło prawdy o tym, czy ktoś tam jest.
+   *
+   * Poza tym okienkiem automat odpowiada normalnie — a odpowiada tylko na to, co ma w
+   * słowniku i w faktach, bo reguła „NIGDY NIE ZMYŚLAJ" w chatSystemPrompt() jest nietknięta.
+   * Najgorszy przypadek to gotowa odpowiedź o kasku obok wątku, w którym organizator ustala
+   * warunki sponsoringu. Najgorszy przypadek przedtem to cisza na każde pytanie.
+   */
+  /* `|| 0` po Date.parse, nie przed nim. `Date.parse(0)` to nie „brak daty" — V8 czyta to jako
+     napis "0" i zwraca 1 stycznia 2000, czyli poprawną datę w przeszłości. Tu wyszłoby na to
+     samo, ale tylko przypadkiem, a świeży wątek nie ma tej kolumny w SELECT po INSERT. */
+  const humanTyping = thread.mode === 'human'
+    && Date.now() - (Date.parse(thread.admin_typing_at || '') || 0) < CHAT_TYPING_TTL_MS;
+  if (humanTyping) {
     // Zdjęcie w wiadomości do człowieka nie zmienia niczego w tej gałęzi: organizator
     // zobaczy je w panelu przy tym wierszu, tak jak treść.
     /* Awaited, nie waitUntil. Na Vercelu ctx.waitUntil nie ma czego trzymać przy życiu
@@ -1264,28 +1332,54 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   }
 
   if (!reply) {
-    await setThreadMode(env, thread.id, 'human');
+    /* `mode` nadal idzie na `'human'`, bo to jest sygnał dla panelu i dla dzwonka: ten wątek
+       czeka na człowieka. Zmieniło się to, że od teraz `'human'` nie zamyka automatowi ust
+       na kolejne pytania — patrz warunek `humanTyping` wyżej. */
+    const waiting = thread.mode === 'human';
+    if (!waiting) await setThreadMode(env, thread.id, 'human');
     /* Two sentences, not one: what happens, and when. A handover that only says "somebody
        will answer" reads the same at 23:00 as at 11:00, and at 23:00 it is the sentence
        that makes a chat feel abandoned. */
     const open = chatOpenNow();
+    /* Zdanie o przekazaniu raz, godziny za każdym razem.
+       ---------------------------------------------------------------------------
+       Odkąd automat odpowiada także w wątku oznaczonym `'human'`, ta gałąź zdarza się więcej
+       niż raz — a „przekazuję to organizatorom" powtórzone przy trzecim pytaniu z rzędu czyta
+       się jak zapętlony automat, nie jak przekazanie. Gość przeczytał to raz i wie.
+
+       Ale milczeć też nie można: wiadomość bez żadnej odpowiedzi wygląda jak niedostarczona, i
+       to jest dokładnie ten objaw, od którego cała ta zmiana się zaczęła. Zostaje więc samo
+       zdanie o godzinach — jest w słowniku we wszystkich sześciu językach, mówi „ktoś to
+       przeczyta i kiedy", i za trzecim razem nadal nie brzmi jak kopia poprzedniej odpowiedzi.
+
+       Sygnał do organizatorów leci niezależnie od tego, co widzi gość: to on decyduje, czy
+       ktoś naprawdę odpowie. */
+    const hours = open ? deck.chatHoursNow : deck.chatHoursLater;
     const handover = [
-      deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.',
-      open ? deck.chatHoursNow : deck.chatHoursLater
+      waiting ? '' : (deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.'),
+      hours
     ].filter(Boolean).join(' ');
-    const saved = await insertRow(
-      env,
-      'chat_messages',
-      { thread_id: thread.id, author: 'ai', body: handover },
-      'id,created_at'
-    );
+    const saved = handover
+      ? await insertRow(
+        env,
+        'chat_messages',
+        { thread_id: thread.id, author: 'ai', body: handover },
+        'id,created_at'
+      )
+      : { ok: true, row: null };
     /* Ten sygnał jest ważniejszy od poprzedniego: gość właśnie przeczytał „przekazuję to
-       organizatorom", więc od tej chwili czeka na człowieka i wie o tym. */
-    await alertOrganisers(env, thread, body, true);
+       organizatorom", więc od tej chwili czeka na człowieka i wie o tym.
+
+       `!waiting`, nie `true`: obejście wyciszenia w alertOrganisers należy do PIERWSZEGO
+       przekazania, bo tylko ono jest nową informacją. Odkąd ta gałąź może się powtórzyć w
+       jednym wątku, `true` znaczyłoby jeden WhatsApp na każde pytanie bez odpowiedzi, także
+       do skrzynki, w którą nikt jeszcze nie zajrzał. Kolejne przechodzą przez zwykły warunek
+       „licznik nieprzeczytanych jest na zerze". */
+    await alertOrganisers(env, thread, body, !waiting);
     return json({
       ok: true,
       mode: 'human',
-      reply: handover,
+      reply: handover || null,
       chatOpen: open,
       ...echo,
       // Same reason as the visitor's own message: without the id the poll would fetch this
@@ -1303,7 +1397,11 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   );
   return json({
     ok: true,
-    mode: 'ai',
+    /* Tryb oddawany taki, jaki jest w bazie, a nie zawsze `'ai'`.
+       Wątek czekający na organizatora czeka dalej, mimo że na to jedno pytanie odpowiedział
+       automat — a przeglądarka po `mode` rysuje zieloną kropkę „ktoś tu jest". Zwrócenie
+       `'ai'` gasiłoby ją człowiekowi, który wciąż ma coś do odpisania. */
+    mode: thread.mode === 'human' ? 'human' : 'ai',
     reply,
     ...echo,
     replyId: saved.row?.id || null,
@@ -2977,7 +3075,13 @@ async function entryManage(env, payload, cors) {
     isMinor: Boolean(row.is_minor),
     riderAge: row.rider_age ? String(row.rider_age) : '',
     // Same four values the registration route branches on, so no new route is needed in Make.
-    branch: `registration-${row.is_minor ? 'minor' : 'adult'}-${locale === 'it' ? 'it' : 'xx'}`
+    branch: `registration-${row.is_minor ? 'minor' : 'adult'}-${locale === 'it' ? 'it' : 'xx'}`,
+    /* Ten sam odsyłacz co w pierwszym potwierdzeniu, i tu jest ważniejszy niż tam: ten mail
+       wychodzi WŁAŚNIE dlatego, że dane się zmieniły, więc formularz z poprzedniego maila
+       niesie już nieaktualne. Token liczy się z `id`, które się nie zmienia, więc stary
+       odsyłacz też pokaże nowe dane — ale nikt nie wraca do starego maila, gdy dostał nowy. */
+    formUrl: `${(COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '')}`
+      + `/api/carruleddhi/form?id=${row.id}&t=${await printToken(env, row.id)}`
   };
   attachCopy(fresh);
   /* Marked in the subject, because two identical confirmations in one inbox is the situation
@@ -3448,6 +3552,18 @@ function attachCopy(payload) {
   payload.pdfUrlOwn = locale === 'it' ? '' : `${base}/emails/${stem}-${locale}.pdf`;
   payload.pdfNameOwn = `${stem}-${locale.toUpperCase()}-`;
 
+  /* Przycisk „otwórz wypełniony formularz" nie może prowadzić w nikąd.
+     ---------------------------------------------------------------------------
+     `formUrl` liczy handler, bo potrzebuje `env` i uuid zapisanego wiersza. Gdy zapisu nie
+     było — Supabase nieskonfigurowany albo wysyłka ze ścieżki, która nie tworzy wiersza —
+     pole jest puste, a renderTemplate() zamienia brakujące pole na pusty napis. Wyszłoby
+     `href=""`, czyli przycisk, który przeładowuje maila.
+
+     Zapasowo więc blankiet, ten sam, który i tak jest w załączniku. Nie jest tym, co
+     obiecuje etykieta, ale jest formularzem — a to jedyna sytuacja, w której cokolwiek
+     innego znaczyłoby martwy przycisk. */
+  payload.formUrl = payload.formUrl || payload.pdfUrl;
+
   /* --- the handful of values a template cannot work out for itself -----------
      The bodies are rendered below by substituting plain paths and nothing else, so
      anything that needed a function call is computed here instead. Five lines of
@@ -3679,7 +3795,11 @@ async function storeIntake(env, request, type, payload) {
     });
   }
 
-  const stored = await insertRow(env, 'registrations', row, 'race_number');
+  /* `id` obok `race_number`, i to jest jedyny powód: bez niego nie ma z czego policzyć
+     tokenu do formularza z danymi (patrz printToken i formUrl w handlerze). Numer startowy
+     do tego nie wystarczy — token jest liczony z uuid, żeby nie dało się go zgadnąć,
+     przechodząc po kolejnych numerach. */
+  const stored = await insertRow(env, 'registrations', row, 'id,race_number');
   if (!stored.ok) {
     /* A second entry on one address is not a server fault, it is a fact the person
        needs to hear. Told apart here so the API can answer 409 with something the
@@ -3718,7 +3838,7 @@ async function storeIntake(env, request, type, payload) {
     status: 'active'
   }, '', 'email').catch(() => {});
 
-  return { ok: true, raceNumber: stored.row?.race_number ?? null };
+  return { ok: true, raceNumber: stored.row?.race_number ?? null, id: stored.row?.id ?? null };
 }
 
 /**
@@ -5468,6 +5588,20 @@ export default {
       }
       // Make no longer counts spreadsheet rows to find this. It arrives as a field.
       if (stored.raceNumber) payload.raceNumber = String(stored.raceNumber).padStart(3, '0');
+      /* Odsyłacz do formularza Z DANYMI — krok 4 z make/PLAN-FORMULARZ-Z-DANYMI.md.
+         ---------------------------------------------------------------------------
+         Trasa `GET /form` i token istniały od `0e938ee`, ale nikt nie generował adresu, więc
+         endpoint był sprawny i nieosiągalny: token liczy się z uuid, a uuid nie było w mailu.
+         Tu się ten łańcuch domyka.
+
+         Liczone TUTAJ, a nie w attachCopy(): `printToken` jest asynchroniczne (WebCrypto), a
+         attachCopy jest wołane też ze ścieżki wznowienia i nie dostaje `env`. Zrobienie go
+         async znaczyłoby przerobienie dwóch wywołań po to, żeby dołożyć jedno pole. */
+      if (stored.id && type === 'registration') {
+        const site = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
+        payload.formUrl = `${site}/api/carruleddhi/form?id=${stored.id}`
+          + `&t=${await printToken(env, stored.id)}`;
+      }
       /* The way out of the list, in the letter that puts them on it. Only the reminder
          opt-in returns a token: a registration confirmation is a receipt, and a contact
          reply is one message, so neither has anything to unsubscribe from. */

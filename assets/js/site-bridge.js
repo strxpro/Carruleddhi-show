@@ -121,6 +121,72 @@ export function showToast(message, duration = 4200, tone = 'info') {
   showToast.timer = window.setTimeout(() => toast.classList.remove('is-visible'), duration);
 }
 
+/* ------------------------------------------------------------------- wysokość ekranu */
+
+let svhProbe = null;
+let screenHeightPx = 0;
+
+/**
+ * Wysokość jednego ekranu, zmierzona i wpisana do CSS jako `--screen-h`.
+ *
+ * TO JEST NAPRAWA TELEPORTOWANIA PRZY PRZEWIJANIU PALCEM
+ *   Układ strony opiera się na wysokości ekranu: czternaście sekcji ma `min-height` jednego
+ *   ekranu, a rozmiary pisma i odstępy są liczone z tej samej wielkości. Według specyfikacji
+ *   `svh` jest stałe — to wysokość okna przy WIDOCZNYM pasku adresu. Na przeglądarce
+ *   zgłaszającego nie jest.
+ *
+ *   ZMIERZONE, rejestrator z `?jump=1`:
+ *     okno 797 → 615 px  (pasek adresu wyjeżdża, −182)
+ *     dokument 13095 → 11143 px  (−1952), i tak dziewięć razy w osiemnaście sekund.
+ *   Odtworzone w Chrome przy oknie 844 → 662: rozrzut dokumentu 1891 px. Po zamrożeniu: 0.
+ *
+ *   Każde przeciągnięcie palcem zmieniało więc wysokość dokumentu o dwa tysiące pikseli, a to
+ *   przesuwa wszystko poniżej bieżącego miejsca. Dyskusja „która jednostka jest właściwa" nie
+ *   ma tu wyjścia, bo ta przeglądarka wiąże każdą z nich z bieżącym widokiem. Więc wysokość
+ *   ekranu przestaje być jednostką CSS i staje się liczbą wpisaną raz.
+ *
+ * DLACZEGO POMIAR, A NIE OBLICZENIE
+ *   `svh` nie da się policzyć z niczego, co jest w JS. Trzeba dać przeglądarce pudełko o
+ *   wysokości `100svh` i zapytać, ile to wyszło. Element jest bezwymiarowy w poziomie,
+ *   `visibility: hidden` i poza kolejnością malowania, więc niczego nie zasłania.
+ *
+ * `Math.min` Z innerHeight
+ *   Zabezpieczenie na wypadek, gdyby sonda `100svh` oddała wartość „dużego" widoku — czyli przy
+ *   schowanym pasku. Przy wejściu na stronę pasek jest widoczny, więc `innerHeight` to wtedy
+ *   właśnie mały widok. Bierzemy mniejszą z dwóch: sekcja nigdy nie będzie wyższa od tego, co
+ *   widać, więc dolna krawędź treści nie schowa się pod paskiem.
+ *
+ * KTO TO WOŁA
+ *   app.js przy starcie i przy zmianie szerokości okna (tam ta sama liczba rozstrzyga też
+ *   werdykt `pinned` / `flow`), a voting-boot.js na podstronie głosowania. Jedna
+ *   implementacja, bo dwie rozjechałyby się przy pierwszej poprawce.
+ */
+export function measureScreenHeight() {
+  if (!(window.CSS && CSS.supports && CSS.supports('height', '100svh'))) {
+    // Przeglądarka bez svh (starsze WebView): innerHeight jest jedyną liczbą, jaką mamy.
+    screenHeightPx = window.innerHeight;
+  } else {
+    if (!svhProbe) {
+      svhProbe = document.createElement('div');
+      svhProbe.setAttribute('aria-hidden', 'true');
+      svhProbe.style.cssText =
+        'position:absolute;top:0;left:0;width:0;height:100svh;visibility:hidden;pointer-events:none;';
+      document.body.appendChild(svhProbe);
+    }
+    screenHeightPx = svhProbe.getBoundingClientRect().height || window.innerHeight;
+  }
+
+  const stable = Math.max(320, Math.min(screenHeightPx || Infinity, window.innerHeight || Infinity));
+  if (Number.isFinite(stable)) {
+    screenHeightPx = Math.round(stable);
+    document.documentElement.style.setProperty('--screen-h', `${screenHeightPx}px`);
+  }
+  return screenHeightPx;
+}
+
+/** Ostatnio zmierzona wysokość ekranu, bez ponownego pomiaru. */
+export const screenHeight = () => screenHeightPx;
+
 /* -------------------------------------------------------------------------------- sieć */
 
 export async function postJSON(endpoint, payload) {

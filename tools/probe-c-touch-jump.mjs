@@ -227,6 +227,74 @@ try {
   await keyboardCase('czat — pole wiadomości', '[data-chat-input]');
   await keyboardCase('czat — brama, imię', '#chat-gate-name');
 
+  /* --------------------- 3. przywracanie NIE MOŻE nadpisywać decyzji człowieka */
+  /* Naprawa, która przywraca pozycję zawsze, jest równie zła jak jej brak: ktoś przy
+     otwartej klawiaturze przewinął stronę, bo chciał coś zobaczyć, i po zamknięciu
+     zostaje zabrany z powrotem. Ten przypadek musi zostawiać go tam, gdzie sam stanął. */
+  {
+    await setViewport(TALL);
+    await sleep(400);
+    await scrollTo(6000);
+    const before = await state();
+    await setViewport(SHORT);
+    await sleep(900);
+    await scrollTo(3000);
+    await sleep(700);
+    const chosen = await state();
+    await setViewport(TALL);
+    await sleep(1000);
+    const after = await state();
+    console.log('\ncelowe przewinięcie przy otwartej klawiaturze');
+    console.log(`   przed=${before.y}  przy klawiaturze wybrano=${chosen.y}  po zamknięciu=${after.y}`);
+    check(Math.abs(after.y - chosen.y) <= 60,
+      `zostajemy tam, gdzie człowiek sam stanął (${chosen.y} -> ${after.y}), a nie wracamy na ${before.y}`);
+  }
+
+  /* ------------------------------------------------------------------- 4. obrót ekranu */
+  {
+    await setViewport(TALL);
+    await sleep(500);
+    await scrollTo(7000);
+    const before = await state();
+    /* Poziomo: i szerokość, i wysokość inne, czyli inny układ i inna wysokość dokumentu. */
+    await call('Emulation.setDeviceMetricsOverride', {
+      width: TALL, height: WIDTH, deviceScaleFactor: 1, mobile: false,
+      screenWidth: TALL, screenHeight: WIDTH, positionX: 0, positionY: 0
+    });
+    await sleep(1200);
+    const landscape = await state();
+    await setViewport(TALL);
+    await sleep(1200);
+    const back = await state();
+    console.log('\nobrót ekranu w tę i z powrotem');
+    console.log(`   pion=${before.y} (dokument ${before.h})  poziom=${landscape.y} (${landscape.h})  z powrotem=${back.y} (${back.h})`);
+    check(back.h === before.h, `po powrocie do pionu dokument ma tę samą wysokość (${before.h} -> ${back.h})`);
+    check(Math.abs(back.y - before.y) <= 60, `po powrocie do pionu jesteśmy tam, gdzie byliśmy (${before.y} -> ${back.y})`);
+  }
+
+  /* ------------------------------------- 5. czujnik OKNO w rejestratorze przeskoków */
+  /* Osobne wczytanie strony, bo panel rejestratora jest przyklejony do dołu ekranu i
+     zasłoniłby pola, w które wyżej trzeba było tapnąć. Tu sprawdzane jest jedno: czy przy
+     prawdziwej zmianie wysokości okna wiersz OKNO faktycznie się pojawia. Bez tego
+     rejestrator ma czujnik nieznanego stanu akurat na to zdarzenie, które na telefonie
+     zachodzi najczęściej. */
+  await setViewport(TALL);
+  await call('Page.navigate', { url: `${origin}/?lang=pl&jump=1` });
+  await sleep(3000);
+  await setViewport(SHORT);
+  await sleep(900);
+  await setViewport(TALL);
+  await sleep(900);
+  const recorderText = await evaluate(`(() => {
+    const panel = [...document.querySelectorAll('div[role="status"]')]
+      .find((el) => el.textContent.includes('rejestrator przeskoków'));
+    return panel ? panel.textContent : '';
+  })()`);
+  console.log('');
+  check(/OKNO/.test(recorderText), `rejestrator zapisuje zmianę wysokości okna (${(recorderText.match(/OKNO/g) || []).length} wierszy OKNO)`);
+  const okno = /OKNO[^\n]*/.exec(recorderText);
+  if (okno) console.log(`   ${okno[0].trim()}`);
+
   console.log(`\n${fails === 0 ? 'wszystko przeszło' : fails + ' nieudanych sprawdzeń'}`);
 } finally {
   try { cdp.ws.close(); } catch { /* i tak zamykamy */ }

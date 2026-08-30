@@ -83,7 +83,13 @@ function payloadFor({ locale, isMinor }) {
     remWindow: deck.remWindow7,
     remHeading: deck.remHeading7,
     remBody: deck.remBody7,
-    remRiderLine: `#041 — ${deck.remRiderNote}`
+    remRiderLine: `#041 — ${deck.remRiderNote}`,
+    /* Odsyłacz do formularza z wpisanymi danymi. Prawdziwy kształt adresu, z uuid i tokenem
+       HMAC długości 32 znaków, bo w podglądzie chodzi o to, żeby zobaczyć, jak przycisk
+       wygląda i czy się nie zawija — a nie o to, żeby link działał. Adres liczy worker
+       (patrz formUrl w handlerze i w entryManage), tutaj nie ma z czego. */
+    formUrl: 'https://www.carruleddhishow.com/api/carruleddhi/form'
+      + '?id=1f2e3d4c-5b6a-4798-8899-aabbccddeeff&t=8f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f'
   };
   /* The attachment block. One form for an Italian rider, two for everybody else, which
      is the same choice attachCopy() makes and the reason these are fields at all. */

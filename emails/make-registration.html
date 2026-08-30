@@ -93,6 +93,31 @@
     <a href="{{1.ev.map}}" style="display:inline-block;background:#2469d8;background-image:linear-gradient(135deg,#2469d8 0%,#1b4fae 100%);color:#ffffff;font-size:14px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;text-decoration:none;padding:14px 28px;border-radius:999px;">{{1.copy.regCta}} &rarr;</a>
   </td></tr>
 
+  <!-- FORMULARZ Z WPISANYMI DANYMI.
+       Blankiet w zalaczniku zostaje dla tych, ktorzy wola wypelnic recznie. Ten odsylacz
+       prowadzi do tej samej strony w tym samym ukladzie, tylko z danymi tej osoby — do
+       wydruku albo do zapisania jako PDF z menu druku przegladarki.
+
+       Dlaczego odsylacz, a nie zalacznik: na Vercelu nie ma Chrome, a szablon to HTML z
+       `@page`. Pelny wywod w make/PLAN-FORMULARZ-Z-DANYMI.md.
+
+       Stoi NAD blokiem o zalaczniku, bo tresc `regPdfBody` mowi „wersje z danymi otwierasz
+       odsylaczem powyzej" — a odsylacz ponizej zdania, ktore mowi „powyzej", to bledna
+       instrukcja w dokumencie, ktory ktos zaraz podpisuje.
+
+       Adres jest polem zadania, a nie skladany w szablonie: niesie token HMAC, ktory liczy
+       worker z `WALL_SALT`. Generator nic tu nie podmienia — oba uzyte odwolania sa juz w
+       gramatyce, ktora renderer w workerze rozumie. -->
+  <tr><td class="pad" style="padding:0 34px 26px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f2f8ff;border:2px solid #2469d8;border-radius:14px;">
+      <tr><td style="padding:18px 20px;">
+        <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#1b4fae;padding-bottom:6px;">{{1.copy.regFormTitle}}</div>
+        <div style="font-size:14px;line-height:1.6;color:#2b3f63;padding-bottom:14px;">{{1.copy.regFormBody}}</div>
+        <a href="{{1.formUrl}}" style="display:inline-block;background:#ffc928;color:#071a3d;font-size:14px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;text-decoration:none;padding:13px 24px;border-radius:999px;">{{1.copy.regFormCta}} &rarr;</a>
+      </td></tr>
+    </table>
+  </td></tr>
+
   <!-- Najważniejszy blok w całym mailu. -->
   <tr><td class="pad" style="padding:0 34px 26px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff3f3;border:2px solid #f6494f;border-radius:14px;">
@@ -187,12 +212,21 @@
 
   <tr><td class="pad" style="background:#071a3d;background-image:linear-gradient(135deg,#071a3d 0%,#0d2a5e 100%);padding:22px 34px;">
     <div style="font-size:12px;line-height:1.6;color:#8fb0e8;">{{1.copy.footerNote}}</div>
+    <!-- Stopka prawna: bialy kolor i wlasny jezyk.
+         Stalo tu wpisane na sztywno „Regolamento" i „Privacy" — po wlosku, takze w mailu do
+         Niemca i Polaka, mimo ze `?lang={{1.loc}}` otwieral strone w ich jezyku. Etykieta i
+         zawartosc mowily wiec dwoma jezykami naraz. Teraz obie ida z decka.
+
+         Kolor wypisany na kazdym odsylaczu osobno i razem z `text-decoration`, bo Gmail i
+         Outlook dokladaja wlasny styl kazdemu `<a>`, ktorego nie ostylowano wprost — a
+         separator `&middot;` zostaje w bladym niebieskim wrappera, zeby bialy byl tekst do
+         klikniecia, nie kropka miedzy nimi. -->
     <div style="font-size:12px;color:#8fb0e8;padding-top:8px;">
-      <a href="mailto:{{1.ev.email}}" style="color:#ffc928;text-decoration:none;">{{1.ev.email}}</a>
+      <a href="mailto:{{1.ev.email}}" style="color:#ffffff;text-decoration:underline;">{{1.ev.email}}</a>
       &nbsp;&middot;&nbsp;
-      <a href="https://carruleddhishow.com/regolamento.html?lang={{1.loc}}" style="color:#ffffff;">Regolamento</a>
+      <a href="https://carruleddhishow.com/regolamento.html?lang={{1.loc}}" style="color:#ffffff;text-decoration:underline;">{{1.copy.footRules}}</a>
       &nbsp;&middot;&nbsp;
-      <a href="https://carruleddhishow.com/privacy.html?lang={{1.loc}}" style="color:#ffffff;">Privacy</a>
+      <a href="https://carruleddhishow.com/privacy.html?lang={{1.loc}}" style="color:#ffffff;text-decoration:underline;">{{1.copy.footPrivacy}}</a>
     </div>
   </td></tr>
 

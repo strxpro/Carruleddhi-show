@@ -45,6 +45,49 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* ============================================================
+   PRZEŁADOWANIE STRONY OD ZERA — TO JEST TA PRZYCZYNA.
+   ============================================================
+   OBJAW
+     „Strona sama się ładuje od nowa" przy szybkim przewijaniu w górę. Osobny objaw od
+     przeskakiwania i od wyrzucenia karty z pamięci (o tym drugim jest blok w carnival.css
+     przy `backdrop-filter`), i jedyny z trzech, który ma jednoliniową przyczynę.
+
+   CO SIĘ DZIEJE
+     Rzut palcem w górę na pozycji 0 to na Androidzie i w Chrome na iOS gest „pull to
+     refresh". Bezwładność po rzucie dochodzi do góry dokumentu z prędkością, więc nadmiar
+     ruchu idzie w odświeżenie — nikt nie musiał ciągnąć strony celowo. Przy czternastu
+     przypiętych panelach dochodzi się do zera częściej niż na zwykłej stronie, bo pierwszy
+     panel jest przyklejony do góry i cały czas widoczny.
+
+     Drugi kierunek: rzut w dół poza koniec dokumentu daje odbicie (`overscroll`), a strona
+     ma pod stopką pas, który liczy pozycję z `scrollHeight` — odbicie karmi tę matematykę
+     wartościami poza zakresem.
+
+   DLACZEGO `-y: none`, A NIE `contain`
+     `contain` zatrzymuje tylko propagację do rodzica; na korzeniu nie ma rodzica, więc
+     `contain` nie wyłącza ani odświeżania, ani odbicia. `none` wyłącza jedno i drugie.
+     Oś X zostaje nietknięta, bo `overflow-x: clip` z carnival.css i tak nie daje się
+     przewijać w poziomie, a wpisanie tu `overscroll-behavior: none` na obie osie skasowałoby
+     gest „wstecz przez przeciągnięcie od krawędzi" na części przeglądarek.
+
+   OBA ELEMENTY, NIE JEDEN
+     `document.scrollingElement` na tej stronie to `html` (carnival.css nadaje mu jawne
+     `overflow-x: clip`), więc regułą decydującą jest ta na `html`. Ta na `body` jest tu na
+     wypadek, gdyby to kiedyś przestało być prawdą — dokładnie ten sam błąd, który jest już
+     opisany niżej przy `.is-locked`, gdzie blokada na samym `body` nie robiła nic.
+
+   CZEGO TU CELOWO NIE MA: `-webkit-overflow-scrolling: touch`
+     Ta deklaracja jest bezczynna na dzisiejszym iOS-ie (przewijanie z bezwładnością jest
+     tam domyślne od iOS 13), a na starszym robi rzecz przeciwną do zamierzonej: promuje
+     element do OSOBNEJ warstwy przewijanej przez kompozytor, z własną teksturą. Na korzeniu
+     strony o czternastu przypiętych panelach to jest dokładanie do rachunku pamięci, który
+     i tak jest tu problemem. Zostaje tam, gdzie ma sens i gdzie już jest — w oknach
+     modalnych z własnym przewijaniem.
+   ============================================================ */
+html,
+body { overscroll-behavior-y: none; }
+
 /* =========================================================================
    Jelly scrollbar.
 
@@ -184,62 +227,180 @@ img, svg { display: block; max-width: 100%; }
 html.has-custom-cursor,
 html.has-custom-cursor * { cursor: none !important; }
 
+/* KURSOR SYSTEMOWY WRACA TAM, GDZIE WŁASNY NIE MA JAK SIĘ POKAZAĆ.
+   ---------------------------------------------------------------------------
+   Zgłoszone jako „przy wybieraniu daty nie widać kursora". Przyczyna jest jedna i nie ma
+   nic wspólnego z samym kalendarzem: kalendarz urodzenia to `<dialog>` otwierany przez
+   `showModal()` (patrz setupBirthDatePicker w form-experience.js), a modalny `<dialog>`
+   ląduje w WARSTWIE NADRZĘDNEJ przeglądarki. Warstwa nadrzędna jest nad każdym `z-index`
+   w dokumencie — także nad kursorem — więc kropka i pierścień były rysowane pod okienkiem.
+   `cursor: none` obowiązywał dalej, bo to reguła założona na stronę. Kursora nie było
+   nigdzie i nie dało się trafić w dzień w kalendarzu.
+
+   `z-index` tego nie naprawia i dlatego są tu dwie osobne poprawki:
+
+     1. Warstwa nadrzędna — `:has(dialog[open])` niżej. Nie da się jej przebić, więc na czas
+        otwartego okienka oddajemy kursor systemowi. Dotyczy kalendarza i podglądu zdjęcia
+        z tablicy, czyli obu miejsc, gdzie ta strona używa `showModal()`.
+     2. Zwykłe nakładki — `.modal` (1100), `.cookie-banner` (1050), `.page-wipe` (1200),
+        `.toast` (1400). Te siedzą w dokumencie, tylko wyżej niż kursor stojący na 998.
+        Naprawia je podniesienie `z-index` samego kursora, przy jego definicji niżej.
+
+   Trzeci przypadek: okienka systemowe (wybór pliku, rozwinięty `select`). Tych też nie da
+   się wykryć, ale da się wykryć ich powód — fokus na kontrolce, która je otwiera. Zakłada
+   wtedy klasę `native-cursor` app.js, patrz `nativeCursorFields` w setupCursor.
+
+   Selektory z DWIEMA klasami, nie jedną: `html.has-custom-cursor *` ma tę samą wagę co
+   `html.native-cursor *`, więc rozstrzygałaby kolejność w pliku — a to jest rodzaj
+   zależności, który psuje się przy pierwszym przeniesieniu bloku. */
+html.has-custom-cursor.native-cursor,
+html.has-custom-cursor.native-cursor *,
+html.has-custom-cursor:has(dialog[open]),
+html.has-custom-cursor:has(dialog[open]) * { cursor: auto !important; }
+html.has-custom-cursor.native-cursor a,
+html.has-custom-cursor.native-cursor button,
+html.has-custom-cursor.native-cursor [role="button"],
+html.has-custom-cursor.native-cursor summary,
+html.has-custom-cursor.native-cursor label,
+html.has-custom-cursor:has(dialog[open]) a,
+html.has-custom-cursor:has(dialog[open]) button,
+html.has-custom-cursor:has(dialog[open]) [role="button"],
+html.has-custom-cursor:has(dialog[open]) summary,
+html.has-custom-cursor:has(dialog[open]) label { cursor: pointer !important; }
+/* Własny kursor gaśnie, zamiast stać zamrożony obok systemowego. Przy otwartym okienku
+   strona nie dostaje `pointermove`, więc bez tego zostawałby dokładnie tam, gdzie był w
+   chwili kliknięcia — dwa kursory na ekranie, z czego jeden nieruchomy. */
+html.has-custom-cursor.native-cursor .cursor-dot,
+html.has-custom-cursor.native-cursor .cursor-ring,
+html.has-custom-cursor:has(dialog[open]) .cursor-dot,
+html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
+
 .cursor-dot, .cursor-ring {
   position: fixed;
-  z-index: 998;
+  /* NAJWYŻEJ, I TO NIE JEST LENISTWO.
+     ---------------------------------------------------------------------------
+     Stało tu 998, czyli poniżej połowy nakładek na tej stronie: `.cookie-banner` 1050,
+     `.modal` 1100, `.page-wipe` 1200, `.voting-demo` 1300, `.toast` 1400. Nad każdą z nich
+     kursor był rysowany pod spodem, a `cursor: none` obowiązywał dalej — więc w każdym
+     okienku strona zostawała bez żadnego kursora. Objaw zgłoszono na kalendarzu, ale
+     dotyczył też modalu zapisu i banera z ciasteczkami.
+
+     Konkretna liczba w rodzaju 1500 tylko przesuwa problem do następnej dodanej nakładki.
+     Kursor jest jedynym elementem, który MUSI być nad wszystkim i nie zabiera niczego
+     innym: ma `pointer-events: none`, więc nie łapie kliknięć, i nie zasłania treści, bo
+     jest wielkości kropki. Maksimum jest tu poprawną odpowiedzią, nie obejściem.
+
+     Warstwy nadrzędnej (`<dialog>` z showModal) to nie przebija — tam kursor oddajemy
+     systemowi, patrz `:has(dialog[open])` wyżej. */
+  z-index: 2147483000;
   left: 0;
   top: 0;
   pointer-events: none;
   border-radius: 50%;
   opacity: 0;
+  /* setupCursor() overwrites this with the same centring plus a translate3d that carries the
+     pointer position — it used to write `left`/`top` instead, which is laid out and painted
+     rather than composited. This value is what the elements look like until it does. */
   transform: translate(-50%, -50%);
+  /* Two small permanent layers, on desktop only: both elements are `display: none` under
+     `@media (hover: none)` and on coarse pointers, so phones pay nothing for this. */
+  will-change: transform;
 }
-.cursor-dot { width: 8px; height: 8px; background: var(--yellow); }
-/* The ring reports what is under it.
+/* KROPKA: koralowy rdzeń w białej obwódce.
    ---------------------------------------------------------------------------
-   It had one state — bigger over anything clickable — which made it decoration: it moved, but
-   it never said anything you could not already see. Each state below answers a different
-   question about the thing under the pointer, and the shapes are chosen so they are
-   distinguishable out of the corner of your eye rather than only side by side.
+   Była żółta, 8 px, bez obwódki — i to jest jedyny element interfejsu, który przechodzi
+   przez wszystkie tła tej strony: kremowe hero, żółtą banderolę, granatowe sekcje i
+   zdjęcia w galerii. Żółte na żółtym nie istnieje, a marquee i „Będę tam" to duże żółte
+   płachty, przez które kursor jedzie za każdym przewinięciem.
 
-   `border-radius` and `border-width` join the transition list, because two of the states are
-   changes of shape rather than of size. */
+   Koral trzyma kontrast na kremowym i na granatowym, a biała obwódka domyka przypadek,
+   którego kolor nie domknie: zdjęcie o dowolnej barwie. Dwa kolory zamiast jednego to
+   jedna dodatkowa właściwość i zero dodatkowego malowania. */
+.cursor-dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgb(255 255 255 / .92);
+  background: var(--coral, #f6494f);
+  box-shadow: 0 0 0 1px rgb(7 26 61 / .28), 0 2px 8px rgb(7 26 61 / .35);
+}
+/* PIERŚCIEŃ: karnawałowa obręcz w trzech barwach wydarzenia, kręcąca się wolno.
+   ---------------------------------------------------------------------------
+   Był jednolicie żółty. Trzy kolory z banderoli — żółty, koral, błękit — są tym, po czym tę
+   stronę widać z drugiego końca pokoju, więc kursor niesie je razem z nią.
+
+   Gradient jest w `::before`, a nie na `border`: `border-image` nie zna promienia, więc
+   kolorowa obwódka na okrągłym elemencie wychodzi kwadratem. Maska wycina środek i zostaje
+   pierścień o grubości `--ring`, który da się animować jedną wartością.
+
+   Obrót jest w pseudoelemencie, więc `transform` samego pierścienia zostaje wolny dla
+   `place()` w app.js — inaczej animacja i pozycja walczyłyby o tę samą właściwość.
+
+   `border-radius` i `border-width` zostają na liście przejść, bo dwa stany zmieniają kształt,
+   nie rozmiar. */
 .cursor-ring {
+  --ring: 2px;
   width: 42px;
   height: 42px;
-  border: 2px solid rgba(255, 201, 40, .9);
   transition:
     width .2s, height .2s, background .2s,
-    border-radius .2s, border-width .15s, opacity .2s;
+    border-radius .2s, opacity .2s;
 }
-/* Something to press: grows and fills faintly. */
-.cursor-ring.is-hover { width: 64px; height: 64px; background: rgba(255, 201, 40, .14); }
-/* Something to throw sideways — the prize deck, the gallery. Wide and flat, so the shape
-   itself suggests the axis it moves on. */
+.cursor-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    #ffc928 0deg,
+    #f6494f 120deg,
+    #2469d8 240deg,
+    #ffc928 360deg
+  );
+  /* Wycięty środek: zostaje sama obręcz. Prefiks `-webkit-` obok wersji bez prefiksu, bo
+     Safari nadal obsługuje tylko tę pierwszą. */
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring)));
+  animation: cursor-spin 4.5s linear infinite;
+  transition: opacity .2s;
+}
+@keyframes cursor-spin { to { transform: rotate(1turn); } }
+
+/* Coś do naciśnięcia: rośnie, grubieje i wypełnia się na żółto. */
+.cursor-ring.is-hover {
+  --ring: 3px;
+  width: 62px;
+  height: 62px;
+  background: rgb(255 201 40 / .16);
+}
+/* Coś do rzucenia w bok — talia nagród, galeria. Szeroki i płaski, żeby sam kształt mówił,
+   w której osi to działa. */
 .cursor-ring.is-drag {
+  --ring: 3px;
   width: 76px;
   height: 44px;
   border-radius: 999px;
-  border-width: 3px;
-  background: rgba(255, 201, 40, .1);
+  background: rgb(36 105 216 / .14);
 }
-/* A field that takes typing: narrows to something caret-shaped. */
+/* Pole do pisania: zwęża się do kształtu karetki. Obręcz gaśnie, bo pasek 4 px szeroki nie ma
+   gdzie pokazać gradientu — zostaje pełny koralowy prostokąt, czyli karetka. */
 .cursor-ring.is-text {
   width: 4px;
   height: 34px;
   border-radius: 2px;
-  border-width: 0;
-  background: rgba(255, 201, 40, .95);
+  background: var(--coral, #f6494f);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .6);
 }
-/* Pointer down, on anything. Collapses inwards and brightens, so a click is acknowledged even
-   on a target with no hover style of its own. Listed last so it wins over the states above. */
+.cursor-ring.is-text::before { opacity: 0; }
+/* Naciśnięcie, na czymkolwiek. Ściąga się do środka i rozjaśnia, więc klik jest potwierdzony
+   także na celu, który sam nie ma stanu hover. Ostatni na liście, żeby wygrywał z resztą. */
 .cursor-ring.is-press {
+  --ring: 4px;
   width: 30px;
   height: 30px;
-  border-width: 3px;
-  background: rgba(255, 201, 40, .3);
+  background: rgb(246 73 79 / .28);
 }
-.cursor-ring.is-press.is-text { width: 4px; height: 26px; }
+.cursor-ring.is-press.is-text { width: 4px; height: 26px; background: var(--coral, #f6494f); }
 
 .preloader {
   position: fixed;
@@ -425,9 +586,10 @@ html.has-custom-cursor * { cursor: none !important; }
 
 .hero {
   position: relative;
-  min-height: max(760px, 100svh);
+  /* Zamrożona wysokość ekranu, nie `100svh` — patrz `--screen-h` w experience.css. */
+  min-height: max(760px, var(--screen-h, var(--screen-h, 100svh)));
   overflow: hidden;
-  padding: clamp(130px, 18vh, 190px) 0 100px;
+  padding: clamp(130px, calc(var(--screen-h, 100svh) * 0.18), 190px) 0 100px;
   background: linear-gradient(145deg, #edf5ff 0%, var(--cream) 48%, #fff0cc 100%);
 }
 .hero::before {
@@ -515,8 +677,8 @@ html.has-custom-cursor * { cursor: none !important; }
 .stack-card {
   position: sticky;
   top: calc(96px + var(--stack-index, 0) * 18px);
-  min-height: min(70vh, 650px);
-  margin-bottom: 20vh;
+  min-height: min(calc(var(--screen-h, 100svh) * 0.7), 650px);
+  margin-bottom: calc(var(--screen-h, 100svh) * 0.2);
   overflow: hidden;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
@@ -791,7 +953,7 @@ html.has-custom-cursor * { cursor: none !important; }
 .modal { position: fixed; z-index: 1100; inset: 0; display: none; align-items: center; justify-content: center; padding: 18px; }
 .modal.is-open { display: flex; }
 .modal__backdrop { position: absolute; inset: 0; border: 0; background: rgba(7,26,61,.72); backdrop-filter: blur(12px); cursor: pointer; animation: fade-in .3s both; }
-.modal__dialog { position: relative; width: min(670px,100%); max-height: min(850px,calc(100svh - 30px)); overflow-y: auto; padding: clamp(28px,5vw,58px); border-radius: 38px; background: var(--paper); box-shadow: 0 44px 120px rgba(7,26,61,.5); animation: modal-in .55s var(--ease-out) both; }
+.modal__dialog { position: relative; width: min(670px,100%); max-height: min(850px,calc(var(--screen-h, 100svh) - 30px)); overflow-y: auto; padding: clamp(28px,5vw,58px); border-radius: 38px; background: var(--paper); box-shadow: 0 44px 120px rgba(7,26,61,.5); animation: modal-in .55s var(--ease-out) both; }
 .modal__close { position: absolute; top: 17px; right: 17px; }
 .modal__icon { display: grid; width: 65px; height: 65px; margin-bottom: 22px; place-items: center; border-radius: 22px; background: var(--yellow); font-size: 30px; transform: rotate(-6deg); }
 .modal h2 { margin: 0 45px 14px 0; font-family: var(--font-display); font-size: clamp(30px,5vw,54px); font-weight: 400; line-height: 1; }
@@ -912,7 +1074,7 @@ html.has-custom-cursor * { cursor: none !important; }
 .reveal[data-delay='2'] { transition-delay: .2s; }
 .reveal[data-delay='3'] { transition-delay: .3s; }
 
-.legal-page { min-height: 100vh; padding: 130px 0 80px; background: var(--paper); }
+.legal-page { min-height: var(--screen-h, 100svh); padding: 130px 0 80px; background: var(--paper); }
 .legal-page__head { margin-bottom: 50px; }
 .legal-page__head h1 { margin: 12px 0; font-family: var(--font-display); font-size: clamp(42px,8vw,92px); font-weight: 400; line-height: .95; }
 .legal-content { max-width: 850px; padding: clamp(24px,5vw,58px); border-radius: 36px; background: var(--white); box-shadow: var(--shadow-sm); }
@@ -978,7 +1140,7 @@ html.has-custom-cursor * { cursor: none !important; }
   .hero__aside { grid-template-columns: 1fr; }
   .hero__scroll { display: none; }
   .stack-intro, .signup__head { grid-template-columns: 1fr; }
-  .stack-card { top: calc(84px + var(--stack-index,0) * 10px); min-height: 680px; margin-bottom: 16vh; }
+  .stack-card { top: calc(84px + var(--stack-index,0) * 10px); min-height: 680px; margin-bottom: calc(var(--screen-h, 100svh) * 0.16); }
   .stack-card__inner { grid-template-columns: 1fr; grid-template-rows: auto 280px; }
   .stack-card__copy { padding: 27px; }
   .route__map { min-height: 430px; }
@@ -1153,13 +1315,13 @@ html.has-custom-cursor * { cursor: none !important; }
   clip-path: circle(150% at calc(100% - 80px) 55px);
   pointer-events: auto;
 }
-.menu-panel__inner { width: min(1180px, 100%); min-height: calc(100svh - 150px); margin: 0 auto; }
+.menu-panel__inner { width: min(1180px, 100%); min-height: calc(var(--screen-h, 100svh) - 150px); margin: 0 auto; }
 .menu-panel__heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: clamp(24px, 4vh, 46px);
+  margin-bottom: clamp(24px, calc(var(--screen-h, 100svh) * 0.04), 46px);
   padding-bottom: 18px;
   border-bottom: 1px solid rgba(255,255,255,.16);
   color: var(--blue-200);
@@ -1482,7 +1644,7 @@ main section[id] { scroll-margin-top: 96px; }
   }
   .stack-card {
     min-height: clamp(640px, 178vw, 720px);
-    margin-bottom: 17vh;
+    margin-bottom: calc(var(--screen-h, 100svh) * 0.17);
   }
   .stack-card__copy { gap: 28px; }
   .stack-card h3 { margin-block: 20px 16px; }
@@ -1649,8 +1811,8 @@ body { font-variation-settings: 'opsz' 16; }
 .card-tag { font-weight: 760; }
 .lead { letter-spacing: -.012em; }
 .hero {
-  min-height: clamp(720px, 100svh, 940px);
-  padding-top: clamp(126px, 15vh, 164px);
+  min-height: clamp(720px, var(--screen-h, var(--screen-h, 100svh)), 940px);
+  padding-top: clamp(126px, calc(var(--screen-h, var(--screen-h, 100svh)) * .15), 164px);
 }
 .hero__title { max-width: 8.4ch; }
 .hero__tagline { font-weight: 760; }
@@ -1676,11 +1838,11 @@ body { font-variation-settings: 'opsz' 16; }
 .card-stack {
   --stack-top: 108px;
   --stack-gap: 20px;
-  --stack-card-height: min(660px, calc(100svh - 160px));
+  --stack-card-height: min(660px, calc(var(--screen-h, var(--screen-h, 100svh)) - 160px));
   position: relative;
   isolation: isolate;
   counter-reset: stack-card;
-  padding-bottom: clamp(30px, 6vh, 72px);
+  padding-bottom: clamp(30px, calc(var(--screen-h, 100svh) * 0.06), 72px);
 }
 .stack-card {
   counter-increment: stack-card;
@@ -1688,7 +1850,7 @@ body { font-variation-settings: 'opsz' 16; }
   z-index: calc(10 + var(--stack-index, 0));
   width: 100%;
   min-height: max(510px, var(--stack-card-height));
-  margin-bottom: clamp(180px, 27vh, 310px);
+  margin-bottom: clamp(180px, calc(var(--screen-h, 100svh) * 0.27), 310px);
   overflow: clip;
   border: 1px solid rgba(255,255,255,.72);
   border-radius: clamp(32px, 4vw, 54px);
@@ -1880,12 +2042,12 @@ body { font-variation-settings: 'opsz' 16; }
   .card-stack {
     --stack-top: 86px;
     --stack-gap: 11px;
-    --stack-card-height: clamp(520px, calc(100svh - 112px), 650px);
+    --stack-card-height: clamp(520px, calc(var(--screen-h, var(--screen-h, 100svh)) - 112px), 650px);
     padding-bottom: 24px;
   }
   .stack-card {
     min-height: var(--stack-card-height);
-    margin-bottom: clamp(118px, 20vh, 176px);
+    margin-bottom: clamp(118px, calc(var(--screen-h, 100svh) * 0.2), 176px);
     border-radius: 30px;
   }
   .stack-card::before { top: 16px; right: 17px; min-width: 75px; padding: 7px 10px; font-size: 10px; }

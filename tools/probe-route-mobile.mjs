@@ -77,7 +77,9 @@ const probe = `
       return {
         asked,
         actual: Math.round(window.scrollY),
-        progress: Number(frame.style.getPropertyValue('--route-progress') || 0),
+        /* Wyliczona, nie inline: `--route-progress` jest teraz pisane na `#route` i dziedziczone
+           do ramki (blok przy `@property` w route-zoom.css). `frame.style` zwróciłby pustkę. */
+        progress: Number(getComputedStyle(frame).getPropertyValue('--route-progress') || 0),
         scale: Number(m.a.toFixed(3)),
         // Kat obrotu z macierzy: b/a to tangens, wiec atan daje stopnie.
         rotate: Number((Math.atan2(m.b, m.a) * 180 / Math.PI).toFixed(2)),

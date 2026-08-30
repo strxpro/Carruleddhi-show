@@ -382,6 +382,38 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
   }
 
   gsap.registerPlugin(ScrollTrigger);
+
+  /* ============================================================
+     `ignoreMobileResize` — pasek adresu nie jest zmianą rozmiaru okna.
+     ============================================================
+     ScrollTrigger domyślnie odświeża wszystkie swoje pomiary na zdarzeniu `resize`. Na telefonie
+     `resize` przychodzi za każdym razem, gdy pasek adresu się chowa albo wraca, czyli w trakcie
+     przewijania — a odświeżenie to przeliczenie pozycji wszystkich wyzwalaczy, z odczytami
+     wymuszającymi układ. Ta strona ma czternaście przypiętych paneli i trzynaście tysięcy pikseli
+     dokumentu, więc to nie jest tani przebieg, i wypada w najgorszym momencie.
+
+     `ignoreMobileResize: true` każe pominąć odświeżenie, gdy zmieniła się TYLKO wysokość widoku na
+     urządzeniu dotykowym. Obrót telefonu zmienia szerokość, więc jest nadal łapany.
+
+     To jest dokładnie ta sama zasada, na której stoi `onResize` w setupPanels („width is the honest
+     trigger") i pomiar `--screen-h` w site-bridge.js. Trzecie miejsce, więc warto to powiedzieć raz:
+     na tej stronie ŻADEN pomiar nie ma prawa ruszyć z powodu samej zmiany wysokości widoku na
+     ekranie dotykowym.
+
+     CZEGO TU CELOWO NIE MA: `ScrollTrigger.normalizeScroll(true)`
+       `normalizeScroll` przejmuje dotyk i przewija stronę z JavaScriptu, na wątku głównym, żeby
+       ujednolicić zachowanie paska adresu. Na stronie, której cały układ stoi na `position: sticky`
+       składanym przez kompozytor, to znaczy zamianę przewijania darmowego na przewijanie płacone z
+       tego samego wątku, na którym stoi wszystko inne — czyli wprowadzenie tego konfliktu
+       wirtualnego scrolla z natywnym, którego ta strona akurat nie ma (nie ma tu Lenisa ani
+       Locomotive). Objawem byłoby dokładnie to, co jest naprawiane: szarpanie pod palcem.
+
+       Poza tym nie miałoby czego naprawiać. ScrollTrigger prowadzi tu JEDNĄ animację wejścia z
+       `once: true`. Nie ma tu ani jednego `scrub`, ani jednego `pin` — efekty sterowane
+       przewijaniem robi własny kod w app.js, z pozycji przewijania.
+     ============================================================ */
+  ScrollTrigger.config({ ignoreMobileResize: true });
+
   const frame = section.querySelector('[data-gallery3d-frame]');
   const heading = section.querySelector('[data-gallery3d-heading]');
 

@@ -2,8 +2,49 @@
 :root {
   --section-card-radius: clamp(30px, 4.4vw, 62px);
   --section-card-overlap: clamp(30px, 4.6vw, 68px);
-  --section-card-pad: clamp(78px, 9svh, 126px);
+  --section-card-pad: clamp(78px, calc(var(--screen-h) * .09), 126px);
   --header-clearance: 92px;
+
+  /**
+   * Wysokość jednego ekranu, ZAMROŻONA.
+   * ===========================================================================
+   *
+   * TO JEST PRZYCZYNA TELEPORTOWANIA PRZY PRZEWIJANIU PALCEM
+   *   Domyślna wartość to `100svh`, czyli — według specyfikacji — wysokość okna przy WIDOCZNYM
+   *   pasku adresu, wielkość stała, nieruszająca się przy przewijaniu. Na tym opierał się cały
+   *   układ: czternaście sekcji ma `min-height` jednego ekranu.
+   *
+   *   Zapis z telefonu użytkownika (rejestrator z `?jump=1`) pokazał, że na jego przeglądarce
+   *   `svh` NIE jest stałe:
+   *
+   *     okno 797 -> 615  (pasek adresu wyjeżdża, -182 px)
+   *     dokument 13095 -> 11143 px  (-1952 px)
+   *     okno 615 -> 797  (pasek się chowa, +182 px)
+   *     dokument 11143 -> 13095 px  (+1952 px)
+   *
+   *   1952 / 182 ≈ 10,7 — czyli mniej więcej jedenaście sekcji, których treść mieści się w
+   *   ekranie, więc rządzi nimi `min-height`. Każde przeciągnięcie palcem chowa albo pokazuje
+   *   pasek adresu, dokument skraca się albo wydłuża o dwa tysiące pikseli, a wszystko poniżej
+   *   bieżącego miejsca przesuwa się o tyle samo. Z zewnątrz: strona teleportuje do innej
+   *   sekcji i wraca.
+   *
+   *   Nie da się tego naprawić inną jednostką, bo problem nie jest w wyborze jednostki — jest w
+   *   tym, że ta przeglądarka wiąże KAŻDĄ jednostkę wysokości okna z bieżącym widokiem. Więc
+   *   wysokość ekranu przestaje być jednostką CSS: app.js mierzy ją raz i wpisuje tutaj w
+   *   pikselach, a przelicza wyłącznie przy zmianie SZEROOKOŚCI okna (obrót telefonu, zmiana
+   *   rozmiaru okna). Chowanie paska adresu nie zmienia szerokości, więc nie zmienia niczego.
+   *
+   * BEZ JAVASCRIPTU
+   *   Zostaje `100svh` — czyli dokładnie to, co było do tej pory. Strona bez JS nie jest
+   *   gorsza niż przedtem, a na przeglądarce trzymającej się specyfikacji obie drogi dają tę
+   *   samą liczbę.
+   *
+   * DLACZEGO NIE `dvh` ANI NIE `lvh`
+   *   `dvh` rusza się z definicji. `lvh` to wysokość przy SCHOWANYM pasku, więc sekcja byłaby
+   *   o 182 px wyższa niż widoczny obszar i dolna krawędź treści wychodziłaby pod pasek.
+   *   Patrz measureScreenHeight() w app.js.
+   */
+  --screen-h: 100svh;
 }
 
 #main {
@@ -20,7 +61,10 @@
   position: sticky;
   top: 0;
   display: grid;
-  min-height: 100svh;
+  /* `var(--screen-h)`, nie `100svh` — patrz komentarz przy tej zmiennej na górze pliku.
+     Zmierzone: przy `100svh` dokument skracał się i wydłużał o 1952 px za każdym ruchem
+     paska adresu, a to przesuwa wszystko poniżej bieżącego miejsca. */
+  min-height: var(--screen-h);
   height: auto;
   align-content: center;
   margin-top: 0;
@@ -57,15 +101,15 @@
 #main > section.section-card[data-panel='flow'] {
   position: relative;
   top: auto;
-  min-height: 100svh;
+  min-height: var(--screen-h);
   align-content: start;
   overflow: visible;
 }
 
 #main > section.section-card--hero {
-  min-height: 100svh;
-  padding-top: clamp(126px, 15svh, 170px);
-  padding-bottom: clamp(118px, 14svh, 152px);
+  min-height: var(--screen-h);
+  padding-top: clamp(126px, calc(var(--screen-h) * .15), 170px);
+  padding-bottom: clamp(118px, calc(var(--screen-h) * .14), 152px);
   border-radius: 0;
 }
 
@@ -159,7 +203,7 @@
 @media (max-width: 1050px) {
   :root {
     --section-card-overlap: clamp(24px, 4vw, 42px);
-    --section-card-pad: clamp(76px, 9svh, 104px);
+    --section-card-pad: clamp(76px, calc(var(--screen-h) * .09), 104px);
   }
 }
 
@@ -167,19 +211,19 @@
   :root {
     --section-card-radius: 30px;
     --section-card-overlap: 18px;
-    --section-card-pad: clamp(72px, 10svh, 94px);
+    --section-card-pad: clamp(72px, calc(var(--screen-h) * .1), 94px);
     --header-clearance: 74px;
   }
 
   #main > section.section-card {
-    min-height: 100svh;
+    min-height: var(--screen-h);
     margin-top: 0;
     padding-block: var(--section-card-pad);
     border-radius: var(--section-card-radius) var(--section-card-radius) 0 0;
   }
 
   #main > section.section-card--hero {
-    min-height: 100svh;
+    min-height: var(--screen-h);
     padding-top: 108px;
     padding-bottom: 96px;
     border-radius: 0;
@@ -388,7 +432,6 @@
 .site-header.is-compact.is-menu-open .nav-current,
 .site-header.is-compact.is-menu-open .nav-attend,
 .site-header.is-compact.is-menu-open .language-picker {
-  overflow: visible;
   max-width: 260px;
   min-width: auto;
   opacity: 1;
@@ -396,6 +439,11 @@
   pointer-events: auto;
   transform: none;
 }
+/* Bez „Bede tam" — patrz `is-peeked` w carnival.css. `overflow: hidden` na `.btn` przycina
+   zolte wypelnienie `.btn::before`, ktore w spoczynku stoi pod przyciskiem; podniesienie go
+   tutaj wystawialo zolty prostokat 68x59 px pod pasek i odbieralo tam klikniecia. */
+.site-header.is-compact.is-menu-open .nav-current,
+.site-header.is-compact.is-menu-open .language-picker { overflow: visible; }
 .site-header.is-compact.is-menu-open .nav-actions { gap: 10px; }
 .site-header.is-compact.is-menu-open .menu-toggle {
   width: auto;
@@ -870,7 +918,7 @@ body.is-language-transitioning .nav-current__copy {
 .date-dialog {
   width: min(680px, calc(100vw - 28px));
   max-width: none;
-  max-height: calc(100svh - 30px);
+  max-height: calc(var(--screen-h, 100svh) - 30px);
   margin: auto;
   padding: 0;
   overflow: visible;
@@ -882,7 +930,7 @@ body.is-language-transitioning .nav-current__copy {
 }
 .date-dialog::backdrop { background: rgba(3, 13, 36, .72); backdrop-filter: blur(14px) saturate(.85); animation: date-backdrop-in .3s ease both; }
 .date-dialog__surface {
-  max-height: calc(100svh - 30px);
+  max-height: calc(var(--screen-h, 100svh) - 30px);
   overflow: auto;
   overscroll-behavior: contain;
   border: 1px solid rgba(255, 255, 255, .65);
@@ -974,8 +1022,8 @@ body.is-date-open { overscroll-behavior: none; }
   .stepper-sparks { display: none; }
   .form-main { padding: 35px 18px 30px; }
   .form-progress { height: 6px; }
-  .date-dialog { width: 100%; max-height: calc(100svh - 8px); margin: auto 0 0; border-radius: 30px 30px 0 0; }
-  .date-dialog__surface { max-height: calc(100svh - 8px); border-radius: inherit; animation-name: date-sheet-in; }
+  .date-dialog { width: 100%; max-height: calc(var(--screen-h, 100svh) - 8px); margin: auto 0 0; border-radius: 30px 30px 0 0; }
+  .date-dialog__surface { max-height: calc(var(--screen-h, 100svh) - 8px); border-radius: inherit; animation-name: date-sheet-in; }
   .date-dialog__header { padding: 21px 18px 16px; }
   .date-dialog__header h2 { font-size: 30px; }
   .date-dialog__close { width: 42px; height: 42px; }
@@ -1202,12 +1250,12 @@ body.is-date-open { overscroll-behavior: none; }
 
 /* 3. Overlapping category cards — a clearer, deeper stack. */
 .card-stack {
-  --stack-top: clamp(88px, 11svh, 118px);
+  --stack-top: clamp(88px, calc(var(--screen-h, 100svh) * 0.11), 118px);
   --stack-gap: clamp(12px, 1.5vw, 22px);
-  --stack-card-height: min(640px, calc(100svh - var(--stack-top) - 72px));
+  --stack-card-height: min(640px, calc(var(--screen-h, 100svh) - var(--stack-top) - 72px));
 }
 .stack-card {
-  margin-bottom: clamp(150px, 24vh, 260px);
+  margin-bottom: clamp(150px, calc(var(--screen-h, 100svh) * 0.24), 260px);
   transform-origin: 50% 0;
   transition:
     transform .18s linear,
@@ -1248,9 +1296,9 @@ body.is-date-open { overscroll-behavior: none; }
   .card-stack {
     --stack-top: 84px;
     --stack-gap: 9px;
-    --stack-card-height: min(620px, calc(100svh - 150px));
+    --stack-card-height: min(620px, calc(var(--screen-h, 100svh) - 150px));
   }
-  .stack-card { margin-bottom: clamp(120px, 20vh, 200px); }
+  .stack-card { margin-bottom: clamp(120px, calc(var(--screen-h, 100svh) * 0.2), 200px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1353,57 +1401,57 @@ body.is-date-open { overscroll-behavior: none; }
 /* 7. Panel density.
       A pinned panel must fit one viewport, so the type scale is capped by svh
       as well as vw. Without this, headlines alone blow past 100svh on laptops. */
-:root { --section-card-pad: clamp(52px, 6.4svh, 88px); }
+:root { --section-card-pad: clamp(52px, calc(var(--screen-h, 100svh) * 0.064), 88px); }
 
-.section-title { font-size: clamp(34px, min(6.6vw, 9svh), 86px); }
-.section-title--medium { font-size: clamp(29px, min(4.9vw, 6.6svh), 62px); }
-.hero__title { font-size: clamp(52px, min(9.6vw, 13svh), 132px); }
-.hero__tagline { font-size: clamp(20px, min(2.6vw, 3.4svh), 34px); }
-.lead { font-size: clamp(15px, min(1.5vw, 2.1svh), 19px); }
-.eyebrow { margin-bottom: clamp(10px, 1.6svh, 18px); font-size: clamp(12px, 1.5svh, 14px); }
+.section-title { font-size: clamp(34px, min(6.6vw, calc(var(--screen-h, 100svh) * 0.09)), 86px); }
+.section-title--medium { font-size: clamp(29px, min(4.9vw, calc(var(--screen-h, 100svh) * 0.066)), 62px); }
+.hero__title { font-size: clamp(52px, min(9.6vw, calc(var(--screen-h, 100svh) * 0.13)), 132px); }
+.hero__tagline { font-size: clamp(20px, min(2.6vw, calc(var(--screen-h, 100svh) * 0.034)), 34px); }
+.lead { font-size: clamp(15px, min(1.5vw, calc(var(--screen-h, 100svh) * 0.021)), 19px); }
+.eyebrow { margin-bottom: clamp(10px, calc(var(--screen-h, 100svh) * 0.016), 18px); font-size: clamp(12px, calc(var(--screen-h, 100svh) * 0.015), 14px); }
 
-.hero__actions { margin-top: clamp(18px, 3svh, 32px); }
-.hero__title { margin: clamp(16px, 3svh, 28px) 0 clamp(12px, 2.2svh, 22px); }
-.countdown__number { font-size: clamp(19px, min(2.6vw, 3.4svh), 33px); }
-.hero-stat { padding: clamp(13px, 2svh, 22px) clamp(16px, 2vw, 24px); }
-.hero-stat__number { font-size: clamp(30px, min(4.2vw, 5.4svh), 58px); }
+.hero__actions { margin-top: clamp(18px, calc(var(--screen-h, 100svh) * 0.03), 32px); }
+.hero__title { margin: clamp(16px, calc(var(--screen-h, 100svh) * 0.03), 28px) 0 clamp(12px, calc(var(--screen-h, 100svh) * 0.022), 22px); }
+.countdown__number { font-size: clamp(19px, min(2.6vw, calc(var(--screen-h, 100svh) * 0.034)), 33px); }
+.hero-stat { padding: clamp(13px, calc(var(--screen-h, 100svh) * 0.02), 22px) clamp(16px, 2vw, 24px); }
+.hero-stat__number { font-size: clamp(30px, min(4.2vw, calc(var(--screen-h, 100svh) * 0.054)), 58px); }
 
-.story__numbers { gap: clamp(8px, 1.4svh, 12px); }
-.story-number { padding: clamp(12px, 2svh, 20px) clamp(18px, 2vw, 26px); }
-.story-number strong { font-size: clamp(34px, min(5vw, 6.6svh), 66px); }
-.story-number span { font-size: clamp(15px, 2svh, 20px); }
+.story__numbers { gap: clamp(8px, calc(var(--screen-h, 100svh) * 0.014), 12px); }
+.story-number { padding: clamp(12px, calc(var(--screen-h, 100svh) * 0.02), 20px) clamp(18px, 2vw, 26px); }
+.story-number strong { font-size: clamp(34px, min(5vw, calc(var(--screen-h, 100svh) * 0.066)), 66px); }
+.story-number span { font-size: clamp(15px, calc(var(--screen-h, 100svh) * 0.02), 20px); }
 
-.schedule-list { margin-top: clamp(20px, 3.6svh, 42px); }
-.schedule-row { padding: clamp(14px, 2.4svh, 26px) 8px; }
-.schedule-row time { font-size: clamp(28px, min(4.4vw, 5.8svh), 58px); }
-.schedule-row span { font-size: clamp(16px, min(1.9vw, 2.5svh), 24px); }
+.schedule-list { margin-top: clamp(20px, calc(var(--screen-h, 100svh) * 0.036), 42px); }
+.schedule-row { padding: clamp(14px, calc(var(--screen-h, 100svh) * 0.024), 26px) 8px; }
+.schedule-row time { font-size: clamp(28px, min(4.4vw, calc(var(--screen-h, 100svh) * 0.058)), 58px); }
+.schedule-row span { font-size: clamp(16px, min(1.9vw, calc(var(--screen-h, 100svh) * 0.025)), 24px); }
 
-.attendance__counter { margin: clamp(16px, 3.4svh, 40px) 0 6px; font-size: clamp(76px, min(17vw, 22svh), 240px); }
-.attendance__label { font-size: clamp(14px, min(1.9vw, 2.4svh), 22px); }
+.attendance__counter { margin: clamp(16px, calc(var(--screen-h, 100svh) * 0.034), 40px) 0 6px; font-size: clamp(76px, min(17vw, calc(var(--screen-h, 100svh) * 0.22)), 240px); }
+.attendance__label { font-size: clamp(14px, min(1.9vw, calc(var(--screen-h, 100svh) * 0.024)), 22px); }
 .attendance__press {
-  width: clamp(140px, min(19vw, 24svh), 240px);
-  margin: clamp(20px, 3.6svh, 38px) auto clamp(14px, 2.4svh, 22px);
-  font-size: clamp(18px, min(2.5vw, 3.2svh), 33px);
+  width: clamp(140px, min(19vw, calc(var(--screen-h, 100svh) * 0.24)), 240px);
+  margin: clamp(20px, calc(var(--screen-h, 100svh) * 0.036), 38px) auto clamp(14px, calc(var(--screen-h, 100svh) * 0.024), 22px);
+  font-size: clamp(18px, min(2.5vw, calc(var(--screen-h, 100svh) * 0.032)), 33px);
 }
-.avatar-stack { margin-top: clamp(14px, 2.6svh, 26px); }
-.avatar { width: clamp(38px, 5.4svh, 48px); height: clamp(38px, 5.4svh, 48px); }
+.avatar-stack { margin-top: clamp(14px, calc(var(--screen-h, 100svh) * 0.026), 26px); }
+.avatar { width: clamp(38px, calc(var(--screen-h, 100svh) * 0.054), 48px); height: clamp(38px, calc(var(--screen-h, 100svh) * 0.054), 48px); }
 
-.accordion__button { padding: clamp(14px, 2.4svh, 24px) 0; font-size: clamp(16px, min(2vw, 2.7svh), 24px); }
-.accordion__panel p { padding: 0 clamp(0px, 4vw, 50px) clamp(14px, 2.4svh, 24px) 0; }
+.accordion__button { padding: clamp(14px, calc(var(--screen-h, 100svh) * 0.024), 24px) 0; font-size: clamp(16px, min(2vw, calc(var(--screen-h, 100svh) * 0.027)), 24px); }
+.accordion__panel p { padding: 0 clamp(0px, 4vw, 50px) clamp(14px, calc(var(--screen-h, 100svh) * 0.024), 24px) 0; }
 
-.contact__links { margin-top: clamp(16px, 3svh, 30px); }
-.contact__links a { font-size: clamp(18px, min(2.7vw, 3.6svh), 34px); }
-.contact-card { padding: clamp(20px, 3.4svh, 44px); }
-.contact-card h3 { margin-bottom: clamp(14px, 2.6svh, 26px); font-size: clamp(21px, 3svh, 28px); }
-.field input, .field select { min-height: clamp(52px, 7svh, 62px); }
-.field textarea { min-height: clamp(92px, 14svh, 130px); }
+.contact__links { margin-top: clamp(16px, calc(var(--screen-h, 100svh) * 0.03), 30px); }
+.contact__links a { font-size: clamp(18px, min(2.7vw, calc(var(--screen-h, 100svh) * 0.036)), 34px); }
+.contact-card { padding: clamp(20px, calc(var(--screen-h, 100svh) * 0.034), 44px); }
+.contact-card h3 { margin-bottom: clamp(14px, calc(var(--screen-h, 100svh) * 0.026), 26px); font-size: clamp(21px, calc(var(--screen-h, 100svh) * 0.03), 28px); }
+.field input, .field select { min-height: clamp(52px, calc(var(--screen-h, 100svh) * 0.07), 62px); }
+.field textarea { min-height: clamp(92px, calc(var(--screen-h, 100svh) * 0.14), 130px); }
 
-.route__facts { margin: clamp(16px, 3svh, 28px) 0; }
-.route__fact { padding: clamp(10px, 1.8svh, 14px) 17px; }
+.route__facts { margin: clamp(16px, calc(var(--screen-h, 100svh) * 0.03), 28px) 0; }
+.route__fact { padding: clamp(10px, calc(var(--screen-h, 100svh) * 0.018), 14px) 17px; }
 
 /* Short laptops and landscape phones: let anything oversized flow instead of clipping. */
 @media (max-height: 620px) {
-  :root { --section-card-pad: clamp(44px, 6svh, 64px); }
+  :root { --section-card-pad: clamp(44px, calc(var(--screen-h, 100svh) * 0.06), 64px); }
 }
 
 
@@ -1411,51 +1459,51 @@ body.is-date-open { overscroll-behavior: none; }
       Measured at 1440x749: hero 963, route 835, schedule 947, attendance 1146.
       Target for all of them is one viewport. */
 #main > section.section-card--hero {
-  padding-top: clamp(94px, 12svh, 128px);
-  padding-bottom: clamp(84px, 10svh, 104px);
+  padding-top: clamp(94px, calc(var(--screen-h, 100svh) * 0.12), 128px);
+  padding-bottom: clamp(84px, calc(var(--screen-h, 100svh) * 0.1), 104px);
 }
-.hero { min-height: 100svh; padding-top: 0; }
-.hero__kicker { padding: 6px 13px 6px 7px; font-size: clamp(12px, 1.7svh, 15px); }
-.hero__kicker-dot { width: clamp(19px, 2.7svh, 27px); height: clamp(19px, 2.7svh, 27px); }
+.hero { min-height: var(--screen-h, 100svh); padding-top: 0; }
+.hero__kicker { padding: 6px 13px 6px 7px; font-size: clamp(12px, calc(var(--screen-h, 100svh) * 0.017), 15px); }
+.hero__kicker-dot { width: clamp(19px, calc(var(--screen-h, 100svh) * 0.027), 27px); height: clamp(19px, calc(var(--screen-h, 100svh) * 0.027), 27px); }
 .hero__title {
   max-width: 9ch;
-  margin: clamp(12px, 2.4svh, 24px) 0 clamp(10px, 1.8svh, 18px);
-  font-size: clamp(44px, min(8vw, 10.4svh), 116px);
+  margin: clamp(12px, calc(var(--screen-h, 100svh) * 0.024), 24px) 0 clamp(10px, calc(var(--screen-h, 100svh) * 0.018), 18px);
+  font-size: clamp(44px, min(8vw, calc(var(--screen-h, 100svh) * 0.104)), 116px);
 }
-.hero__tagline { font-size: clamp(18px, min(2.3vw, 2.9svh), 30px); }
-.hero__actions { gap: 10px; margin-top: clamp(14px, 2.4svh, 28px); }
+.hero__tagline { font-size: clamp(18px, min(2.3vw, calc(var(--screen-h, 100svh) * 0.029)), 30px); }
+.hero__actions { gap: 10px; margin-top: clamp(14px, calc(var(--screen-h, 100svh) * 0.024), 28px); }
 .hero__grid { gap: clamp(22px, 4vw, 70px); }
-.hero__aside { gap: clamp(8px, 1.4svh, 14px); }
-.countdown { padding: clamp(6px, 1.1svh, 10px); }
-.countdown__unit { padding: clamp(9px, 1.7svh, 15px) 6px; }
-.hero-stat { padding: clamp(11px, 1.7svh, 20px) clamp(15px, 2vw, 24px); }
-.hero-stat__number { font-size: clamp(26px, min(3.6vw, 4.6svh), 52px); }
-.btn { min-height: clamp(46px, 6.2svh, 54px); padding-block: clamp(11px, 1.7svh, 14px); }
+.hero__aside { gap: clamp(8px, calc(var(--screen-h, 100svh) * 0.014), 14px); }
+.countdown { padding: clamp(6px, calc(var(--screen-h, 100svh) * 0.011), 10px); }
+.countdown__unit { padding: clamp(9px, calc(var(--screen-h, 100svh) * 0.017), 15px) 6px; }
+.hero-stat { padding: clamp(11px, calc(var(--screen-h, 100svh) * 0.017), 20px) clamp(15px, 2vw, 24px); }
+.hero-stat__number { font-size: clamp(26px, min(3.6vw, calc(var(--screen-h, 100svh) * 0.046)), 52px); }
+.btn { min-height: clamp(46px, calc(var(--screen-h, 100svh) * 0.062), 54px); padding-block: clamp(11px, calc(var(--screen-h, 100svh) * 0.017), 14px); }
 
 .route__frame { aspect-ratio: 16 / 9; border-width: clamp(5px, .6vw, 8px); }
-.route__map figcaption { margin-top: clamp(8px, 1.4svh, 16px); font-size: 12px; }
+.route__map figcaption { margin-top: clamp(8px, calc(var(--screen-h, 100svh) * 0.014), 16px); font-size: 12px; }
 .route__grid { gap: clamp(22px, 4vw, 64px); }
 .route__actions { gap: 10px; }
 
-.schedule-list { margin-top: clamp(14px, 2.6svh, 30px); }
-.schedule-row { padding: clamp(10px, 1.9svh, 20px) 8px; }
-.schedule-row time { font-size: clamp(24px, min(3.6vw, 4.6svh), 48px); }
-.schedule-row span { font-size: clamp(15px, min(1.7vw, 2.2svh), 21px); }
-.schedule .lead { margin-top: clamp(12px, 2.2svh, 22px); }
+.schedule-list { margin-top: clamp(14px, calc(var(--screen-h, 100svh) * 0.026), 30px); }
+.schedule-row { padding: clamp(10px, calc(var(--screen-h, 100svh) * 0.019), 20px) 8px; }
+.schedule-row time { font-size: clamp(24px, min(3.6vw, calc(var(--screen-h, 100svh) * 0.046)), 48px); }
+.schedule-row span { font-size: clamp(15px, min(1.7vw, calc(var(--screen-h, 100svh) * 0.022)), 21px); }
+.schedule .lead { margin-top: clamp(12px, calc(var(--screen-h, 100svh) * 0.022), 22px); }
 
-.attendance__title { font-size: clamp(24px, min(3.8vw, 5svh), 50px); }
-.attendance__counter { margin: clamp(10px, 2svh, 24px) 0 4px; font-size: clamp(58px, min(12vw, 15svh), 170px); }
-.attendance__label { font-size: clamp(12px, min(1.6vw, 2svh), 18px); }
+.attendance__title { font-size: clamp(24px, min(3.8vw, calc(var(--screen-h, 100svh) * 0.05)), 50px); }
+.attendance__counter { margin: clamp(10px, calc(var(--screen-h, 100svh) * 0.02), 24px) 0 4px; font-size: clamp(58px, min(12vw, calc(var(--screen-h, 100svh) * 0.15)), 170px); }
+.attendance__label { font-size: clamp(12px, min(1.6vw, calc(var(--screen-h, 100svh) * 0.02)), 18px); }
 .attendance__press {
-  width: clamp(118px, min(15vw, 18svh), 190px);
-  margin: clamp(14px, 2.6svh, 28px) auto clamp(10px, 1.8svh, 18px);
+  width: clamp(118px, min(15vw, calc(var(--screen-h, 100svh) * 0.18)), 190px);
+  margin: clamp(14px, calc(var(--screen-h, 100svh) * 0.026), 28px) auto clamp(10px, calc(var(--screen-h, 100svh) * 0.018), 18px);
   border-width: clamp(7px, .9vw, 12px);
-  font-size: clamp(15px, min(2vw, 2.6svh), 27px);
+  font-size: clamp(15px, min(2vw, calc(var(--screen-h, 100svh) * 0.026)), 27px);
 }
-.attendance__hint { font-size: clamp(11px, 1.6svh, 14px); }
-.avatar-stack { margin-top: clamp(10px, 1.9svh, 20px); }
-.avatar { width: clamp(32px, 4.4svh, 44px); height: clamp(32px, 4.4svh, 44px); font-size: clamp(11px, 1.6svh, 15px); }
-.attendance .btn[data-open-reminder] { margin-top: clamp(14px, 2.6svh, 28px) !important; }
+.attendance__hint { font-size: clamp(11px, calc(var(--screen-h, 100svh) * 0.016), 14px); }
+.avatar-stack { margin-top: clamp(10px, calc(var(--screen-h, 100svh) * 0.019), 20px); }
+.avatar { width: clamp(32px, calc(var(--screen-h, 100svh) * 0.044), 44px); height: clamp(32px, calc(var(--screen-h, 100svh) * 0.044), 44px); font-size: clamp(11px, calc(var(--screen-h, 100svh) * 0.016), 15px); }
+.attendance .btn[data-open-reminder] { margin-top: clamp(14px, calc(var(--screen-h, 100svh) * 0.026), 28px) !important; }
 
 .faq__grid { gap: clamp(22px, 4vw, 72px); }
 .contact__grid { gap: clamp(22px, 4vw, 72px); }
@@ -1472,21 +1520,21 @@ body.is-date-open { overscroll-behavior: none; }
       type can grow back into the space each panel actually has.
       Measured slack at 1440x749 before this block: hero 155px, story 294px,
       route 144px, schedule 244px, attendance 130px, faq 207px, contact 251px. */
-.hero__title { font-size: clamp(46px, min(8.6vw, 12svh), 124px); }
-.hero__tagline { font-size: clamp(19px, min(2.5vw, 3.2svh), 32px); }
-.section-title { font-size: clamp(34px, min(6.6vw, 10svh), 92px); }
-.section-title--medium { font-size: clamp(30px, min(4.9vw, 7.6svh), 66px); }
-.hero-stat__number { font-size: clamp(27px, min(3.8vw, 5.2svh), 56px); }
-.countdown__number { font-size: clamp(19px, min(2.6vw, 3.6svh), 34px); }
-.story-number strong { font-size: clamp(34px, min(5vw, 7.4svh), 70px); }
-.schedule-row time { font-size: clamp(25px, min(3.6vw, 5.4svh), 52px); }
-.schedule-row span { font-size: clamp(15px, min(1.8vw, 2.5svh), 22px); }
-.attendance__title { font-size: clamp(25px, min(3.8vw, 5.6svh), 54px); }
-.attendance__counter { font-size: clamp(62px, min(13vw, 17svh), 190px); }
-.attendance__press { width: clamp(124px, min(16vw, 20svh), 206px); font-size: clamp(16px, min(2.1vw, 2.9svh), 29px); }
-.contact__links a { font-size: clamp(19px, min(2.7vw, 4svh), 38px); }
-.accordion__button { font-size: clamp(16px, min(2vw, 3svh), 25px); }
-.lead { font-size: clamp(15px, min(1.55vw, 2.3svh), 20px); }
+.hero__title { font-size: clamp(46px, min(8.6vw, calc(var(--screen-h, 100svh) * 0.12)), 124px); }
+.hero__tagline { font-size: clamp(19px, min(2.5vw, calc(var(--screen-h, 100svh) * 0.032)), 32px); }
+.section-title { font-size: clamp(34px, min(6.6vw, calc(var(--screen-h, 100svh) * 0.1)), 92px); }
+.section-title--medium { font-size: clamp(30px, min(4.9vw, calc(var(--screen-h, 100svh) * 0.076)), 66px); }
+.hero-stat__number { font-size: clamp(27px, min(3.8vw, calc(var(--screen-h, 100svh) * 0.052)), 56px); }
+.countdown__number { font-size: clamp(19px, min(2.6vw, calc(var(--screen-h, 100svh) * 0.036)), 34px); }
+.story-number strong { font-size: clamp(34px, min(5vw, calc(var(--screen-h, 100svh) * 0.074)), 70px); }
+.schedule-row time { font-size: clamp(25px, min(3.6vw, calc(var(--screen-h, 100svh) * 0.054)), 52px); }
+.schedule-row span { font-size: clamp(15px, min(1.8vw, calc(var(--screen-h, 100svh) * 0.025)), 22px); }
+.attendance__title { font-size: clamp(25px, min(3.8vw, calc(var(--screen-h, 100svh) * 0.056)), 54px); }
+.attendance__counter { font-size: clamp(62px, min(13vw, calc(var(--screen-h, 100svh) * 0.17)), 190px); }
+.attendance__press { width: clamp(124px, min(16vw, calc(var(--screen-h, 100svh) * 0.2)), 206px); font-size: clamp(16px, min(2.1vw, calc(var(--screen-h, 100svh) * 0.029)), 29px); }
+.contact__links a { font-size: clamp(19px, min(2.7vw, calc(var(--screen-h, 100svh) * 0.04)), 38px); }
+.accordion__button { font-size: clamp(16px, min(2vw, calc(var(--screen-h, 100svh) * 0.03)), 25px); }
+.lead { font-size: clamp(15px, min(1.55vw, calc(var(--screen-h, 100svh) * 0.023)), 20px); }
 
 /* 10. Phone layout: the hero aside and contact card were the two panels that
        still overflowed at 390x693. */
@@ -1596,7 +1644,7 @@ body.is-date-open { overscroll-behavior: none; }
 .consent-dialog {
   width: min(780px, calc(100vw - 24px));
   max-width: none;
-  max-height: calc(100svh - 28px);
+  max-height: calc(var(--screen-h, 100svh) - 28px);
   margin: auto;
   padding: 0;
   overflow: visible;
@@ -1609,7 +1657,7 @@ body.is-date-open { overscroll-behavior: none; }
 .consent-dialog__surface {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  max-height: calc(100svh - 28px);
+  max-height: calc(var(--screen-h, 100svh) - 28px);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, .6);
   border-radius: inherit;
@@ -1720,8 +1768,8 @@ body.is-date-open { overscroll-behavior: none; }
 @keyframes consent-in { from { opacity: 0; transform: translateY(38px) scale(.96); } }
 
 @media (max-width: 620px) {
-  .consent-dialog { width: 100%; max-height: 100svh; margin: auto 0 0; border-radius: 26px 26px 0 0; }
-  .consent-dialog__surface { max-height: 100svh; animation-name: consent-sheet-in; }
+  .consent-dialog { width: 100%; max-height: var(--screen-h, 100svh); margin: auto 0 0; border-radius: 26px 26px 0 0; }
+  .consent-dialog__surface { max-height: var(--screen-h, 100svh); animation-name: consent-sheet-in; }
   .consent-dialog__header { padding: 18px 18px 14px; }
   .consent-progress { margin-inline: 18px; }
   .consent-dialog__body { padding: 16px 18px 22px; }
@@ -1847,14 +1895,14 @@ body.is-date-open { overscroll-behavior: none; }
 #signup .field input:not(:placeholder-shown) + label,
 #signup .field textarea:focus + label,
 #signup .field textarea:not(:placeholder-shown) + label { transform: translateY(-11px); font-size: 10px; }
-#signup .form-step h3 { font-size: clamp(24px, min(3.4vw, 4.6svh), 40px); }
-#signup .form-step__intro { margin-bottom: clamp(14px, 2.6svh, 26px); font-size: 13.5px; }
-#signup .form-nav { margin-top: clamp(16px, 2.8svh, 30px); }
+#signup .form-step h3 { font-size: clamp(24px, min(3.4vw, calc(var(--screen-h, 100svh) * 0.046)), 40px); }
+#signup .form-step__intro { margin-bottom: clamp(14px, calc(var(--screen-h, 100svh) * 0.026), 26px); font-size: 13.5px; }
+#signup .form-nav { margin-top: clamp(16px, calc(var(--screen-h, 100svh) * 0.028), 30px); }
 #signup .consent-box { margin-top: 16px; padding: 16px; }
 #signup .date-trigger { min-height: 64px; }
 #signup .step-indicator__number { width: 38px; height: 38px; }
-#signup .form-sidebar h3 { margin-bottom: clamp(18px, 3svh, 38px); font-size: clamp(21px, 3svh, 30px); }
-#signup .step-list { gap: clamp(12px, 2.4svh, 24px); }
+#signup .form-sidebar h3 { margin-bottom: clamp(18px, calc(var(--screen-h, 100svh) * 0.03), 38px); font-size: clamp(21px, calc(var(--screen-h, 100svh) * 0.03), 30px); }
+#signup .step-list { gap: clamp(12px, calc(var(--screen-h, 100svh) * 0.024), 24px); }
 
 @media (max-width: 760px) {
   #signup .field input,
@@ -2030,7 +2078,7 @@ html.no-js .preloader { display: none !important; }
   pointer-events: none;
 }
 .marquee__item {
-  font-size: clamp(18px, min(2.3vw, 2.9svh), 32px);
+  font-size: clamp(18px, min(2.3vw, calc(var(--screen-h, 100svh) * 0.029)), 32px);
   /* The dot separators were the same yellow as the band at low opacity. Coral gives the row
      a rhythm you can see from across the room, which is what a marquee is for. */
   color: var(--navy-950);
@@ -2048,7 +2096,15 @@ html.no-js .preloader { display: none !important; }
 
 /* ---------- Sponsor band ---------- */
 .sponsor-band {
-  --sponsor-band-h: clamp(56px, 8svh, 76px);
+  /* Roughly twice what it was (56–76 px). At the old height a logo was about 46 px tall on a
+     laptop, which is smaller than the section heading two lines above it and small enough that
+     a wordmark with any detail in it was a grey smudge. These are thank-yous with somebody's
+     name on them; they have to be readable at a glance from a normal viewing distance. */
+  --sponsor-band-h: clamp(88px, calc(var(--screen-h, 100svh) * 0.13), 132px);
+  /* One number for the spacing, because the seam of the loop depends on it: the repeat unit
+     is "logo + this gap", and the trailing copy of it is what makes the join invisible.
+     See .sponsor-band__rep below. */
+  --sponsor-gap: clamp(34px, 4.5vw, 72px);
   position: absolute;
   z-index: 6;
   right: 0;
@@ -2061,14 +2117,50 @@ html.no-js .preloader { display: none !important; }
   backdrop-filter: blur(10px) saturate(1.1);
 }
 .sponsor-band[hidden] { display: none !important; }
+
+/* Why three nested levels instead of one flat row of logos.
+   ---------------------------------------------------------------------------
+   The loop is `translateX(-50%)`, so the strip is seamless only if half the track's width is
+   exactly one whole pass over the sponsor list — including the gap that follows the last logo,
+   because that gap has to be there when the first one comes round again.
+
+   The flat version could not be that. It put `gap` between the logos and `padding-inline` on
+   the ends, so half the track came to `padding + logos + (n − ½) gaps`: off by
+   `padding − gap/2` on every cycle. Those two clamps happened to be close on a phone and
+   several pixels apart on a laptop, which is why the strip twitched once per loop on desktop
+   and looked fine on mobile.
+
+     .sponsor-band__track   two halves, nothing else — no gap, no padding, so −50% is exact
+     .sponsor-band__half    as many passes as it takes to be wider than the strip
+     .sponsor-band__rep     one pass over the list, plus a trailing gap
+
+   The second reason for the middle level is the hole. Four sponsors on a wide screen do not
+   fill the strip twice over, so the tail of the second half ran out before the first came back
+   round and a stretch of empty white scrolled past. setupSponsors() measures one pass and puts
+   as many as it takes into each half, so both halves are always at least as wide as the strip
+   and there is nothing to run out. */
 .sponsor-band__track {
   display: flex;
   width: max-content;
   height: 100%;
   align-items: center;
-  gap: clamp(30px, 5vw, 68px);
-  padding-inline: clamp(15px, 3vw, 34px);
   animation: sponsor-scroll var(--sponsor-speed, 34s) linear infinite;
+}
+.sponsor-band__half {
+  display: flex;
+  height: 100%;
+  flex: none;
+  align-items: center;
+}
+.sponsor-band__rep {
+  display: flex;
+  height: 100%;
+  flex: none;
+  align-items: center;
+  gap: var(--sponsor-gap);
+  /* The gap that follows the last logo of the pass. Without it two passes meet with no space
+     between them and the seam is visible as a pair of logos sitting too close. */
+  padding-right: var(--sponsor-gap);
 }
 .sponsor-band:hover .sponsor-band__track,
 .sponsor-band:focus-within .sponsor-band__track { animation-play-state: paused; }
@@ -2096,8 +2188,10 @@ html.no-js .preloader { display: none !important; }
      pilnuje proporcji. Logotypy rastrowe mają własny wymiar i nic dla nich się nie
      zmienia. */
   height: 100%;
-  max-width: clamp(96px, 13vw, 168px);
-  max-height: calc(var(--sponsor-band-h) - clamp(20px, 3svh, 30px));
+  max-width: clamp(150px, 20vw, 280px);
+  /* Less air above and below than before, so the extra band height goes into the logo rather
+     than around it. */
+  max-height: calc(var(--sponsor-band-h) - clamp(14px, calc(var(--screen-h, 100svh) * 0.02), 22px));
   object-fit: contain;
   /* Logos arrive in every colour and weight; this evens them out and lets the
      hover state bring the real colours back. */
@@ -2112,17 +2206,31 @@ html.no-js .preloader { display: none !important; }
 
 /* Hero has to leave room for both strips. */
 #main > section.section-card--hero {
-  padding-bottom: calc(clamp(84px, 10svh, 104px) + var(--hero-bottom-strips, 0px));
+  padding-bottom: calc(clamp(84px, calc(var(--screen-h, 100svh) * 0.1), 104px) + var(--hero-bottom-strips, 0px));
 }
 
 @media (max-width: 760px) {
-  .sponsor-band { --sponsor-band-h: clamp(48px, 7svh, 60px); }
+  .sponsor-band {
+    --sponsor-band-h: clamp(72px, calc(var(--screen-h, 100svh) * 0.11), 100px);
+    --sponsor-gap: clamp(26px, 7vw, 44px);
+  }
   .marquee { padding: 10px 0; }
   .marquee__item { font-size: clamp(15px, 4.4vw, 20px); }
 }
 
+/* No motion: one pass, and the reader scrolls it themselves if it does not fit.
+   ---------------------------------------------------------------------------
+   This used to wrap the logos onto several lines instead. That needs the strip to grow, and
+   the strip cannot grow: every logo inside is `height: 100%`, and a percentage height against
+   a parent of `height: auto` resolves to zero — the note in demo.css records the measurement,
+   72 px of strip with eight logos of 0x0 in it. So the height stays, the duplicate half and
+   the extra passes come out, and the strip becomes an ordinary horizontal scroller. Nothing
+   moves on its own and no logo is cut off with no way to reach it. */
 @media (prefers-reduced-motion: reduce) {
-  .sponsor-band__track { animation: none; justify-content: center; flex-wrap: wrap; }
+  .sponsor-band { overflow-x: auto; }
+  .sponsor-band__track { animation: none; }
+  .sponsor-band__half + .sponsor-band__half,
+  .sponsor-band__rep + .sponsor-band__rep { display: none; }
   .sponsor-logo img { filter: none; }
 }
 
@@ -2172,10 +2280,10 @@ html.no-js .preloader { display: none !important; }
    slides straight over the pinned one, and the card height alone provides the
    scroll distance. */
 .card-stack {
-  --stack-top: clamp(84px, 10svh, 112px);
+  --stack-top: clamp(84px, calc(var(--screen-h, 100svh) * 0.1), 112px);
   --stack-gap: clamp(10px, 1.4vw, 18px);
-  --stack-card-height: min(660px, calc(100svh - var(--stack-top) - 40px));
-  padding-bottom: clamp(40px, 8vh, 90px);
+  --stack-card-height: min(660px, calc(var(--screen-h, 100svh) - var(--stack-top) - 40px));
+  padding-bottom: clamp(40px, calc(var(--screen-h, 100svh) * 0.08), 90px);
 }
 .stack-card {
   min-height: max(480px, var(--stack-card-height));
@@ -2199,7 +2307,7 @@ html.no-js .preloader { display: none !important; }
   .card-stack {
     --stack-top: 78px;
     --stack-gap: 8px;
-    --stack-card-height: min(600px, calc(100svh - 118px));
+    --stack-card-height: min(600px, calc(var(--screen-h, 100svh) - 118px));
   }
   .stack-card + .stack-card { margin-top: 0; }
 }
@@ -2249,7 +2357,7 @@ html.no-js .preloader { display: none !important; }
    viewport, so the bottom of it was unreachable while pinned. */
 @media (max-width: 760px) {
   .stack-card__inner { grid-template-rows: auto minmax(0, 1fr); }
-  .stack-card__visual { min-height: 150px; max-height: 34svh; }
+  .stack-card__visual { min-height: 150px; max-height: calc(var(--screen-h, 100svh) * 0.34); }
   .stack-card__visual svg { width: min(58%, 240px); }
   .stack-card__copy { padding: 46px 20px 20px; }
   .stack-card h3 { max-width: none; margin: 12px 0 8px; font-size: clamp(26px, 8vw, 34px); }

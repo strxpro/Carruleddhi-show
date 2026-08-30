@@ -6,7 +6,13 @@ import { flagSvg } from './flags.js';
    wersję: wysyłka, pasek komunikatów, odczyt ze słownika i przepisanie znaczników na język.
    Stały tutaj i były podawane na zewnątrz przez window.CARRULEDDHI_API — patrz nagłówek
    site-bridge.js, w którym opisane jest, dlaczego druga kopia `postJSON` byłaby błędem. */
-import { makeText, makePayload, postJSON, showToast, translateDom } from './site-bridge.js';
+/* `screenHeight` pod aliasem, bo `setupPanels` ma własną lokalną zmienną o tej nazwie
+   trzymającą tę samą liczbę. Alias jest tańszy niż przemianowanie tamtej i nie zostawia dwóch
+   nazw znaczących to samo w jednym pliku. */
+import {
+  makeText, makePayload, measureScreenHeight, postJSON,
+  screenHeight as frozenScreenHeight, showToast, translateDom
+} from './site-bridge.js';
 
 (() => {
   'use strict';
@@ -16,6 +22,12 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const finePointer = window.matchMedia('(pointer: fine)').matches;
+  /* Ekran dotykowy. `(hover: none)` zamiast `maxTouchPoints`, bo pyta o to, o co naprawdę
+     chodzi — o brak wskaźnika, który mógłby najechać — i nie łapie laptopa z ekranem
+     dotykowym jako telefonu. setupPanels ma własną, starszą flagę na `maxTouchPoints`; obie
+     odpowiadają tam, gdzie są używane, i nie warto ich scalać za cenę zmiany zachowania w
+     miejscu, które działa. */
+  const touchScreen = window.matchMedia('(hover: none)').matches;
   const config = getPublicSiteConfig();
 
   /**
@@ -130,11 +142,20 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
     });
     $$('[data-route-map-link]').forEach((link) => { link.href = config.route.mapUrl; });
 
-    const routeImage = $('[data-route-image]');
-    if (routeImage) routeImage.src = config.media.routeImage;
+    /* Only when the configuration actually differs from what is in the markup.
+       Writing the same URL back into `src` restarts the element's loading decision, and
+       these images are marked `loading="lazy"` precisely so the browser gets to make it
+       once, near the section, rather than during the first-screen rush. */
+    const setImage = (image, source) => {
+      if (!image || !source) return;
+      const current = image.getAttribute('src');
+      if (current !== source) image.src = source;
+    };
+
+    setImage($('[data-route-image]'), config.media.routeImage);
     $$('[data-gallery-image]').forEach((image) => {
       const index = Number.parseInt(image.dataset.galleryImage, 10);
-      if (config.media.galleryImages[index]) image.src = config.media.galleryImages[index];
+      setImage(image, config.media.galleryImages[index]);
     });
 
     Object.entries(config.features).forEach(([feature, enabled]) => {
@@ -1050,7 +1071,27 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       // Only transform and brightness: an animated blur on a card this large
       // repaints the whole layer every frame and drops the framerate.
       card.style.transform = `translate3d(0,${(-eased * 12).toFixed(2)}px,0) scale(${(1 - eased * 0.085).toFixed(4)})`;
-      card.style.filter = `brightness(${(1 - eased * 0.26).toFixed(3)})`;
+      /* PRZYCIEMNIANIE TYLKO TAM, GDZIE JEST NA NIE MOC.
+         ---------------------------------------------------------------------------
+         `transform` składa się na GPU: przeglądarka bierze gotową teksturę warstwy i przesuwa
+         ją, nie rysując zawartości od nowa. `filter` tego nie robi. Każda zmiana wartości to
+         przebieg filtra po CAŁEJ warstwie karty, a karta ma tu wysokość niemal ekranu. Dwanaście
+         kart razy jeden przebieg na klatkę.
+
+         Do tego samo ISTNIENIE `filter` — nawet przy `brightness(1)` — wymusza dla elementu
+         osobną warstwę kompozytora z własną teksturą. Dwanaście przypiętych kart wysokości
+         ekranu to dwanaście takich tekstur trzymanych w pamięci graficznej przez cały czas, obok
+         czternastu warstw sekcji. To jest ten sam rachunek, z którego wypisano `backdrop-filter`
+         poniżej 760 px (blok w carnival.css) — i ta sama odpowiedź.
+
+         Głębia na telefonie zostaje, tylko robi ją co innego: `transform` powyżej nadal cofa i
+         zmniejsza kartę, a klasa `is-covered` niżej przestawia jej cień na płaski. Ubytkiem jest
+         samo ściemnienie o 26%.
+
+         Na pulpicie nic się nie zmienia. `filter` jest tam widoczną częścią efektu i nie ma
+         powodu go zabierać. */
+      if (touchScreen) card.style.removeProperty('filter');
+      else card.style.filter = `brightness(${(1 - eased * 0.26).toFixed(3)})`;
       card.classList.toggle('is-covered', progress > 0.15);
     });
 
@@ -1108,13 +1149,28 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
      * @param {number} direction  1 sends the top card away to the left and brings
      *                            the next one up, -1 goes back.
      */
-    function advance(direction = 1) {
-      if (state.deckLocked) return;
+    function advance(direction = 1, { fromDrag = false } = {}) {
+      if (state.deckLocked) return false;
       state.deckLocked = true;
       const outgoing = cards[state.deckIndex];
-      outgoing.style.removeProperty('transform');
+
+      /* Two ways in, and they must not be handled the same way.
+         ---------------------------------------------------------------------------
+         From a button or the keyboard the card is sitting at centre with no inline
+         styles, so clearing them and forcing a reflow costs nothing and guarantees a
+         clean starting point.
+
+         From a throw the card is already out under the finger — often most of the way
+         to the edge. Wiping the transform and flushing it (`void offsetWidth`) commits
+         centre as the "before" style, so the card snaps back for one frame and only
+         then flies away. That backwards jump was the ugliest frame in the interaction.
+
+         So on a throw both inline properties come off and the class goes on inside the
+         same task, with nothing in between that forces a style flush. The browser sees
+         one change — dragged position to off screen — and interpolates it in one go. */
       outgoing.style.removeProperty('transition');
-      void outgoing.offsetWidth;
+      outgoing.style.removeProperty('transform');
+      if (!fromDrag) void outgoing.offsetWidth;
       outgoing.classList.add(direction < 0 ? 'is-gone-back' : 'is-gone');
 
       /* Wait for the throw to actually finish, then reset without animating.
@@ -1150,7 +1206,7 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
 
       if (reducedMotion) {
         window.setTimeout(settle, 10);
-        return;
+        return true;
       }
 
       let done = false;
@@ -1166,7 +1222,13 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
         if (event.target === outgoing && event.propertyName === 'transform') once();
       };
       outgoing.addEventListener('transitionend', onEnd);
-      window.setTimeout(once, 460);
+      /* Escape hatch only. It used to be the actual mechanism, because the stylesheet had
+         no transform transition on these cards and so `transitionend` could never fire —
+         every swipe was followed by 460 ms of a deck that ignored you. carnival.css puts
+         the transition back; this timer is now just insurance against a transition that
+         is interrupted before it ends, sat comfortably past the .42s it should take. */
+      window.setTimeout(once, 560);
+      return true;
     }
 
     /**
@@ -1184,50 +1246,128 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
     let drag = null;
     let dragFrame = 0;
 
+    /** Sideways travel that commits to a throw on its own, with no flick behind it. */
+    const THROW_PX = 52;
+    /** Where the card stops following the finger one-for-one, in px. */
+    const SOFT_PX = 150;
+    /** px per ms. A deliberate swipe runs well over 1; a careful drag stays under .2. */
+    const FLICK_SPEED = 0.6;
+    /** A flick still has to move the card visibly, or a twitch would throw it. */
+    const FLICK_MIN_PX = 24;
+    /** A flick has to be the last thing that happened, not something from a second ago. */
+    const FLICK_MAX_AGE = 90;
+
     const paint = () => {
       dragFrame = 0;
       if (!drag) return;
       const { dx, dy } = drag;
+      /* Past SOFT_PX the card gives about a third of what the finger gives. The throw has
+         already committed by then (52 px), so this changes nothing about what happens —
+         it is only so the card reads as an object with some weight rather than something
+         glued to the cursor, and so a long drag cannot fling it a screen and a half wide. */
+      const magnitude = Math.abs(dx);
+      const pull = Math.sign(dx) * (magnitude <= SOFT_PX ? magnitude : SOFT_PX + (magnitude - SOFT_PX) * 0.35);
+      /* translate3d rather than translate: it asks for the card to be composited, which
+         together with the will-change set on pointerdown keeps the whole drag off the
+         paint path. The card is 500x430 with a 70 px shadow — repainting that per frame
+         is exactly the cost this is avoiding. */
       drag.card.style.transform =
-        `translate(-50%, -50%) translate(${dx.toFixed(1)}px, ${(dy * 0.22).toFixed(1)}px)`
-        + ` rotate(${(dx * 0.03).toFixed(2)}deg)`;
+        `translate(-50%, -50%) translate3d(${pull.toFixed(1)}px, ${(dy * 0.2).toFixed(1)}px, 0)`
+        + ` rotate(${(pull * 0.028).toFixed(2)}deg)`;
     };
 
     deck.addEventListener('pointerdown', (event) => {
       const card = event.target.closest('[data-prize-card]');
       if (!card || card !== cards[state.deckIndex] || state.deckLocked) return;
-      drag = { card, startX: event.clientX, startY: event.clientY, dx: 0, dy: 0, moved: false };
+      const now = event.timeStamp || performance.now();
+      drag = {
+        card, startX: event.clientX, startY: event.clientY,
+        dx: 0, dy: 0, moved: false,
+        // Smoothed pointer speed, so the release can tell a flick from a slow shove.
+        vx: 0, lastAt: now, lastMoveAt: now
+      };
       card.setPointerCapture?.(event.pointerId);
+      // Narrower than leaving the transition out of the stylesheet, which is what used to
+      // be done here — see the note on `.prize-deck .prize-card` in carnival.css. Off for
+      // the drag, back on the moment the finger lifts, so the card can ease home or fly.
       card.style.transition = 'none';
-      // Stops the page from scrolling under a sideways drag on a touchscreen, and
-      // freezes the floating artwork so the card feels like a solid object.
+      card.style.willChange = 'transform';
+      // Freezes the floating artwork so the card feels like a solid object.
       deck.classList.add('is-dragging');
     });
 
     deck.addEventListener('pointermove', (event) => {
       if (!drag) return;
-      drag.dx = event.clientX - drag.startX;
+      const now = event.timeStamp || performance.now();
+      const dx = event.clientX - drag.startX;
+      const elapsed = now - drag.lastAt;
+      if (elapsed > 0) {
+        /* Weighted average, not the raw sample. A 1000 Hz mouse delivers moves 1 ms apart
+           and a single jittery one is enough to read as a flick if taken on its own. */
+        drag.vx = drag.vx * 0.6 + ((dx - drag.dx) / elapsed) * 0.4;
+        drag.lastAt = now;
+      }
+      if (dx !== drag.dx) drag.lastMoveAt = now;
+      drag.dx = dx;
       drag.dy = event.clientY - drag.startY;
       drag.moved ||= Math.abs(drag.dx) > 4 || Math.abs(drag.dy) > 4;
       if (!dragFrame) dragFrame = requestAnimationFrame(paint);
-    });
+    }, { passive: true });
+
+    /** Puts the card back under the stylesheet's control; it eases home from wherever it is. */
+    const settleHome = (card) => {
+      card.style.removeProperty('transition');
+      card.style.removeProperty('transform');
+    };
 
     const release = () => {
       if (!drag) return;
-      const { card, dx, moved } = drag;
+      const { card, dx, moved, vx } = drag;
+      const stale = (performance.now() - drag.lastMoveAt) > FLICK_MAX_AGE;
       drag = null;
       cancelAnimationFrame(dragFrame);
       dragFrame = 0;
       deck.classList.remove('is-dragging');
-      card.style.removeProperty('transition');
-      card.style.removeProperty('transform');
-      if (!moved) { advance(1); return; }
-      if (dx <= -52) advance(1);
-      else if (dx >= 52) advance(-1);
+      card.style.removeProperty('will-change');
+
+      // A tap, not a drag: same meaning as the next button.
+      if (!moved) { settleHome(card); advance(1); return; }
+
+      /* Two ways to commit. Distance is the obvious one. Speed is the one that matters on
+         a phone, where a flick is over in 80 ms and covers barely 30 px — under the old
+         distance-only rule those swipes did nothing at all and the deck felt dead. The
+         flick has to still be in progress at release and to agree with which way the card
+         actually went, so a drag out and back does not count as a throw. */
+      const flick = !stale && Math.abs(vx) > FLICK_SPEED && Math.sign(vx) === Math.sign(dx);
+      const thrown = Math.abs(dx) >= THROW_PX || (flick && Math.abs(dx) >= FLICK_MIN_PX);
+
+      // Left sends the deck forward, right sends it back — the card leaves the side it was
+      // thrown towards, so the flick and the movement always agree.
+      if (thrown && advance(dx < 0 ? 1 : -1, { fromDrag: true })) return;
+      // Not far enough, or the deck was already busy: ease back to centre.
+      settleHome(card);
+    };
+
+    /* `pointercancel` is not a release, it is the browser saying the gesture is no longer
+       ours — a vertical pan taking over, a phone call, a palm on the screen. Committing a
+       throw on it would mean the deck moved on a gesture the reader never finished, so the
+       card always eases back to centre instead. */
+    const abort = () => {
+      if (!drag) return;
+      const { card } = drag;
+      drag = null;
+      cancelAnimationFrame(dragFrame);
+      dragFrame = 0;
+      deck.classList.remove('is-dragging');
+      card.style.removeProperty('will-change');
+      settleHome(card);
     };
 
     deck.addEventListener('pointerup', release);
-    deck.addEventListener('pointercancel', release);
+    deck.addEventListener('pointercancel', abort);
+    // Fires after both of the above, by which point `drag` is already null and this is a
+    // no-op. It is here for the case they do not fire at all — capture lost to a
+    // disappearing element leaves the card stranded mid-drag otherwise.
     deck.addEventListener('lostpointercapture', release);
     deck.addEventListener('keydown', (event) => {
       if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); advance(1); }
@@ -1677,24 +1817,49 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
     const minimum = 0.05;
     let frame = 0;
 
-    const measure = () => {
+    /* WYSOKOŚĆ DOKUMENTU I PASA JEST PAMIĘTANA, NIE CZYTANA NA KLATKĘ.
+       ---------------------------------------------------------------------------
+       Stało tu `document.documentElement.scrollHeight` i `band.offsetHeight`, oba w funkcji
+       wołanej z każdego zdarzenia przewijania. To są odczyty WYMUSZAJĄCE przeliczenie układu: żeby
+       oddać wysokość dokumentu, przeglądarka musi policzyć pozycje wszystkiego, co w nim jest —
+       a tu jest czternaście przypiętych paneli i trzynaście tysięcy pikseli.
+
+       Komentarz wyżej mówi „only `transform: scaleY()` reads it, so this never triggers layout"
+       i to jest prawda o ZAPISIE. Odczyt dwie linie wcześniej wymuszał układ i tak, więc funkcja
+       robiła dokładnie to, czego wedle swojego opisu nie robiła.
+
+       Żadna z tych dwóch liczb nie zmienia się w trakcie przewijania — zmienia je zmiana okna i
+       zmiana wysokości treści, czyli dokładnie te trzy zdarzenia, które i tak są tu obsłużone.
+       Więc pomiar idzie tam, a pętla przewijania czyta z pamięci i wykonuje jeden zapis. */
+    let bandHeight = 1;
+    let documentHeight = 0;
+    const remeasure = () => {
+      bandHeight = band.offsetHeight || 1;
+      documentHeight = document.documentElement.scrollHeight;
+    };
+
+    const paint = () => {
       frame = 0;
-      const height = band.offsetHeight || 1;
-      const left = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
-      const progress = clamp((height - left) / height, 0, 1);
+      const left = documentHeight - window.innerHeight - window.scrollY;
+      const progress = clamp((bandHeight - left) / bandHeight, 0, 1);
       band.style.setProperty(
         '--footer-glow-progress',
         (minimum + (1 - minimum) * progress).toFixed(4)
       );
     };
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
+      if (!frame) frame = requestAnimationFrame(paint);
     };
+    const remeasureAndPaint = () => { remeasure(); schedule(); };
 
-    measure();
+    remeasure();
+    paint();
     window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule, { passive: true });
-    if ('ResizeObserver' in window) new ResizeObserver(schedule).observe(document.body);
+    window.addEventListener('resize', remeasureAndPaint, { passive: true });
+    /* Obserwator na `body` łapie każdą zmianę wysokości dokumentu, także tę z werdyktu
+       `pinned`/`flow` w setupPanels — czyli jedyny przypadek, w którym wysokość zmienia się bez
+       zmiany okna. */
+    if ('ResizeObserver' in window) new ResizeObserver(remeasureAndPaint).observe(document.body);
   }
 
   /**
@@ -4208,18 +4373,74 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
        zamiennika. Zdejmowana nie jest, bo `setupCursor` uruchamia się raz. */
     document.documentElement.classList.add('has-custom-cursor');
 
+    /* KURSOR SYSTEMOWY NA CZAS OKIENEK PRZEGLĄDARKI.
+       ---------------------------------------------------------------------------
+       Zgłoszone jako „przy wybieraniu daty nie widać kursora", i tak właśnie było.
+       Kalendarz `input[type=date]` rysuje przeglądarka NAD stroną, poza dokumentem. Póki
+       jest otwarty, strona nie dostaje ani jednego `pointermove` — kropka i pierścień stoją
+       zamrożone w miejscu, w którym były w chwili kliknięcia, zwykle pod samym okienkiem.
+       `cursor: none` obowiązuje dalej, bo to reguła założona na stronę. Kursora nie ma
+       nigdzie i nie da się trafić w dzień w kalendarzu.
+
+       Samego okienka nie da się wykryć: nie emituje zdarzeń, nie jest elementem, nie rusza
+       fokusu. Da się natomiast wykryć jego POWÓD — fokus na kontrolce, która je otwiera.
+       Lista niżej to wszystkie takie kontrolki na tej stronie: pola daty i czasu, wybór
+       koloru, wybór pliku i `select`. Póki któraś z nich ma fokus, oddajemy kursor systemowi.
+
+       DLACZEGO FOKUS, A NIE KLIKNIĘCIE
+         Kalendarz otwiera też klawiatura (spacja na polu daty) i strzałka w dół na
+         `select`. Warunek na kliknięciu przegapiłby oba, a to są drogi, którymi chodzi
+         każdy, kto nie używa myszy.
+
+       DLACZEGO PRZY OKAZJI `blur` OKNA
+         Wybór pliku otwiera okno systemowe, które zabiera fokus całej karcie. Wtedy
+         `focusout` nie przyjdzie, dopóki okno się nie zamknie — a przez ten czas kursor
+         i tak należy do systemu. Jeden warunek więcej, ta sama klasa. */
+    const nativeCursorFields = 'input[type="date"], input[type="time"], input[type="month"],'
+      + ' input[type="week"], input[type="datetime-local"], input[type="color"],'
+      + ' input[type="file"], select';
+    const nativeCursor = (on) => document.documentElement.classList.toggle('native-cursor', on);
+    const insidePicker = () => Boolean(document.activeElement?.closest?.(nativeCursorFields));
+
+    document.addEventListener('focusin', () => nativeCursor(insidePicker()));
+    document.addEventListener('focusout', () => {
+      /* Po `focusout` `activeElement` jest jeszcze starym elementem — odczyt w następnej
+         mikropauzie widzi już nowy fokus (albo `body`). Bez tego przejście z pola daty na
+         sąsiednie pole tekstowe zostawiałoby kursor systemowy do końca wizyty. */
+      setTimeout(() => nativeCursor(insidePicker()), 0);
+    });
+    window.addEventListener('blur', () => nativeCursor(true));
+    window.addEventListener('focus', () => nativeCursor(insidePicker()));
+
     let pointerX = -100;
     let pointerY = -100;
     let ringX = -100;
     let ringY = -100;
+    let cursorFrame = 0;
+
+    /* `transform`, not `left`/`top`.
+       ---------------------------------------------------------------------------
+       Both of these elements used to be positioned by writing `left` and `top`: the dot on
+       every pointermove, which on a 1000 Hz mouse is a thousand style writes a second, and
+       the ring on every frame of the follow loop below, forever. Those two properties are
+       laid out and painted; `transform` is composited, so the same movement costs the main
+       thread nothing once the layer exists.
+
+       The `translate(-50%, -50%)` stays on the end and keeps doing what it did in the
+       stylesheet — centring each element on the pointer. It has to be the second function,
+       not the first, because it is relative to the element's own size and the ring changes
+       size between its five states. */
+    const place = (element, x, y) => {
+      element.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, -50%)`;
+    };
 
     window.addEventListener('pointermove', (event) => {
       pointerX = event.clientX;
       pointerY = event.clientY;
-      dot.style.left = `${pointerX}px`;
-      dot.style.top = `${pointerY}px`;
       dot.style.opacity = '1';
       ring.style.opacity = '1';
+      // The loop parks itself when the ring catches up, so every move has to restart it.
+      if (!cursorFrame) cursorFrame = requestAnimationFrame(animate);
     }, { passive: true });
     /* What the ring says about what is under it.
        ---------------------------------------------------------------------------
@@ -4261,14 +4482,28 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       ring.classList.remove('is-press');
     });
 
+    /* Runs only while there is something left to move.
+       ---------------------------------------------------------------------------
+       This used to be an unconditional `requestAnimationFrame(animate)` at the end of every
+       frame: a loop that started on load and never stopped, on every desktop visit, for the
+       whole visit. It kept running with the pointer parked, with the window scrolled to a
+       section that has no cursor in it, and with the ring already exactly where it belongs —
+       waking the main thread sixty times a second to write two values that had not changed.
+
+       Now the last frame is the one where the ring arrives. A tenth of a pixel is below what
+       `place()` even writes out, so stopping there is invisible, and the next pointermove
+       starts it again. Idle costs nothing. */
     function animate() {
+      cursorFrame = 0;
       ringX += (pointerX - ringX) * 0.16;
       ringY += (pointerY - ringY) * 0.16;
-      ring.style.left = `${ringX}px`;
-      ring.style.top = `${ringY}px`;
-      requestAnimationFrame(animate);
+      place(dot, pointerX, pointerY);
+      place(ring, ringX, ringY);
+      if (Math.abs(pointerX - ringX) > 0.1 || Math.abs(pointerY - ringY) > 0.1) {
+        cursorFrame = requestAnimationFrame(animate);
+      }
     }
-    requestAnimationFrame(animate);
+    cursorFrame = requestAnimationFrame(animate);
   }
 
   function setupMagneticButtons() {
@@ -4549,31 +4784,58 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
      *   `onResize` niżej i tak przelicza wszystko od nowa. Chowanie paska adresu tego nie
      *   rusza, i o to chodzi.
      */
-    let svhProbe = null;
-    let screenHeight = 0;
-    function measureScreenHeight() {
-      if (!(window.CSS && CSS.supports && CSS.supports('height', '100svh'))) {
-        // Przeglądarka bez svh (starsze WebView): innerHeight jest wtedy jedyną liczbą,
-        // jaką mamy, a bez svh w CSS sekcje i tak dostają fallback z tej samej rodziny.
-        screenHeight = window.innerHeight;
-        return;
-      }
-      if (!svhProbe) {
-        svhProbe = document.createElement('div');
-        svhProbe.setAttribute('aria-hidden', 'true');
-        svhProbe.style.cssText =
-          'position:absolute;top:0;left:0;width:0;height:100svh;' +
-          'visibility:hidden;pointer-events:none;';
-        document.body.appendChild(svhProbe);
-      }
-      screenHeight = svhProbe.getBoundingClientRect().height || window.innerHeight;
-    }
-    measureScreenHeight();
+    /* Pomiar i wpisanie `--screen-h` stoją w site-bridge.js, bo robi to samo podstrona
+       głosowania, która nie wciąga tego pliku. Ta sama liczba rozstrzyga tutaj werdykt
+       `pinned` / `flow`, a w CSS wysokość sekcji — i musi być jedna. */
+    let screenHeight = measureScreenHeight();
 
+    /* ============================================================
+       POMIAR W TRZECH PRZEBIEGACH, NIE W JEDNYM — I TO JEST NAJWIĘKSZA NAPRAWA KLATKOWANIA.
+       ============================================================
+       CO TU BYŁO
+         Jedna pętla po czternastu sekcjach, a w każdym obrocie po kolei: ZAPIS
+         (`data-panel='measure'`, co zdejmuje `position: sticky`, `min-height` i `overflow`),
+         ODCZYT (`panel.scrollHeight`) i znowu ZAPIS (werdykt).
+
+       DLACZEGO TO JEST DROŻSZE, NIŻ WYGLĄDA
+         Odczyt `scrollHeight` po zapisie, który unieważnił układ, WYMUSZA przeliczenie układu:
+         przeglądarka nie może oddać liczby, dopóki nie policzy pozycji od nowa. Zapis dotyczył
+         `position` i `min-height` sekcji o wysokości ekranu w stosie czternastu przypiętych
+         paneli, więc przeliczenie obejmowało cały trzynastotysięczny dokument. Czternaście
+         obrotów pętli to czternaście takich przeliczeń, jedno po drugim, synchronicznie,
+         w jednym wywołaniu funkcji.
+
+         To jest wzorzec zwany layout thrashing i jest tu w najczystszej postaci. Ta sama pułapka
+         jest już rozpoznana i naprawiona w `updateCardStack` kilka tysięcy linii wyżej —
+         komentarz brzmi tam „read every rect first, write afterwards: interleaving reads and
+         writes forces a layout on each card and is what made the stack stutter". Ten sam błąd,
+         ta sama naprawa, o jeden poziom wyżej: tam chodziło o dwanaście kart, tu o czternaście
+         sekcji, z których każda jest wysokości ekranu.
+
+       CO SIĘ ZMIENIA NA MOBILE
+         Ten przebieg jest wywoływany z ResizeObserverów na `.container` każdej sekcji, czyli
+         wtedy, gdy dojdzie obrazek, zamieni się font albo wejdzie tłumaczenie — a to zdarza się
+         W TRAKCIE przewijania. Czternaście wymuszonych przeliczeń w jednej klatce na telefonie
+         to kilkaset milisekund zajętego wątku głównego: przewijanie stoi, bezwładność leci
+         dalej, a po odblokowaniu strona jest w innym miejscu. Stąd i „zacina się", i część
+         „teleportacji".
+
+       DLACZEGO WSZYSTKIE NARAZ DAJĄ TEN SAM WYNIK
+         `scrollHeight` sekcji zależy od jej własnej treści, a nie od tego, gdzie stoją sekcje
+         obok. Są rodzeństwem w normalnym przepływie; zdjęcie `sticky` z sąsiada nie zmienia
+         wysokości treści tej. Więc trzy przebiegi (wszystkie w tryb pomiarowy, wszystkie
+         odczytać, wszystkie rozstrzygnąć) dają te same liczby co czternaście przeplotów, przy
+         jednym wymuszonym przeliczeniu zamiast czternastu.
+       ============================================================ */
     function measure() {
       selfInflicted = true;
       const viewport = screenHeight || window.innerHeight;
       const routeFlows = window.innerWidth <= routeFlowsBelow;
+
+      /* PRZEBIEG 1 — same zapisy. Sekcje z góry rozstrzygnięte dostają werdykt od razu i nie
+         wchodzą do pomiaru; pozostałe idą w tryb pomiarowy. Ani jednego odczytu układu, więc
+         przeglądarka może zebrać to wszystko w jedno unieważnienie. */
+      const pending = [];
       panels.forEach((panel) => {
         if (alwaysFlow.has(panel.id) || (panel.id === 'route' && routeFlows)) {
           panel.dataset.panel = 'flow';
@@ -4584,10 +4846,17 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
           return;
         }
         // Measure without the sticky/clip constraints, then restore.
-        const previous = panel.dataset.panel;
+        pending.push({ panel, previous: panel.dataset.panel });
         panel.dataset.panel = 'measure';
-        const needed = panel.scrollHeight;
+      });
 
+      /* PRZEBIEG 2 — same odczyty. Pierwszy `scrollHeight` opłaca przeliczenie za wszystkie
+         zapisy z przebiegu 1; każdy następny czyta z tego samego, już policzonego układu, bo nic
+         między nimi go nie unieważnia. Jedno przeliczenie na cały pomiar. */
+      pending.forEach((entry) => { entry.needed = entry.panel.scrollHeight; });
+
+      /* PRZEBIEG 3 — werdykty. Znowu same zapisy. */
+      pending.forEach(({ panel, previous, needed }) => {
         /* Histereza, a nie jeden próg.
            ---------------------------------------------------------------------------
            Warunek `needed > viewport + 4` ma jedną granicę, a `window.innerHeight` na
@@ -4618,7 +4887,6 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
           verdict = needed < viewport - HYSTERESIS ? 'pinned' : 'flow';
         }
         panel.dataset.panel = verdict;
-        if (previous === verdict) return;
       });
       updateCardStack();
       /* Released after the browser has delivered the notifications this pass caused.
@@ -4651,12 +4919,77 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       window.clearTimeout(fallback);
       measure();
     };
-    const schedule = () => {
+    const scheduleNow = () => {
       cancelAnimationFrame(frame);
       window.clearTimeout(fallback);
       frame = requestAnimationFrame(run);
       fallback = window.setTimeout(run, 80);
     };
+
+    /* ============================================================
+       ANI JEDNEGO POMIARU, DOPÓKI STRONA JEST W RUCHU POD PALCEM.
+       ============================================================
+       OSTATNIA DROGA DO „TELEPORTACJI", KTÓRA ZOSTAŁA OTWARTA
+         Zabezpieczenia wyżej pilnują, żeby pomiar nie ruszał z powodu paska adresu: `onResize`
+         patrzy na szerokość, a ResizeObserver obserwuje `.container`, nie sekcję. Oba dotyczą
+         POWODU wywołania. Żadne nie dotyczy MOMENTU.
+
+         A powody, które zostały, są prawdziwe i wypadają w najgorszej chwili: dochodzi leniwie
+         ładowany obrazek w sekcji, zamienia się font, wchodzi tłumaczenie o linijkę dłuższe.
+         Wszystkie zdarzają się w trakcie przewijania, bo właśnie przewijanie ściąga te rzeczy na
+         ekran. Wtedy `measure()` może przestawić werdykt sekcji z `pinned` na `flow` — czyli
+         `position` ze `sticky` na `relative` — a to przesuwa tę sekcję i wszystko pod nią,
+         w trakcie trwającej bezwładności. Z zewnątrz: strona przeskakuje w inne miejsce.
+
+       ROZWIĄZANIE: POMIAR CZEKA NA CISZĘ
+         Na urządzeniu dotykowym pomiar jest odkładany, dopóki strona się rusza, i wykonywany
+         160 ms po ostatnim zdarzeniu przewijania. Zamiar nie ginie — jest kolejkowany, więc
+         rozwinięty formularz i tak zostanie zmierzony, tylko wtedy, gdy przestawienie układu
+         nikogo nie szarpnie.
+
+       160 ms, I DLACZEGO LICZONE OD `scroll`, A NIE OD `touchend`
+         Bezwładność po rzucie palcem trwa długo po oderwaniu palca — `touchend` przychodzi na
+         jej początku, nie na końcu. Jedyny sygnał, który naprawdę mówi „strona stanęła", to brak
+         kolejnych zdarzeń `scroll`. 160 ms to około dziesięć klatek: dłużej niż przerwa między
+         zdarzeniami w trakcie rzutu, krócej niż zauważalne opóźnienie po zatrzymaniu.
+
+       NA PULPICIE BEZ ZMIAN
+         Tam nie ma bezwładności do zepsucia, kółko daje przewijanie krok po kroku, a odłożenie
+         pomiaru o 160 ms przy każdym ruchu kółkiem oznaczałoby przyciętą treść widoczną dłużej.
+         Warunek jest więc na `touchDevice`, tak jak przy `heightSettle` niżej i z tego samego
+         powodu.
+       ============================================================ */
+    const SCROLL_QUIET_MS = 160;
+    let lastScrollAt = 0;
+    let quietTimer = 0;
+    let deferred = false;
+
+    const schedule = () => {
+      if (!touchDevice) {
+        scheduleNow();
+        return;
+      }
+      if (performance.now() - lastScrollAt >= SCROLL_QUIET_MS) {
+        scheduleNow();
+        return;
+      }
+      /* Strona jest w ruchu. Zapamiętujemy zamiar i sprawdzamy ponownie, gdy cisza mogła już
+         nastąpić; jeden timer na wszystkie odłożone zamiary, bo pomiar i tak jest jeden. */
+      deferred = true;
+      window.clearTimeout(quietTimer);
+      quietTimer = window.setTimeout(flushDeferred, SCROLL_QUIET_MS);
+    };
+
+    function flushDeferred() {
+      quietTimer = 0;
+      if (!deferred) return;
+      if (performance.now() - lastScrollAt < SCROLL_QUIET_MS) {
+        quietTimer = window.setTimeout(flushDeferred, SCROLL_QUIET_MS);
+        return;
+      }
+      deferred = false;
+      scheduleNow();
+    }
 
     /**
      * Re-measure on resize, but not on a phone's address bar.
@@ -4673,15 +5006,59 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
      * for separately because on some devices it lands before the new width is readable.
      */
     let lastWidth = window.innerWidth;
+    let heightSettle = 0;
+
+    /**
+     * Zmiana samej wysokości: raz to pasek adresu, raz człowiek ciągnący krawędź okna.
+     *
+     * Szerokość jest odpowiedzią uczciwą i wystarczającą na telefonie, ale na komputerze
+     * przeciągnięcie dolnej krawędzi okna zmienia tylko wysokość — i wtedy `--screen-h`
+     * zostałoby przy starej liczbie aż do pierwszej zmiany szerokości. Sekcje byłyby wyższe
+     * albo niższe od okna, i to widać.
+     *
+     * Rozróżnienie: pasek adresu rusza się WYŁĄCZNIE w trakcie przewijania. Więc zmiana
+     * wysokości jest przyjmowana z opóźnieniem, a każde przewinięcie w tym czasie ją odwołuje.
+     * Na urządzeniu dotykowym nie jest przyjmowana wcale — tam każda zmiana wysokości bez
+     * zmiany szerokości to pasek albo klawiatura, nigdy zmiana rozmiaru okna.
+     */
+    const touchDevice = (navigator.maxTouchPoints || 0) > 0;
+    let settleY = 0;
+    const cancelHeightSettle = () => { window.clearTimeout(heightSettle); heightSettle = 0; };
+    /* Odwołanie po PRZESUNIĘCIU, nie po samym zdarzeniu.
+       Zmierzone: zmiana wysokości widoku sama wysyła `scroll` z tą samą pozycją, więc warunek
+       „przyszło zdarzenie scroll" odwoływał pomiar także wtedy, gdy nikt nie przewinął — i na
+       komputerze `--screen-h` nie aktualizowało się nigdy.
+
+       Ten sam listener znakuje czas ostatniego przewinięcia dla bramki ciszy wyżej. Jeden
+       listener na dwie rzeczy, bo obie potrzebują dokładnie tego samego zdarzenia — a każdy
+       kolejny listener `scroll` to kolejne wywołanie w czasie rzutu palcem, czyli dokładnie ten
+       koszt, który ta funkcja ma obniżać. */
+    window.addEventListener('scroll', () => {
+      lastScrollAt = performance.now();
+      if (!heightSettle) return;
+      if (Math.abs(window.scrollY - settleY) > 2) cancelHeightSettle();
+    }, { passive: true });
+
     const onResize = () => {
       const width = window.innerWidth;
-      if (width === lastWidth) return;
-      lastWidth = width;
-      // Szerokość naprawdę się zmieniła, więc jeden ekran ma teraz inną wysokość.
-      // Przeliczane tutaj, a nie w measure(), żeby zostało kosztem zmiany okna,
-      // a nie kosztem każdego pomiaru.
-      measureScreenHeight();
-      schedule();
+      if (width !== lastWidth) {
+        lastWidth = width;
+        cancelHeightSettle();
+        // Szerokość naprawdę się zmieniła, więc jeden ekran ma teraz inną wysokość.
+        // Przeliczane tutaj, a nie w measure(), żeby zostało kosztem zmiany okna,
+        // a nie kosztem każdego pomiaru.
+        screenHeight = measureScreenHeight();
+        schedule();
+        return;
+      }
+      if (touchDevice) return;
+      cancelHeightSettle();
+      settleY = window.scrollY;
+      heightSettle = window.setTimeout(() => {
+        heightSettle = 0;
+        screenHeight = measureScreenHeight();
+        schedule();
+      }, 420);
     };
 
     /**
@@ -4755,9 +5132,9 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
          nowe wymiary — na części urządzeń `orientationchange` przychodzi wcześniej.
          Stąd pomiar i tutaj, i w rAF-ie: pierwszy łapie urządzenia, które są już gotowe,
          drugi te, które jeszcze nie. */
-      measureScreenHeight();
+      screenHeight = measureScreenHeight();
       requestAnimationFrame(() => {
-        measureScreenHeight();
+        screenHeight = measureScreenHeight();
         schedule();
       });
       schedule();
@@ -4927,7 +5304,16 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
         const image = document.createElement('img');
         image.src = sponsor.image;
         image.alt = duplicate ? '' : (sponsor.name || 'Sponsor');
-        image.loading = 'lazy';
+        /* The real pass loads eagerly, every repeat of it stays lazy.
+           ---------------------------------------------------------------------------
+           How many passes fit in the strip is worked out from how wide one pass is, and a
+           lazy logo four screens down is 0 px wide until somebody scrolls to it. Measured
+           then, a pass is nothing but its gaps and the count comes out several times too
+           high. These are a handful of small marks and every repeat is the same URL, so
+           eager here is n requests in total, not n × passes — and `low` keeps them behind
+           everything above the fold. */
+        image.loading = duplicate ? 'lazy' : 'eager';
+        image.fetchPriority = 'low';
         image.decoding = 'async';
         item.appendChild(image);
       } else {
@@ -4939,11 +5325,139 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       return item;
     };
 
-    sponsors.forEach((sponsor) => track.appendChild(build(sponsor, false)));
-    sponsors.forEach((sponsor) => track.appendChild(build(sponsor, true)));
+    /** One pass over the sponsor list. Its own trailing gap lives in CSS, on `.sponsor-band__rep`. */
+    const buildRep = (decorative) => {
+      const rep = document.createElement('div');
+      rep.className = 'sponsor-band__rep';
+      if (decorative) rep.setAttribute('aria-hidden', 'true');
+      sponsors.forEach((sponsor) => rep.appendChild(build(sponsor, decorative)));
+      return rep;
+    };
 
+    /* How many passes go into each half.
+       ---------------------------------------------------------------------------
+       There used to be exactly one, twice: the list, then the same list marked decorative.
+       Four sponsors do not fill a 1200 px strip twice over, so the second copy ran out before
+       the first came back round and a stretch of empty white scrolled through the middle of
+       the thank-you strip. Filling each half past the width of the strip means there is never
+       a moment when nothing is under any part of it. */
+    let passes = 0;
+
+    const fill = (count) => {
+      if (count === passes) return false;
+      passes = count;
+      const halves = [0, 1].map((index) => {
+        const half = document.createElement('div');
+        half.className = 'sponsor-band__half';
+        // Everything except the first pass of the first half is the same list said again:
+        // never announced, never focusable. The second half is the loop's own copy.
+        if (index === 1) half.setAttribute('aria-hidden', 'true');
+        for (let pass = 0; pass < count; pass += 1) half.appendChild(buildRep(index === 1 || pass > 0));
+        return half;
+      });
+      track.replaceChildren(...halves);
+      /* Re-wired on every fill, not once at the end. The listeners have to sit on the images
+         that are actually in the document, and this function throws the previous set away —
+         attaching them once meant that after the first refill nothing was left to tell us the
+         logos had finished loading, and the strip kept whatever width it had guessed from
+         images of zero. */
+      track.querySelectorAll('img').forEach((image) => {
+        if (image.complete) return;
+        image.addEventListener('load', schedule, { once: true });
+        image.addEventListener('error', schedule, { once: true });
+      });
+      return true;
+    };
+
+    /** Pixels a second. Constant on purpose: the strip should read at the same pace whether
+        there are three sponsors in it or thirty, which a duration measured in seconds cannot
+        do once the number of passes changes with the width. */
+    const SPEED = 55;
+    let frame = 0;
+    let lastSpeed = 0;
+
+    function remeasure() {
+      frame = 0;
+      const bandWidth = band.clientWidth;
+      const firstRep = track.firstElementChild?.firstElementChild;
+      const repWidth = firstRep ? firstRep.getBoundingClientRect().width : 0;
+      // Nothing laid out yet — a hidden card, or images that have not settled. Try again when
+      // something tells us it has changed rather than guessing now.
+      if (bandWidth < 1 || repWidth < 1) return;
+      /* And a pass whose logos have not arrived is a row of gaps with nothing between them.
+         `complete` turns true on a failed load as well as a successful one, so a sponsor whose
+         file is missing holds nothing up — fill() wires both events. */
+      const pending = [...firstRep.querySelectorAll('img')].some((image) => !image.complete);
+      if (pending) return;
+
+      // A little over the strip's own width, so a pass never ends exactly on the edge.
+      fill(Math.max(1, Math.ceil((bandWidth * 1.15) / repWidth)));
+
+      const halfWidth = track.firstElementChild?.getBoundingClientRect().width || 0;
+      if (halfWidth < 1) return;
+      const seconds = Math.max(14, halfWidth / SPEED);
+      /* Writing this restarts the animation, which is a visible jump. Only when it actually
+         differs, and only past a hundredth — a resize of a few pixels must not make the strip
+         stutter. */
+      if (Math.abs(seconds - lastSpeed) > 0.01) {
+        lastSpeed = seconds;
+        band.style.setProperty('--sponsor-speed', `${seconds.toFixed(2)}s`);
+      }
+    }
+
+    /* rAF with a timer behind it, the same shape as the scroll handler further up.
+       ---------------------------------------------------------------------------
+       A `requestAnimationFrame` that never runs is not a theoretical failure on this page —
+       there are three comments elsewhere in this file recording it. Here it would mean a strip
+       that is never measured: one pass per half, a loop shorter than the strip it is inside,
+       and a hole scrolling through it. The escape hatch is written in rather than added after
+       somebody reports it. */
+    let fallback = 0;
+    const run = () => {
+      window.clearTimeout(fallback);
+      cancelAnimationFrame(frame);
+      frame = 0;
+      remeasure();
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(run);
+      fallback = window.setTimeout(run, 120);
+    };
+
+    /* First pass only. remeasure() below turns it into as many as the strip needs — it cannot
+       run before there is something to measure, and `schedule` has to exist before fill() can
+       hand it to an image. */
     band.hidden = false;
-    band.style.setProperty('--sponsor-speed', `${Math.max(18, sponsors.length * 6)}s`);
+    fill(1);
+
+    /* Two more things change the width of a pass, and both arrive late: the display face swaps
+       in under the wordmarks, and the window is resized. (The third, images finishing, is wired
+       inside fill().) */
+    document.fonts?.ready.then(schedule).catch(() => {});
+
+    /* setupSponsors() runs again whenever the panel sends new settings, so a fresh observer
+       every time would mean one more callback per re-render for the life of the page. The
+       previous one is taken down first; the handle lives on the element because that is the
+       thing whose lifetime it is tied to. */
+    band._sponsorResize?.disconnect();
+    band._sponsorResize = null;
+    if ('ResizeObserver' in window) {
+      // The band, not the track: the track's width is what this function writes, and observing
+      // it would be a loop feeding itself.
+      const observer = new ResizeObserver(schedule);
+      observer.observe(band);
+      band._sponsorResize = observer;
+    } else if (!band._sponsorResizeFallback) {
+      band._sponsorResizeFallback = true;
+      window.addEventListener('resize', schedule, { passive: true });
+    }
+
+    /* Once now, synchronously, so the strip is right on the first paint rather than one frame
+       into it; and once more on the next frame, because a logo that is already in the cache
+       reports its size only after layout has run. */
+    remeasure();
+    schedule();
 
     /* The band used to sit at the foot of the hero, so its height had to be pushed back into
        the hero's bottom padding and into the marquee — otherwise the strip covered the
@@ -5010,12 +5524,26 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       if (started) return;
       started = true;
       observer?.disconnect();
-      window.removeEventListener('scroll', onFirstScroll);
       window.clearTimeout(fallbackTimer);
       start();
     };
 
-    function onFirstScroll() {
+    /* WYWOŁYWANE RAZ NA START, NIE Z KAŻDEGO ZDARZENIA PRZEWIJANIA.
+       ---------------------------------------------------------------------------
+       Ta funkcja była podpięta pod `scroll` bez żadnego throttlingu ani rAF-a, a robi
+       `getBoundingClientRect()` — odczyt WYMUSZAJĄCY przeliczenie układu. W trakcie rzutu palcem
+       zdarzeń `scroll` przychodzi kilkadziesiąt na sekundę, więc było to kilkadziesiąt wymuszonych
+       przeliczeń trzynastotysięcznego dokumentu na sekundę, przez cały czas do momentu, w którym
+       galeria wystartuje.
+
+       I było zbędne: `IntersectionObserver` z `rootMargin: 700px` odpowiada na dokładnie to samo
+       pytanie, poza wątkiem głównym i bez wymuszania układu. Komentarz wyżej mówi, że trzy
+       niezależne wyzwalacze są celowe, bo obserwator „can be starved in embedded and automated
+       browsers" — więc trzecia droga zostaje, tylko już nie w pętli przewijania: jedno sprawdzenie
+       na start łapie przypadek „sekcja jest widoczna od razu", a timer 2600 ms łapie wszystko
+       inne. Zagłodzony obserwator kończy więc galerią wczytaną z opóźnieniem, a nie brakiem
+       galerii, i to jest ta gwarancja, o którą tamten komentarz chodził. */
+    function checkVisibleNow() {
       const box = section.getBoundingClientRect();
       if (box.top < window.innerHeight * 2.2) kickOff();
     }
@@ -5026,9 +5554,8 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       }, { rootMargin: '700px 0px' });
       observer.observe(section);
     }
-    window.addEventListener('scroll', onFirstScroll, { passive: true });
     fallbackTimer = window.setTimeout(kickOff, 2600);
-    onFirstScroll();
+    checkVisibleNow();
   }
 
   function setupFooterYear() {
@@ -6438,11 +6965,62 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
 
     let queued = false;
 
+    /* GEOMETRIA JEST MIERZONA PRZY ZMIANIE UKŁADU, NIE NA KLATKĘ.
+       ---------------------------------------------------------------------------
+       `documentTop()` wyżej wspina się po łańcuchu `offsetParent`, czytając `offsetTop` na
+       każdym szczeblu, a `section.offsetHeight` to kolejny odczyt tego samego rodzaju. Oba
+       WYMUSZAJĄ przeliczenie układu: przeglądarka musi porzucić to, co ma w kolejce, i policzyć
+       pozycje od nowa, żeby oddać liczbę. Stały w `measure()`, czyli działy się na każdej
+       klatce przewijania przez sekcję trasy — po dwa wymuszone przeliczenia trzynastotysięcznego
+       dokumentu o czternastu przypiętych panelach, sześćdziesiąt razy na sekundę.
+
+       Żadna z tych dwóch liczb nie zmienia się w trakcie przewijania. Zmienia je zmiana okna,
+       obrót telefonu, `--screen-h` i werdykt `pinned`/`flow` z setupPanels — czyli dokładnie te
+       zdarzenia, które są obsłużone niżej. Więc są mierzone tam i pamiętane.
+
+       WYSOKOŚĆ EKRANU Z `--screen-h`, NIE Z `window.innerHeight`
+         To ta sama pułapka, która jest opisana przy zmiennej `--screen-h` w experience.css, tu
+         w trzecim miejscu. `innerHeight` na telefonie chudnie i puchnie o 60–100 px, gdy pasek
+         adresu się chowa. Z niego liczył się `slack`, `roomy`, `start` i `end`, czyli całe okno
+         przebiegu — więc chowający się pasek przesuwał okno pod trwającą animacją i progres
+         przeskakiwał o kilka procent w jednej klatce, w kierunku niezależnym od ruchu palca.
+         `--screen-h` jest zamrożone i wysokość sekcji w CSS jest z niego liczona, więc to jest
+         liczba, względem której to okno naprawdę stoi. */
+    let geometry = { top: 0, height: 0, viewport: 1 };
+    const remeasureGeometry = () => {
+      geometry = {
+        top: documentTop(section),
+        height: section.offsetHeight,
+        viewport: frozenScreenHeight() || window.innerHeight || 1
+      };
+    };
+
+    /* Docelowy element zapisu progresu.
+       ---------------------------------------------------------------------------
+       `#route`, bo to najbliższy wspólny przodek ramki i tekstu obok niej, a `@property` w
+       route-zoom.css sprawia, że dziedziczenie unieważnia zależne `calc()` — czyli robi to, po
+       co wcześniej pisało się na korzeniu.
+
+       Bez `@property` (Safari poniżej 16.4, Firefox poniżej 128) dziedziczenie nie unieważnia
+       tych `calc()`, co jest zmierzone i opisane w tamtym pliku. Tam i tylko tam wracamy na
+       korzeń: strona w starej przeglądarce działa jak przedtem, a nowa nie płaci za jej brak. */
+    const propertyRegistered = (() => {
+      if (typeof CSS === 'undefined' || typeof CSS.registerProperty !== 'function') return false;
+      /* Rejestracja przez CSS.registerProperty tej samej właściwości, którą już zarejestrował
+         arkusz, rzuca InvalidModificationError — i to jest odpowiedź „tak, obsługiwane".
+         Gdyby arkusz nie doszedł, rejestracja się udaje i zachowanie jest takie samo. */
+      try {
+        CSS.registerProperty({ name: '--route-progress', syntax: '<number>', inherits: true, initialValue: '1' });
+        return true;
+      } catch (_) {
+        return true;
+      }
+    })();
+    const progressHost = propertyRegistered ? section : document.documentElement;
+
     const measure = () => {
       queued = false;
-      const viewport = window.innerHeight || 1;
-      const top = documentTop(section);
-      const height = section.offsetHeight;
+      const { top, height, viewport } = geometry;
       const y = window.scrollY || window.pageYOffset || 0;
 
       /* Efekt zaczyna się, gdy sekcja wypełnia ekran — nie wcześniej.
@@ -6477,20 +7055,17 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
          wykresie i pod palcem czyta się jak opóźnienie, bo najszybsza jest na początku ruchu,
          w którym człowiek jeszcze nie zdążył spojrzeć. */
       const progress = linear * linear * (3 - 2 * linear);
-      frame.style.setProperty('--route-progress', progress.toFixed(3));
-      /* And on the root, for everything outside the frame that follows the same number — the
-         heading and the facts beside the photograph.
-         ---------------------------------------------------------------------------
-         Setting it on `#route` and letting it inherit down to `.route__copy` was the obvious
-         thing and it does not work. Measured: the copy read `--route-progress` as 0.091 while
-         its own `opacity: calc(1 - var(--route-progress) * .58)` stayed pinned at the value
-         for 1. The variable inherited; the properties that depend on it were never recomputed.
-         Removing `will-change` from the element did not change it either.
 
-         On the root it invalidates reliably, which is the whole reason `:root` is where custom
-         properties usually live. The frame keeps its own copy because it already had one and a
-         self-declared property was never the part that misbehaved. */
-      document.documentElement.style.setProperty('--route-progress', progress.toFixed(3));
+      /* JEDEN ZAPIS NA KLATKĘ, NA `#route`.
+         ---------------------------------------------------------------------------
+         Były dwa: na ramce i na `:root`. Ten drugi unieważniał styl całego dokumentu na każdej
+         klatce — pełne uzasadnienie stoi w route-zoom.css przy `@property --route-progress`,
+         razem z powodem, dla którego kiedyś był konieczny.
+
+         Ramka nie dostaje już własnej kopii. Dziedziczy tę z `#route`, a przy zarejestrowanej
+         właściwości dziedziczenie unieważnia jej `transform` tak samo pewnie jak zapis własny.
+         Dwie kopie tej samej liczby to dwa miejsca, w których mogą się rozjechać. */
+      progressHost.style.setProperty('--route-progress', progress.toFixed(3));
 
       /* The cart rides the road.
          Held back until the photograph has most of its size, because a cart crossing a
@@ -6523,11 +7098,28 @@ import { makeText, makePayload, postJSON, showToast, translateDom } from './site
       window.setTimeout(() => { if (queued) measure(); }, 120);
     };
 
+    /* Geometria najpierw, progres z niej.
+       Odwrotna kolejność dałaby pierwszą klatkę policzoną z zer, czyli progres 1 na wejściu i
+       zdjęcie w pełnym rozmiarze, zanim ktokolwiek zaczął przewijać. */
+    remeasureGeometry();
     measure();
     window.addEventListener('scroll', onScroll, { passive: true });
-    // The section is a sticky panel whose own height changes when app.js decides between
-    // `pinned` and `flow`, so a resize needs a fresh measurement rather than the old one.
-    window.addEventListener('resize', onScroll, { passive: true });
+
+    /* Ponowny pomiar geometrii — i tylko tutaj.
+       ---------------------------------------------------------------------------
+       Sekcja jest przypiętym panelem, więc jej wysokość i pozycja zmieniają się, gdy setupPanels
+       rozstrzyga `pinned`/`flow`, gdy zmienia się `--screen-h`, gdy tłumaczenie przestawi tekst o
+       linijkę i gdy dojdzie brakujący obrazek. Wszystkie te przypadki kończą się jednym z tych
+       trzech zdarzeń, a `carruleddhi:relayout` jest sygnałem, który setupPanels już wysyła i
+       nasłuchuje — patrz komentarz przy nim tam.
+
+       `resize` na telefonie to w większości pasek adresu, ale ponowny pomiar jest tu tani i
+       bezpieczny: to dwa odczyty, nie czternaście, i nie przestawia niczego w układzie. Wysokość
+       ekranu bierze się z zamrożonego `--screen-h`, więc sam pasek adresu nie zmieni wyniku. */
+    const remeasure = () => { remeasureGeometry(); onScroll(); };
+    window.addEventListener('resize', remeasure, { passive: true });
+    window.addEventListener('orientationchange', remeasure, { passive: true });
+    window.addEventListener('carruleddhi:relayout', remeasure);
   }
 
   function setupPanelDepth() {

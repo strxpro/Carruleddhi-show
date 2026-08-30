@@ -97,6 +97,7 @@ Settings → Environment Variables. Po każdej zmianie **Redeploy**.
 | `AI_API_KEY` | `console.groq.com` → API Keys | czat odpowiada tylko na sześć pytań ze słownika, resztę oddaje człowiekowi |
 | `AI_API_URL` | `https://api.groq.com/openai/v1/chat/completions` | jak wyżej — bez tego leci do OpenAI, a tam klucz Groq nie zadziała |
 | `AI_MODEL` | `llama-3.3-70b-versatile` | domyślnie `gpt-4o-mini`, czyli model, którego Groq nie ma |
+| `AI_VISION_MODEL` | `meta-llama/llama-4-scout-17b-16e-instruct` (Groq) albo `gpt-4o-mini` (OpenAI) | wiadomość ze **zdjęciem** idzie prosto do organizatora — model tekstowy obrazów nie przyjmuje |
 | `WHATSAPP_ALERTS` | `48665626101:2990681:pl,393284981574:3364881:it` | o nowej wiadomości na czacie dowiesz się tylko mailem, nie na telefon |
 
 `WHATSAPP_ALERTS` to trójki `numer:klucz:język` po przecinku, numer bez plusa. Język jest

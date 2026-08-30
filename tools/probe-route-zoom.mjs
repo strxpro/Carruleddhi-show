@@ -73,7 +73,12 @@ const probe = `
         // What the page actually did. If this stays 0 the probe never scrolled and every
         // other number in the row is meaningless.
         actual: Math.round(window.scrollY),
-        progress: frame.style.getPropertyValue('--route-progress').trim(),
+        /* Wartość WYLICZONA, nie inline. app.js pisze `--route-progress` na `#route`, a ramka
+           ją dziedziczy — patrz blok przy `@property` w route-zoom.css. Odczyt z
+           `frame.style` zwracałby więc pustkę i sonda raportowałaby zero przy działającym
+           efekcie. `getComputedStyle` daje tę samą liczbę bez względu na to, który element ją
+           nosi, więc jest też odporny na kolejną taką przenosinę. */
+        progress: getComputedStyle(frame).getPropertyValue('--route-progress').trim(),
         scale: Number(matrix.a.toFixed(4)),
         translateY: Number(matrix.f.toFixed(1)),
         /* The rest of the choreography, read the same way and for the same reason: the cart

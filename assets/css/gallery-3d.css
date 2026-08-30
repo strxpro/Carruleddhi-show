@@ -30,7 +30,7 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
   align-content: center;
   justify-items: center;
-  gap: clamp(10px, 2svh, 24px);
+  gap: clamp(10px, calc(var(--screen-h, 100svh) * 0.02), 24px);
   /* A shared 3D space for the cards to turn in. Without it rotateY collapses to
      a flat squash. Kept generous so the turn reads as a lean, not a fisheye. */
   perspective: 1600px;
@@ -51,7 +51,10 @@
    so the section has to be addressed the same way to win the cascade. */
 #main > section.section-card#gallery {
   display: flex;
-  height: 100svh;
+  /* Zamrożona wysokość ekranu, nie `100svh` — patrz `--screen-h` w experience.css. Galeria
+     jest jedyną sekcją z twardą wysokością, więc przy ruchomym `svh` zmieniała się co do
+     piksela razem z paskiem adresu. */
+  height: var(--screen-h, var(--screen-h, 100svh));
   flex-direction: column;
   overflow: hidden;
 }
@@ -60,7 +63,7 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  gap: clamp(8px, 1.6svh, 22px);
+  gap: clamp(8px, calc(var(--screen-h, 100svh) * 0.016), 22px);
 }
 #gallery .g3d { flex: 1 1 auto; min-height: 0; }
 
@@ -103,7 +106,7 @@
   margin: 0;
   color: var(--navy-950);
   font-family: var(--font-display);
-  font-size: clamp(24px, min(4.6vw, 6svh), 54px);
+  font-size: clamp(24px, min(4.6vw, calc(var(--screen-h, 100svh) * 0.06)), 54px);
   font-weight: 400;
   letter-spacing: -.03em;
   line-height: 1;
@@ -225,7 +228,7 @@
   display: grid;
   grid-row: 3;
   justify-items: center;
-  gap: clamp(10px, 1.8svh, 18px);
+  gap: clamp(10px, calc(var(--screen-h, 100svh) * 0.018), 18px);
 }
 
 .g3d__caption {
@@ -264,7 +267,7 @@
   #gallery .gallery__head > div:last-child { display: none; }
   #gallery .gallery__head { grid-template-columns: minmax(0, 1fr); }
 
-  #gallery { height: 100svh; }
+  #gallery { height: var(--screen-h, var(--screen-h, 100svh)); }
   .g3d__frame { width: 96vw; max-height: 345px; gap: 2px; }
   .g3d__ring { width: min(252px, 64vw); }
   .g3d__nav { width: 42px; height: 42px; border-width: 2px; font-size: 17px; }
@@ -274,8 +277,8 @@
 }
 
 /* No GSAP, or motion turned down: a plain tall block, still centred. */
-.g3d.is-static { min-height: 0; padding-block: clamp(30px, 6vh, 60px); }
-.g3d.is-static .g3d__frame { height: min(460px, 58svh); }
+.g3d.is-static { min-height: 0; padding-block: clamp(30px, calc(var(--screen-h, 100svh) * 0.06), 60px); }
+.g3d.is-static .g3d__frame { height: min(460px, calc(var(--screen-h, 100svh) * 0.58)); }
 
 @media (prefers-reduced-motion: reduce) {
   .g3d__caption, .g3d__dot, .g3d__nav, .g3d__media { transition: none; }

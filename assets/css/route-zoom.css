@@ -11,40 +11,40 @@
    ========================================================================== */
 
 /* ----------------------------------------------------------------------------
-   Dwie liczby, nie jedna: `--route-progress` i `--route-zoom`
+   KIEDY EFEKT SIĘ ZACZYNA I JAK JEST WYGŁADZONY — TO NALEŻY DO app.js, NIE TUTAJ
    ----------------------------------------------------------------------------
-   app.js zaczyna liczyc progres od `top - viewport * 1.1`, czyli caly ekran z okladem
-   ZANIM sekcja w ogole wejdzie w kadr. Zmierzone na 1440x900: zdjecie miesci sie w
-   calosci dopiero przy `--route-progress` = 0.606, a jest wtedy przeskalowane juz do
-   0.909 z docelowego 1.0. Szescdziesiat procent powiekszenia dzialo sie poza ekranem
-   i na gorze bylo widac tylko koncowke — stad "efekt zaczyna sie za wczesnie".
+   Stała tu przez chwilę druga zmienna, `--route-zoom`: przeliczała `--route-progress`
+   tak, żeby powiększanie ruszało dopiero przy pełnej widoczności sekcji, i dokładała
+   wygładzenie t*t*(3-2t). Powód był zmierzony — przy ówczesnym oknie `top - viewport*1.1`
+   zdjęcie mieściło się w kadrze dopiero przy progresie 0.606, mając już skalę 0.909
+   z docelowego 1.0, czyli sześćdziesiąt procent efektu działo się poza ekranem.
 
-   Okno pomiarowe nalezy do app.js (tor A), wiec zostaje nietkniete. Zamiast tego jego
-   wynik jest tu przeliczany: `--route-zoom` stoi na zerze, dopoki sekcja nie jest w
-   calosci widoczna, i dopiero potem przebiega pelne 0 -> 1.
+   Równolegle to samo zostało naprawione w `setupRouteZoom`, i naprawione lepiej: tam
+   jest okno pomiarowe, więc `start = top` (panel wypełnia ekran) rozwiązuje to u źródła,
+   zamiast obcinać wynik po fakcie. Ta sama funkcja stosuje teraz również smoothstep.
 
-   `--route-zoom-gate` to prog, `--route-zoom-rate` to 1/(1 - prog) — mnozenie zamiast
-   dzielenia, ten sam ksztalt, ktory nizej ma juz `--route-pin-in`.
+   Dwie warstwy tego samego dały efekt gorszy niż brak którejkolwiek: wygładzenie
+   nałożone dwa razy spłaszcza oba końce, a bramka nałożona na bramkę przesuwa start
+   o pół ekranu za daleko. Zmierzone po scaleniu: przy progresie 0.369 zdjęcie stało
+   jeszcze na 0.77, czyli nie ruszało się przez pierwsze pięćset pikseli przewijania
+   po tym, jak było już w całości widoczne.
 
-   Na koncu wygladzenie: t*t*(3-2t). Liniowa rampa zaczyna sie i konczy kantem, a po
-   scisnieciu calego ruchu do krotszego okna ten kant bylo widac na obu koncach.
-
-   Wartosc jest liczona i na :root, i na samej ramce, bo app.js pisze `--route-progress`
-   w oba miejsca — powod jest w komentarzu setupRouteZoom i nadal obowiazuje. */
-:root,
+   Więc arkusz czyta `--route-progress` wprost i niczego z nim nie robi. Jeden właściciel
+   momentu i krzywej. Jeśli kiedyś okaże się, że efekt znów startuje za wcześnie, miejsce
+   do poprawienia jest w `setupRouteZoom`, nie tu. */
 .route__frame {
-  --route-zoom-gate: 0.60;
-  --route-zoom-rate: 2.5;
-  --route-zoom-t: clamp(0, calc((var(--route-progress) - var(--route-zoom-gate)) * var(--route-zoom-rate)), 1);
-  --route-zoom: calc(var(--route-zoom-t) * var(--route-zoom-t) * (3 - 2 * var(--route-zoom-t)));
-}
+  /* TU NIE WOLNO ZADEKLAROWAĆ `--route-progress`, I TO JEST PUŁAPKA WARTA NAZWANIA.
+     ---------------------------------------------------------------------------
+     Stało tu `--route-progress: 1` jako zabezpieczenie na brak JavaScriptu. Było poprawne, dopóki
+     app.js pisał tę liczbę na TYM elemencie. Teraz pisze ją na `#route`, a ramka ją dziedziczy —
+     a wartość zadeklarowana NA elemencie wygrywa z dziedziczoną, zawsze i bez względu na
+     specyficzność. Ta jedna linia zatrzymałaby więc zdjęcie na wartości 1, czyli w pełnym
+     rozmiarze, przez cały czas. Objaw byłby identyczny z „nie ma powiększania", zgłaszanym tu już
+     dwa razy z innych powodów.
 
-.route__frame {
-  /* The fallback matters. Without JavaScript the property is never set, and every calc()
-     below would be invalid — which in CSS means the whole declaration is dropped and the
-     frame renders unstyled. `1` means "already arrived", which is the right resting state
-     for a page with no script. */
-  --route-progress: 1;
+     Zabezpieczenie na brak JavaScriptu nie zniknęło, tylko przeniosło się tam, gdzie nie koliduje
+     z dziedziczeniem: `initial-value: 1` w `@property` niżej, plus deklaracja na `:root` dla
+     przeglądarek, które `@property` ignorują. */
 
   /* Grown from the centre, so the frame expands into its own box in both directions rather
      than pushing away from one corner. */
@@ -64,10 +64,10 @@
      grid, and past that it starts to overlap the text it is displacing. */
   transform:
     translate(
-      calc(var(--route-zoom) * -8%),
-      calc((1 - var(--route-zoom)) * 34px)
+      calc(var(--route-progress) * -8%),
+      calc((1 - var(--route-progress)) * 34px)
     )
-    scale(calc(0.77 + var(--route-zoom) * 0.23));
+    scale(calc(0.77 + var(--route-progress) * 0.23));
 
   /* Cien juz sie nie animuje, i to jest zmiana o plynnosc, nie o wyglad.
      ---------------------------------------------------------------------------
@@ -95,19 +95,62 @@
    translate() that carnival.css uses to lift each label clear of its dot. Left alone on
    purpose rather than by omission. */
 
+/* ============================================================
+   `--route-progress` JEST WŁAŚCIWOŚCIĄ ZAREJESTROWANĄ, I TO JEST NAPRAWA PŁYNNOŚCI.
+   ============================================================
+   CO TU BYŁO
+     app.js wpisywał tę liczbę DWA razy na klatkę: na `.route__frame` i na `:root`. Drugi
+     zapis nie był ozdobą — komentarz przy nim opisywał zmierzoną usterkę: `.route__copy`
+     widziała odziedziczoną wartość 0.091, a jej własne `calc()` zostawało na wartości dla 1.
+     Zmienna dochodziła, właściwości z niej liczone nie były przeliczane.
+
+   DLACZEGO ZAPIS NA `:root` BYŁ NAJDROŻSZĄ LINIĄ NA STRONIE
+     Nierejestrowana właściwość własna jest dziedziczona przez CAŁE drzewo, a przeglądarka nie
+     wie, które `calc()` od niej zależą — więc zapis na korzeniu unieważnia styl całego
+     dokumentu. Ten dokument ma trzynaście tysięcy pikseli wysokości i czternaście przypiętych
+     paneli. Robiliśmy to sześćdziesiąt razy na sekundę, przez cały czas, gdy sekcja trasy była
+     na ekranie: pełne przeliczenie stylu dokumentu na klatkę, obok wszystkiego innego.
+     Na pulpicie niewidoczne, na telefonie to są te zgubione klatki.
+
+   DLACZEGO `@property` ROZWIĄZUJE TO, CZEGO ZAPIS NA `:root` OMIJAŁ
+     Rejestracja daje właściwości typ. Od tego momentu przeglądarka wie, że `--route-progress`
+     jest liczbą, zna listę właściwości, które ją czytają, i unieważnia DOKŁADNIE je — także
+     przez dziedziczenie. Czyli to samo, co miał załatwiać zapis na korzeniu, tylko bez
+     unieważniania wszystkiego innego. Nierejestrowana właściwość takiej gwarancji nie ma i to
+     jest przyczyna tamtego pomiaru, nie `will-change` ani kompozytor.
+
+   `inherits: true` I `initial-value: 1`
+     Dziedziczenie, bo app.js pisze teraz tylko na `#route`, a czytają potomkowie: ramka,
+     akapit, fakty, wózek. Wartość początkowa 1 znaczy „już na miejscu" i jest tym samym
+     zabezpieczeniem, które stało tu wcześniej jako `:root { --route-progress: 1 }`: bez
+     JavaScriptu strona wygląda jak po zakończeniu efektu, a nie jak z porzuconymi `calc()`.
+     Przy zarejestrowanej właściwości to zabezpieczenie jest mocniejsze — nieprawidłowa
+     wartość nie unieważnia deklaracji, tylko wraca do `initial-value`.
+
+   PRZEGLĄDARKA BEZ `@property` (Safari poniżej 16.4, Firefox poniżej 128)
+     Reguła jest ignorowana, dziedziczenie działa jak przedtem, a niezaktualizowane `calc()`
+     na `.route__copy` to ten sam objaw co pierwotnie. Dlatego `setupRouteZoom` sprawdza
+     `CSS.registerProperty` i tylko w razie jej braku wraca do zapisu na korzeniu — czyli
+     stara droga zostaje tam, gdzie jest naprawdę potrzebna, a nie wszędzie.
+   ============================================================ */
+@property --route-progress {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
 /* The copy steps back as the photograph comes forward.
    ---------------------------------------------------------------------------
-   app.js writes the same `--route-progress` onto :root, so this reads the one number the
-   photograph reads and the two cannot fall out of step. On :root rather than on #route
-   because an inherited change did not invalidate these calc() values in Chrome — the note in
-   setupRouteZoom has the measurement.
+   Reads the same `--route-progress` the photograph reads, inherited from `#route`, so the two
+   cannot fall out of step.
 
    0.42 is the floor, not 0. The column holds the heading, the three facts and two buttons
    including "open in Google Maps" — text nobody can read and a link nobody can see is not a
    nicer animation, it is a broken section. Faded far enough to hand over attention, not far
    enough to stop working. Nothing here touches pointer-events for the same reason. */
-/* The no-script resting value, same reasoning as on the frame: without it every calc() below
-   is invalid, and an invalid declaration is a dropped declaration. */
+/* The no-script resting value. With `@property` above this is already the initial value; the
+   declaration stays for engines that ignore the at-rule, where an unset property still means
+   every calc() below is invalid and therefore dropped. */
 :root {
   --route-progress: 1;
 }
@@ -125,8 +168,8 @@
 .route__copy {
   transform-origin: left center;
   transform:
-    translateX(calc(var(--route-zoom) * -30px))
-    scale(calc(1 - var(--route-zoom) * 0.16));
+    translateX(calc(var(--route-progress) * -30px))
+    scale(calc(1 - var(--route-progress) * 0.16));
   /* No `will-change` here, and that is a measured decision rather than an omission.
      ---------------------------------------------------------------------------
      With `will-change: opacity, transform` on this element Chrome promoted it to its own
@@ -204,28 +247,26 @@
      worst kind of CSS: present, commented, and inert. */
   #main > section#route.section-card {
     /* Two screens: one for the sequence, one for the picture to sit still at the end of it.
-       Any less and the photograph is still moving when the next panel starts to arrive. */
-    min-height: 200svh;
+       Any less and the photograph is still moving when the next panel starts to arrive.
+
+       `--screen-h` instead of `svh`: on the reporter's phone every viewport-height unit tracked
+       the address bar, and this section is worth two of them — see the comment on the variable
+       in experience.css. */
+    min-height: calc(var(--screen-h, var(--screen-h, 100svh)) * 2);
     align-content: start;
   }
 
-  /* Prog jest tu wyzej niz na desktopie, bo kolumna jest nad zdjeciem, nie obok — zanim
-     fotografia zmiesci sie w kadrze w calosci, trzeba przewinac przez cala kopie.
-     Zmierzone na 390x844: pelna widocznosc dopiero miedzy 0.606 a 0.697 progresu. */
-  :root,
-  .route__frame {
-    --route-zoom-gate: 0.68;
-    --route-zoom-rate: 3.125;
-  }
-
-  /* The contents pin inside the tall section. `100svh` and not `100vh`: on a phone the
-     address bar makes vh taller than what you can actually see, and the difference is exactly
-     enough to push the picture's bottom edge off screen. */
+  /* The contents pin inside the tall section. `--screen-h` and not a viewport unit: on the
+     reporter's phone every one of them tracked the address bar, so the pinned block changed
+     height mid-scroll — see the comment on the variable in experience.css. The fallback keeps
+     the original reasoning: `100svh` and not `100vh`, because the address bar makes vh taller
+     than what you can actually see, and the difference is exactly enough to push the picture's
+     bottom edge off screen. */
   #route .route__grid {
     position: sticky;
     top: 0;
     display: grid;
-    min-height: 100svh;
+    min-height: var(--screen-h, var(--screen-h, 100svh));
     align-content: center;
   }
 
@@ -247,23 +288,23 @@
   .route__copy {
     transform-origin: top center;
     transform:
-      translateY(calc(var(--route-zoom) * -22px))
-      scale(calc(1 - var(--route-zoom) * 0.22));
+      translateY(calc(var(--route-progress) * -22px))
+      scale(calc(1 - var(--route-progress) * 0.22));
   }
   /* The gaps inside the column close up too, otherwise a scaled-down block keeps the airy
      spacing of a full-size one and the saving is only in the glyphs. */
   #route .route__facts {
-    gap: calc(10px - var(--route-zoom) * 4px);
-    margin-block: calc(24px - var(--route-zoom) * 14px);
+    gap: calc(10px - var(--route-progress) * 4px);
+    margin-block: calc(24px - var(--route-progress) * 14px);
   }
   /* The paragraph is the one part that may genuinely go: the heading names the section, the
      three facts and the button are information, and this is the sentence that sets the scene.
      It is given away by height rather than by opacity, so what remains is fully legible
      instead of being a grey block. */
   #route .route__copy .lead {
-    max-height: calc(200px - var(--route-zoom) * 150px);
+    max-height: calc(200px - var(--route-progress) * 150px);
     overflow: hidden;
-    margin-bottom: calc(var(--route-zoom) * -6px);
+    margin-bottom: calc(var(--route-progress) * -6px);
   }
 
   /* Bigger, straighter, and it ends up in the middle of the section.
@@ -283,9 +324,9 @@
      it. Both numbers are tied to the same progress value, so they cannot drift apart. */
   .route__frame {
     transform:
-      translateY(calc(var(--route-zoom) * -34px))
-      rotate(calc((1 - var(--route-zoom)) * -2.2deg))
-      scale(calc(0.82 + var(--route-zoom) * 0.24));
+      translateY(calc(var(--route-progress) * -34px))
+      rotate(calc((1 - var(--route-progress)) * -2.2deg))
+      scale(calc(0.82 + var(--route-progress) * 0.24));
   }
 
   /* Start and finish pop in as the picture settles.
@@ -314,7 +355,7 @@
        label sits above its dot, the finish below). On a phone frame that put "META" partly
        outside the picture. The dots keep a small pop-in; the labels do not move. */
   .route__frame {
-    --route-pin-in: clamp(0, calc((var(--route-zoom) - 0.45) * 3.2), 1);
+    --route-pin-in: clamp(0, calc((var(--route-progress) - 0.45) * 3.2), 1);
   }
   .route__frame .route__node { scale: calc(0.55 + var(--route-pin-in) * 0.45); }
 
@@ -353,7 +394,7 @@
     radial-gradient(circle at 58% 44%, rgb(255 224 129 / .46), transparent 33%),
     radial-gradient(circle at 28% 74%, rgb(75 157 255 / .22), transparent 39%),
     linear-gradient(145deg, rgb(255 255 255 / .18), transparent 42%, rgb(7 26 61 / .1));
-  opacity: calc(.18 + var(--route-zoom) * .62);
+  opacity: calc(.18 + var(--route-progress) * .62);
   /* Bylo tu jeszcze `transform: scale(.9 -> 1)`. Dwa powody, dla ktorych go nie ma:
      to jest dziecko ramki, wiec skaluje sie razem z nia i wlasne dziesiec procent
      bylo dokladane do juz istniejacego ruchu; a skalowana warstwa z `mix-blend-mode`
@@ -398,17 +439,18 @@
      `min-height: 100svh` dla paneli w przepływie — z tego samego powodu co w bloku mobilnym.
      Zwykłe `#route` tam przegrywa i reguła byłaby obecna, opisana i bezczynna. */
   #main > section#route.section-card {
-    min-height: 200svh;
+    min-height: calc(var(--screen-h, var(--screen-h, 100svh)) * 2);
     align-content: start;
   }
 
-  /* Treść przypięta w środku wysokiej sekcji. `100svh`, nie `100vh` — na wypadek przeglądarki
-     z chowanym paskiem, bo różnica to dokładnie tyle, ile trzeba, żeby dolna krawędź zdjęcia
-     zeszła poza ekran. Kolumny zostają, jakie były: ta reguła nie rusza grid-template-columns. */
+  /* Treść przypięta w środku wysokiej sekcji. `--screen-h`, nie jednostka wysokości okna — na
+     telefonie zgłaszającego każda z nich chodziła za paskiem adresu. Zapas w fallbacku niesie
+     dawne uzasadnienie: `100svh`, nie `100vh`, bo różnica to dokładnie tyle, ile trzeba, żeby
+     dolna krawędź zdjęcia zeszła poza ekran. Kolumny zostają, jakie były. */
   #route .route__grid {
     position: sticky;
     top: 0;
-    min-height: 100svh;
+    min-height: var(--screen-h, var(--screen-h, 100svh));
     align-content: center;
   }
 }

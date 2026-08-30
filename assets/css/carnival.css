@@ -124,7 +124,7 @@
   border-radius: 999px;
   background: var(--yellow);
   color: var(--navy-950);
-  font-size: clamp(11px, 1.4svh, 13px);
+  font-size: clamp(11px, calc(var(--screen-h, 100svh) * 0.014), 13px);
   letter-spacing: .14em;
   transform: rotate(-1.4deg);
 }
@@ -530,18 +530,23 @@
   .site-header.is-compact:focus-within .nav-actions { gap: 8px; }
   /* `visibility` i `pointer-events` z tego samego powodu, co przy `is-peeked` nizej:
      bez nich rozwiniety pasek robil miejsce na przycisk, ktory zostawal niewidoczny
-     i nieklikalny, bo stan zwiniety chowa go wlasnie tymi dwiema wlasciwosciami. */
+     i nieklikalny, bo stan zwiniety chowa go wlasnie tymi dwiema wlasciwosciami.
+
+     `overflow` NIE wraca tu do `visible` — patrz komentarz przy `is-peeked` nizej. */
   .site-header.is-compact:hover .nav-attend,
   .site-header.is-compact:hover .language-picker,
   .site-header.is-compact:focus-within .nav-attend,
   .site-header.is-compact:focus-within .language-picker {
     max-width: 200px;
-    overflow: visible;
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
     transform: none;
   }
+  /* Tylko wybor jezyka. Lista rozwijana musi wyjsc poza przycisk, wiec ona potrzebuje
+     `visible`; „Bede tam" nie potrzebuje i nie moze go dostac. */
+  .site-header.is-compact:hover .language-picker,
+  .site-header.is-compact:focus-within .language-picker { overflow: visible; }
   /* Chip zostaje widoczny takze po rozwinieciu — od kiedy nie zwija sie do zera,
      nie ma juz efektu "kropka bez etykiety", ktory kazal go tu chowac. Po
      rozwinieciu jest miejsce, wiec wraca tez nazwa sekcji. */
@@ -629,8 +634,8 @@
     display: flex;
     width: 100vw;
     max-width: none;
-    height: 100dvh;
-    max-height: 100dvh;
+    height: var(--screen-h, 100svh);
+    max-height: var(--screen-h, 100svh);
     flex-direction: column;
     border-radius: 0;
   }
@@ -720,11 +725,19 @@
        frame of the floating artwork. Removed in app.js.
      - perspective: 1400px on the deck with no 3D rotation anywhere in it. It
        bought nothing and put the whole stack on its own composited layer.
-     - touch-action: pan-y, which let a sideways drag scroll the page at the same
-       time, so the card and the page moved together. */
+     - touch-action: manipulation, which is what this line said before. It reads as
+       "no double-tap zoom" but it still permits panning on BOTH axes, so a sideways
+       drag was a scroll gesture as far as the browser was concerned: it took the
+       touch stream away and the deck got `pointercancel` mid-swipe. Switching the
+       class to `touch-action: none` on pointerdown cannot undo that — touch-action is
+       read once, when the gesture starts, and never re-read while it runs.
+
+       `pan-y` is the correct value: the vertical axis stays with the browser, so the
+       deck is not a 660 px scroll trap on a phone, and the horizontal axis is ours
+       alone, so a swipe is delivered whole and is never cancelled halfway. */
 .prize-deck {
   perspective: none;
-  touch-action: manipulation;
+  touch-action: pan-y;
 }
 .prize-deck.is-dragging { cursor: grabbing; touch-action: none; }
 .prize-deck.is-dragging .prize-card__art svg { animation-play-state: paused; }
@@ -813,7 +826,7 @@ body.is-language-transitioning .nav-current__copy {
   isolation: auto;
   /* Room under the content for the glow to land in. Doubles as the scroll
      distance the reveal takes. */
-  padding-bottom: var(--footer-glow-h, 34vh);
+  padding-bottom: var(--footer-glow-h, calc(var(--screen-h, 100svh) * 0.34));
   overflow: clip visible;
 }
 
@@ -823,7 +836,7 @@ body.is-language-transitioning .nav-current__copy {
   right: 0;
   bottom: 0;
   left: 0;
-  height: var(--footer-glow-h, 34vh);
+  height: var(--footer-glow-h, calc(var(--screen-h, 100svh) * 0.34));
   pointer-events: none;
   /* Starts as a thin strip of colour along the very bottom edge and grows to full
      height as the last screen scrolls past. app.js writes only this variable. */
@@ -859,7 +872,7 @@ body.is-language-transitioning .nav-current__copy {
 .site-footer > .container { position: relative; z-index: 1; }
 
 @media (max-width: 760px) {
-  .site-footer { --footer-glow-h: 26vh; }
+  .site-footer { --footer-glow-h: calc(var(--screen-h, 100svh) * 0.26); }
 }
 
 /* No JavaScript: show the strip at a fixed, modest height rather than nothing. */
@@ -1186,12 +1199,28 @@ html {
 .site-header.is-peeked .nav-attend,
 .site-header.is-peeked .language-picker {
   max-width: 220px;
-  overflow: visible;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
   transform: none;
 }
+/* `overflow: visible` TYLKO dla wyboru jezyka, i to jest naprawa zoltej plamy pod paskiem.
+   ---------------------------------------------------------------------------
+   Ta regula podnosila `overflow` razem z „Bede tam", zeby odkrecic przyciecie ze stanu
+   zwinietego (`max-width: 0`). Tylko ze `overflow: hidden` na `.btn` robi w tym samym
+   czasie druga, zupelnie inna robote: przycina `.btn::before` — zolte wypelnienie, ktore
+   przy najechaniu wjezdza od dolu i w spoczynku stoi na `top: 100%`, czyli PONIZEJ
+   przycisku.
+
+   Zmierzone na 1903x950 w sekcji kontaktu: `nav-attend::before` wypadalo na
+   `top: 54px; height: 59px`, wiec od dolnej krawedzi paska w dol lezal zolty prostokat
+   68x59 px. Do tego `elementsFromPoint` wskazywalo tam `button.nav-attend` — pseudoelement
+   jest testowany na trafienie razem ze swoim elementem, wiec ten prostokat zabieral
+   klikniecia stronie pod paskiem.
+
+   Lista jezykow naprawde musi wyjsc poza przycisk, wiec dostaje `visible` osobno.
+   „Bede tam" zostaje przyciete przez `.btn`, tak jak kazdy inny przycisk na stronie. */
+.site-header.is-peeked .language-picker { overflow: visible; }
 .site-header.is-peeked .brand { min-width: 132px; }
 
 @media (max-width: 760px) {
@@ -1350,7 +1379,7 @@ html {
   align-items: start;
 }
 
-.wall-form { margin-top: clamp(20px, 3svh, 34px); }
+.wall-form { margin-top: clamp(20px, calc(var(--screen-h, 100svh) * 0.03), 34px); }
 .wall-form__foot {
   display: flex;
   align-items: center;
@@ -1415,7 +1444,7 @@ html {
    The gap is generous on purpose. This is the bottom of a long scroll through other people's
    messages, and a pause before the next section is the thing that says the list has finished
    rather than that the page has broken. */
-#wall .wall__grid { padding-bottom: clamp(40px, 9svh, 96px); }
+#wall .wall__grid { padding-bottom: clamp(40px, calc(var(--screen-h, 100svh) * 0.09), 96px); }
 
 /* Each note is a scrap of paper pinned to a board, tilted by a per-item variable
    set in JS so no two sit at the same angle. */
@@ -2003,7 +2032,7 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   display: grid;
   width: min(560px, 86vw);
   justify-items: center;
-  gap: clamp(10px, 2vh, 20px);
+  gap: clamp(10px, calc(var(--screen-h, 100svh) * 0.02), 20px);
   text-align: center;
   /* Makes this box the unit the wordmark is measured against. See the note on
      .preloader__word: the font size has to come from the width it must fit into,
@@ -2083,7 +2112,7 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 .preloader__eyebrow {
   color: var(--yellow);
   font-family: var(--font-meta);
-  font-size: clamp(10px, 1.6vh, 13px);
+  font-size: clamp(10px, calc(var(--screen-h, 100svh) * 0.016), 13px);
   font-weight: 800;
   letter-spacing: .34em;
   text-transform: uppercase;
@@ -2116,7 +2145,7 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   margin: 0;
   color: var(--white);
   font-family: var(--font-display);
-  font-size: clamp(26px, min(12.4cqw, 9vh), 72px);
+  font-size: clamp(26px, min(12.4cqw, calc(var(--screen-h, 100svh) * 0.09)), 72px);
   line-height: .92;
   letter-spacing: -.02em;
   /* Lifts the wordmark off the turning bands behind it without a solid panel. */
@@ -2236,7 +2265,7 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 .success-plan {
   display: grid;
   width: min(420px, 100%);
-  margin: clamp(16px, 3vh, 26px) auto clamp(14px, 2.4vh, 22px);
+  margin: clamp(16px, calc(var(--screen-h, 100svh) * 0.03), 26px) auto clamp(14px, calc(var(--screen-h, 100svh) * 0.024), 22px);
   padding: 0;
   gap: 8px;
   list-style: none;
@@ -2551,7 +2580,7 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 .wall-lightbox {
   width: min(92vw, 1020px);
   max-width: none;
-  max-height: 90svh;
+  max-height: calc(var(--screen-h, 100svh) * 0.9);
   padding: 0;
   border: 3px solid var(--navy-950);
   border-radius: 20px;
@@ -2569,7 +2598,7 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 .wall-lightbox__figure img {
   display: block;
   width: 100%;
-  max-height: calc(90svh - 52px);
+  max-height: calc(calc(var(--screen-h, 100svh) * 0.9) - 52px);
   border-radius: 17px 17px 0 0;
   object-fit: contain;
   background: #0d1a33;
@@ -2743,11 +2772,41 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
    border, the shadow, and a scale on the inner artwork — which has its own
    transform nobody else touches. Same feeling, no fight. */
 .prize-deck .prize-card {
-  /* Deliberately NOT `transform` in this list. A transition on a property that
-     script rewrites every frame during a drag means the browser is interpolating
-     towards a target that has already moved, and the card lags behind the finger. */
-  transition: box-shadow .32s ease, border-color .32s ease;
+  /* `transform` and `opacity` USED TO BE MISSING FROM THIS LIST, and that is what made
+     the deck feel broken.
+
+     The reasoning written here was that a transform transition fights the drag. True —
+     but the drag already switches it off, inline, on pointerdown (`card.style.transition
+     = 'none'` in setupPrizeDeck), which is both narrower and more reliable than leaving
+     it out of the stylesheet. Leaving it out cost three things at once, because this
+     rule is later and more specific than `.prize-card` above and therefore replaced its
+     transition wholesale:
+
+       - the throw was not animated. `is-gone` sets a transform 125% off screen; with no
+         transition the card teleported there. Nobody saw a card leave.
+       - `transitionend` for `transform` therefore never fired, so advance() always fell
+         through to its 460 ms escape timer before unlocking the deck. Every swipe was
+         followed by nearly half a second in which the deck ignored you. That is the
+         "it sticks" feeling.
+       - releasing a short drag snapped the card back to centre in one frame instead of
+         easing home.
+
+     Kept slightly longer than the .38s above: the card now starts its flight from
+     wherever the finger let go, which is often already halfway out. */
+  transition:
+    transform .42s var(--ease-out),
+    opacity .34s ease,
+    box-shadow .32s ease,
+    border-color .32s ease;
 }
+
+/* Restated at this specificity on purpose. `.prize-card.is-resetting` further up the file
+   is (0,2,0), exactly the same weight as `.prize-deck .prize-card` — and this rule is
+   later, so it would win the tie and put the transition back on precisely the one frame
+   that must not have one: the trip back to the rear of the stack after a throw. Without
+   this line the outgoing card flies visibly from off screen into the deck, across the
+   card coming forward. */
+.prize-deck .prize-card.is-resetting { transition: none; }
 
 .prize-deck:not(.is-dragging) .prize-card:hover {
   border-color: var(--coral);
@@ -3035,4 +3094,45 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   .stack-card::before { background: rgba(255, 255, 255, .95); }
   .hero-stat { background: rgba(255, 255, 255, .93); }
   .sponsor-band { background: rgba(255, 255, 255, .95); }
+}
+
+/* ============================================================
+   CIENIE PANELI — DRUGA POZYCJA NA TYM SAMYM RACHUNKU PAMIĘCI.
+   ============================================================
+   Blok wyżej zdjął `backdrop-filter` z pięciu elementów widocznych przez cały czas i wyliczył,
+   dlaczego: warstwa kompozytora przeliczana na każdej klatce, w której cokolwiek się rusza, a
+   przy `position: sticky` rusza się zawsze. Ten sam argument dotyczy rzeczy, której tamten blok
+   nie objął, a która jest większa.
+
+   CO ZOSTAŁO
+     Każda z czternastu sekcji ma `box-shadow: 0 -26px 70px` (experience.css). Siedemdziesiąt
+     pikseli rozmycia dookoła pudełka o szerokości ekranu znaczy, że warstwa, którą przeglądarka
+     musi trzymać dla tej sekcji, jest o 140 px szersza i wyższa od samej sekcji, a wnętrze
+     rozmycia trzeba policzyć. Sekcje są przypięte i przesuwają się jedna nad drugą przez całe
+     przewijanie, więc wszystkie te warstwy żyją naraz.
+
+     Na telefonie 390×844 to czternaście tekstur po około 390×984 px. To nie jest ozdoba, która
+     kosztuje ułamek klatki — to jest zajęta pamięć graficzna, a gdy jej brakuje, Safari nie
+     zwalnia: wyrzuca kartę i pokazuje „A problem repeatedly occurred".
+
+   CO ZAMIAST
+     Rozmycie schodzi z 70 px na 18 px, a przesunięcie z 26 na 10. Cień jest po to, żeby krawędź
+     nadjeżdżającej karty odcinała się od karty pod nią — na dystansie kilkunastu pikseli robi to
+     równie dobrze, bo i tak widać tylko jego górny skrawek nad zaokrąglonym narożnikiem.
+     Nieprzezroczystość idzie w górę (.26 -> .34), żeby węższy cień był równie wyraźny.
+
+     Wewnętrzna kreska `0 4px 0 inset` zostaje bez zmian: zero rozmycia, więc nie kosztuje nic.
+
+   TYLKO PONIŻEJ 760 px, z tego samego powodu co blok wyżej: na pulpicie miękki cień jest częścią
+   wyglądu tej strony i jest tam na niego moc.
+   ============================================================ */
+@media (max-width: 760px) {
+  #main > section.section-card {
+    box-shadow:
+      0 -10px 18px rgba(7, 26, 61, .34),
+      0 4px 0 rgba(255, 255, 255, .16) inset;
+  }
+  #main > section.section-card--hero { box-shadow: 0 -8px 14px rgba(7, 26, 61, .3); }
+  /* Stopka ma własny cień tej samej wielkości (experience.css), więc i tej samej wagi. */
+  .site-footer { box-shadow: 0 -10px 18px rgba(7, 26, 61, .34); }
 }
