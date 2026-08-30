@@ -79,93 +79,148 @@
 /* ============================================================ podium */
 
 .podium[hidden] { display: none; }
-.podium__stage { position: relative; margin: 8px 0 0; }
-.podium__art { display: block; width: 100%; height: auto; }
 
-.podium__ground { fill: none; stroke: rgb(18 35 61 / .22); stroke-width: 3; stroke-linecap: round; }
-.podium__block { stroke: var(--navy-950); stroke-width: 3; }
-.podium__place {
-  fill: rgb(18 35 61 / .3); font-family: var(--font-display); font-size: 44px;
-  text-anchor: middle; dominant-baseline: middle;
+/* ===========================================================================
+   COKÓŁ: ZDJĘCIA STOJĄ NA STOPNIACH
+   ===========================================================================
+   Wcześniej były tu dwie osobne rzeczy: rysunek SVG ze słupkami i cyframi 2/1/3, a pod nim
+   rząd kart ze zdjęciami. Trzeba było samemu połączyć cyfrę w słupku z nazwą piętro niżej.
+
+   Teraz stopień i zwycięzca to jedna kolumna: karta ze zdjęciem stoi NA bloku o wysokości
+   odpowiadającej miejscu. Wysokość robi to, co robiła cyfra, tylko bez czytania.
+
+   Dlaczego bloki nie są już SVG: `viewBox` ustala proporcje całego rysunku, więc na szerokim
+   ekranie cokół rósł w górę razem z szerokością i zajmował pół ekranu. Blok z CSS ma wysokość
+   podaną wprost, a szerokość z siatki — dwie niezależne wielkości. */
+.podium__stage { position: relative; margin: clamp(18px, 3vw, 34px) 0 0; }
+
+.podium__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* `end` to cała mechanika cokołu: kolumny są równej wysokości, a ich zawartość jest
+     dociśnięta do dolnej krawędzi, więc różne wysokości bloków wypychają karty na różne
+     poziomy same z siebie. Bez tego trzeba by liczyć marginesy dla każdego miejsca. */
+  align-items: end;
+  gap: clamp(8px, 1.4vw, 18px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-
-/* Rysowanie kreski: obwód znormalizowany do 1 przez pathLength w znaczniku, więc długości nie
-   trzeba mierzyć w JS i nie zależą od skali. Klasę dokłada voting.js, gdy podium jest gotowe —
-   animacja startuje wtedy, kiedy jest co pokazać, a nie przy wczytaniu strony. */
-@media (prefers-reduced-motion: no-preference) {
-  .podium__art .podium__ground,
-  .podium__art .podium__block {
-    stroke-dasharray: 1; stroke-dashoffset: 1;
-  }
-  .podium__art .podium__block { fill-opacity: 0; }
-  .podium__art.is-drawn .podium__ground { animation: podium-draw .6s ease forwards; }
-  .podium__art.is-drawn .podium__block { animation: podium-draw .7s ease forwards, podium-fill .5s ease forwards; }
-  /* Najwyższy schodek rysowany ostatni: wynik czyta się od dołu do zwycięzcy. */
-  .podium__art.is-drawn [data-podium-step='3'] .podium__block { animation-delay: .5s, 1.1s; }
-  .podium__art.is-drawn [data-podium-step='2'] .podium__block { animation-delay: .9s, 1.5s; }
-  .podium__art.is-drawn [data-podium-step='1'] .podium__block { animation-delay: 1.3s, 1.9s; }
-  .podium__art .podium__place { opacity: 0; }
-  .podium__art.is-drawn .podium__place { animation: podium-fill .4s ease 2.2s forwards; }
-  @keyframes podium-draw { to { stroke-dashoffset: 0; } }
-  @keyframes podium-fill { to { fill-opacity: 1; opacity: 1; } }
-}
-
-/* Cokół w perspektywie.
-   ---------------------------------------------------------------------------
-   `perspective` stoi na tym jednym kontenerze, a obracają się trzy karty — i to jest cała
-   głębia. Świadomie NIE ma tu `transform-style: preserve-3d` ani `will-change`: to one każą
-   przeglądarce trzymać całe poddrzewo jako warstwy GPU i to one są podejrzanym numer jeden o
-   wywalanie się telefonu w galerii 3D i talii nagród (patrz ZADANIA-ROWNOLEGLE.md). Bez nich
-   warstwy powstają na czas przejścia i znikają — trzy kafelki, nie pół strony.
-
-   Karty boczne są odchylone do środka, zwycięzca stoi prosto i bliżej patrzącego. To ten sam
-   układ co na rysunku pod spodem, tylko że kartami. */
-.podium__winners {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
-  margin: 20px 0 0; padding: 0; list-style: none;
-  perspective: 1100px; perspective-origin: 50% 42%;
-}
-/* Kolejność w znaczniku to 1, 2, 3 — tak czyta to czytnik ekranu i tak wygląda wynik. Na
-   ekranie zwycięzca ma stać w środku, jak na prawdziwym cokole, i to jest rola `order`:
-   przestawia obraz, nie treść. */
+/* Kolejność w znaczniku niesie wynik dla czytnika ekranu; `order` ustawia obraz tak, jak
+   stoi prawdziwe podium — zwycięzca w środku. */
 .podium-card[data-podium-place='1'] { order: 2; }
 .podium-card[data-podium-place='2'] { order: 1; }
 .podium-card[data-podium-place='3'] { order: 3; }
 
 .podium-card {
-  display: grid; gap: 10px; padding: 14px; overflow: hidden;
-  border: 2px solid var(--line); border-radius: 22px; background: var(--white);
+  display: grid;
+  /* Karta u góry, blok pod nią. `min-content` na bloku, żeby wysokość brała się z jego
+     własnej reguły, a nie z podziału wolnego miejsca w kolumnie. */
+  grid-template-rows: auto min-content;
+  align-content: end;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* --------------------------------------------------------------- karta ze zdjęciem */
+.podium-card__top {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  background: var(--white);
+  box-shadow: 0 18px 34px -24px rgb(18 35 61 / .45);
   transition: transform .38s cubic-bezier(.2, .7, .3, 1), box-shadow .38s ease;
 }
-.podium-card[data-podium-place='1'] { border-color: rgb(233 161 27 / .75); background: rgb(255 215 94 / .1); }
-.podium-card[data-podium-place='2'] { border-color: rgb(169 184 205 / .8); }
-.podium-card[data-podium-place='3'] { border-color: rgb(192 116 64 / .6); }
+.podium-card[data-podium-place='1'] .podium-card__top {
+  border-color: rgb(233 161 27 / .8);
+  background: rgb(255 215 94 / .12);
+  box-shadow: 0 24px 44px -24px rgb(233 161 27 / .55);
+}
+.podium-card[data-podium-place='2'] .podium-card__top { border-color: rgb(169 184 205 / .9); }
+.podium-card[data-podium-place='3'] .podium-card__top { border-color: rgb(192 116 64 / .7); }
 
-/* Odchylenie i wysokość. Zwycięzca wychodzi na patrzącego i stoi wyżej; srebro i brąz są
-   obrócone do środka, więc trzy karty czyta się jak jedną scenę, a nie trzy kafelki obok
-   siebie. Cień rośnie razem z wysokością — bez niego uniesienie wygląda na pomyłkę skali. */
-.podium-card[data-podium-place='1'] {
-  transform: translateZ(46px) translateY(-14px);
-  box-shadow: 0 26px 44px -22px rgb(18 35 61 / .5);
-}
-.podium-card[data-podium-place='2'] {
-  transform: rotateY(15deg) translateZ(-10px) translateY(4px);
-  box-shadow: 0 16px 30px -20px rgb(18 35 61 / .42);
-}
-.podium-card[data-podium-place='3'] {
-  transform: rotateY(-15deg) translateZ(-10px) translateY(10px);
-  box-shadow: 0 16px 30px -20px rgb(18 35 61 / .42);
-}
+/* Zwycięzca dostaje większe zdjęcie, nie tylko wyższy blok: na wąskiej kolumnie różnica
+   wysokości bloku sama nie wystarcza, żeby środek czytał się jako pierwsze miejsce. */
+.podium-card[data-podium-place='1'] .podium-card__photo { aspect-ratio: 4 / 3; }
+.podium-card[data-podium-place='2'] .podium-card__photo,
+.podium-card[data-podium-place='3'] .podium-card__photo { aspect-ratio: 3 / 2; }
 
-/* Dotknięcie prostuje kartę i przysuwa ją.
-   Tylko tam, gdzie kursor naprawdę istnieje: na telefonie `:hover` zostaje wciśnięty po
-   stuknięciu i karta zostawałaby wysunięta do końca wizyty. */
 @media (hover: hover) {
-  .podium__winners:hover .podium-card { transform: rotateY(0) translateZ(-30px) translateY(6px); }
-  .podium__winners .podium-card:hover {
-    transform: rotateY(0) translateZ(70px) translateY(-16px);
-    box-shadow: 0 34px 56px -24px rgb(18 35 61 / .55);
+  .podium-card:hover .podium-card__top {
+    transform: translateY(-8px);
+    box-shadow: 0 32px 52px -26px rgb(18 35 61 / .5);
   }
+}
+
+/* ------------------------------------------------------------------- blok cokołu */
+.podium-card__block {
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* Trzy wysokości i to jest cały ranking. Nierówne z premedytacją — równe wyglądają jak
+     wykres, a nie jak podium. */
+  height: var(--step-h);
+  margin: 0;
+  border: 3px solid var(--navy-950);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  /* Rośnie od dołu, więc animacja wejścia wygląda jak stawianie bloku, a nie jak
+     zjeżdżanie go z góry. */
+  transform-origin: 50% 100%;
+}
+.podium-card[data-podium-place='1'] .podium-card__block {
+  --step-h: clamp(78px, 11vw, 142px);
+  background: linear-gradient(180deg, #ffd75e, #e9a11b);
+}
+.podium-card[data-podium-place='2'] .podium-card__block {
+  --step-h: clamp(52px, 7.4vw, 96px);
+  background: linear-gradient(180deg, #e8eef7, #a9b8cd);
+}
+.podium-card[data-podium-place='3'] .podium-card__block {
+  --step-h: clamp(34px, 5vw, 66px);
+  background: linear-gradient(180deg, #f0b08a, #c07440);
+}
+/* Cyfra w bloku: duża, ale wtopiona. Ma potwierdzać miejsce, nie konkurować ze zdjęciem
+   nad sobą — kolejność i tak jest już powiedziana wysokością. */
+.podium-card__block b {
+  color: rgb(18 35 61 / .32);
+  font: 400 clamp(26px, 4vw, 52px)/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kreska, na której stoją bloki. Jeden element, bo to jedna linia — trzy dolne krawędzie
+   bloków nie tworzą jej same, gdy stawka ma mniej niż trzy wozy. */
+.podium__ground {
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(18 35 61 / .22);
+}
+
+/* ---------------------------------------------------- wejście: bloki, potem karty */
+@media (prefers-reduced-motion: no-preference) {
+  .podium__stage .podium-card__block { transform: scaleY(0); }
+  .podium__stage .podium-card__top { opacity: 0; transform: translateY(14px); }
+  .podium__stage .podium__ground { transform: scaleX(0); transform-origin: 50% 50%; }
+
+  .podium__stage.is-drawn .podium__ground { animation: podium-ground .5s var(--ease-out) forwards; }
+  .podium__stage.is-drawn .podium-card__block { animation: podium-rise .55s cubic-bezier(.2, .8, .3, 1) forwards; }
+  .podium__stage.is-drawn .podium-card__top { animation: podium-land .45s var(--ease-out) forwards; }
+
+  /* Od najniższego do zwycięzcy: wynik czyta się od dołu w górę, więc cokół tak się buduje.
+     Karta ląduje 250 ms po swoim bloku — tyle, żeby było widać, że najpierw stanął blok. */
+  .podium-card[data-podium-place='3'] .podium-card__block { animation-delay: .45s; }
+  .podium-card[data-podium-place='2'] .podium-card__block { animation-delay: .75s; }
+  .podium-card[data-podium-place='1'] .podium-card__block { animation-delay: 1.05s; }
+  .podium-card[data-podium-place='3'] .podium-card__top { animation-delay: .7s; }
+  .podium-card[data-podium-place='2'] .podium-card__top { animation-delay: 1s; }
+  .podium-card[data-podium-place='1'] .podium-card__top { animation-delay: 1.3s; }
+
+  @keyframes podium-ground { to { transform: scaleX(1); } }
+  @keyframes podium-rise { to { transform: scaleY(1); } }
+  @keyframes podium-land { to { opacity: 1; transform: none; } }
 }
 
 .podium-card__photo { position: relative; margin: 0; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; background: var(--blue-100); }
@@ -183,34 +238,65 @@
 .podium-card__body p b { font: 900 20px/1 var(--font-meta); color: var(--blue-700); font-variant-numeric: tabular-nums; }
 .podium-card__body p small { color: var(--muted); font: 800 9.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase; }
 
-.podium__actions { margin: 20px 0 0; }
+/* --------------------------------------------- reszta stawki, jednym zdaniem */
+/* Odpowiedź na „a gdzie reszta" bez rozwijania czegokolwiek. Czwarte i dalsze miejsca w
+   jednej linii, drobnym drukiem. Pełna klasyfikacja zostaje pod przyciskiem niżej — to
+   zdanie ma zaspokoić ciekawość, nie zastąpić listy. */
+.podium__rest {
+  margin: clamp(14px, 2vw, 22px) 0 0;
+  color: var(--muted);
+  font: 800 clamp(10.5px, 1.1vw, 12px)/1.7 var(--font-meta);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.podium__rest[hidden] { display: none; }
+.podium__rest b { color: var(--blue-700); font-weight: 900; font-variant-numeric: tabular-nums; }
+/* Rozdzielacz jako pseudoelement, nie znak w treści: kropka wpisana między wpisy trafiłaby
+   do zaznaczenia i do schowka razem z nazwami. */
+.podium__rest span + span::before {
+  content: '·';
+  margin: 0 7px;
+  color: rgb(18 35 61 / .32);
+}
 
-/* Na telefonie trzy karty w rzędzie to trzy nieczytelne karty. Jedna kolumna i kolejność
-   wyniku, bez przestawiania — cokół i tak jest wtedy nad nimi, nie za nimi. */
+.podium__actions { margin: clamp(16px, 2.4vw, 24px) 0 0; }
+
+/* Na telefonie trzy kolumny cokołu robią trzy nieczytelne kolumny: zdjęcie w kolumnie o
+   szerokości 100 px to znaczek. Cokół schodzi wtedy do listy w kolejności wyniku, a blok
+   zamienia się w wąski pasek koloru z lewej — zostaje po nim złoto, srebro i brąz, czyli
+   informacja, a nie dekoracja, której nie ma gdzie pokazać. */
 @media (max-width: 700px) {
-  .podium__winners { grid-template-columns: 1fr; perspective: none; }
+  .podium__steps { grid-template-columns: 1fr; gap: 10px; }
   .podium-card[data-podium-place='1'],
   .podium-card[data-podium-place='2'],
   .podium-card[data-podium-place='3'] { order: 0; }
-  .podium-card { grid-template-columns: 96px minmax(0, 1fr); align-items: center; }
-  .podium-card__photo { aspect-ratio: 1; }
-
-  /* Kolumna kart pod sobą nie jest sceną, tylko listą — obracanie jej wygląda na usterkę,
-     a nie na cokół. Zdejmowana jest transformacja, nie tylko przesłonięta: karta bez
-     `transform` nie dostaje własnej warstwy GPU, a na telefonie to jest cały powód. */
-  .podium-card[data-podium-place='1'],
-  .podium-card[data-podium-place='2'],
-  .podium-card[data-podium-place='3'] { transform: none; }
-  .podium-card[data-podium-place='1'] { box-shadow: 0 14px 26px -20px rgb(18 35 61 / .45); }
+  .podium-card {
+    grid-template-rows: auto;
+    grid-template-columns: 10px minmax(0, 1fr);
+    align-items: stretch;
+  }
+  /* Blok pierwszy w siatce, czyli po lewej; wysokość z rozciągnięcia wiersza. */
+  .podium-card__block {
+    height: auto;
+    border: 0;
+    border-radius: 999px;
+  }
+  .podium-card__block b { display: none; }
+  .podium-card__top { border-radius: 18px; }
+  .podium-card[data-podium-place='1'] .podium-card__photo,
+  .podium-card[data-podium-place='2'] .podium-card__photo,
+  .podium-card[data-podium-place='3'] .podium-card__photo { aspect-ratio: 16 / 9; }
+  .podium__ground { display: none; }
 }
 
-/* Kto prosi o mniej ruchu, dostaje płaski cokół: te same karty, te same kolory, zero obrotu
-   i zero przejścia. */
+/* Kto prosi o mniej ruchu, dostaje gotowy cokół: te same bloki, te same kolory, zero
+   wznoszenia i zero przejść. Wartości spoczynkowe są tu wypisane, bo bez animacji, która je
+   ustawia na końcu, bloki zostałyby ściśnięte do zera. */
 @media (prefers-reduced-motion: reduce) {
-  .podium__winners { perspective: none; }
-  .podium-card,
-  .podium__winners:hover .podium-card,
-  .podium__winners .podium-card:hover { transform: none; transition: none; }
+  .podium-card__block { transform: none; }
+  .podium-card__top { opacity: 1; transform: none; transition: none; }
+  .podium__ground { transform: none; }
+  .podium-card:hover .podium-card__top { transform: none; }
 }
 
 /* ============================================================ przełącznik faz w demo */
@@ -435,10 +521,14 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 /* Dwie kolumny, tak jak zamówione — i ograniczona szerokość, żeby na monitorze dwa kafelki nie
    zamieniły się w dwa banery po siedemset pikseli. */
+/* Szerzej i luźniej. Kafelek niesie teraz zdjęcie z podpisem na nim, więc jest obiektem do
+   oglądania, a nie wierszem tabeli — a takie chcą powietrza wokół siebie. Trzy kolumny dopiero
+   od 1100 px: przy dwóch na szerokim ekranie zdjęcia robiły się nienaturalnie wielkie. */
 .vote-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
-  max-width: 900px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(16px, 2.4vw, 26px);
+  max-width: 1120px;
 }
+@media (min-width: 1100px) { .vote-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .vote-empty { margin: 26px 0 0; color: var(--muted); font-size: 14.5px; }
 .vote-empty[hidden] { display: none; }
 
@@ -449,18 +539,25 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 /* --------------------------------------------------------------- kafelek */
 
+/* Kafelek na ciemno, pod kolor strony.
+   ---------------------------------------------------------------------------
+   Podstrona głosowania jest granatowa, a kafelki były białe — czyli każdy z nich był jasnym
+   prostokątem wyciętym w ciemnym tle i to one, a nie zdjęcia, rzucały się w oczy pierwsze.
+   Po przejściu na granat jedyną jasną rzeczą na kafelku jest fotografia wozu, a to ona ma
+   być treścią. Obwódka zamiast tła oddziela kafelek od strony. */
 .vote-card {
   display: grid; overflow: hidden;
-  border: 2px solid var(--line); border-radius: 20px;
-  background: var(--white);
+  border: 2px solid rgb(255 255 255 / .1); border-radius: 24px;
+  background: rgb(255 255 255 / .045);
+  transition: border-color .25s ease, transform .25s ease;
 }
-.vote-card.is-voted { border-color: rgb(31 169 113 / .6); }
+.vote-card.is-voted { border-color: rgb(31 169 113 / .75); background: rgb(31 169 113 / .1); }
 
-/* Zdjęcie NIE jest przyciskiem — zgłoszone wprost. Kafelek pokazuje pojazd, a czynność ma
-   własny przycisk pod spodem. */
+/* Zdjęcie jest teraz celem dotknięcia — patrz komentarz przy card() w voting-page.js.
+   Wyższe niż szerokie: podpis kładzie się na dolnej części, a przy 4/3 zjadał zdjęcie. */
 .vote-card__photo {
-  position: relative; margin: 0; aspect-ratio: 4 / 3; overflow: hidden;
-  background: var(--blue-100);
+  position: relative; margin: 0; aspect-ratio: 4 / 5; overflow: hidden;
+  background: var(--navy-900);
 }
 .vote-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vote-card__blank {
@@ -468,14 +565,17 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   color: rgb(18 35 61 / .16); font: 900 clamp(30px, 7vw, 56px)/1 var(--font-meta);
 }
 /* Numer startowy w rogu — tak jak jest przyklejony na prawdziwym carruleddhi. */
+/* Numer startowy w PRAWYM rogu, miejsce w klasyfikacji w lewym. Zamienione miejscami:
+   numer jest tym, po czym publiczność szuka wozu na liście startowej, więc stoi tam, gdzie
+   wzrok idzie na końcu wiersza. */
 .vote-card__number {
-  position: absolute; top: 8px; left: 8px;
+  position: absolute; top: 10px; right: 10px;
   padding: 5px 9px; border-radius: 999px;
   background: var(--navy-950); color: var(--white);
   font: 900 11px/1 var(--font-meta); letter-spacing: .08em;
 }
 .vote-card__rank {
-  position: absolute; top: 8px; right: 8px;
+  position: absolute; top: 10px; left: 10px;
   padding: 5px 9px; border-radius: 999px;
   background: var(--yellow); color: var(--navy-950);
   font: 900 11px/1 var(--font-meta); letter-spacing: .08em;
@@ -758,4 +858,142 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   .standings__photo { width: 44px; }
   .standings__score { grid-column: 2 / -1; justify-items: start; }
   .standings__score b { font-size: 16px; }
+}
+
+/* ===========================================================================
+   Podpis NA zdjęciu: przyciemnienie, nazwa, pigułka z imieniem
+   =========================================================================== */
+
+/* Przyciemnienie od dołu do czerni. Osobna warstwa nad zdjęciem, pod podpisem — biały tekst
+   musi mieć kontrast także wtedy, gdy w dolnej części zdjęcia jest jasne niebo albo piasek.
+   `transparent` w środku, a nie od razu czerń: gradient zaczynający się u góry zabierałby
+   zdjęciu połowę, a chodzi o podłoże pod dwie linijki tekstu. */
+.vote-card__scrim {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to top,
+    rgb(4 12 28 / .92) 0%,
+    rgb(4 12 28 / .78) 18%,
+    rgb(4 12 28 / .34) 42%,
+    rgb(4 12 28 / 0) 66%);
+}
+
+.vote-card__caption {
+  position: absolute; right: 12px; bottom: 12px; left: 12px;
+  display: grid; gap: 7px; justify-items: start; pointer-events: none;
+}
+
+/* Pigułka z imieniem. Samo imię, a nazwisko dopiero gdy dwóch ludzi je dzieli — patrz
+   nameBadges() w voting-page.js. Stoi NAD nazwą wozu, bo odpowiada na inne pytanie:
+   nazwa mówi „co to jest", imię mówi „czyje to jest". */
+.vote-card__who {
+  padding: 5px 12px; border-radius: 999px;
+  background: rgb(255 255 255 / .16); color: var(--white);
+  backdrop-filter: blur(6px);
+  font: 800 10.5px/1 var(--font-meta); letter-spacing: .1em; text-transform: uppercase;
+}
+
+/* Największa rzecz na kafelku. `text-wrap: balance` — dwuwyrazowa nazwa łamana na „Fulmine /
+   di Gallura" wygląda jak przypadek; zbalansowana dzieli się po połowie. */
+.vote-card__title {
+  color: var(--white);
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.4vw, 26px); line-height: 1.05;
+  text-wrap: balance;
+  text-shadow: 0 2px 14px rgb(4 12 28 / .5);
+}
+
+/* Przezroczysty przycisk na całym zdjęciu. Leży nad przyciemnieniem i podpisem, więc trafia
+   w niego każde dotknięcie zdjęcia — a plakietki są `pointer-events: none`, żeby nie zjadały
+   dotknięcia w swoim rogu. */
+.vote-card__hit {
+  position: absolute; inset: 0;
+  border: 0; padding: 0; background: transparent; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vote-card__hit:focus-visible { outline: 3px solid var(--yellow); outline-offset: -5px; border-radius: 22px 22px 0 0; }
+
+/* Zdjęcie odsuwa się pod palcem — jedyny sygnał, że kafelek w ogóle reaguje. */
+@media (prefers-reduced-motion: no-preference) {
+  .vote-card__photo.is-tappable img { transition: transform .5s cubic-bezier(.2,.7,.3,1); }
+  .vote-card:hover .vote-card__photo.is-tappable img,
+  .vote-card__hit:focus-visible ~ img { transform: scale(1.05); }
+}
+@media (hover: hover) {
+  .vote-card:hover { border-color: rgb(255 201 40 / .55); transform: translateY(-3px); }
+}
+
+/* Ciemny kafelek znaczy jasny tekst w treści pod zdjęciem. */
+.vote-card__body { color: var(--white); }
+.vote-card__rider { color: rgb(255 255 255 / .55); }
+.vote-card__stats b { color: var(--yellow); }
+.vote-card__stats small,
+.vote-card__used { color: rgb(255 255 255 / .5); }
+.vote-card__yours { color: #6ee7b7; }
+
+/* ============================================ krok 1: „zagłosować na ten wóz?" */
+
+.vote-ask { display: grid; gap: 10px; }
+.vote-ask[hidden] { display: none; }
+.vote-ask__q {
+  margin: 0; color: var(--white);
+  font-family: var(--font-display); font-size: 16px; line-height: 1.2;
+  text-wrap: balance;
+}
+.vote-ask__actions { display: grid; gap: 6px; }
+.vote-ask__actions .btn { width: 100%; justify-content: center; min-height: 44px; }
+
+/* ============================================ krok 2: suwak z oceną */
+
+.vote-slider__row { display: flex; align-items: center; gap: 14px; }
+
+/* Wielka liczba obok suwaka. `tabular-nums` i stała szerokość, żeby tor nie skakał przy
+   przejściu z 9 na 10. */
+.vote-slider__value {
+  min-width: 2.2ch; text-align: center;
+  color: var(--yellow); font: 900 34px/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tor wypełniany do uchwytu przez zmienną `--at`, ustawianą w JS: przeglądarki nie zgadzają
+   się co do stylowania wypełnienia `input[type=range]`, a gradient na tle działa wszędzie. */
+.vote-slider {
+  flex: 1; min-width: 0; height: 34px;
+  appearance: none; -webkit-appearance: none; background: transparent; cursor: pointer;
+}
+.vote-slider::-webkit-slider-runnable-track {
+  height: 10px; border-radius: 999px;
+  background: linear-gradient(to right, var(--yellow) var(--at, 50%), rgb(255 255 255 / .16) var(--at, 50%));
+}
+.vote-slider::-moz-range-track {
+  height: 10px; border-radius: 999px;
+  background: linear-gradient(to right, var(--yellow) var(--at, 50%), rgb(255 255 255 / .16) var(--at, 50%));
+}
+/* Uchwyt 28 px: to jest cel dla kciuka w tłumie na zboczu, a nie wskaźnik dla myszy. */
+.vote-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 28px; height: 28px; margin-top: -9px;
+  border: 3px solid var(--navy-950); border-radius: 50%;
+  background: var(--white); box-shadow: 0 4px 12px rgb(0 0 0 / .4);
+}
+.vote-slider::-moz-range-thumb {
+  width: 28px; height: 28px;
+  border: 3px solid var(--navy-950); border-radius: 50%;
+  background: var(--white); box-shadow: 0 4px 12px rgb(0 0 0 / .4);
+}
+.vote-slider:focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; border-radius: 999px; }
+
+.vote-slider__scale {
+  display: flex; justify-content: space-between;
+  color: rgb(255 255 255 / .4); font: 800 10px/1 var(--font-meta); letter-spacing: .1em;
+}
+
+.vote-picker__label { color: rgb(255 255 255 / .55); }
+.vote-picker__cancel { color: rgb(255 255 255 / .5); }
+
+/* Na telefonie kafelki idą w jedną kolumnę — zdjęcie z podpisem na całą szerokość czyta się
+   jak plakat, a dwa wąskie obok siebie jak dwie miniatury. */
+@media (max-width: 560px) {
+  .vote-grid { grid-template-columns: 1fr; gap: 18px; }
+  .vote-card__photo { aspect-ratio: 5 / 4; }
+  .vote-card__title { font-size: clamp(21px, 6.4vw, 28px); }
 }

@@ -829,6 +829,20 @@ import {
       if (!id) return;
       currentSectionId = id;
       if (currentLabel) currentLabel.textContent = sectionName(id);
+      /* NA SAMEJ GÓRZE CHIP SIĘ NIE POKAZUJE.
+         ---------------------------------------------------------------------------
+         W hero `sectionName()` zwraca „Carruleddhi", czyli dokładnie to, co stoi trzy
+         centymetry w lewo w marce. Pasek czytał się wtedy „CARRULEDDHI · 0% · CARRULEDDHI"
+         — ta sama nazwa dwa razy i procent, który na górze strony zawsze wynosi zero.
+         Zgłoszone jako „brzydko wygląda".
+
+         Chip istnieje, żeby powiedzieć „gdzie jesteś i ile zostało". Na górze nie ma jeszcze
+         czego powiedzieć, więc go nie ma. Od pierwszej prawdziwej sekcji pojawia się sam.
+
+         Atrybut na nagłówku, nie klasa na chipie: stan „gdzie jesteśmy" należy do paska, a
+         chip ma już cztery reguły zmieniające jego szerokość między stanami i piąty warunek
+         w tym samym miejscu byłby piątym miejscem do pomylenia. */
+      header?.toggleAttribute('data-nav-at-top', id === 'hero');
       $$('[data-section-link]', menu || document).forEach((link) => {
         const active = link.dataset.sectionLink === id;
         link.classList.toggle('is-active', active);

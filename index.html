@@ -308,44 +308,42 @@
           <p class="section-lead" data-i18n="voting.podiumLead">Media dei voti del pubblico. Tre carretti su tre gradini.</p>
         </header>
 
-        <div class="podium__stage" data-podium-stage>
-          <!-- viewBox, brak width/height: skala idzie z CSS, więc rysunek jest ostry na
-               każdym ekranie i nie trzeba dla telefonu drugiego pliku. -->
-          <svg class="podium__art" viewBox="0 0 720 360" role="img" aria-labelledby="podium-art-title" data-podium-art>
-            <title id="podium-art-title" data-i18n="voting.podiumArt">Podio con tre gradini</title>
-            <defs>
-              <linearGradient id="podium-gold" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#ffd75e"/><stop offset="1" stop-color="#e9a11b"/>
-              </linearGradient>
-              <linearGradient id="podium-silver" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#e8eef7"/><stop offset="1" stop-color="#a9b8cd"/>
-              </linearGradient>
-              <linearGradient id="podium-bronze" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stop-color="#f0b08a"/><stop offset="1" stop-color="#c07440"/>
-              </linearGradient>
-            </defs>
-            <!-- Ziemia pod cokołem, rysowana pierwsza. -->
-            <path class="podium__ground" d="M40 318 H680" pathLength="1"/>
-            <!-- Drugie miejsce po lewej, pierwsze w środku, trzecie po prawej — tak stoi
-                 prawdziwe podium i tak czyta je każdy bez podpisu. -->
-            <g class="podium__step" data-podium-step="2">
-              <path class="podium__block" d="M96 318 V214 H264 V318 Z" fill="url(#podium-silver)" pathLength="1"/>
-              <text class="podium__place" x="180" y="262">2</text>
-            </g>
-            <g class="podium__step" data-podium-step="1">
-              <path class="podium__block" d="M276 318 V158 H444 V318 Z" fill="url(#podium-gold)" pathLength="1"/>
-              <text class="podium__place" x="360" y="216">1</text>
-            </g>
-            <g class="podium__step" data-podium-step="3">
-              <path class="podium__block" d="M456 318 V246 H624 V318 Z" fill="url(#podium-bronze)" pathLength="1"/>
-              <text class="podium__place" x="540" y="288">3</text>
-            </g>
-          </svg>
+        <!-- ZDJĘCIA STOJĄ NA COKOLE, NIE OBOK NIEGO.
+             ==================================================================
+             Był tu rysunek SVG z trzema słupkami i cyframi 2/1/3, a karty zwycięzców leżały
+             pod nim, w osobnym rzędzie. Czytało się to jako dwie rzeczy: wykres i lista. Kto
+             chciał wiedzieć, kto wygrał, patrzył na cyfrę w słupku, a potem szukał nazwy
+             piętro niżej i sam je łączył.
 
-          <!-- Karty zwycięzców wstawia voting.js; leżą nad rysunkiem w gridzie o tej samej
-               kolejności co schodki. -->
-          <ol class="podium__winners" data-podium-winners></ol>
+             Teraz cokół i zwycięzcy są jednym elementem: każdy stopień to prawdziwy blok o
+             własnej wysokości, a na jego szczycie stoi zdjęcie tego wozu. Wysokość bloku robi
+             to, co robiła cyfra, tylko bez czytania — pierwsze miejsce jest wyżej, bo jest
+             pierwsze.
+
+             Słupki nie są już SVG, bo miały jedną wadę, której nie da się w nich obejść:
+             `viewBox` ustala proporcje całego rysunku, więc na szerokim ekranie cokół rósł w
+             górę razem z szerokością i zajmował pół ekranu. Bloki z CSS mają wysokość podaną
+             wprost i szerokość z siatki, czyli dwie niezależne wielkości.
+
+             Kolejność w znaczniku to 2, 1, 3 — tak stoi prawdziwe podium i tak je czyta każdy
+             bez podpisu. Kolejność wyniku dla czytnika ekranu niesie lista niżej. -->
+        <div class="podium__stage" data-podium-stage>
+          <ol class="podium__steps" data-podium-winners></ol>
+          <!-- Kreska, na której stoją bloki. Jeden element, bo to jest jedna linia — trzy
+               krawędzie bloków nie tworzą jej same, gdy któryś jest pusty. -->
+          <div class="podium__ground" aria-hidden="true"></div>
         </div>
+
+        <!-- Reszta stawki jednym zdaniem, małym drukiem.
+             ==================================================================
+             Pierwsze pytanie po „kto wygrał" brzmi „a gdzie reszta". Pełna klasyfikacja jest
+             pod przyciskiem niżej, ale rozwinięcie jej to decyzja — a to zdanie odpowiada
+             od razu i nie zabiera miejsca: czwarte, piąte i szóste miejsce z punktami, w
+             jednej linii, drobnym drukiem pod cokołem.
+
+             Wypełnia je voting.js z tej samej odpowiedzi serwera, co cokół. Puste, gdy
+             stawka kończy się na trzech. -->
+        <p class="podium__rest" data-podium-rest hidden></p>
 
         <div class="podium__actions">
           <!-- Pełna klasyfikacja rozwija się TUTAJ, pod cokołem — nie prowadzi na podstronę.

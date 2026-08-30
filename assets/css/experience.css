@@ -348,13 +348,28 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  /* Zeby dlugie nazwy nie wjezdzaly pod marke ani pod przyciski. `min()` zamiast stalej,
-     bo pasek zmienia szerokosc miedzy stanami: 720 px odslonietym, 560 zwinietym. */
-  max-width: min(260px, calc(100% - 400px));
+  /* Zeby dlugie nazwy nie wjezdzaly pod marke ani pod przyciski.
+     ---------------------------------------------------------------------------
+     Rezerwa 300 px, nie 400. Przy 400 px zwiniety pasek (560 px szerokosci) zostawial chipowi
+     160 px, a jego tresc — kropka, procent i nazwa sekcji — ma przy najdluzszej nazwie okolo
+     175 px. Nazwa byla wiec obcinana wielokropkiem dokladnie w tym stanie, w ktorym pasek jest
+     najczesciej ogladany. Zglosone jako „ucina sie i brzydko wyglada, jak sie zwija".
+
+     300 px to dwa razy 150, czyli szerokosc marki — najszersza z dwoch stron w stanie
+     zwinietym, bo „Bede tam" jest wtedy zlozone. Powyzej 560 px paska ten warunek i tak nie
+     obowiazuje, bo wczesniej trafia stale 260 px. */
+  max-width: min(260px, calc(100% - 300px));
 }
 .site-header .brand,
 .site-header .nav-actions { flex: none; }
 .site-header .nav-actions { margin-left: auto; justify-content: flex-end; }
+/* Na samej gorze strony chipu nie ma — patrz `setCurrentSection` w app.js. Wygaszany, nie
+   `display: none`: pasek nie ma powodu przeskakiwac, a chip i tak nie zajmuje miejsca w
+   ukladzie, bo jest pozycjonowany absolutnie. */
+.site-header[data-nav-at-top] .nav-current {
+  opacity: 0;
+  visibility: hidden;
+}
 
 /* 292 -> 560: w pigulce zostaja teraz flaga i pelny chip z nazwa sekcji, wiec
    zwiniety pasek jest blizszy pelnemu niz kropce. To jest swiadomy wybor — kontrolki,
@@ -471,7 +486,7 @@
 }
 /* Chip osobno, bo jego `transform` niesie wysrodkowanie i nie wolno go zdjac. */
 .site-header.is-compact.is-menu-open .nav-current {
-  max-width: min(260px, calc(100% - 400px));
+  max-width: min(260px, calc(100% - 300px));
   min-width: auto;
   opacity: 1;
   visibility: visible;

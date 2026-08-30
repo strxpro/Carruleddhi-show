@@ -75,9 +75,9 @@ import {
         phase: () => demoPhase,
         onPhase: (phase) => {
           demoPhase = phase;
-          /* Rysunek podium rysuje się raz, więc przy powrocie do tej fazy trzeba zdjąć klasę,
+          /* Cokół wznosi się raz, więc przy powrocie do tej fazy trzeba zdjąć klasę,
              inaczej drugie wejście pokazuje gotowy cokół bez animacji. */
-          $('[data-podium-art]')?.classList.remove('is-drawn');
+          $('[data-podium-stage]')?.classList.remove('is-drawn');
           pull();
         },
         onSkip: () => {
@@ -329,6 +329,13 @@ import {
       item.className = 'podium-card';
       item.dataset.podiumPlace = String(index + 1);
 
+      /* Karta i blok to dwa dzieci kolumny, w tej kolejności — patrz `.podium-card` w
+         voting.css. Karta jest osobnym pudełkiem, a nie samym `li`, bo blok musi mieć własne
+         tło i własną animację wznoszenia; jedno pudełko na oba znaczyłoby jeden `transform`
+         dzielony przez dwie rzeczy, które ruszają się w innym czasie. */
+      const top = document.createElement('div');
+      top.className = 'podium-card__top';
+
       const figure = document.createElement('figure');
       figure.className = 'podium-card__photo';
       /* Brak zdjęcia dostaje rysowany kafelek z numerem, nie pusty prostokąt — patrz
@@ -373,12 +380,64 @@ import {
         : text('voting.noVotes');
       stats.append(points, count);
       body.append(project, rider, stats);
+      top.append(figure, body);
 
-      item.append(figure, body);
+      /* Blok cokołu. Wysokość, kolor i opóźnienie animacji bierze z CSS po
+         `data-podium-place` na kolumnie — tutaj powstaje tylko element i cyfra w nim, bo
+         wysokość stopnia jest decyzją wyglądu, nie danych. */
+      const block = document.createElement('div');
+      block.className = 'podium-card__block';
+      const place2 = document.createElement('b');
+      place2.textContent = String(index + 1);
+      block.append(place2);
+
+      item.append(top, block);
       return item;
     }));
 
-    if (!reducedMotion) $('[data-podium-art]')?.classList.add('is-drawn');
+    paintRest();
+    /* Klasa na scenie, nie na rysunku: rysunku SVG już nie ma, a wznoszenie bloków i
+       lądowanie kart są animacjami potomków tej scenki. */
+    if (!reducedMotion) $('[data-podium-stage]')?.classList.add('is-drawn');
+  }
+
+  /**
+   * Reszta stawki jednym zdaniem, drobnym drukiem pod cokołem.
+   *
+   * Pierwsze pytanie po „kto wygrał" brzmi „a gdzie reszta", i jest zadawane w tej samej
+   * sekundzie. Pełna klasyfikacja jest pod przyciskiem niżej, ale jej rozwinięcie to decyzja —
+   * a to zdanie odpowiada od razu i nie zabiera miejsca.
+   *
+   * Bierze te same, już posortowane wiersze co pełna lista (`standingsRows`), więc kolejność
+   * nie może się z nią rozjechać. Pokazuje najwyżej sześć pozycji: siedem i więcej to już
+   * lista udająca zdanie, a na to jest przycisk.
+   */
+  const REST_SHOWN = 6;
+
+  function paintRest() {
+    const box = $('[data-podium-rest]');
+    if (!box) return;
+
+    // Pierwsza trójka stoi na cokole; to zdanie zaczyna się od czwartego miejsca.
+    const rest = standingsRows().slice(3, 3 + REST_SHOWN);
+    if (!rest.length) {
+      box.hidden = true;
+      box.replaceChildren();
+      return;
+    }
+
+    box.hidden = false;
+    box.replaceChildren(...rest.map((row, index) => {
+      const entry = document.createElement('span');
+      /* Miejsce liczone od czwartego, a nie od pierwszego wiersza tej listy — inaczej
+         czwarty wóz byłby podpisany jedynką. */
+      const place = index + 4;
+      const who = row.projectName || `${row.firstName} ${row.lastName}`.trim() || text('voting.noProject');
+      const score = document.createElement('b');
+      score.textContent = String(row.totalScore);
+      entry.append(`${place}. ${who} `, score);
+      return entry;
+    }));
   }
 
   /* ------------------------------------------------------------------------- odliczanie */

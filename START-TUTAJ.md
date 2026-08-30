@@ -112,6 +112,42 @@ Settings → Environment Variables. Po każdej zmianie **Redeploy**.
 > `ai.lastFailure`. Odróżnia „klucz unieważniony" (HTTP 401) od „nie ma takiego modelu"
 > (HTTP 404 albo 400 z nazwą modelu w treści) od „za wolno" (TimeoutError). Bez tego
 > wszystkie trzy wyglądają identycznie: jak „przekazuję organizatorom".
+
+### Gemini zamiast Groqa — trzy zmienne, zero zmian w kodzie
+
+Gemini ma [endpoint zgodny z OpenAI](https://ai.google.dev/gemini-api/docs/openai), a ten
+worker mówi właśnie tym protokołem. Wystarczy podmienić trzy zmienne w Vercelu i zrobić
+**Redeploy**:
+
+| Zmienna | Wartość |
+|---|---|
+| `AI_API_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` |
+| `AI_API_KEY` | klucz z **aistudio.google.com → Get API key** |
+| `AI_MODEL` | `gemini-flash-latest` |
+| `AI_VISION_MODEL` | `gemini-flash-latest` (opcjonalnie — Gemini przyjmuje obrazy) |
+
+**`gemini-flash-latest`, nie `gemini-2.5-flash`.** Alias `-latest` przesuwa się sam na
+kolejne wydanie, więc nie powtórzy się to, co stało się z `llama-3.3-70b-versatile`:
+wycofana nazwa i czat oddający każde pytanie człowiekowi.
+
+`flash`, nie `pro`, i to nie jest oszczędzanie. Odpowiedzi w tym czacie mają dwa–trzy
+zdania, a gość czeka na nie w oknie rozmowy — liczy się czas do pierwszego słowa, nie
+zdolność do rozumowania. Do tego `gemini-2.5-pro` [wypadł z darmowego poziomu w wielu
+kontach](https://www.cometapi.com/is-free-gemini-2-5-pro-api-fried-changes-to-the-free-quota-in-2025/),
+a `flash` w nim został.
+
+**Uwaga na dwie rzeczy:**
+
+1. **Subskrypcja Google AI Pro to nie to samo co dostęp do API.** Pro daje limity w
+   aplikacji Gemini; klucz API bierze się osobno w AI Studio i ma własny darmowy poziom.
+   Płacenie za Pro nie podnosi limitów API ani o jedno żądanie.
+2. **Limity są liczone na projekt, nie na klucz.** Wygenerowanie drugiego klucza w tym samym
+   projekcie nie daje ani jednego żądania więcej. Dzienne limity zerują się o północy czasu
+   pacyficznego. Aktualne wartości: [rate limits](https://ai.google.dev/gemini-api/docs/rate-limits).
+
+Jeśli włączysz `AI_VISION_MODEL`, wróć też do `features.chatPhotos` w
+`assets/js/site-config.js` i ustaw je na `true` — spinacz w czacie jest wyłączony właśnie
+dlatego, że poprzedni dostawca nie miał modelu przyjmującego obrazy.
 | `WHATSAPP_ALERTS` | `48665626101:2990681:pl,393284981574:3364881:it` | o nowej wiadomości na czacie dowiesz się tylko mailem, nie na telefon |
 
 `WHATSAPP_ALERTS` to trójki `numer:klucz:język` po przecinku, numer bez plusa. Język jest

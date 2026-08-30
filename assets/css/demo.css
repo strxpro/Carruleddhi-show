@@ -107,21 +107,55 @@ html.is-demo .wall-note { position: relative; }
   margin: 0;
   border-top: 0;
   background: transparent;
-}
+  /* WYŻSZY PAS I WIĘKSZE LOGOTYPY.
+     ---------------------------------------------------------------------------
+     Bazowa wysokość jest pisana pod pas przyklejony do dołu hero, gdzie musi być niska, bo
+     zabiera miejsce zdjęciu. Tutaj pas leży w środku strony, w białej karcie, i nie zabiera
+     niczego — a znak sponsora ma być czytelny z odległości, z której patrzy się na ekran.
 
-.sponsor-band--inline .sponsor-band__track {
-  /* Partly greyed, not fully. Full saturation next to a section heading pulls harder than the
-     heading does — these are thank-yous rather than advertising — but `grayscale(1)` at 62%
-     opacity on a cream background made a 64 px strip of pale grey shapes that read as a
-     loading placeholder. At 0.55 and 0.86 the logos are recognisable at a glance, which is
-     the entire point of putting somebody's logo on a page. */
-  filter: grayscale(0.55);
-  opacity: 0.86;
-  transition: filter 0.3s, opacity 0.3s;
+     Około półtora raza więcej: 132 px zamiast 88 na laptopie. Razem ze zdjętym ograniczeniem
+     szerokości niżej daje to logo wysokości około 110 px zamiast 84.
+
+     Nadpisywana jest ZMIENNA, nie `height`. `height: auto` kasuje pas do zera, bo ścieżka i
+     każde logo mają `height: 100%`, a procent liczony względem `auto` schodzi do zera — jest
+     to zmierzone i opisane w komentarzu wyżej. Zmiana samej zmiennej zachowuje twardą
+     wysokość i przy okazji przelicza `max-height` logotypów, bo ono się do niej odwołuje. */
+  --sponsor-band-h: clamp(112px, calc(var(--screen-h, 100svh) * 0.19), 176px);
+  --sponsor-gap: clamp(44px, 6vw, 96px);
 }
+/* Szerokość logotypu przestaje być wąskim gardłem.
+   Zmierzone na przykładowych znakach: proporcja 240:72, więc przy wysokości 110 px logo chce
+   366 px szerokości, a `max-width: clamp(150px, 20vw, 280px)` z bazowej reguły przycinało je
+   do 280 — czyli realna wysokość spadała do 84 px i podniesienie pasa nic nie dawało. */
+.sponsor-band--inline .sponsor-logo img { max-width: clamp(200px, 30vw, 420px); }
+
+/* WŁASNE KOLORY LOGOTYPÓW, I TO JEST CAŁA ZMIANA.
+   ---------------------------------------------------------------------------
+   Wyszarzenie było nałożone DWA RAZY: `grayscale(1) opacity(.62)` na każdym `img`
+   (experience.css) i jeszcze `grayscale(0.55) opacity(0.86)` na całej ścieżce tutaj. Filtry
+   się mnożą, więc realnie logotypy szły na ekran jako blade szare plamy o nasyceniu bliskim
+   zera i przezroczystości około 53% — na białej karcie wyglądało to jak niewczytany obrazek.
+   Zgłoszone jako „kolory nie są normalne".
+
+   Zostaje jeden filtr i tylko delikatny: 0,12 szarości zbija najkrzykliwsze czerwienie do
+   poziomu, na którym nie przekrzykują nagłówka sekcji, a każdy znak jest rozpoznawalny na
+   pierwszy rzut oka — po to się go tu wstawia. Ktoś zapłacił za to, żeby jego logo było
+   widoczne, nie żeby było ładnie wtopione.
+
+   `opacity` schodzi całkiem: przezroczystość na białym tle nie przycisza koloru, tylko go
+   rozmywa, a do przyciszenia jest nasycenie. */
+.sponsor-band--inline .sponsor-band__track {
+  filter: grayscale(0.12);
+  opacity: 1;
+  transition: filter 0.3s;
+}
+/* Zdejmuje wyszarzenie z samych obrazków, bo bazowa regula w experience.css jest pisana pod
+   pas w hero, gdzie logotypy leza na zdjeciu i musza byc przygaszone. Tutaj leza na bialej
+   karcie i nie maja z czym konkurowac. */
+.sponsor-band--inline .sponsor-logo img { filter: none; }
 
 @media (hover: hover) {
-  .sponsor-band--inline:hover .sponsor-band__track { filter: grayscale(0); opacity: 1; }
+  .sponsor-band--inline:hover .sponsor-band__track { filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -151,8 +185,10 @@ html.is-demo .wall-note { position: relative; }
   border-radius: clamp(18px, 2vw, 26px);
   background: rgb(255 255 255 / 0.94);
 }
-/* Oddech nad pasem daje karta, bo pas musi zostać przy swojej twardej wysokości. */
-.sponsor-zone > .sponsor-band--inline { margin: 14px 0; }
+/* Oddech nad pasem daje karta, bo pas musi zostać przy swojej twardej wysokości.
+   Podniesione z 14 px: przy wyższym pasie logotypy dotykały krawędzi karty i pas czytał się
+   jako doklejony do jej dna, a nie jako coś, co w niej leży. */
+.sponsor-zone > .sponsor-band--inline { margin: clamp(20px, 2.6vw, 34px) 0; }
 
 .sponsor-pitch {
   display: flex;
