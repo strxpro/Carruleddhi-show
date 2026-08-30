@@ -26,7 +26,7 @@
  */
 import {
   $, $$, demoMode, text, toast,
-  deviceId, savedVoter, rememberVoter, readState, paintDemoBar
+  deviceId, savedVoter, rememberVoter, readState, paintDemoBar, avatarFor
 } from './voting-core.js';
 
 (function () {
@@ -61,16 +61,131 @@ import {
   const cartLabel = (row) => row.projectName || text('voting.noProject');
   const startBadge = (row) => String(row.startNumber).padStart(3, '0');
 
+  /**
+   * Samo imię na plakietce — a nazwisko dopiero wtedy, gdy imię przestaje wystarczać.
+   * ---------------------------------------------------------------------------
+   * Na kafelku liczy się nazwa pojazdu; imię jest podpisem, kto go zbudował, i „Claudio"
+   * czyta się szybciej niż „Claudio Taras". Ale w wiosce, w której startuje kilkadziesiąt
+   * wozów, dwóch Salvatore to sytuacja normalna, a dwie identyczne plakietki znaczą, że
+   * głosujący nie wie, na kogo patrzy.
+   *
+   * Dokładany jest więc NAJKRÓTSZY przedrostek nazwiska, który rozróżnia tych, co dzielą imię.
+   * Jedna litera dla „Salvatore Mannu" i „Salvatore Pinna"; przy „Taras" i „Tarantino" jedna
+   * litera nie wystarcza, więc rośnie do „Taras" i „Taran" — dopiero to są dwie różne
+   * plakietki. Stały przedrostek jednoliterowy dawałby dwa razy „Salvatore T." i wyglądałby
+   * na działający dokładnie do dnia, w którym przestaje.
+   *
+   * Liczone raz na przerysowanie listy, nie raz na kafelek: to jest porównanie każdego z
+   * każdym w obrębie imienia, a lista bywa kilkudziesięcioelementowa.
+   */
+  function nameBadges(rows) {
+    const byFirst = new Map();
+    rows.forEach((row) => {
+      const key = String(row.firstName || '').trim().toLowerCase();
+      if (!byFirst.has(key)) byFirst.set(key, []);
+      byFirst.get(key).push(row);
+    });
+
+    const badges = new Map();
+    byFirst.forEach((group) => {
+      const first = String(group[0].firstName || '').trim();
+      if (group.length === 1) {
+        badges.set(group[0].id, first);
+        return;
+      }
+      const surnames = group.map((row) => String(row.lastName || '').trim());
+      const longest = Math.max(...surnames.map((name) => name.length));
+      /* Rośnie, dopóki którekolwiek dwa nazwiska w grupie dają ten sam przedrostek. */
+      let cut = 1;
+      while (cut < longest) {
+        const seen = surnames.map((name) => name.slice(0, cut).toLowerCase());
+        if (new Set(seen).size === seen.length) break;
+        cut += 1;
+      }
+      group.forEach((row, index) => {
+        const surname = surnames[index];
+        /* Kropka tylko wtedy, gdy nazwisko zostało faktycznie skrócone — „Salvatore Mannu."
+           z kropką po pełnym nazwisku wygląda na literówkę. */
+        const short = surname.slice(0, cut);
+        badges.set(row.id, surname
+          ? `${first} ${short}${short.length < surname.length ? '.' : ''}`
+          : first);
+      });
+    });
+    return badges;
+  }
+
+  /** Wypełniane przy każdym przerysowaniu siatki — patrz paintGrid(). */
+  let badgeByParticipant = new Map();
+
+  /**
+   * Narysowane kafelki, po identyfikatorze uczestnika: `id -> { key, node }`.
+   * `key` to odcisk wszystkiego, co kafelek pokazuje — patrz paintGrid().
+   */
+  let cardCache = new Map();
+
   /* ---------------------------------------------------------------------------- odczyt */
+
+  /**
+   * Adresy zdjęć, które już raz przyszły — klucz to identyfikator uczestnika.
+   *
+   * TO JEST PIERWSZA POŁOWA NAPRAWY MIGOTANIA ZDJĘĆ.
+   * ---------------------------------------------------------------------------
+   * Zdjęcia leżą w prywatnym buckecie i Worker podaje je jako adresy podpisane na godzinę
+   * (`signPhotos`, `expiresIn: 3600`). Podpis to token z własnym znacznikiem czasu, więc ten
+   * sam plik dostaje INNY adres przy każdym odczycie — a odczyt chodzi co trzydzieści sekund.
+   * Dla przeglądarki nowy adres to nowy obrazek: pobiera go od zera, a przez ten czas kafelek
+   * jest pusty. Stąd zgłoszenie „zdjęcia co chwilę się przeładowują".
+   *
+   * Adres raz zapamiętany zostaje więc użyty ponownie, dopóki trwa ta wizyta. Podpis żyje
+   * godzinę, a strona głosowania jest otwarta przez kilkanaście minut wyścigu, więc nie ma
+   * praktycznej możliwości, żeby wygasł na oczach patrzącego.
+   *
+   * Nowy adres wchodzi tylko wtedy, gdy poprzedniego nie było — czyli gdy organizator dopiero
+   * teraz wgrał zdjęcie. Wtedy zmiana JEST pożądana i ma się pokazać.
+   */
+  const photoById = new Map();
+
+  /** Identyfikatory znane z poprzedniego odczytu — po nich poznajemy nowego uczestnika. */
+  let knownIds = null;
+  /** Świeżo dopisani, wyróżnieni animacją wejścia na kilka sekund. */
+  let freshIds = new Set();
+  let freshTimer = 0;
 
   function absorb(result) {
     const mine = Array.isArray(result.myVotes) ? result.myVotes[0] : null;
+    const incoming = Array.isArray(result.participants) ? result.participants : [];
+
+    /* Adres zdjęcia przepisywany z pamięci, jeśli już go mamy. Podmieniany jest obiekt
+       uczestnika, a nie tablica w miejscu: `state.participants` jest czytane w kilku miejscach
+       i mutowanie cudzego wiersza w trakcie rysowania byłoby zmianą pod ręką. */
+    const participants = incoming.map((row) => {
+      const remembered = photoById.get(row.id);
+      if (row.photo && !remembered) photoById.set(row.id, row.photo);
+      return remembered ? { ...row, photo: remembered } : row;
+    });
+
+    /* Nowy uczestnik rozpoznany z RÓŻNICY zbiorów identyfikatorów, a nie z odpowiedzi na
+       zapis: ten sam sposób łapie też wóz dopisany w panelu z drugiego urządzenia w trakcie
+       odpytywania. Przy pierwszym odczycie `knownIds` jest `null`, więc cała stawka nie jest
+       „nowa" — inaczej pierwsze wejście animowałoby kilkadziesiąt kafelków naraz. */
+    const ids = new Set(participants.map((row) => row.id));
+    if (knownIds) {
+      const added = [...ids].filter((id) => !knownIds.has(id));
+      if (added.length) {
+        freshIds = new Set(added);
+        window.clearTimeout(freshTimer);
+        freshTimer = window.setTimeout(() => { freshIds = new Set(); paintGrid(); }, 6000);
+      }
+    }
+    knownIds = ids;
+
     Object.assign(state, {
       phase: result.phase,
       scoreMin: Number(result.scoreMin) || 3,
       scoreMax: Number(result.scoreMax) || 10,
       categories: Array.isArray(result.categories) ? result.categories : [],
-      participants: Array.isArray(result.participants) ? result.participants : [],
+      participants,
       myVote: mine ? { participantId: mine.participantId, score: mine.score } : null,
       loaded: true
     });
@@ -109,13 +224,19 @@ import {
 
     const shell = $('[data-vote-shell]');
     if (shell) {
-      shell.hidden = !(open || closed);
+      /* Powłoka odsłonięta także PRZED pierwszym odczytem, żeby było gdzie pokazać szkielet.
+         Wcześniej warunek brzmiał „otwarte albo zamknięte", więc przez cały czas oczekiwania na
+         odpowiedź strona była pusta — a to jest ten moment, w którym ktoś zamyka kartę. Po
+         odczycie warunek wraca do swojego: powłoki nie ma, gdy głosowanie jeszcze nie ruszyło. */
+      shell.hidden = state.loaded && !(open || closed);
       shell.classList.toggle('is-closed', closed);
     }
 
     const notice = $('[data-vote-notice]');
     if (notice) {
-      notice.hidden = open || closed;
+      // Przed pierwszym odczytem nie wiadomo jeszcze, czy głosowanie jest zamknięte — a zdanie
+      // „jeszcze nie otwarte" postawione zawczasu bywałoby nieprawdą przez dwie sekundy.
+      notice.hidden = !state.loaded || open || closed;
       notice.textContent = state.loaded || demoDriven ? text('voting.notOpenYet') : '';
     }
 
@@ -229,16 +350,91 @@ import {
       a.startNumber - b.startNumber);
   }
 
+  /**
+   * Szkielet: sześć kafelków w kształcie tych prawdziwych, dopóki nie ma danych.
+   *
+   * Bez tego pierwsze wejście i zerwany odczyt wyglądały identycznie — jak pusta strona. A
+   * pierwsze wejście zdarza się w dniu wyścigu, na telefonie, na sieci obciążonej przez cały
+   * plac: te dwie sekundy pustki są dokładnie tym momentem, w którym ktoś zamyka kartę.
+   *
+   * Sześć, nie dwanaście: szkielet ma powiedzieć „to się wczytuje", a nie udawać zawartości.
+   * `aria-hidden`, bo czytnikowi ekranu mówi to `aria-busy` na siatce — sześć pustych kafelków
+   * odczytanych na głos jest szumem.
+   */
+  const SKELETON_TILES = 6;
+
+  function paintSkeleton(grid) {
+    grid.setAttribute('aria-busy', 'true');
+    grid.replaceChildren(...Array.from({ length: SKELETON_TILES }, () => {
+      const tile = document.createElement('div');
+      tile.className = 'vote-card vote-card--skeleton';
+      tile.setAttribute('aria-hidden', 'true');
+      const photo = document.createElement('span');
+      photo.className = 'vote-card__photo';
+      const line = document.createElement('span');
+      line.className = 'vote-skeleton__line';
+      const short = document.createElement('span');
+      short.className = 'vote-skeleton__line vote-skeleton__line--short';
+      tile.append(photo, line, short);
+      return tile;
+    }));
+  }
+
   function paintGrid() {
     const grid = $('[data-vote-grid]');
     const empty = $('[data-vote-empty]');
     if (!grid) return;
 
+    /* Dopóki pierwszy odczyt nie wrócił, nie ma czym rysować siatki ani czym twierdzić, że
+       jest pusta — „lista nie jest jeszcze opublikowana" przy nieudanym odczycie byłoby
+       zdaniem nieprawdziwym. */
+    if (!state.loaded) {
+      if (empty) empty.hidden = true;
+      paintSkeleton(grid);
+      return;
+    }
+    grid.removeAttribute('aria-busy');
+
     const all = rows();
     if (empty) empty.hidden = all.length > 0;
 
+    /* Plakietki liczone z CAŁEJ stawki, nie z widocznej porcji: gdyby liczyć z dwunastu
+       narysowanych, trzynasty Salvatore doczytany przyciskiem „pokaż więcej" zmieniłby
+       podpisy pod kafelkami, które już stoją na ekranie. */
+    badgeByParticipant = nameBadges(state.participants);
+
     const closed = state.phase === 'closed';
-    grid.replaceChildren(...all.slice(0, state.shown).map((row, index) => card(row, closed ? index + 1 : 0)));
+
+    /* DRUGA POŁOWA NAPRAWY MIGOTANIA: kafelek, który się nie zmienił, nie jest budowany od nowa.
+       ---------------------------------------------------------------------------
+       `replaceChildren` z nowymi węzłami znaczyło nowy `<img>` co trzydzieści sekund — a nowy
+       element pobiera obrazek nawet wtedy, gdy adres jest ten sam, bo nie ma jeszcze czego
+       ponownie użyć. Stabilny adres (patrz `photoById`) załatwia połowę sprawy; ta druga połowa
+       to nietykanie węzła, dopóki nie ma po co.
+
+       Klucz obejmuje wszystko, co kafelek rysuje. Cokolwiek się zmieni — wynik, plakietka,
+       miejsce w rankingu, mój głos — klucz się różni i kafelek powstaje na nowo. Gdy nic się
+       nie zmieniło, do siatki wraca ten sam węzeł, razem z już wczytanym zdjęciem. */
+    const cache = cardCache;
+    const next = new Map();
+    const nodes = all.slice(0, state.shown).map((row, index) => {
+      const rank = closed ? index + 1 : 0;
+      const mine = state.myVote;
+      const key = [
+        row.photo, row.voteCount, row.totalScore, row.averageScore,
+        rank, badgeByParticipant.get(row.id) || '',
+        mine && mine.participantId === row.id ? `mine:${mine.score}` : '',
+        state.phase, freshIds.has(row.id) ? 'fresh' : ''
+      ].join('|');
+
+      const previous = cache.get(row.id);
+      const node = previous && previous.key === key ? previous.node : card(row, rank);
+      next.set(row.id, { key, node });
+      return node;
+    });
+    cardCache = next;
+
+    grid.replaceChildren(...nodes);
     paintMore(all.length);
   }
 
@@ -289,32 +485,60 @@ import {
     article.dataset.participant = row.id;
     if (isMine) article.classList.add('is-voted');
     if (rank && rank <= 3) article.classList.add(`is-place-${rank}`);
+    /* Nowy wóz wjeżdża, a nie pojawia się.
+       Kafelek dopisany w panelu w trakcie wyścigu doszedłby inaczej bez śladu — siatka
+       przeskakuje, bo doszedł jeden element, i trzeba go odnaleźć wzrokiem między
+       kilkudziesięcioma innymi. Klasa gaśnie po sześciu sekundach; patrz `freshIds`. */
+    if (freshIds.has(row.id)) article.classList.add('is-fresh');
 
-    /* Zdjęcie NIE jest przyciskiem. Zgłoszone wprost: klik w zdjęcie nie ma otwierać okna.
-       Kafelek pokazuje pojazd, a czynność ma własny przycisk pod spodem. */
+    /* CAŁE zdjęcie jest teraz celem dotknięcia.
+       ---------------------------------------------------------------------------
+       Wcześniej stała tu reguła odwrotna — „klik w zdjęcie nie ma otwierać okna" — i osobny
+       przycisk pod kafelkiem. Zmienione na wyraźną prośbę: na telefonie zdjęcie jest wielkim
+       celem, a przycisk pod nim małym, więc naturalny ruch kciuka trafiał w miejsce, które
+       nic nie robiło. Zdjęcie prowadzi teraz do pytania „zagłosować na ten wóz?", a nie do
+       wysłania głosu — potwierdzenie zostaje osobnym krokiem.
+
+       `button`, a nie `div` z obsługą kliknięcia: dostaje fokus, reaguje na spację i enter i
+       ogłasza się czytnikowi jako czynność, bez ani jednego atrybutu ARIA. */
     const figure = document.createElement('figure');
     figure.className = 'vote-card__photo';
-    if (row.photo) {
-      const image = document.createElement('img');
-      image.src = row.photo;
-      image.alt = cartLabel(row);
-      image.loading = 'lazy';
-      image.decoding = 'async';
-      figure.append(image);
-    } else {
-      // Zastępnik, nie puste miejsce: kafelek bez zdjęcia ma mieć ten sam kształt co reszta,
-      // inaczej siatka rozjeżdża się na jednym brakującym pliku.
-      const blank = document.createElement('span');
-      blank.className = 'vote-card__blank';
-      blank.setAttribute('aria-hidden', 'true');
-      blank.textContent = startBadge(row);
-      figure.append(blank);
-    }
+
+    const image = document.createElement('img');
+    /* Brak zdjęcia dostaje rysowany kafelek z numerem — ten sam awatar co na cokole strony
+       głównej, więc ten sam wóz wygląda tak samo w obu miejscach. Wcześniej był tu goły numer
+       na jednolitym tle, na którym przyciemnienie i podpis nie miały się na czym położyć. */
+    image.src = row.photo || avatarFor(row);
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    figure.append(image);
+
+    /* Przyciemnienie od dołu. Osobny element, nie `background` na figurze: leży NAD zdjęciem,
+       a pod podpisem, więc biały tekst trzyma kontrast także na jasnym niebie w tle. */
+    const scrim = document.createElement('span');
+    scrim.className = 'vote-card__scrim';
+    scrim.setAttribute('aria-hidden', 'true');
+    figure.append(scrim);
+
     const badge = document.createElement('span');
     badge.className = 'vote-card__number';
     badge.setAttribute('aria-hidden', 'true');
     badge.textContent = startBadge(row);
     figure.append(badge);
+
+    /* Podpis na zdjęciu: pigułka z imieniem nad nazwą pojazdu, nazwa największa. */
+    const caption = document.createElement('figcaption');
+    caption.className = 'vote-card__caption';
+    const who = document.createElement('span');
+    who.className = 'vote-card__who';
+    who.textContent = badgeByParticipant.get(row.id) || row.firstName || '';
+    const title = document.createElement('strong');
+    title.className = 'vote-card__title';
+    title.textContent = cartLabel(row);
+    caption.append(who, title);
+    figure.append(caption);
+
     if (rank) {
       const place = document.createElement('span');
       place.className = 'vote-card__rank';
@@ -331,12 +555,13 @@ import {
 
     const body = document.createElement('div');
     body.className = 'vote-card__body';
-    const project = document.createElement('strong');
-    project.textContent = cartLabel(row);
+    /* Nazwa pojazdu i imię stoją już na zdjęciu, więc tu zostaje to, czego tam nie ma:
+       pełne nazwisko i kategoria. Powtórzenie nazwy pod zdjęciem, na którym ta nazwa właśnie
+       stoi, zajmowałoby drugi wiersz, żeby nie powiedzieć nic nowego. */
     const rider = document.createElement('span');
     rider.className = 'vote-card__rider';
     rider.textContent = `${riderName(row)} · ${row.category}`;
-    body.append(project, rider);
+    body.append(rider);
 
     if (state.phase === 'closed') {
       const stats = document.createElement('p');
@@ -366,7 +591,19 @@ import {
       used.textContent = text('voting.already');
       body.append(used);
     } else if (state.phase === 'voting') {
-      body.append(voteControls(row));
+      const controls = voteControls(row);
+      body.append(controls);
+
+      /* Dotknięcie zdjęcia wchodzi w ten sam przepływ co przycisk pod spodem — nie w skrót
+         obok niego. Przezroczysty przycisk NA zdjęciu, a nie obsługa kliknięcia na figurze:
+         dostaje fokus i reaguje na enter, więc droga z klawiatury jest ta sama co palcem. */
+      const hit = document.createElement('button');
+      hit.type = 'button';
+      hit.className = 'vote-card__hit';
+      hit.setAttribute('aria-label', `${text('voting.cta')} — ${cartLabel(row)}`);
+      hit.addEventListener('click', () => controls.openVote());
+      figure.append(hit);
+      figure.classList.add('is-tappable');
     }
     article.append(body);
     return article;
@@ -381,6 +618,24 @@ import {
    * dziewiątkę bez możliwości cofnięcia byłoby oszczędnością jednego naciśnięcia okupioną
    * cudzym wynikiem.
    */
+  /**
+   * Trzy kroki przy pojeździe: dotknięcie → „zagłosować na ten wóz?" → suwak i potwierdzenie.
+   *
+   * DLACZEGO PYTANIE JEST OSOBNYM KROKIEM
+   *   Całe zdjęcie jest celem dotknięcia, a na telefonie trzymanym w jednej ręce zdarza się
+   *   trafić w nie przy przewijaniu. Gdyby dotknięcie od razu otwierało oceny, przypadkowe
+   *   muśnięcie stawiałoby człowieka przed rzędem liczb bez wyjaśnienia, w co właśnie wszedł.
+   *   Pytanie z nazwą wozu odpowiada na „czy to na pewno ten" zanim padnie „ile punktów".
+   *
+   * DLACZEGO SUWAK, A NIE OSIEM PRZYCISKÓW
+   *   Osiem sąsiadujących celów na szerokości telefonu to osiem okazji do trafienia w ósemkę
+   *   zamiast w dziewiątkę. Suwak ma jeden uchwyt, który się CIĄGNIE — pomyłkę widać i
+   *   poprawia się ją bez podnoszenia palca, a wartość stoi wypisana wielką liczbą obok.
+   *   Zakres bierze się z serwera (`scoreMin`/`scoreMax`), nie z liczby wpisanej tutaj.
+   *
+   * Potwierdzenie zostaje osobnym naciśnięciem: głos jest jeden na cały konkurs i do maila
+   * ze żetonem nieodwracalny.
+   */
   function voteControls(row) {
     const wrap = document.createElement('div');
     wrap.className = 'vote-card__act';
@@ -391,6 +646,27 @@ import {
     open.dataset.voteStart = '';
     open.textContent = text('voting.cta');
 
+    /* ---------------------------------------------------------------- krok 1: pytanie */
+    const ask = document.createElement('div');
+    ask.className = 'vote-ask';
+    ask.hidden = true;
+    const question = document.createElement('p');
+    question.className = 'vote-ask__q';
+    question.textContent = `${text('voting.askVote')} ${cartLabel(row)}?`;
+    const askYes = document.createElement('button');
+    askYes.type = 'button';
+    askYes.className = 'btn btn--yellow btn--small';
+    askYes.textContent = text('voting.askYes');
+    const askNo = document.createElement('button');
+    askNo.type = 'button';
+    askNo.className = 'vote-picker__cancel';
+    askNo.textContent = text('voting.askNo');
+    const askRow = document.createElement('div');
+    askRow.className = 'vote-ask__actions';
+    askRow.append(askYes, askNo);
+    ask.append(question, askRow);
+
+    /* ---------------------------------------------------------------- krok 2: suwak */
     const picker = document.createElement('div');
     picker.className = 'vote-picker';
     picker.hidden = true;
@@ -399,67 +675,91 @@ import {
     label.className = 'vote-picker__label';
     label.textContent = text('voting.pickScore');
 
-    const scores = document.createElement('div');
-    scores.className = 'vote-picker__scores';
-    scores.setAttribute('role', 'group');
-    scores.setAttribute('aria-label', text('voting.pickScore'));
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.className = 'vote-slider';
+    slider.min = String(state.scoreMin);
+    slider.max = String(state.scoreMax);
+    slider.step = '1';
+    /* Start w środku skali, nie na minimum: suwak ustawiony na 3 podpowiada trójkę i trzeba
+       go przeciągnąć, żeby powiedzieć cokolwiek innego. Środek nie podpowiada niczego. */
+    slider.value = String(Math.round((state.scoreMin + state.scoreMax) / 2));
+    slider.setAttribute('aria-label', text('voting.pickScore'));
 
-    let picked = 0;
+    const value = document.createElement('b');
+    value.className = 'vote-slider__value';
+    const paintValue = () => {
+      value.textContent = slider.value;
+      /* Wypełnienie toru do uchwytu — `input[type=range]` nie umie tego samo w każdej
+         przeglądarce, więc procent idzie zmienną CSS. */
+      const span = Number(slider.max) - Number(slider.min);
+      const at = span ? (Number(slider.value) - Number(slider.min)) / span : 0;
+      slider.style.setProperty('--at', Math.round(at * 100) + '%');
+    };
+    paintValue();
+    slider.addEventListener('input', paintValue);
+
+    const scale = document.createElement('div');
+    scale.className = 'vote-slider__scale';
+    const low = document.createElement('span');
+    low.textContent = String(state.scoreMin);
+    const high = document.createElement('span');
+    high.textContent = String(state.scoreMax);
+    scale.append(low, high);
+
+    const track = document.createElement('div');
+    track.className = 'vote-slider__row';
+    track.append(slider, value);
+
     const confirm = document.createElement('button');
     confirm.type = 'button';
     confirm.className = 'btn btn--blue btn--small vote-picker__confirm';
     confirm.textContent = text('voting.confirm');
-    confirm.disabled = true;
-
-    for (let score = state.scoreMin; score <= state.scoreMax; score += 1) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'vote-picker__score';
-      button.dataset.voteScore = String(score);
-      button.textContent = String(score);
-      button.setAttribute('aria-pressed', 'false');
-      button.addEventListener('click', () => {
-        picked = score;
-        $$('[data-vote-score]', scores).forEach((other) => {
-          const active = other === button;
-          other.classList.toggle('is-picked', active);
-          other.setAttribute('aria-pressed', String(active));
-        });
-        confirm.disabled = false;
-      });
-      scores.append(button);
-    }
-
-    confirm.addEventListener('click', () => {
-      if (picked) askIdentity(row, picked);
-    });
+    confirm.addEventListener('click', () => askIdentity(row, Number(slider.value)));
 
     const cancel = document.createElement('button');
     cancel.type = 'button';
     cancel.className = 'vote-picker__cancel';
     cancel.textContent = text('a11y.close');
-    cancel.addEventListener('click', () => {
-      picker.hidden = true;
-      open.hidden = false;
-      open.focus();
-    });
 
     const actions = document.createElement('div');
     actions.className = 'vote-picker__actions';
     actions.append(confirm, cancel);
-    picker.append(label, scores, actions);
+    picker.append(label, track, scale, actions);
 
-    open.addEventListener('click', () => {
-      /* Jeden otwarty wybór na całą stronę. Dwa otwarte rzędy ocen na dwóch kafelkach to
-         pytanie „którą z nich właśnie wysyłam", zadane w chwili wysyłania. */
+    /* ---------------------------------------------------------------- przechodzenie */
+    const reset = () => {
+      ask.hidden = true;
+      picker.hidden = true;
+      open.hidden = false;
+    };
+    /* Jeden otwarty wybór na całą stronę. Dwa otwarte suwaki na dwóch kafelkach to pytanie
+       „który z nich właśnie wysyłam", zadane w chwili wysyłania. */
+    const closeOthers = () => {
       $$('[data-vote-start]').forEach((other) => { other.hidden = false; });
+      $$('.vote-ask').forEach((other) => { other.hidden = true; });
       $$('.vote-picker').forEach((other) => { other.hidden = true; });
-      open.hidden = true;
-      picker.hidden = false;
-      scores.querySelector('button')?.focus();
-    });
+    };
 
-    wrap.append(open, picker);
+    const toAsk = () => {
+      closeOthers();
+      open.hidden = true;
+      ask.hidden = false;
+      askYes.focus();
+    };
+    open.addEventListener('click', toAsk);
+    /* Uchwyt dla dotknięcia w zdjęcie — kafelek woła to zamiast powielać kroki u siebie. */
+    wrap.openVote = toAsk;
+
+    askYes.addEventListener('click', () => {
+      ask.hidden = true;
+      picker.hidden = false;
+      slider.focus();
+    });
+    askNo.addEventListener('click', () => { reset(); open.focus(); });
+    cancel.addEventListener('click', () => { reset(); open.focus(); });
+
+    wrap.append(open, ask, picker);
     return wrap;
   }
 
@@ -692,6 +992,12 @@ import {
     if (!$('[data-vote-shell]')) return;
     setupDialog();
     $('[data-vote-more]')?.addEventListener('click', showMore);
+
+    /* Szkielet od pierwszej klatki, nie po pierwszej odpowiedzi.
+       `paint()` był wołany wyłącznie z `absorb()`, czyli już PO odczycie — więc przez cały czas
+       oczekiwania nie było na ekranie niczego, także szkieletu. Jedno wywołanie tutaj rysuje go,
+       zanim cokolwiek poleci do serwera. */
+    paint();
 
     // Etykiety są w słowniku, więc przełączenie języka przerysowuje wszystko, co je nosi.
     window.addEventListener('carruleddhi:language', () => { if (state.loaded) paint(); });

@@ -654,6 +654,71 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 .vote-card.is-voted { border-color: rgb(31 169 113 / .75); background: rgb(31 169 113 / .1); }
 
+/* ---------------------------------------------------------- szkielet wczytywania */
+/* Sześć kafelków w kształcie tych prawdziwych, dopóki pierwszy odczyt nie wróci. Bez tego
+   pierwsze wejście i zerwany odczyt wyglądały identycznie — jak pusta strona, w dniu wyścigu,
+   na sieci obciążonej przez cały plac.
+
+   Ten sam `aspect-ratio` na zdjęciu co w prawdziwym kafelku, więc siatka nie skacze w chwili
+   podmiany szkieletu na treść. */
+.vote-card--skeleton { pointer-events: none; }
+.vote-card--skeleton .vote-card__photo { display: block; }
+.vote-skeleton__line {
+  display: block;
+  height: 12px;
+  margin: 12px 14px 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / .09);
+}
+.vote-skeleton__line--short { width: 45%; margin-bottom: 16px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Przesuwający się połysk, nie pulsujące tło: pulsowanie sześciu kafelków naraz miga na
+     całej stronie, a połysk czyta się jako „to się wczytuje" bez przyciągania wzroku.
+     Gradient na tle elementu, więc animowana jest `background-position` — jedna właściwość
+     kompozytowana, zero przeliczania układu. */
+  .vote-card--skeleton .vote-card__photo,
+  .vote-card--skeleton .vote-skeleton__line {
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgb(255 255 255 / .07) 40%,
+      rgb(255 255 255 / .07) 55%,
+      transparent 75%
+    );
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    animation: vote-skeleton 1.5s ease-in-out infinite;
+  }
+  @keyframes vote-skeleton {
+    from { background-position: 140% 0; }
+    to { background-position: -60% 0; }
+  }
+}
+
+/* ------------------------------------------------------ nowy uczestnik wjeżdża */
+/* Wóz dopisany w panelu w trakcie wyścigu doszedłby bez śladu: siatka przeskakuje, bo doszedł
+   jeden element, i trzeba go odnaleźć wzrokiem między kilkudziesięcioma innymi. Żółta obwódka
+   gaśnie razem z animacją, a klasę zdejmuje JavaScript po sześciu sekundach — patrz `freshIds`
+   w voting-page.js. */
+@media (prefers-reduced-motion: no-preference) {
+  .vote-card.is-fresh { animation: vote-arrive .65s cubic-bezier(.2, .8, .3, 1) both; }
+  @keyframes vote-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(.94);
+      border-color: var(--yellow);
+      box-shadow: 0 0 0 6px rgb(255 201 40 / .28);
+    }
+    60% { border-color: var(--yellow); box-shadow: 0 0 0 4px rgb(255 201 40 / .2); }
+    to { opacity: 1; transform: none; }
+  }
+}
+/* Bez animacji zostaje samo wyróżnienie kolorem — nadal odpowiada na „który doszedł". */
+@media (prefers-reduced-motion: reduce) {
+  .vote-card.is-fresh { border-color: var(--yellow); }
+}
+
 /* Zdjęcie jest teraz celem dotknięcia — patrz komentarz przy card() w voting-page.js.
    Wyższe niż szerokie: podpis kładzie się na dolnej części, a przy 4/3 zjadał zdjęcie. */
 .vote-card__photo {
