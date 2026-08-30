@@ -50,7 +50,23 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
     // switches when the panel got the ability to turn a section off without a deploy,
     // for the weeks when the photos or the numbers are not ready to be shown.
     prizes: true,
-    counters: true
+    counters: true,
+    /* Spinacz w czacie. WYŁĄCZONY.
+       ---------------------------------------------------------------------------
+       Cała droga zdjęcia działa: przeglądarka je zmniejsza, worker sprawdza pierwsze bajty
+       i wgrywa do prywatnego bucketa `chat-photos` (migracja 0024), a organizator widzi je
+       w panelu przy wiadomości. Nie działa jedno ogniwo — model wizyjny. Groq wycofał
+       modele przyjmujące obrazy z tego konta, więc `AI_VISION_MODEL` nie ma czym ustawić,
+       a askModel() bez niego oddaje każdą wiadomość ze zdjęciem prosto człowiekowi.
+
+       Spinacz zapraszał więc do wysłania zdjęcia i pytania „czy takie koło przejdzie?",
+       po czym rozmowa milkła do godzin pracy organizatora. Przycisk, który obiecuje
+       odpowiedź automatu i jej nie daje, jest gorszy niż brak przycisku.
+
+       Zostaje przełącznikiem, nie usunięciem: obsługa po stronie serwera jest napisana,
+       przetestowana i wgrana. Gdy pojawi się model wizyjny, wystarczy `true` tutaj i
+       `AI_VISION_MODEL` w Vercelu. */
+    chatPhotos: false
   },
   endpoints: {
     registration: '',

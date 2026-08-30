@@ -6639,30 +6639,51 @@ import {
       window.dispatchEvent(new Event('carruleddhi:relayout'));
     };
 
-    attachButton.addEventListener('click', () => fileField.click());
-    previewDrop.addEventListener('click', dropAttachment);
-    fileField.addEventListener('change', async () => {
-      const file = fileField.files?.[0];
-      if (!file) return;
-      try {
-        attached = await shrinkPhoto(file);
-        paintAttach();
-        window.dispatchEvent(new Event('carruleddhi:relayout'));
-        input?.focus({ preventScroll: true });
-      } catch (error) {
-        console.warn('Chat attachment could not be prepared:', error);
-        dropAttachment();
-        note('chat.attachFailed');
-      }
-    });
+    /* SPINACZ WCHODZI DO ZNACZNIKA TYLKO PRZY WŁĄCZONEJ FLADZE.
+       ---------------------------------------------------------------------------
+       `features.chatPhotos` stoi dziś na `false` — powód jest wypisany przy samej fladze w
+       site-config.js: cała droga zdjęcia działa oprócz modelu wizyjnego, którego to konto
+       Groqa nie ma. Spinacz zapraszał więc do wysłania zdjęcia z pytaniem „czy takie koło
+       przejdzie?", po czym rozmowa milkła do godzin pracy organizatora.
 
-    if (form) {
-      form.prepend(attachButton);
-      form.append(fileField);
-      form.before(preview);
+       Wyłączone przez NIEDODANIE do znacznika, nie przez `hidden` ani `display: none`:
+       ukryty przycisk zostaje w kolejności tabulacji dopóki ktoś nie doda `hidden`, a ukryte
+       `input[type=file]` nadal da się kliknąć skryptem z konsoli. Czego nie ma w drzewie, tego
+       nie da się nacisnąć ani przypadkiem, ani celowo.
+
+       `attached`, `paintAttach` i `dropAttachment` zostają zdefiniowane wyżej z rozmysłu.
+       Woła je `send()` i `startFresh()`, a przy wyłączonej fladze `attached` zostaje na zawsze
+       `null` — czyli te wywołania robią dokładnie to, co robiły, gdy nikt nie wybrał zdjęcia.
+       Owijanie ich w warunki znaczyłoby trzy nowe rozgałęzienia po to, żeby schować przycisk.
+
+       Serwer nie jest ruszany. Obsługa zdjęcia w workerze i bucket z migracji 0024 zostają
+       na miejscu, przetestowane; gdy pojawi się model wizyjny, wraca to jednym `true`. */
+    if (config.features.chatPhotos) {
+      attachButton.addEventListener('click', () => fileField.click());
+      previewDrop.addEventListener('click', dropAttachment);
+      fileField.addEventListener('change', async () => {
+        const file = fileField.files?.[0];
+        if (!file) return;
+        try {
+          attached = await shrinkPhoto(file);
+          paintAttach();
+          window.dispatchEvent(new Event('carruleddhi:relayout'));
+          input?.focus({ preventScroll: true });
+        } catch (error) {
+          console.warn('Chat attachment could not be prepared:', error);
+          dropAttachment();
+          note('chat.attachFailed');
+        }
+      });
+
+      if (form) {
+        form.prepend(attachButton);
+        form.append(fileField);
+        form.before(preview);
+      }
+      paintAttach();
+      window.addEventListener('carruleddhi:language', paintAttach);
     }
-    paintAttach();
-    window.addEventListener('carruleddhi:language', paintAttach);
 
     async function send(body) {
       const message = String(body || '').trim();
