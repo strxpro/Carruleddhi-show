@@ -334,48 +334,23 @@
           <div class="podium__ground" aria-hidden="true"></div>
         </div>
 
-        <!-- Reszta stawki jednym zdaniem, małym drukiem.
+        <!-- CAŁA STAWKA OD RAZU, BEZ PRZYCISKU.
              ==================================================================
-             Pierwsze pytanie po „kto wygrał" brzmi „a gdzie reszta". Pełna klasyfikacja jest
-             pod przyciskiem niżej, ale rozwinięcie jej to decyzja — a to zdanie odpowiada
-             od razu i nie zabiera miejsca: czwarte, piąte i szóste miejsce z punktami, w
-             jednej linii, drobnym drukiem pod cokołem.
+             Stał tu przycisk „Classifica completa", a pod nim zwijana lista doczytywana po
+             pięć. Dwie decyzje do podjęcia, żeby zobaczyć wynik, którego i tak wszyscy
+             szukają: nacisnąć, a potem doczytywać. W dniu po wyścigu to jest jedyna rzecz,
+             po którą ktoś tu wchodzi.
 
-             Wypełnia je voting.js z tej samej odpowiedzi serwera, co cokół. Puste, gdy
-             stawka kończy się na trzech. -->
-        <p class="podium__rest" data-podium-rest hidden></p>
+             Teraz jest jedna lista, widoczna od pierwszej sekundy, a wyróżnienie robi
+             ROZMIAR: pierwsze miejsce ma największe zdjęcie, drugie średnie, trzecie
+             mniejsze, a pozostałe najmniejsze. Kolejność czyta się bez czytania cyfr, tak
+             samo jak na cokole wyżej — bo to ta sama zasada, tylko w dwóch wymiarach.
 
-        <div class="podium__actions">
-          <!-- Pełna klasyfikacja rozwija się TUTAJ, pod cokołem — nie prowadzi na podstronę.
-               ==========================================================================
-               Cokół odpowiada na jedno pytanie: kto wygrał. Następne pytanie brzmi „a gdzie
-               jest mój wóz" i jest zadawane w tym samym miejscu, tą samą sekundę. Przeskok na
-               osobną podstronę gubił kontekst i kazał wracać przyciskiem wstecz.
-
-               Porcjami po pięć, bo pełna stawka to kilkadziesiąt wierszy i rozwinięta naraz
-               spycha stopkę poza ekran — czyli odpowiada na pytanie, którego nikt nie zadał,
-               kosztem tego, co było widać.
-
-               Stała tu wcześniej zwijana lista zwycięzców dwunastu nagród. Zdjęta razem z
-               przejściem na jedną nagrodę publiczności: tamtych dwanaście rozstrzyga jury i
-               stoper, więc lista „zwycięzców" wyliczona z głosów publiczności mówiłaby o nich
-               coś, czego nie da się z tych głosów wyliczyć. -->
-          <button class="btn btn--blue" type="button" data-podium-toggle
-                  aria-expanded="false" aria-controls="podium-standings">
-            <span data-podium-toggle-label data-i18n="voting.seeAll">Classifica completa</span>
-            <span class="podium__chev" aria-hidden="true">↓</span>
-          </button>
-        </div>
-
-        <!-- Lista dorysowywana przez voting.js z tej samej odpowiedzi serwera, co cokół —
-             ani jednego żądania więcej. `hidden` do pierwszego naciśnięcia. -->
-        <div class="podium__standings" id="podium-standings" data-podium-standings hidden>
-          <ol class="standings" data-standings-list></ol>
-          <div class="standings__more">
-            <button class="btn btn--outline" type="button" data-standings-more hidden>
-              <span data-standings-more-label data-i18n="voting.loadMore">Mostra altri</span>
-            </button>
-          </div>
+             Nagłówek nad listą mówi, ile tego jest, żeby długość listy nie była
+             niespodzianką po przewinięciu. -->
+        <div class="podium__field" data-podium-field hidden>
+          <h3 class="podium__field-title" data-podium-field-title></h3>
+          <ol class="podium__field-list" data-podium-field-list></ol>
         </div>
       </div>
     </section>

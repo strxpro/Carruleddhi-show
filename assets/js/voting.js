@@ -98,7 +98,7 @@ import {
     paintPodium();
     paintClock();
     paintHeroVote();
-    paintStandings();
+    paintField();
   }
 
   /**
@@ -122,6 +122,83 @@ import {
         a.startNumber - b.startNumber);
   }
 
+  /**
+   * Pozostała stawka: od czwartego miejsca w dół, cała, od razu.
+   *
+   * Zastępuje `paintStandings()` — listę rozwijaną przyciskiem i doczytywaną po pięć. Dwie
+   * decyzje do podjęcia, żeby zobaczyć wynik, po który wszyscy tu przyszli. Teraz wyróżnienie
+   * robi ROZMIAR zdjęcia: cokół ma trzy największe, ta siatka najmniejsze.
+   *
+   * Te same posortowane wiersze co cokół (`standingsRows`), więc kolejność nie może się
+   * rozjechać z trzema kartami nad nią.
+   */
+  function paintField() {
+    const box = $('[data-podium-field]');
+    const list = $('[data-podium-field-list]');
+    const title = $('[data-podium-field-title]');
+    if (!box || !list) return;
+
+    // Pierwsza trójka stoi na cokole; ta siatka zaczyna się od czwartego miejsca.
+    const rest = standingsRows().slice(3);
+    if (!rest.length) {
+      box.hidden = true;
+      list.replaceChildren();
+      return;
+    }
+
+    box.hidden = false;
+    /* Ile tego jest, powiedziane nad listą. Bez tego długość stawki jest niespodzianką po
+       przewinięciu — a przy kilkudziesięciu wozach to długie przewijanie. */
+    if (title) {
+      title.textContent = `${text('voting.restTitle')} · ${rest.length}`;
+    }
+
+    list.replaceChildren(...rest.map((row, index) => {
+      const item = document.createElement('li');
+      item.className = 'podium__field-item';
+
+      const figure = document.createElement('figure');
+      figure.className = 'podium__field-photo';
+      const image = document.createElement('img');
+      image.src = row.photo || avatarFor(row);
+      image.alt = '';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      figure.append(image);
+
+      const place = document.createElement('span');
+      place.className = 'podium__field-place';
+      // Numeracja od czwartego, nie od pierwszego wiersza tej listy.
+      place.textContent = String(index + 4);
+      figure.append(place);
+
+      const body = document.createElement('div');
+      body.className = 'podium__field-body';
+      const project = document.createElement('strong');
+      project.textContent = row.projectName || text('voting.noProject');
+      const rider = document.createElement('span');
+      rider.textContent = `${row.firstName} ${row.lastName}`.trim();
+      const stats = document.createElement('p');
+      const points = document.createElement('b');
+      points.textContent = String(row.totalScore);
+      const count = document.createElement('small');
+      count.textContent = `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`;
+      stats.append(points, count);
+      body.append(project, rider, stats);
+
+      item.append(figure, body);
+      return item;
+    }));
+  }
+
+  /**
+   * NIEUŻYWANA OD PRZEJŚCIA NA JEDNĄ LISTĘ — zostaje wyłącznie dlatego, że wołają ją dwa
+   * nasłuchy niżej, podpięte do przycisków, których w znaczniku już nie ma. Kończy się na
+   * pierwszym `return`, bo `[data-podium-standings]` nie istnieje.
+   *
+   * Do usunięcia razem z nasłuchami i regułami `.standings__*` w voting.css przy następnej
+   * zmianie w tym pliku. Zostawione na jedno przejście, nie na zawsze.
+   */
   function paintStandings() {
     const box = $('[data-podium-standings]');
     const list = $('[data-standings-list]');
@@ -395,7 +472,6 @@ import {
       return item;
     }));
 
-    paintRest();
     /* Klasa na scenie, nie na rysunku: rysunku SVG już nie ma, a wznoszenie bloków i
        lądowanie kart są animacjami potomków tej scenki. */
     if (!reducedMotion) $('[data-podium-stage]')?.classList.add('is-drawn');
@@ -414,6 +490,11 @@ import {
    */
   const REST_SHOWN = 6;
 
+  /**
+   * NIEUŻYWANA. Zastąpiła ją `paintField()`, która pokazuje całą pozostałą stawkę w siatce
+   * zamiast sześciu pozycji w jednym zdaniu. `[data-podium-rest]` nie istnieje w znaczniku,
+   * więc kończy się na pierwszym `return`. Do usunięcia przy następnej zmianie w tym pliku.
+   */
   function paintRest() {
     const box = $('[data-podium-rest]');
     if (!box) return;
