@@ -16,6 +16,7 @@
 <body class="vote-page">
   <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
   <div class="noise" aria-hidden="true"></div>
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
 
   <!-- Nagłówek: ten sam pasek co na stronie głównej, z tym samym przełącznikiem języka.
        ==========================================================================
@@ -31,6 +32,14 @@
         <span class="brand__name">Carruleddhi</span>
         <span class="brand__date">17 · 10 · 2026</span>
       </a>
+
+      <div class="nav-current" data-nav-current aria-live="polite">
+        <span class="nav-current__pulse" aria-hidden="true"></span>
+        <span class="nav-current__copy">
+          <small class="nav-current__progress" data-nav-progress>00%</small>
+          <strong data-i18n="voting.pageKicker">Voto del pubblico</strong>
+        </span>
+      </div>
 
       <div class="nav-actions">
         <div class="language-picker" data-language-picker>
@@ -51,9 +60,46 @@
         <a class="btn btn--small btn--yellow" href="index.html" data-vote-back>
           <span data-i18n="voting.backToSite">← Torna al sito</span>
         </a>
+        <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Menu">
+          <span class="menu-toggle__label">Menu</span>
+          <span class="menu-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span>
+        </button>
       </div>
     </div>
   </header>
+
+  <!-- Menu, ten sam co na stronie głównej.
+       ==========================================================================
+       Te same klasy, więc te same style i to samo przejście — panel zjeżdża spod paska tak
+       jak tam. Obsługę ma jednak własną, w voting-boot.js: cała maszyneria menu siedzi w
+       app.js razem z czternastoma przypiętymi panelami, galerią 3D i GSAP-em, a wciąganie
+       tego wszystkiego na podstronę, która ma listę wozów i suwak, kosztowałoby więcej niż
+       waży cała ta strona.
+
+       Odsyłacze prowadzą do `index.html#…`, nie do samych zakotwiczeń: tych sekcji tutaj nie
+       ma, więc `#route` byłby skokiem donikąd. -->
+  <button class="menu-backdrop" type="button" data-menu-backdrop tabindex="-1" aria-label="Chiudi il menu"></button>
+  <nav class="mobile-nav" id="site-menu" data-mobile-menu aria-label="Main navigation" aria-hidden="true">
+    <div class="menu-panel__inner">
+      <div class="menu-panel__heading">
+        <span class="menu-panel__eyebrow">Carruleddhi Show 2026</span>
+        <span data-i18n="hero.kicker">17 ottobre 2026 · Santa Teresa Gallura</span>
+      </div>
+
+      <div class="menu-panel__grid">
+        <div class="menu-panel__links">
+          <a href="index.html#hero"><span class="menu-link__index">01</span><span>Carruleddhi</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#story"><span class="menu-link__index">02</span><span data-i18n="nav.race">La gara</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#categories"><span class="menu-link__index">03</span><span data-i18n="nav.categories">Categorie</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#route"><span class="menu-link__index">04</span><span data-i18n="nav.route">Percorso</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#schedule"><span class="menu-link__index">05</span><span data-i18n="nav.program">Programma</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#prizes"><span class="menu-link__index">06</span><span data-i18n="nav.prizes">Premi</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#faq"><span class="menu-link__index">07</span><span data-i18n="nav.faq">FAQ</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#contact"><span class="menu-link__index">08</span><span data-i18n="nav.contact">Contatti</span><span class="menu-link__arrow">↗</span></a>
+        </div>
+      </div>
+    </div>
+  </nav>
 
   <main class="vote-main" id="main">
     <div class="container">
@@ -75,6 +121,33 @@
       <p class="vote-notice" data-vote-notice hidden aria-live="polite"></p>
 
       <div class="vote-shell" data-vote-shell hidden>
+        <section class="vote-results" data-vote-results hidden aria-labelledby="vote-results-title">
+          <header class="vote-results__head">
+            <span class="eyebrow" data-i18n="voting.podiumKicker">Risultato del pubblico</span>
+            <h2 id="vote-results-title" data-i18n="voting.podiumTitle">Il podio.</h2>
+            <p data-i18n="voting.resultsLead">Il voto è chiuso. Ecco tutti i partecipanti, dal punteggio più alto.</p>
+          </header>
+          <ol class="vote-podium" data-vote-podium aria-label="Podio"></ol>
+          <div class="vote-standings">
+            <h3 data-i18n="voting.seeAll">Classifica completa</h3>
+            <div class="vote-standings__scroll" tabindex="0">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Carruleddhi</th>
+                    <th scope="col" data-i18n="voting.points">punti</th>
+                    <th scope="col" data-i18n="voting.avgShort">media</th>
+                    <th scope="col" data-i18n="voting.votes">voti</th>
+                  </tr>
+                </thead>
+                <tbody data-vote-standings></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div data-vote-open-content>
         <!-- Panel „Twój głos".
              Bez niego jedyną informacją o oddanym głosie była plakietka na jednym z
              kilkudziesięciu kafelków — czyli trzeba było go najpierw znaleźć. Głos jest jeden na
@@ -109,6 +182,7 @@
           <button class="btn btn--outline" type="button" data-vote-more hidden>
             <span data-vote-more-label data-i18n="voting.loadMore">Mostra altri</span>
           </button>
+        </div>
         </div>
       </div>
     </div>
@@ -212,6 +286,37 @@
         <span>© <span data-current-year>2026</span> Carruleddhi Show · Santa Teresa Gallura</span>
         <span data-i18n="footer.credit">Progetto digitale Carruleddhi Show</span>
       </div>
+    </div>
+
+    <div class="footer-glow" data-footer-glow aria-hidden="true">
+      <svg viewBox="0 0 1271 599" preserveAspectRatio="none" focusable="false">
+        <defs>
+          <linearGradient id="vote-footer-glow-grad" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#340B05"/>
+            <stop offset="0.1827" stop-color="#0358F7"/>
+            <stop offset="0.2837" stop-color="#5092C7"/>
+            <stop offset="0.4135" stop-color="#E1ECFE"/>
+            <stop offset="0.5866" stop-color="#FFD400"/>
+            <stop offset="0.6827" stop-color="#FA3D1D"/>
+            <stop offset="0.8029" stop-color="#FD02F5"/>
+            <stop offset="1" stop-color="#FFC0FD" stop-opacity="0"/>
+          </linearGradient>
+          <filter id="vote-footer-glow-blur" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="34"/>
+          </filter>
+        </defs>
+        <g filter="url(#vote-footer-glow-blur)" fill="url(#vote-footer-glow-grad)">
+          <g class="footer-glow__col" style="--i:0"><rect x="-30" y="269" width="200" height="360" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:1"><rect x="111" y="185" width="200" height="444" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:2"><rect x="252" y="120" width="200" height="509" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:3"><rect x="393" y="74" width="200" height="555" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:4"><rect x="534" y="12" width="200" height="617" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:5"><rect x="675" y="74" width="200" height="555" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:6"><rect x="816" y="120" width="200" height="509" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:7"><rect x="957" y="185" width="200" height="444" rx="100"/></g>
+          <g class="footer-glow__col" style="--i:8"><rect x="1098" y="269" width="200" height="360" rx="100"/></g>
+        </g>
+      </svg>
     </div>
   </footer>
 

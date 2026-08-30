@@ -212,9 +212,47 @@ function paintDemoBanner() {
   document.body.prepend(banner);
 }
 
+function setupScrollEffects() {
+  const progress = document.querySelector('[data-scroll-progress]');
+  const navProgress = document.querySelector('[data-nav-progress]');
+  const glow = document.querySelector('[data-footer-glow]');
+  if (!progress && !navProgress && !glow) return;
+
+  let frame = 0;
+  let documentHeight = 1;
+  let glowHeight = 1;
+  const measure = () => {
+    documentHeight = document.documentElement.scrollHeight;
+    glowHeight = glow?.offsetHeight || 1;
+  };
+  const paint = () => {
+    frame = 0;
+    const max = Math.max(1, documentHeight - window.innerHeight);
+    const ratio = Math.min(1, Math.max(0, window.scrollY / max));
+    if (progress) progress.style.width = `${(ratio * 100).toFixed(2)}%`;
+    if (navProgress) navProgress.textContent = `${String(Math.round(ratio * 100)).padStart(2, '0')}%`;
+    if (glow) {
+      const left = documentHeight - window.innerHeight - window.scrollY;
+      const reveal = Math.min(1, Math.max(0, (glowHeight - left) / glowHeight));
+      glow.style.setProperty('--footer-glow-progress', (0.05 + 0.95 * reveal).toFixed(4));
+    }
+  };
+  const schedule = () => {
+    if (!frame) frame = window.requestAnimationFrame(paint);
+  };
+  const remeasure = () => { measure(); schedule(); };
+
+  measure();
+  paint();
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', remeasure, { passive: true });
+  if ('ResizeObserver' in window) new ResizeObserver(remeasure).observe(document.body);
+}
+
 function boot() {
   paintDemoBanner();
   setupPicker();
+  setupScrollEffects();
   // Rok w stopce z zegara, nie wpisany: strona przeżyje sylwestra.
   document.querySelectorAll('[data-current-year]').forEach((slot) => {
     slot.textContent = String(new Date().getFullYear());
@@ -252,3 +290,51 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
 else boot();
 
 export { text };
+
+/* ===========================================================================
+   Menu podstrony
+   ===========================================================================
+   Te same klasy co na stronie głównej (`.mobile-nav.is-open`, `.menu-backdrop.is-open`,
+   `body.is-menu-open`), więc CSS i przejście są wspólne — tu jest tylko otwieranie.
+
+   Nie da się tego wziąć z app.js: tamta obsługa jest wpleciona w system przypiętych paneli,
+   blokadę przewijania i pułapkę fokusu całej strony głównej. Podstrona ma jeden ekran treści,
+   więc powtórzenie trzydziestu linijek jest tańsze niż wciągnięcie tamtego modułu.
+
+   Escape i kliknięcie w tło zamykają, a fokus wraca na przycisk — bez tego zamknięcie menu
+   z klawiatury zostawia kursor w panelu, którego już nie widać.
+*/
+function setupMenu() {
+  const toggle = document.querySelector('[data-menu-toggle]');
+  const menu = document.querySelector('[data-mobile-menu]');
+  const backdrop = document.querySelector('[data-menu-backdrop]');
+  if (!toggle || !menu) return;
+
+  const setOpen = (open) => {
+    menu.classList.toggle('is-open', open);
+    menu.setAttribute('aria-hidden', String(!open));
+    backdrop?.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    document.querySelector('.site-header')?.classList.toggle('is-menu-open', open);
+    document.body.classList.toggle('is-menu-open', open);
+    /* Blokada przewijania tła, ta sama klasa co na stronie głównej: bez niej lista wozów
+       jedzie pod otwartym panelem przy każdym ruchu palca. */
+    document.body.classList.toggle('is-locked', open);
+  };
+
+  toggle.addEventListener('click', () => setOpen(!menu.classList.contains('is-open')));
+  backdrop?.addEventListener('click', () => { setOpen(false); toggle.focus(); });
+  /* Odsyłacze wychodzą na inną stronę, ale zamknięcie i tak jest potrzebne: powrót
+     przyciskiem wstecz pokazuje stronę z pamięci, razem z otwartym menu. */
+  menu.addEventListener('click', (event) => {
+    if (event.target.closest('a')) setOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && menu.classList.contains('is-open')) {
+      setOpen(false);
+      toggle.focus();
+    }
+  });
+}
+
+setupMenu();

@@ -215,6 +215,7 @@ import {
     paintPhase();
     paintMyVote();
     paintFilters();
+    paintResults();
     paintGrid();
   }
 
@@ -231,6 +232,11 @@ import {
       shell.hidden = state.loaded && !(open || closed);
       shell.classList.toggle('is-closed', closed);
     }
+
+    const openContent = $('[data-vote-open-content]');
+    if (openContent) openContent.hidden = closed;
+    const results = $('[data-vote-results]');
+    if (results) results.hidden = !closed;
 
     const notice = $('[data-vote-notice]');
     if (notice) {
@@ -335,21 +341,131 @@ import {
     );
   }
 
-  function rows() {
-    const list = state.participants.filter((row) => !state.category || row.category === state.category);
-    if (state.phase !== 'closed') return list;
-    /* Po zamknięciu ta sama siatka jest rankingiem, więc kolejność jest wynikiem. W trakcie
-       głosowania zostaje numer startowy: sortowanie po wyniku pokazywałoby, kto prowadzi, a to
-       zamienia ocenianie pojazdów w dopisywanie się do lidera pierwszej godziny.
-
-       Suma punktów, nie średnia — ta sama kolejność, którą Worker liczy dla podium. Gdyby siatka
-       sortowała inaczej niż cokół, pierwszy kafelek na liście nie byłby zwycięzcą i nikt by tego
-       nie umiał wytłumaczyć. */
-    return [...list].sort((a, b) =>
+  function standingsRows() {
+    return [...state.participants].sort((a, b) =>
       b.totalScore - a.totalScore ||
       b.voteCount - a.voteCount ||
       b.averageScore - a.averageScore ||
       a.startNumber - b.startNumber);
+  }
+
+  function rows() {
+    return state.participants.filter((row) => !state.category || row.category === state.category);
+  }
+
+  function formattedAverage(row) {
+    if (!row.voteCount) return '—';
+    return new Intl.NumberFormat(document.documentElement.lang || 'it', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(Number(row.averageScore) || 0);
+  }
+
+  /** Osobny finał: podium i pełna tabela istnieją wyłącznie po zamknięciu głosowania. */
+  function paintResults() {
+    const section = $('[data-vote-results]');
+    const podium = $('[data-vote-podium]');
+    const standings = $('[data-vote-standings]');
+    if (!section || !podium || !standings) return;
+
+    const closed = state.loaded && state.phase === 'closed';
+    section.hidden = !closed;
+    if (!closed) {
+      podium.replaceChildren();
+      standings.replaceChildren();
+      return;
+    }
+
+    const ranked = standingsRows();
+    const podiumNodes = ranked.slice(0, 3).map((row, index) => {
+      const place = index + 1;
+      const item = document.createElement('li');
+      item.className = 'vote-podium__item';
+      item.dataset.place = String(place);
+
+      const winner = document.createElement('article');
+      winner.className = 'vote-podium__winner';
+      const photo = document.createElement('figure');
+      photo.className = 'vote-podium__photo';
+      const image = document.createElement('img');
+      image.src = row.photo || avatarFor(row);
+      image.alt = cartLabel(row);
+      image.loading = 'eager';
+      image.decoding = 'async';
+      const medal = document.createElement('span');
+      medal.className = 'vote-podium__medal';
+      medal.textContent = String(place);
+      medal.setAttribute('aria-hidden', 'true');
+      photo.append(image, medal);
+
+      const copy = document.createElement('div');
+      copy.className = 'vote-podium__copy';
+      const title = document.createElement('strong');
+      title.textContent = cartLabel(row);
+      const rider = document.createElement('span');
+      rider.textContent = `${riderName(row)} · ${startBadge(row)}`;
+      const score = document.createElement('p');
+      const points = document.createElement('b');
+      points.textContent = row.voteCount ? String(row.totalScore) : '—';
+      const scoreLabel = document.createElement('small');
+      scoreLabel.textContent = row.voteCount
+        ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+        : text('voting.noVotes');
+      score.append(points, scoreLabel);
+      copy.append(title, rider, score);
+      winner.append(photo, copy);
+
+      const step = document.createElement('div');
+      step.className = 'vote-podium__step';
+      step.setAttribute('aria-hidden', 'true');
+      const numeral = document.createElement('b');
+      numeral.textContent = String(place);
+      step.append(numeral);
+      item.append(winner, step);
+      return item;
+    });
+    podium.replaceChildren(...podiumNodes);
+
+    const tableRows = ranked.map((row, index) => {
+      const tr = document.createElement('tr');
+      if (index < 3) tr.dataset.place = String(index + 1);
+
+      const rank = document.createElement('th');
+      rank.scope = 'row';
+      rank.className = 'vote-standings__rank';
+      rank.textContent = String(index + 1);
+
+      const who = document.createElement('td');
+      who.className = 'vote-standings__who';
+      const image = document.createElement('img');
+      image.src = row.photo || avatarFor(row);
+      image.alt = '';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      const identity = document.createElement('span');
+      const cart = document.createElement('strong');
+      cart.textContent = cartLabel(row);
+      const rider = document.createElement('small');
+      rider.textContent = `${riderName(row)} · ${row.category} · ${startBadge(row)}`;
+      identity.append(cart, rider);
+      who.append(image, identity);
+
+      const points = document.createElement('td');
+      points.className = 'vote-standings__number vote-standings__points';
+      points.dataset.label = text('voting.points');
+      points.textContent = row.voteCount ? String(row.totalScore) : '—';
+      const average = document.createElement('td');
+      average.className = 'vote-standings__number';
+      average.dataset.label = text('voting.avgShort');
+      average.textContent = formattedAverage(row);
+      const votes = document.createElement('td');
+      votes.className = 'vote-standings__number';
+      votes.dataset.label = text('voting.votes');
+      votes.textContent = String(row.voteCount || 0);
+      tr.append(rank, who, points, average, votes);
+      return tr;
+    });
+    standings.replaceChildren(...tableRows);
   }
 
   /**
@@ -396,6 +512,16 @@ import {
       return;
     }
     grid.removeAttribute('aria-busy');
+
+    /* Po zamknięciu nie budujemy równolegle ukrytej siatki kart. Wynik ma jeden widok:
+       podium i pełną tabelę, a ta gałąź dodatkowo gwarantuje, że ranking nie istnieje w DOM
+       przed fazą `closed`. */
+    if (state.phase === 'closed') {
+      grid.replaceChildren();
+      if (empty) empty.hidden = true;
+      paintMore(0);
+      return;
+    }
 
     const all = rows();
     if (empty) empty.hidden = all.length > 0;
@@ -678,9 +804,13 @@ import {
       : 'btn btn--yellow btn--small vote-card__start';
     open.dataset.voteStart = '';
     open.textContent = startLabel;
+    open.setAttribute('aria-expanded', 'false');
 
     /* ---------------------------------------------------------------- krok 1: pytanie */
     const ask = document.createElement('div');
+    const flowId = `vote-flow-${String(row.id).replace(/[^a-z0-9_-]/gi, '-')}`;
+    ask.id = `${flowId}-ask`;
+    open.setAttribute('aria-controls', ask.id);
     ask.className = 'vote-ask';
     ask.hidden = true;
     const question = document.createElement('p');
@@ -705,6 +835,7 @@ import {
 
     /* ---------------------------------------------------------------- krok 2: suwak */
     const picker = document.createElement('div');
+    picker.id = `${flowId}-picker`;
     picker.className = 'vote-picker';
     picker.hidden = true;
 
@@ -779,11 +910,16 @@ import {
       ask.hidden = true;
       picker.hidden = true;
       open.hidden = false;
+      open.setAttribute('aria-expanded', 'false');
+      open.setAttribute('aria-controls', ask.id);
     };
     /* Jeden otwarty wybór na całą stronę. Dwa otwarte suwaki na dwóch kafelkach to pytanie
        „który z nich właśnie wysyłam", zadane w chwili wysyłania. */
     const closeOthers = () => {
-      $$('[data-vote-start]').forEach((other) => { other.hidden = false; });
+      $$('[data-vote-start]').forEach((other) => {
+        other.hidden = false;
+        other.setAttribute('aria-expanded', 'false');
+      });
       $$('.vote-ask').forEach((other) => { other.hidden = true; });
       $$('.vote-picker').forEach((other) => { other.hidden = true; });
     };
@@ -791,8 +927,10 @@ import {
     const toAsk = () => {
       closeOthers();
       open.hidden = true;
+      open.setAttribute('aria-expanded', 'true');
+      open.setAttribute('aria-controls', ask.id);
       ask.hidden = false;
-      askYes.focus();
+      askYes.focus({ preventScroll: true });
     };
     open.addEventListener('click', toAsk);
     /* Uchwyt dla dotknięcia w zdjęcie — kafelek woła to zamiast powielać kroki u siebie. */
@@ -801,10 +939,17 @@ import {
     askYes.addEventListener('click', () => {
       ask.hidden = true;
       picker.hidden = false;
-      slider.focus();
+      open.setAttribute('aria-controls', picker.id);
+      slider.focus({ preventScroll: true });
     });
-    askNo.addEventListener('click', () => { reset(); open.focus(); });
-    cancel.addEventListener('click', () => { reset(); open.focus(); });
+    askNo.addEventListener('click', () => { reset(); open.focus({ preventScroll: true }); });
+    cancel.addEventListener('click', () => { reset(); open.focus({ preventScroll: true }); });
+    wrap.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape' || (!open.hidden && ask.hidden && picker.hidden)) return;
+      event.preventDefault();
+      reset();
+      open.focus({ preventScroll: true });
+    });
 
     wrap.append(open, ask, picker);
     return wrap;

@@ -157,7 +157,7 @@ function cartArt(startNumber, index) {
 }
 
 /**
- * Osiemnastu uczestników, nie sześciu.
+ * Dwudziestu uczestników, nie sześciu.
  * ---------------------------------------------------------------------------
  * Sześciu wystarczało, dopóki siatka mieściła się na jednym ekranie. Podstrona głosowania
  * dokłada dwie rzeczy, których na sześciu kafelkach nie da się ani zobaczyć, ani zmierzyć:
@@ -202,7 +202,20 @@ const RAW_PARTICIPANTS = [
   { startNumber: 108, category: 'classic', firstName: 'Giovanni', lastName: 'Addis',
     projectName: 'Maestrale', photo: '/assets/images/gallery-finish.svg', votes: 18, average: 7.96 },
   { startNumber: 113, category: 'art', firstName: 'Sara', lastName: 'Demuru',
-    projectName: 'Ginepro Blu', photo: '/assets/images/gallery-race.svg', votes: 21, average: 8.48 }
+    projectName: 'Ginepro Blu', photo: '/assets/images/gallery-race.svg', votes: 21, average: 8.48 },
+  /* Dwie pary z tym samym imieniem — bez nich nie da sie zobaczyc plakietki, ktora dokłada
+     nazwisko (nameBadges w voting-page.js), a to jest przypadek normalny w wiosce, gdzie
+     polowa startujacych to kuzyni.
+
+     Salvatore Mannu (007) i Salvatore Pinna: pierwsze litery nazwisk sa rozne, wiec wystarcza
+     jedna — „Salvatore M." i „Salvatore P.".
+     Giulia Deiana (012) i Giulia Demuru: „D" i „De" sa wspolne, wiec przedrostek musi urosnac
+     do trzech liter — „Giulia Dei." i „Giulia Dem.". To ten drugi przypadek jest powodem, dla
+     ktorego przedrostek nie moze byc na sztywno jednoliterowy. */
+  { startNumber: 121, category: 'classic', firstName: 'Salvatore', lastName: 'Pinna',
+    projectName: 'Punta Falcone', photo: '', votes: 11, average: 7.1 },
+  { startNumber: 128, category: 'art', firstName: 'Giulia', lastName: 'Demuru',
+    projectName: 'Barca a Rotelle', photo: '', votes: 13, average: 7.4 }
 ];
 
 /**
