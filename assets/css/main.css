@@ -859,6 +859,12 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .field.is-invalid input, .field.is-invalid textarea, .field.is-invalid select { border-color: var(--coral); }
 .field__error { display: none; margin: 6px 5px 0; color: var(--coral); font-size: 12px; }
 .field.is-invalid .field__error { display: block; }
+/* Podpowiedź pod polem — po co je wypełniać, a nie co jest w nim nie tak.
+   Osobno od `.field__error`, bo tamto pojawia się dopiero po błędzie i na czerwono; ta stoi
+   od początku i ma być cicha. Chowana, gdy pole jest niepoprawne: dwa zdania pod jednym
+   polem, jedno szare i jedno czerwone, każą czytać oba, żeby znaleźć to, które coś znaczy. */
+.field__note { margin: 6px 5px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.field.is-invalid .field__note { display: none; }
 .choice-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
 .choice { position: relative; }
 .choice input { position: absolute; opacity: 0; }
@@ -904,12 +910,114 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .accordion { border-bottom: 1px solid var(--line); }
 .accordion__item { border-top: 1px solid var(--line); }
 .accordion__button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 20px; padding: 25px 0; border: 0; background: transparent; color: var(--navy-950); font-family: var(--font-display); font-size: clamp(18px,2.1vw,25px); text-align: left; cursor: pointer; }
-.accordion__plus { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: 50%; background: var(--blue-600); color: var(--white); transition: transform .4s var(--ease-out); }
-.accordion__button[aria-expanded='true'] .accordion__plus { transform: rotate(45deg); background: var(--coral); }
+/* PLUS RYSOWANY DWOMA KRESKAMI, NIE ZNAKIEM Z KROJU.
+   ---------------------------------------------------------------------------
+   Stał tu `＋` (U+FF0B, fullwidth plus) jako treść spana, i dlatego nie dawał się
+   wyśrodkować. `place-items: center` centruje BOX wiersza tekstu, a nie rysunek glifu:
+   pole znaku fullwidth jest szersze od samych kresek, ma własną linię bazową i half-leading
+   z `line-height: normal`, więc plus siedział poniżej środka kółka. Do tego `font-size` był
+   dziedziczony z `.accordion__button`, który ma `clamp()` zależny od wysokości okna — czyli
+   przesunięcie zmieniało się razem z rozmiarem przeglądarki i nie dawało się skorygować
+   żadną stałą wartością.
+
+   Dwie kreski pozycjonowane absolutnie względem kółka są wyśrodkowane z konstrukcji: nie
+   zależą od kroju, od `line-height` ani od rozmiaru tekstu w przycisku. */
+.accordion__plus {
+  position: relative;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue-600);
+  color: var(--white);
+  /* Obrót i kolor osobno, bo kolor ma nadążyć za palcem, a obrót ma być widoczny. */
+  transition: transform .42s var(--ease-snap), background-color .25s ease;
+}
+.accordion__plus::before,
+.accordion__plus::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: currentColor;
+  /* Pół piksela ujemnego marginesu na grubości nieparzystej: `translate(-50%, -50%)` na
+     wysokości 2,5 px wypada na połówce piksela i przeglądarka rozmywa kreskę. */
+  transform: translate(-50%, -50%);
+}
+.accordion__plus::after { transform: translate(-50%, -50%) rotate(90deg); }
+/* Otwarte: kółko obraca się o 135°, więc pionowa kreska ląduje dokładnie na poziomej i plus
+   staje się minusem. 45° zostawiałoby iks, a to znak „zamknij", nie „zwiń". */
+.accordion__button[aria-expanded='true'] .accordion__plus {
+  transform: rotate(135deg);
+  background: var(--coral);
+}
+.accordion__button[aria-expanded='true'] .accordion__plus::after { opacity: 0; }
+.accordion__plus::after { transition: opacity .3s ease; }
+
+/* Naciśnięcie potwierdzone na kółku, nie tylko na treści: akordeon rozwija się prawie pół
+   sekundy, a bez tego pierwsze 100 ms wygląda, jakby klik nie doszedł. */
+.accordion__button:active .accordion__plus { transform: scale(.9); }
+.accordion__button[aria-expanded='true']:active .accordion__plus { transform: rotate(135deg) scale(.9); }
+.accordion__button:hover .accordion__plus { background: var(--navy-950); }
+.accordion__button[aria-expanded='true']:hover .accordion__plus { background: var(--coral); }
+
 .accordion__panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--ease-out); }
 .accordion__panel > div { overflow: hidden; }
-.accordion__panel p { max-width: 65ch; margin: 0; padding: 0 50px 25px 0; color: var(--muted); line-height: 1.7; }
+/* Treść wjeżdża, nie tylko się odsłania.
+   Samo `grid-template-rows: 0fr -> 1fr` przycina akapit od dołu, więc tekst wysuwa się
+   spod krawędzi jak z kieszeni. Dołożone przesunięcie i przezroczystość sprawiają, że
+   akapit wchodzi jako całość — a opóźnienie 90 ms znaczy, że najpierw robi się miejsce,
+   a potem pojawia się treść, zamiast obu rzeczy naraz. */
+.accordion__panel p {
+  max-width: 65ch;
+  margin: 0;
+  padding: 0 50px 25px 0;
+  color: var(--muted);
+  line-height: 1.7;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity .3s ease, transform .38s var(--ease-out);
+}
 .accordion__button[aria-expanded='true'] + .accordion__panel { grid-template-rows: 1fr; }
+.accordion__button[aria-expanded='true'] + .accordion__panel p {
+  opacity: 1;
+  transform: none;
+  transition-delay: .09s;
+}
+/* Otwarty wiersz zabarwiony i podkreślony od lewej — po zwinięciu jednego z pięciu pytań
+   inaczej nie widać, które było otwarte, bo wszystkie mają identyczną kreskę u góry. */
+.accordion__item {
+  position: relative;
+  transition: background-color .3s ease;
+}
+.accordion__item::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--coral);
+  transition: width .45s var(--ease-out);
+}
+.accordion__item:has(.accordion__button[aria-expanded='true'])::after { width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .accordion__plus,
+  .accordion__plus::after,
+  .accordion__panel,
+  .accordion__panel p,
+  .accordion__item,
+  .accordion__item::after { transition: none; }
+  /* Bez przejścia przesunięcie musi być zdjęte od razu, inaczej zwinięty akapit zostaje
+     przesunięty o 8 px w górę na stałe. */
+  .accordion__panel p { opacity: 1; transform: none; }
+}
 
 .contact { background: var(--blue-700); color: var(--white); }
 .contact .eyebrow { color: var(--yellow); }

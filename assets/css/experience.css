@@ -322,10 +322,39 @@
    Bez `min-width: 0`: domyslne `auto` nie pozwala skurczyc zadnej ze stron ponizej jej
    wlasnej tresci, wiec w najciasniejszym stanie centrowanie ustepuje, zamiast obcinac
    nazwe marki. */
+/* CHIP WYSRODKOWANY W PASKU, NIE W WOLNYM MIEJSCU MIEDZY SASIADAMI.
+   ---------------------------------------------------------------------------
+   Dzielenie wolnego miejsca po rowno (`flex: 1 1 0` na obu stronach) dziala tylko dopoki
+   ZADNA ze stron nie jest szersza od swojego udzialu. A prawa strona jest: flaga 52 px,
+   „Bede tam" 102 px, „Menu" 50 px plus odstepy to okolo 220 px, i `flex-shrink` ich nie
+   sciesnie ponizej tresci, bo domyslne `min-width: auto` na to nie pozwala. Lewa strona
+   kurczy sie do `min-width` marki. Roznica wychodzi na chipie.
+
+   Zmierzone na 1440x900: w stanie rozwinietym i przy otwartym menu chip stal 5-6 px od
+   srodka, ale w stanie odslonietym (`is-peeked`, gdzie carnival.css zmniejsza marke do
+   132 px) uciekal 29 px w lewo. Ten sam mechanizm daje inne przesuniecie przy kazdej
+   szerokosci okna i przy kazdej dlugosci nazwy sekcji, wiec nie da sie tego wyrownac
+   marginesem dobranym na oko.
+
+   Pozycjonowanie absolutne wzgledem paska liczy sie od jego wlasnych krawedzi, a nie od
+   tego, co zostalo miedzy sasiadami. Chip jest wtedy na srodku z konstrukcji: w kazdym
+   stanie, w kazdym jezyku i przy kazdej szerokosci. Marka i przyciski wracaja do zwyklego
+   ukladu i nie musza sie juz o nic dzielic.
+
+   `pointer-events: none` chip mial od poczatku (main.css), wiec nawet gdyby przy bardzo
+   waskim pasku nachodzil na sasiada, nie odbiera mu klikniec. `.nav-shell` jest
+   `position: relative` — patrz experience.css wyzej. */
+.site-header .nav-current {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Zeby dlugie nazwy nie wjezdzaly pod marke ani pod przyciski. `min()` zamiast stalej,
+     bo pasek zmienia szerokosc miedzy stanami: 720 px odslonietym, 560 zwinietym. */
+  max-width: min(260px, calc(100% - 400px));
+}
 .site-header .brand,
-.site-header .nav-actions { flex: 1 1 0; }
-.site-header .nav-actions { justify-content: flex-end; }
-.site-header .nav-current { flex: 0 1 auto; }
+.site-header .nav-actions { flex: none; }
+.site-header .nav-actions { margin-left: auto; justify-content: flex-end; }
 
 /* 292 -> 560: w pigulce zostaja teraz flaga i pelny chip z nazwa sekcji, wiec
    zwiniety pasek jest blizszy pelnemu niz kropce. To jest swiadomy wybor — kontrolki,
@@ -360,7 +389,9 @@
   overflow: hidden;
   opacity: 1;
   visibility: visible;
-  transform: none;
+  /* `translateX(-50%)`, nie `none`: to jest teraz wysrodkowanie chipu, a nie efekt zwijania.
+     `transform: none` w tym miejscu zdejmowalo je i chip w pigulce wracal 130 px w prawo. */
+  transform: translateX(-50%);
   padding-inline: 0;
 }
 /* Nazwa sekcji zostaje. Bez niej procent mowi "ile", ale nie mowi "gdzie",
@@ -429,7 +460,6 @@
    Both classes are on the element at the same time (the header stays compact underneath the
    open menu, so closing it does not flash the full bar), so this is the state that needs the
    contents restored, and it has to out-specify the compact rules — hence the doubled class. */
-.site-header.is-compact.is-menu-open .nav-current,
 .site-header.is-compact.is-menu-open .nav-attend,
 .site-header.is-compact.is-menu-open .language-picker {
   max-width: 260px;
@@ -438,6 +468,14 @@
   visibility: visible;
   pointer-events: auto;
   transform: none;
+}
+/* Chip osobno, bo jego `transform` niesie wysrodkowanie i nie wolno go zdjac. */
+.site-header.is-compact.is-menu-open .nav-current {
+  max-width: min(260px, calc(100% - 400px));
+  min-width: auto;
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%);
 }
 /* Bez „Bede tam" — patrz `is-peeked` w carnival.css. `overflow: hidden` na `.btn` przycina
    zolte wypelnienie `.btn::before`, ktore w spoczynku stoi pod przyciskiem; podniesienie go

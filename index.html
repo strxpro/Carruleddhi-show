@@ -1325,11 +1325,11 @@
           <h2 class="section-title section-title--medium" id="faq-title" data-i18n="faq.title" data-text-effect="rise">Domande frequenti.</h2>
         </div>
         <div class="accordion reveal" data-accordion>
-          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="true"><span data-i18n="faq.q1">Chi può partecipare?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a1">Chi ha compiuto 18 anni, con modulo, liberatoria e documento. I minori partecipano con liberatoria firmata.</p></div></div></div>
-          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q2">Quanto costa?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a2">Nulla: l’iscrizione è completamente gratuita.</p></div></div></div>
-          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q3">Il carretto può avere un motore?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a3">No. Nessun motore o propulsione: si scende soltanto per gravità.</p></div></div></div>
-          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q4">Serve il casco?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a4">Sì, un casco omologato è obbligatorio.</p></div></div></div>
-          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q5">Come ricevo il numero di gara?</span><span class="accordion__plus" aria-hidden="true">＋</span></button><div class="accordion__panel"><div><p data-i18n="faq.a5">Appare dopo l’iscrizione e arriverà via e-mail con il PDF dopo il collegamento Make.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="true"><span data-i18n="faq.q1">Chi può partecipare?</span><span class="accordion__plus" aria-hidden="true"></span></button><div class="accordion__panel"><div><p data-i18n="faq.a1">Chi ha compiuto 18 anni, con modulo, liberatoria e documento. I minori partecipano con liberatoria firmata.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q2">Quanto costa?</span><span class="accordion__plus" aria-hidden="true"></span></button><div class="accordion__panel"><div><p data-i18n="faq.a2">Nulla: l’iscrizione è completamente gratuita.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q3">Il carretto può avere un motore?</span><span class="accordion__plus" aria-hidden="true"></span></button><div class="accordion__panel"><div><p data-i18n="faq.a3">No. Nessun motore o propulsione: si scende soltanto per gravità.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q4">Serve il casco?</span><span class="accordion__plus" aria-hidden="true"></span></button><div class="accordion__panel"><div><p data-i18n="faq.a4">Sì, un casco omologato è obbligatorio.</p></div></div></div>
+          <div class="accordion__item"><button class="accordion__button" type="button" aria-expanded="false"><span data-i18n="faq.q5">Come ricevo il numero di gara?</span><span class="accordion__plus" aria-hidden="true"></span></button><div class="accordion__panel"><div><p data-i18n="faq.a5">Appare dopo l’iscrizione e arriverà via e-mail con il PDF dopo il collegamento Make.</p></div></div></div>
         </div>
       </div>
     </section>
@@ -1369,6 +1369,22 @@
               <div class="field" data-field>
                 <input id="wall-place" name="place" type="text" autocomplete="address-level2" maxlength="40" placeholder=" ">
                 <label for="wall-place" data-i18n="wall.place">Da dove scrivi</label>
+              </div>
+              <!-- E-mail, opcjonalny i nigdy nie publikowany.
+                   `field--full`, bo etykieta z dopiskiem „(facoltativa)" nie mieści się w
+                   połowie siatki obok „Da dove scrivi" — w niemieckim jest o dziesięć znaków
+                   dłuższa i zawijałaby się na dwa wiersze, przesuwając pole względem sąsiada.
+
+                   Bez `required`: to jest tablica publiczna, a nie zapisy. Pole obowiązkowe
+                   zabrałoby możliwość zostawienia anonimowego wpisu, czyli tego, po co ta
+                   sekcja istnieje. Walidowany jest tylko wtedy, gdy ktoś coś wpisał — patrz
+                   submit w setupWall(). Powód zbierania stoi pod polem, bo adres w formularzu
+                   publicznym bez wyjaśnienia jest pytaniem, na które nikt nie odpowiada. -->
+              <div class="field field--full" data-field>
+                <input id="wall-email" name="email" type="email" autocomplete="email" maxlength="120" placeholder=" ">
+                <label for="wall-email" data-i18n="wall.email">E-mail (facoltativa)</label>
+                <span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span>
+                <p class="field__note" data-i18n="wall.emailNote">Non la pubblichiamo. Serve solo se dobbiamo risponderti.</p>
               </div>
               <div class="field field--full" data-field>
                 <textarea id="wall-message" name="message" maxlength="280" placeholder=" " required></textarea>

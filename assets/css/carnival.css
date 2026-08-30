@@ -2405,9 +2405,31 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
    The native file input cannot be styled, so it is moved out of sight while staying
    in the tab order, and the label becomes the button. Clicking a label bound to a
    file input opens the picker in every browser, so no click handler is involved. */
-.wall-photo { margin-top: 16px; }
+/* SIATKA, NIE WIERSZ TEKSTU — I TO JEST NAPRAWA KRZYWEJ MINIATURY.
+   ---------------------------------------------------------------------------
+   `.wall-photo` był zwykłym blokiem, a `.wall-photo__pick` i `.wall-photo__preview` mają
+   `display: inline-flex` i `inline-block`. Dwa elementy inline w bloku lądują w TYM SAMYM
+   wierszu tekstowym i wyrównują się do linii bazowej, więc miniatura 108 px wisiała obok
+   przycisku zaczepiona dolną krawędzią o jego tekst, a `margin-top: 12px` nie działał jak
+   odstęp pionowy, bo w wierszu tekstu nie ma czego odsuwać. Do tego ukryty `input` (1×1 px,
+   `position: absolute` bez `left`/`top`) wchodził w ten sam wiersz i dokładał własne
+   przesunięcie linii bazowej.
+
+   Siatka z jedną kolumną ustawia je jedno pod drugim, wyrównane do lewej krawędzi, i odstęp
+   jest odstępem. `justify-items: start`, żeby ani przycisk, ani miniatura nie rozciągały się
+   na całą szerokość formularza. */
+.wall-photo {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 16px;
+}
 .wall-photo__input {
   position: absolute;
+  /* Wyjęty z przepływu na dobre. Bez `left`/`top` element o rozmiarze 1×1 px zostaje tam,
+     gdzie by płynął, i nadal liczy się do wysokości wiersza. */
+  top: 0;
+  left: 0;
   width: 1px;
   height: 1px;
   opacity: 0;
@@ -2437,16 +2459,26 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 .wall-photo[data-state="ready"] .wall-photo__pick { border-style: solid; }
 .wall-photo__preview {
   position: relative;
-  display: inline-block;
-  margin-top: 12px;
+  /* Blok w siatce, nie inline-block: odstęp daje `gap` rodzica, a szerokość jest szerokością
+     miniatury, żeby krzyżyk „usuń" miał się do czego zaczepić w prawym górnym rogu. */
+  display: block;
+  width: 108px;
 }
+.wall-photo__preview[hidden] { display: none; }
 .wall-photo__preview img {
   display: block;
   width: 108px;
+  /* `aspect-ratio` obok `height`, nie zamiast: gdyby jakaś reguła globalna nadpisała
+     `height` na `auto` (a to najczęstsza reguła w każdym resecie obrazków), proporcja
+     utrzyma kwadrat i zdjęcie nadal nie będzie rozciągnięte. */
   height: 108px;
+  aspect-ratio: 1;
   border: 2px solid var(--navy-950);
   border-radius: 14px;
+  /* Kadr, nie deformacja. Zdjęcie z telefonu jest pionowe albo poziome, nigdy kwadratowe. */
   object-fit: cover;
+  object-position: center;
+  background: var(--blue-100);
 }
 .wall-photo__drop {
   position: absolute;

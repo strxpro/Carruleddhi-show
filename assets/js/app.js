@@ -1127,10 +1127,32 @@ import {
     deck.tabIndex = 0;
     deck.setAttribute('aria-label', 'Interactive prize cards');
 
-    function layout() {
+    /**
+     * @param {-1|0} peek  -1 podkłada pod wierzchnią kartę tę POPRZEDNIĄ, nie następną.
+     *
+     * TO JEST NAPRAWA „WIDZĘ 7, PUSZCZAM I MAM 6".
+     * ---------------------------------------------------------------------------
+     * Stos był układany raz, po animacji, i zawsze w jedną stronę: pod kartą numer N leżała
+     * karta N+1. Przeciągnięcie w PRAWO cofa talię (`advance(-1)`, patrz `release`), więc na
+     * wierzch wchodziła karta N-1 — a użytkownik przez cały czas przeciągania patrzył na
+     * N+1 wystającą spod krawędzi. Karta, na którą patrzył, nie była kartą, którą dostawał.
+     *
+     * Kierunek nie jest tu do zmiany: przeciągnięcie w prawo ma cofać, bo karta odjeżdża w tę
+     * stronę, w którą ją rzucono. Do zmiany jest to, co pokazujemy pod spodem — i stąd ten
+     * parametr. `pointermove` przestawia go, gdy tylko znak `dx` się ustali.
+     */
+    function layout(peek = 0) {
       const total = cards.length;
+      const previous = (state.deckIndex - 1 + total) % total;
       cards.forEach((card, index) => {
-        const relative = (index - state.deckIndex + total) % total;
+        let relative = (index - state.deckIndex + total) % total;
+        /* Poprzednia karta wskakuje na pozycję drugą, a wszystko, co za wierzchnią, przesuwa
+           się o jedno w głąb. Liczba kart w stosie zostaje ta sama — zmienia się tylko
+           kolejność, więc żadna nie znika i nie ma dziury w środku. */
+        if (peek === -1 && total > 1) {
+          if (index === previous) relative = 1;
+          else if (relative >= 1) relative += 1;
+        }
         card.style.setProperty('--deck-i', String(Math.min(relative, 7)));
         card.style.zIndex = String(total - relative);
         card.style.opacity = relative > 7 ? '0' : String(Math.max(0.55, 1 - relative * 0.055));
@@ -1284,7 +1306,10 @@ import {
         card, startX: event.clientX, startY: event.clientY,
         dx: 0, dy: 0, moved: false,
         // Smoothed pointer speed, so the release can tell a flick from a slow shove.
-        vx: 0, lastAt: now, lastMoveAt: now
+        vx: 0, lastAt: now, lastMoveAt: now,
+        // Którą kartę podłożyliśmy pod spód. Trzymane, żeby nie przekładać stosu na każdy
+        // ruch wskaźnika — patrz `layout(peek)`.
+        peek: 0
       };
       card.setPointerCapture?.(event.pointerId);
       // Narrower than leaving the transition out of the stylesheet, which is what used to
@@ -1311,6 +1336,17 @@ import {
       drag.dx = dx;
       drag.dy = event.clientY - drag.startY;
       drag.moved ||= Math.abs(drag.dx) > 4 || Math.abs(drag.dy) > 4;
+
+      /* Pod spodem ma leżeć karta, która naprawdę wejdzie na wierzch.
+         Próg 4 px to ten sam, który decyduje o `moved`: poniżej niego nie ma jeszcze kierunku,
+         tylko drgnienie palca, a przekładanie stosu na drgnienie byłoby migotaniem. Przekładamy
+         wyłącznie przy ZMIANIE strony, nie na każdy ruch — `layout()` przechodzi po dwunastu
+         kartach i pisze im cztery właściwości, więc na każdą klatkę byłoby to widoczne. */
+      const wanted = Math.abs(dx) > 4 && dx > 0 ? -1 : 0;
+      if (wanted !== drag.peek) {
+        drag.peek = wanted;
+        layout(wanted);
+      }
       if (!dragFrame) dragFrame = requestAnimationFrame(paint);
     }, { passive: true });
 
@@ -1322,7 +1358,7 @@ import {
 
     const release = () => {
       if (!drag) return;
-      const { card, dx, moved, vx } = drag;
+      const { card, dx, moved, vx, peek } = drag;
       const stale = (performance.now() - drag.lastMoveAt) > FLICK_MAX_AGE;
       drag = null;
       cancelAnimationFrame(dragFrame);
@@ -1343,9 +1379,14 @@ import {
 
       // Left sends the deck forward, right sends it back — the card leaves the side it was
       // thrown towards, so the flick and the movement always agree.
+      /* Rzut zostawia stos w kolejności podglądu z rozmysłu: karta, którą było widać pod
+         spodem, zostaje pod spodem przez cały lot wierzchniej, a `settle()` przelicza układ
+         dopiero na końcu. Tak podglądana karta jest tą, która zostaje. */
       if (thrown && advance(dx < 0 ? 1 : -1, { fromDrag: true })) return;
       // Not far enough, or the deck was already busy: ease back to centre.
       settleHome(card);
+      // Podgląd był obietnicą, która się nie spełniła — stos wraca do zwykłej kolejności.
+      if (peek) layout(0);
     };
 
     /* `pointercancel` is not a release, it is the browser saying the gesture is no longer
@@ -1354,13 +1395,14 @@ import {
        card always eases back to centre instead. */
     const abort = () => {
       if (!drag) return;
-      const { card } = drag;
+      const { card, peek } = drag;
       drag = null;
       cancelAnimationFrame(dragFrame);
       dragFrame = 0;
       deck.classList.remove('is-dragging');
       card.style.removeProperty('will-change');
       settleHome(card);
+      if (peek) layout(0);
     };
 
     deck.addEventListener('pointerup', release);
@@ -2475,6 +2517,25 @@ import {
         if (status) status.textContent = text('validation.required');
         return;
       }
+
+      /* E-mail sprawdzany TYLKO wtedy, gdy ktoś coś wpisał.
+         ---------------------------------------------------------------------------
+         Pole jest opcjonalne, więc puste jest poprawne. Ale adres z literówką jest gorszy
+         niż brak adresu: wygląda na drogę odpowiedzi, której nie ma, a organizator dowie się
+         o tym dopiero po odbiciu wiadomości — czyli wtedy, gdy nie ma już jak dopytać.
+
+         Zaznaczane na polu przez `is-invalid`, a nie tylko w pasku statusu na dole: pasek jest
+         wspólny dla całego formularza i przy trzech polach nie mówi, które z nich poprawić. */
+      const emailField = form.elements.namedItem('email');
+      const email = String(emailField?.value || '').trim();
+      const emailHolder = emailField?.closest('[data-field]');
+      emailHolder?.classList.remove('is-invalid');
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        emailHolder?.classList.add('is-invalid');
+        if (status) status.textContent = text('validation.email');
+        emailField?.focus({ preventScroll: true });
+        return;
+      }
       const submit = $('button[type="submit"]', form);
       if (submit) submit.disabled = true;
       if (status) status.textContent = text('wall.sending');
@@ -2485,6 +2546,9 @@ import {
         name,
         place: String(form.elements.namedItem('place').value || '').trim(),
         message,
+        // Pusty adres nie jedzie wcale, zamiast jechać jako pusty napis — inaczej w bazie
+        // rosłaby kolumna pełna `''`, których nie da się odróżnić od „nie podano".
+        ...(email ? { email } : {}),
         ...(rating ? { rating } : {}),
         ...(pendingPhoto
           ? {

@@ -148,7 +148,10 @@ const FIELD_WHITELIST = {
   // `photo` is a data URL from the browser, already downscaled there. See wallPost.
   // The dimensions come from the browser too, and are used only to reserve the right
   // shape of space in the layout, so a wrong one costs a reflow and nothing more.
-  'wall-post': ['name', 'place', 'message', 'rating', 'photo', 'photoWidth', 'photoHeight'],
+  /* `email` jest opcjonalny i NIGDY nie wychodzi publicznie — nie ma go ani w widoku
+     `wall_comments_public`, ani w zapytaniach `wallList`. Zbierany po to, żeby organizator
+     mógł odpisać na komentarz, który jest pytaniem. */
+  'wall-post': ['name', 'place', 'message', 'email', 'rating', 'photo', 'photoWidth', 'photoHeight'],
   'wall-translate': ['text', 'from', 'to'],
   // Moderation, behind the same passphrase as the roster.
   'wall-admin': ['action', 'id', 'limit'],
@@ -4289,6 +4292,8 @@ async function wallPost(env, request, payload, cors) {
   const name = String(payload.name || '').trim().slice(0, WALL_MAX_NAME);
   const place = String(payload.place || '').trim().slice(0, WALL_MAX_NAME);
   const message = String(payload.message || '').trim().slice(0, WALL_MAX_MESSAGE);
+  // 120 znaków to ta sama granica co w formularzu i w kolumnie z migracji 0028.
+  const email = String(payload.email || '').trim().toLowerCase().slice(0, 120);
   if (name.length < 1 || message.length < 2) {
     return json({ ok: false, code: 'WALL_VALIDATION' }, 422, cors);
   }
@@ -4340,6 +4345,13 @@ async function wallPost(env, request, payload, cors) {
       display_name: name,
       place: place || null,
       message,
+      /* Adres, jeśli ktoś go zostawił. Sprawdzany tym samym wzorcem co wszędzie tutaj, a nie
+         przepuszczany na słowo przeglądarki: walidacja w przeglądarce jest wygodą dla
+         piszącego, nie zabezpieczeniem — żądanie może przyjść bez niej. Niepoprawny adres
+         wchodzi jako `null`, a nie jako 422: komentarz jest treścią, o którą prosiliśmy, a
+         adres dodatkiem, i odrzucenie całego wpisu przez literówkę w polu opcjonalnym
+         znaczyłoby wyrzucenie tego, co ważne, przez to, co nieważne. */
+      email: EMAIL_PATTERN.test(email) ? email : null,
       locale: payload.locale || 'it',
       rating,
       photo_path: photoPath || null,
