@@ -4780,12 +4780,40 @@ async function votingVote(env, payload, cors) {
  * przestawi suwak.
  */
 async function votingEdit(env, payload, cors) {
+  /* DWIE DROGI DO WŁASNEGO GŁOSU, JEDNA FUNKCJA.
+     ---------------------------------------------------------------------------
+     ŻETON Z MAILA działa z każdego urządzenia i z każdej przeglądarki — po to jest. Ktoś
+     głosował z telefonu na placu, a poprawia wieczorem z laptopa.
+
+     TO SAMO URZĄDZENIE działa bez maila, bo głos JEST przypisany do urządzenia: para
+     (urządzenie, kategoria) ma indeks unikalny od migracji 0022, czyli z tej przeglądarki
+     istnieje co najwyżej jeden głos i nie ma czego rozstrzygać. To ta sama tożsamość, na
+     którą serwer i tak się już powołuje, gdy odmawia drugiego głosu przez
+     `VOTING_ALREADY_VOTED`.
+
+     Świadomy koszt: identyfikator urządzenia leży w `localStorage` i nie jest sekretem, więc
+     kto ma ten telefon w ręku, może przestawić oddany z niego głos. Uznane za dopuszczalne,
+     bo dokładnie ta sama osoba mogła nim zagłosować minutę wcześniej — a alternatywą było
+     zmuszanie każdego do szukania maila, żeby poprawić ocenę.
+
+     Żeton NIGDY nie wraca w odpowiedzi. Kto edytuje urządzeniem, nie dowie się z tego swojego
+     żetonu — inaczej byłby to sposób na wyciągnięcie trwałej zdolności z ulotnej. */
   const token = String(payload.editToken || '').trim().toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(token)) return json({ ok: false, code: 'VOTING_BAD_TOKEN' }, 422, cors);
+  const device = String(payload.deviceId || '').trim().toLowerCase();
+  const byToken = /^[0-9a-f]{64}$/.test(token);
+  const byDevice = !byToken && /^[0-9a-f-]{32,36}$/.test(device);
+  if (!byToken && !byDevice) return json({ ok: false, code: 'VOTING_BAD_TOKEN' }, 422, cors);
 
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/votes`);
   url.searchParams.set('select', 'id,participant_id,category,score');
-  url.searchParams.set('edit_token', `eq.${token}`);
+  if (byToken) {
+    url.searchParams.set('edit_token', `eq.${token}`);
+  } else {
+    url.searchParams.set('device_id', `eq.${device}`);
+    // Kategoria dopisana jawnie: indeks unikalny obejmuje parę, więc bez niej wiersz z
+    // prób sprzed migracji 0026 mógłby trafić przed właściwy.
+    url.searchParams.set('category', `eq.${PUBLIC_AWARD}`);
+  }
   url.searchParams.set('limit', '1');
   const found = await fetch(url, { headers: supabaseHeaders(env) });
   if (!found.ok) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
@@ -4796,6 +4824,11 @@ async function votingEdit(env, payload, cors) {
   const shape = {
     // Kategoria pojazdu, dla podpisu „Classic nr 12" w oknie zmiany oceny.
     category: participant?.category || '',
+    /* Identyfikator wozu, na który głos jest oddany. Dopisany, bo bez niego strona otwarta z
+       maila nie wie, KTÓRY kafelek jest jej — a od kiedy zmiana obejmuje też przeniesienie
+       głosu, musi to wiedzieć, żeby oznaczyć własny kafelek i podpowiedzieć na pozostałych
+       „przenieś tu". Nie jest tajemnicą: ten sam identyfikator wychodzi w liście uczestników. */
+    participantId: vote.participant_id,
     score: vote.score,
     startNumber: participant?.start_number ?? null,
     projectName: participant?.project_name || '',
@@ -4804,26 +4837,60 @@ async function votingEdit(env, payload, cors) {
       : ''
   };
 
-  if (payload.score === undefined) return json({ ok: true, vote: shape }, 200, cors);
+  if (payload.score === undefined && payload.participantId === undefined) {
+    return json({ ok: true, vote: shape }, 200, cors);
+  }
 
   /* Po zamknięciu głosowania nie da się już nic zmienić — także z ważnym żetonem. Wynik jest
      policzony i ogłoszony; cicha zmiana oceny po ogłoszeniu podium byłaby zmianą wyniku. */
   const phase = votingPhase(await readVotingSettings(env));
   if (phase !== 'voting') return json({ ok: false, code: 'VOTING_NOT_OPEN', phase }, 409, cors);
 
-  const score = Number(payload.score);
+  /* Ocena podana albo zostawiona. Zmiana samego wozu bez ruszania oceny jest sensowną
+     czynnością („pomyliłem kafelki, ale ósemkę dałbym tak samo"), więc brak `score` nie jest
+     tu błędem — jest wyborem. */
+  const score = payload.score === undefined ? vote.score : Number(payload.score);
   if (!Number.isInteger(score) || score < VOTE_MIN || score > VOTE_MAX) {
     return json({ ok: false, code: 'VOTING_BAD_SCORE', scoreMin: VOTE_MIN, scoreMax: VOTE_MAX }, 422, cors);
   }
 
-  const saved = await fetch(`${env.SUPABASE_URL}/rest/v1/votes?edit_token=eq.${token}`, {
+  /* ZMIANA WOZU, NIE TYLKO OCENY.
+     Dotąd PATCH obejmował sam `score`, a `participant_id` nie był w ogóle czytany z żądania —
+     więc „pomyliłem się, chciałem zagłosować na inny" nie dało się zrobić inaczej niż prosząc
+     organizatora o rękę w bazie. Schemat na to pozwalał od początku: `participant_id` jest
+     tylko kluczem obcym, nie ma go w żadnym indeksie unikalnym, więc przeniesienie głosu nie
+     narusza reguły „jeden głos na osobę i na urządzenie". */
+  const patch = { score };
+  let moved = shape;
+  if (payload.participantId !== undefined) {
+    const target = await findParticipant(env, payload.participantId);
+    // Nieaktywny uczestnik odpada tak samo jak przy oddawaniu głosu: gdyby wolno było przenieść
+    // głos na wóz zdjęty z listy, wynik zawierałby kogoś, kogo na niej nie ma.
+    if (!target || !target.active) return json({ ok: false, code: 'VOTING_NO_PARTICIPANT' }, 404, cors);
+    patch.participant_id = target.id;
+    moved = {
+      category: target.category || '',
+      score,
+      startNumber: target.start_number ?? null,
+      projectName: target.project_name || '',
+      participantName: `${target.first_name} ${target.last_name}`.trim()
+    };
+  }
+
+  /* Warunek PATCH-a ten sam, którym wiersz został znaleziony. Nie `id`, mimo że go mamy:
+     ograniczenie zapisu do tego samego klucza, którym potwierdzono tożsamość, znaczy, że
+     zapis nie może dotknąć wiersza innego niż ten sprawdzony. */
+  const where = byToken
+    ? `edit_token=eq.${token}`
+    : `device_id=eq.${device}&category=eq.${PUBLIC_AWARD}`;
+  const saved = await fetch(`${env.SUPABASE_URL}/rest/v1/votes?${where}`, {
     method: 'PATCH',
     headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-    body: JSON.stringify({ score })
+    body: JSON.stringify(patch)
   });
   if (!saved.ok) return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
 
-  return json({ ok: true, vote: { ...shape, score } }, 200, cors);
+  return json({ ok: true, vote: { ...moved, score } }, 200, cors);
 }
 
 /**

@@ -286,13 +286,15 @@ import {
       ? `${riderName(row)} · ${startBadge(row)}`
       : '';
     $('[data-vote-mine-score]', panel).textContent = String(mine.score);
-    /* Zmiana oceny idzie wyłącznie odsyłaczem z maila: żeton nigdy nie dociera do przeglądarki
-       (patrz komentarz nad votingVote w Workerze), więc strona nie ma czym się tu wykazać i
-       mówi to wprost, zamiast dawać przycisk, który odpowie odmową. */
+    /* Zmiana jest możliwa na miejscu — i to zdanie musiało się zmienić razem z tym.
+       Stało tu „zmianę zrobisz odsyłaczem z maila", co było prawdą, dopóki żeton był jedyną
+       drogą. Od teraz z tego urządzenia wystarczy przycisk na kafelku, a mail zostaje drogą z
+       każdego innego. Zdanie mówi jedno i drugie, bo obie sytuacje się zdarzają: głosowanie z
+       telefonu na placu i poprawianie wieczorem z laptopa. */
     const note = $('[data-vote-mine-note]', panel);
     if (note) {
       note.hidden = state.phase !== 'voting';
-      note.textContent = text('voting.changeByEmail');
+      note.textContent = text('voting.changeHere');
     }
   }
 
@@ -423,7 +425,19 @@ import {
       const key = [
         row.photo, row.voteCount, row.totalScore, row.averageScore,
         rank, badgeByParticipant.get(row.id) || '',
-        mine && mine.participantId === row.id ? `mine:${mine.score}` : '',
+        /* CAŁY mój głos, nie tylko „czy to mój kafelek".
+           ---------------------------------------------------------------------------
+           Stało tu `mine.participantId === row.id ? 'mine:'+score : ''`, czyli dla CUDZYCH
+           kafelków klucz był pustym napisem i przed oddaniem głosu, i po. A one też się wtedy
+           zmieniają: przycisk przechodzi z „zagłosuj" na „przenieś tu swój głos", pytanie na
+           „przenieść Twój głos na…", a suwak startuje od oceny już oddanej.
+
+           Zmierzone: po oddaniu głosu sąsiednie kafelki nadal mówiły „Zagłosuj", a suwak
+           wracał do środka skali — bo z cache'u wracał węzeł zbudowany, gdy głosu nie było.
+
+           Cały głos w kluczu znaczy, że zmiana czegokolwiek w nim przebudowuje KAŻDY kafelek.
+           Kosztuje to jedno przerysowanie siatki na oddany głos, czyli raz na wizytę. */
+        mine ? `vote:${mine.participantId}:${mine.score}` : 'novote',
         state.phase, freshIds.has(row.id) ? 'fresh' : ''
       ].join('|');
 
@@ -578,19 +592,21 @@ import {
         : text('voting.noVotes');
       stats.append(points, count);
       body.append(stats);
-    } else if (isMine) {
-      const yours = document.createElement('p');
-      yours.className = 'vote-card__yours';
-      yours.textContent = `${text('voting.yourScore')} ${mine.score}`;
-      body.append(yours);
-    } else if (mine) {
-      /* Głos jest już oddany na kogoś innego. Kafelek mówi to na miejscu, zamiast zapraszać do
-         naciśnięcia przycisku, który odpowie odmową. */
-      const used = document.createElement('p');
-      used.className = 'vote-card__used';
-      used.textContent = text('voting.already');
-      body.append(used);
     } else if (state.phase === 'voting') {
+      /* GŁOS DA SIĘ ZMIENIĆ Z TEGO SAMEGO URZĄDZENIA, WIĘC KAFELEK NIE MÓWI JUŻ „NIE".
+         ---------------------------------------------------------------------------
+         Stały tu dwie ślepe uliczki: na własnym kafelku sama ocena bez możliwości jej
+         poprawienia, a na cudzym zdanie „już głosowałeś". Oba były prawdą, dopóki zmiana
+         wymagała żetonu z maila — a od teraz nie wymaga (patrz votingEdit w Workerze).
+
+         Każdy kafelek dostaje więc te same kontrolki, a różni się tylko napis na przycisku:
+         „zagłosuj" bez głosu, „zmień ocenę" na własnym, „przenieś tu swój głos" na cudzym. */
+      if (isMine) {
+        const yours = document.createElement('p');
+        yours.className = 'vote-card__yours';
+        yours.textContent = `${text('voting.yourScore')} ${mine.score}`;
+        body.append(yours);
+      }
       const controls = voteControls(row);
       body.append(controls);
 
@@ -600,7 +616,12 @@ import {
       const hit = document.createElement('button');
       hit.type = 'button';
       hit.className = 'vote-card__hit';
-      hit.setAttribute('aria-label', `${text('voting.cta')} — ${cartLabel(row)}`);
+      /* Nazwa dla czytnika ekranu musi mówić to, co robi przycisk — a robi trzy różne rzeczy
+         w zależności od tego, czy głos jest już oddany i na który wóz. „Zagłosuj" na kafelku,
+         który przenosi cudzy głos, byłoby po prostu nieprawdą. */
+      hit.setAttribute('aria-label', `${isMine
+        ? text('voting.changeScore')
+        : mine ? text('voting.moveVote') : text('voting.cta')} — ${cartLabel(row)}`);
       hit.addEventListener('click', () => controls.openVote());
       figure.append(hit);
       figure.classList.add('is-tappable');
@@ -637,14 +658,26 @@ import {
    * ze żetonem nieodwracalny.
    */
   function voteControls(row) {
+    const mine = state.myVote;
+    const isMine = Boolean(mine && mine.participantId === row.id);
+    /* Trzy stany, trzy napisy, jedna ścieżka pod nimi. Napis jest tu jedyną różnicą, bo
+       czynność jest ta sama: powiedz, na który wóz i ile punktów. */
+    const startLabel = isMine
+      ? text('voting.changeScore')
+      : mine ? text('voting.moveVote') : text('voting.cta');
+
     const wrap = document.createElement('div');
     wrap.className = 'vote-card__act';
 
     const open = document.createElement('button');
     open.type = 'button';
-    open.className = 'btn btn--yellow btn--small vote-card__start';
+    /* Zmiana jest cofnięciem decyzji, nie decyzją — więc nie żółty przycisk zapraszający do
+       naciśnięcia, tylko obrysowany. Żółty zostaje dla oddania głosu, którego jeszcze nie ma. */
+    open.className = mine
+      ? 'btn btn--outline btn--small vote-card__start'
+      : 'btn btn--yellow btn--small vote-card__start';
     open.dataset.voteStart = '';
-    open.textContent = text('voting.cta');
+    open.textContent = startLabel;
 
     /* ---------------------------------------------------------------- krok 1: pytanie */
     const ask = document.createElement('div');
@@ -652,7 +685,11 @@ import {
     ask.hidden = true;
     const question = document.createElement('p');
     question.className = 'vote-ask__q';
-    question.textContent = `${text('voting.askVote')} ${cartLabel(row)}?`;
+    /* Przeniesienie głosu pyta inaczej niż jego oddanie: to jest zabranie punktów jednemu
+       wozowi i danie ich drugiemu, więc pytanie musi powiedzieć, co się traci. */
+    question.textContent = mine && !isMine
+      ? `${text('voting.askMove')} ${cartLabel(row)}?`
+      : `${text('voting.askVote')} ${cartLabel(row)}?`;
     const askYes = document.createElement('button');
     askYes.type = 'button';
     askYes.className = 'btn btn--yellow btn--small';
@@ -684,6 +721,9 @@ import {
     /* Start w środku skali, nie na minimum: suwak ustawiony na 3 podpowiada trójkę i trzeba
        go przeciągnąć, żeby powiedzieć cokolwiek innego. Środek nie podpowiada niczego. */
     slider.value = String(Math.round((state.scoreMin + state.scoreMax) / 2));
+    /* Przy zmianie suwak startuje od oceny już oddanej, nie od środka skali: kto poprawia
+       ósemkę na dziewiątkę, ma przesunąć uchwyt o jedno, a nie ustawiać go od nowa. */
+    if (mine) slider.value = String(mine.score);
     slider.setAttribute('aria-label', text('voting.pickScore'));
 
     const value = document.createElement('b');
@@ -715,7 +755,14 @@ import {
     confirm.type = 'button';
     confirm.className = 'btn btn--blue btn--small vote-picker__confirm';
     confirm.textContent = text('voting.confirm');
-    confirm.addEventListener('click', () => askIdentity(row, Number(slider.value)));
+    /* Głos już oddany idzie inną drogą: bez okna z adresem. Adres jest znany — leży w wierszu,
+       który właśnie poprawiamy — a pytanie o niego dawałoby możliwość podania cudzego i zamiany
+       zmiany oceny w drugi głos. */
+    confirm.addEventListener('click', () => {
+      const score = Number(slider.value);
+      if (state.myVote) void changeVote(row, score);
+      else askIdentity(row, score);
+    });
 
     const cancel = document.createElement('button');
     cancel.type = 'button';
@@ -761,6 +808,73 @@ import {
 
     wrap.append(open, ask, picker);
     return wrap;
+  }
+
+  /* --------------------------------------------------------------- zmiana własnego głosu */
+
+  /**
+   * Przeniesienie głosu na inny wóz albo poprawienie oceny — z tego samego urządzenia.
+   *
+   * Bez okna i bez adresu. Serwer rozpoznaje głos po identyfikatorze urządzenia, bo para
+   * (urządzenie, kategoria) ma indeks unikalny, czyli z tej przeglądarki istnieje co najwyżej
+   * jeden głos i nie ma czego rozstrzygać. Szczegóły i świadomy koszt tego wyboru — przy
+   * `votingEdit` w worker/index.js.
+   *
+   * Żeton z maila nadal działa i nadal jest jedyną drogą z INNEGO urządzenia.
+   */
+  /**
+   * Żeton z odsyłacza w mailu, jeśli ktoś nim wszedł. Puste znaczy „to samo urządzenie".
+   *
+   * Trzymany, a nie zużywany od razu: od kiedy zmiana obejmuje też przeniesienie głosu na inny
+   * wóz, jedno okno z suwakiem nie wystarcza — trzeba móc wskazać kafelek. Żeton zostaje więc
+   * na czas tej wizyty i jedzie z każdą zmianą, dzięki czemu wejście z maila na CUDZYM
+   * urządzeniu daje dokładnie te same możliwości co wejście na własnym.
+   */
+  let mailToken = '';
+
+  async function changeVote(row, score) {
+    if (demoDriven) {
+      state.myVote = { participantId: row.id, score };
+      toast(text('voting.changed'), 'success');
+      paint();
+      return;
+    }
+
+    const bridge = api();
+    const endpoint = config()?.endpoints?.voting;
+    if (!bridge || !endpoint) return;
+
+    try {
+      /* Żeton wygrywa z urządzeniem, gdy jest. Kto wszedł z maila na obcym laptopie, nie ma
+         tam swojego głosu przypisanego do przeglądarki — i to jest cały powód, dla którego
+         żeton istnieje. Serwer sprawdza jedno albo drugie, nigdy oba naraz. */
+      const result = await bridge.post(endpoint, bridge.payload('voting', {
+        action: 'edit',
+        participantId: row.id,
+        score,
+        ...(mailToken ? { editToken: mailToken } : { deviceId: deviceId() })
+      }));
+      if (!result?.ok) throw Object.assign(new Error('edit'), { payload: result });
+      toast(text('voting.changed'), 'success');
+      /* Stan lokalny przestawiony od razu, nie dopiero po odczycie: `pull()` idzie do serwera i
+         na wolnej sieci kafelki jeszcze kilka sekund pokazywałyby stary głos, mimo że
+         potwierdzenie już wyskoczyło. */
+      state.myVote = { participantId: row.id, score };
+      paint();
+      await pull();
+    } catch (error) {
+      const code = error.payload?.code || '';
+      const key = {
+        VOTING_NOT_OPEN: 'voting.notOpen',
+        VOTING_BAD_SCORE: 'voting.badScore',
+        VOTING_NO_VOTE: 'voting.tokenGone',
+        VOTING_NO_PARTICIPANT: 'voting.notOpen',
+        VOTING_BAD_TOKEN: 'voting.tokenGone'
+      }[code] || 'form.sendError';
+      toast(text(key), 'error');
+      // Głosowanie zamknięte w międzyczasie to nie błąd do poprawienia — to nowy stan strony.
+      if (code === 'VOTING_NOT_OPEN') await pull();
+    }
   }
 
   /* ------------------------------------------------------------------- okno z adresem */
@@ -930,6 +1044,20 @@ import {
     try {
       const result = await bridge.post(endpoint, bridge.payload('voting', { action: 'peek', editToken }));
       if (!result?.ok || !result.vote) throw Object.assign(new Error('peek'), { payload: result });
+
+      /* Żeton zostaje na czas wizyty i od tej chwili jedzie z każdą zmianą — patrz `mailToken`.
+         Bez tego odsyłacz z maila dawał tylko suwak w oknie: dało się poprawić ocenę, ale nie
+         zagłosować na inny wóz, bo okno nie ma listy kafelków, a lista nie miała żetonu. */
+      mailToken = editToken;
+
+      /* Głos wpisany w stan strony, więc kafelki od razu wiedzą, który jest jego: własny mówi
+         „zmień ocenę", pozostałe „przenieś tu swój głos". To ta sama droga, którą ma osoba
+         siedząca na własnym telefonie — a nie druga, osobna. */
+      if (result.vote.participantId) {
+        state.myVote = { participantId: result.vote.participantId, score: Number(result.vote.score) };
+        paint();
+      }
+
       openEdit(result.vote, editToken);
     } catch (_) {
       toast(text('voting.tokenGone'), 'error');
