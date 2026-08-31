@@ -268,13 +268,45 @@ function addRow(id, x, y, sheet, values, filter) {
  * second, IMAP connection (`accountImap`) plus a sent-mail folder name, which is
  * one more thing to configure for no benefit — Zimbra already keeps a copy.
  */
-function sendEmail(id, x, y, { to, subject, html, replyTo, attachments, filter, bcc }) {
+/**
+ * Ponowienie zamiast cichej straty listu.
+ * ---------------------------------------------------------------------------
+ * `builtin:Break` zapisuje nieudaną paczkę jako niedokończone wykonanie i próbuje ponownie.
+ * Bez niego zerwane połączenie SMTP kończy przebieg błędem i wiadomość znika — a te listy
+ * idą raz, po zamknięciu głosowania, i nikt nie zauważy braku jednego z nich.
+ *
+ * Trzy próby co piętnaście minut to wartości domyślne modułu. Piętnaście, a nie jedna:
+ * awarie SMTP u operatora trwają minuty, nie sekundy, więc trzy próby w trzy sekundy to
+ * trzy razy ten sam błąd. Po ostatniej próbie paczka zostaje do ręcznego przejrzenia.
+ *
+ * NIE na gałęziach zapisów i przypomnień: tam list niesie załącznik PDF pobierany osobnym
+ * modułem, więc ponowienie samego maila powtórzyłoby wysyłkę bez pliku. To osobna decyzja
+ * i osobna zmiana.
+ */
+function retryOnError(id, x, y) {
+  return [{
+    id,
+    module: 'builtin:Break',
+    version: 1,
+    mapper: { retry: true, count: 3, interval: 15 },
+    metadata: {
+      ...at(x, y),
+      restore: { expect: { retry: { label: 'Yes', nested: {} } } },
+      expect: [
+        { name: 'retry', type: 'boolean', label: 'Retry automatically', required: true }
+      ]
+    }
+  }];
+}
+
+function sendEmail(id, x, y, { to, subject, html, replyTo, attachments, filter, bcc, retryId }) {
   return {
     id,
     module: 'email:ActionSendEmail',
     version: 7,
     parameters: { account: null, saveAfterSent: false },
     ...(filter ? { filter } : {}),
+    ...(retryId ? { onerror: retryOnError(retryId, x + 300, y + 150) } : {}),
     mapper: {
       to: Array.isArray(to) ? to : [to],
       subject,
@@ -888,7 +920,71 @@ const instantFlow = [
           filter: eq('outbox', '{{1.branch}}', 'outbox'),
           to: '{{1.to}}',
           subject: '{{1.subject}}',
-          html: '{{1.html}}'
+          html: '{{1.html}}',
+          /* Ta gałąź idzie partiami z harmonogramu, kilkadziesiąt wywołań pod rząd — czyli
+             jest najbardziej narażona na chwilowy limit po stronie SMTP. */
+          retryId: 41
+        })
+      ]
+    },
+
+    /* ---- I: the audience award podium ------------------------------------
+       Wywoływana raz na zwycięzcę, tylko po zamknięciu głosowania, z panelu (akcja
+       `winners`). Trzech listów nie da się wysłać jednym modułem z listą adresów: każdy
+       niesie inne miejsce, inne liczby i inny kolor plakietki, a `to` z trzema adresami
+       wysłałoby wszystkim treść pierwszego.
+
+       Osobna gałąź, a nie `outbox`, chociaż oba kończą się jednym e-mailem. Różnica jest
+       w tym, kto składa list. `outbox` dostaje gotowy HTML, bo tamten list powstaje w
+       workerze przy okazji rollovera edycji i worker ma tam wszystko pod ręką. Ten
+       powstaje z bloku językowego i pięciu liczb, więc szablon stoi tutaj — razem z
+       pozostałymi szablonami tego projektu, gdzie da się go obejrzeć obok listu z
+       potwierdzeniem zapisu i zobaczyć, że wyglądają jak z jednego zestawu. */
+    /* ---- J: potwierdzenie oddania głosu -----------------------------------
+       Numer 32 jest ten sam, co w żywym scenariuszu, żeby obie strony mówiły o tej samej
+       gałęzi. Treść nie jest ta sama: żywa składa sześć języków przez `switch()` w module,
+       ta czyta blok językowy jak każdy inny list tego projektu. Przy imporcie do pustego
+       konta wygrywa ta; żywego modułu nikt tym plikiem nie nadpisze, bo blueprint stąd nie
+       jest łatką na działający scenariusz — patrz uwaga przy module 33 niżej. */
+    {
+      flow: [
+        sendEmail(32, 1250, 1140, {
+          filter: eq('voting-receipt', '{{1.branch}}', 'voting-receipt'),
+          to: '{{1.email}}',
+          subject: '{{1.copy.rcptSubject}}',
+          html: receiptHtml()
+        })
+      ]
+    },
+
+    {
+      flow: [
+        /* 33, nie 32, i to nie jest dowolny numer.
+           ---------------------------------------------------------------------------
+           W żywym scenariuszu (7084177) 32 jest już zajęte przez gałąź `voting-receipt` —
+           potwierdzenie oddania głosu z odsyłaczem do zmiany, które worker wysyła przy
+           każdym głosie (votingVote w worker/index.js). Tamta gałąź została zbudowana
+           ręcznie w Make i TEGO PLIKU NIE PRZESZŁA, więc blueprint stąd jej nie zawiera.
+
+           CO Z TEGO WYNIKA DLA KOGOŚ, KTO BĘDZIE TO IMPORTOWAŁ
+             Import tego pliku do scenariusza, który już działa, skasuje gałąź
+             `voting-receipt` razem z połączeniami SMTP (parameters.account jest tu `null`
+             z rozmysłu — patrz make/JAK-WGRAC.md krok 5). Ten plik jest artefaktem
+             instalacyjnym dla PUSTEGO konta Make, nie łatką na żywy scenariusz. Żywy
+             scenariusz aktualizuje się biorąc jego własny blueprint i podmieniając w nim
+             jedną gałąź.
+
+           Numer 33 jest tu po to, żeby taka podmiana była wymianą jeden do jednego:
+           gałąź o tym samym numerze i tym samym filtrze, z innym szablonem w środku. */
+        sendEmail(33, 1250, 1000, {
+          filter: eq('voting-winner', '{{1.branch}}', 'voting-winner'),
+          to: '{{1.email}}',
+          subject: '{{1.winSubject}}',
+          html: winnerHtml(),
+          /* Trzy listy w całym roku, każdy do jednej osoby, wysyłane raz. Cichy błąd SMTP
+             znaczyłby tu zwycięzcę, który nigdy nie dostał gratulacji — i nikogo, kto by to
+             zauważył, bo panel pokazuje tylko, że akcja się wykonała. */
+          retryId: 42
         })
       ]
     },
@@ -981,6 +1077,139 @@ const UNSUB_FOOTER = [
   '<a href="{{1.unsubUrl}}" style="color:#6f8dc4;text-decoration:underline;">',
   '{{1.copy.unsubFooter}}</a></div>'
 ].join('');
+
+/**
+ * Potwierdzenie oddania głosu w Nagrodzie publiczności.
+ *
+ * Ten list istniał w Make, zbudowany ręcznie, i nie było go tutaj — więc import tego pliku
+ * do żywego scenariusza kasował całą gałąź. Teraz jest, i przechodzi to samo co pozostałe:
+ * sześć języków w emails/copy.json ze sprawdzianem kompletności, podgląd w shots/emails.
+ *
+ * Wersja żywa składała sześć wariantów przez `switch(1.locale; …)` w środku modułu Make. Ta
+ * czyta blok językowy, bo tak działa reszta tego projektu — i dlatego, że tekst zamknięty w
+ * module Make jest tekstem, którego nie widzi ani `check-i18n`, ani nikt czytający repo.
+ */
+function receiptHtml() {
+  const cell = (label, value) => [
+    '<tr><td style="padding:7px 0;border-bottom:1px solid #e2eaf9;">',
+    '<span style="display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;">',
+    `${label}</span>`,
+    `<span style="font-size:15px;font-weight:700;color:#071a3d;">${value}</span>`,
+    '</td></tr>'
+  ].join('');
+
+  return shell([
+    '<tr><td style="padding:30px 32px 6px;">',
+    '<div style="font-size:15px;line-height:1.6;color:#43516f;">{{1.hi}}</div>',
+    '<h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;',
+    'letter-spacing:-.6px;">{{1.copy.rcptHeading}}</h1>',
+    '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{1.copy.rcptLead}}</div>',
+    '</td></tr>',
+
+    '<tr><td style="padding:18px 32px 4px;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"',
+    ' style="background:#f5f8ff;border:2px solid #071a3d;border-radius:18px;">',
+    '<tr><td style="padding:14px 18px;">',
+    '<div style="font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;',
+    'color:#6b7c9c;padding-bottom:6px;">{{1.copy.rcptVoteTitle}}</div>',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">',
+    cell('{{1.copy.winNumberLabel}}', '{{1.startNumber}}'),
+    cell('{{1.copy.winProjectLabel}}', '{{1.rcptProject}}'),
+    cell('{{1.copy.winCategoryLabel}}', '{{1.category}}'),
+    /* Ocena na końcu i bez kreski pod spodem: to jedyna liczba, którą czytający sam podał,
+       więc jest tym, czego szuka w tym liście. */
+    '<tr><td style="padding:7px 0;">',
+    '<span style="display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;">',
+    '{{1.copy.rcptScoreLabel}}</span>',
+    '<span style="font-size:19px;font-weight:800;color:#071a3d;">{{1.score}}</span>',
+    '</td></tr>',
+    '</table></td></tr></table></td></tr>',
+
+    '<tr><td style="padding:18px 32px 4px;font-size:14px;line-height:1.6;color:#43516f;">',
+    '{{1.copy.rcptChange}}</td></tr>',
+
+    '<tr><td style="padding:12px 32px 4px;">',
+    '<a href="{{1.rcptUrl}}" style="display:inline-block;background:#071a3d;color:#ffffff;',
+    'font-size:14px;font-weight:800;text-decoration:none;padding:13px 22px;border-radius:999px;">',
+    '{{1.copy.rcptCta}} &rarr;</a></td></tr>',
+
+    '<tr><td style="padding:16px 32px 30px;font-size:13px;line-height:1.6;color:#6b7c9c;">',
+    '{{1.copy.rcptResults}}</td></tr>'
+  ].join(''));
+}
+
+/**
+ * Gratulacje dla podium Nagrody publiczności.
+ *
+ * JEDEN MODUŁ NA TRZY MIEJSCA I NA SZEŚĆ JĘZYKÓW
+ *   Kusi, żeby zrobić trzy gałęzie po miejscu albo sześć po języku — i to jest dokładnie ten
+ *   błąd, przed którym ostrzega nagłówek emails/copy.json: „No router, no per-language
+ *   templates". Osiemnaście modułów robiących to samo to osiemnaście miejsc, w których
+ *   poprawka trafia w siedemnaście. Worker wybiera miejsce i język ZANIM wyśle payload
+ *   (votingAdminWinners w worker/index.js), więc tutaj zostaje jeden szablon i same ścieżki.
+ *
+ *   Stąd `{{1.winHeading}}` i `{{1.winSubject}}` zamiast trójki z warunkiem, i `{{1.winColour}}`
+ *   zamiast wyboru koloru plakietki: renderer Make podstawia ścieżki i nie ma jak wybierać.
+ *
+ * CO NIE JEST W TYM LIŚCIE
+ *   Godzina i miejsce odbioru nagrody. `winPickup` mówi „napisz do nas, umówimy się" i to
+ *   jest cała treść: ceremonia bywa przesuwana w dniu zawodów, a list, który zdąży skłamać,
+ *   jest gorszy niż list, który odsyła do człowieka.
+ */
+function winnerHtml() {
+  const cell = (label, value) => [
+    '<tr><td style="padding:7px 0;border-bottom:1px solid #e2eaf9;">',
+    '<span style="display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;">',
+    `${label}</span>`,
+    `<span style="font-size:15px;font-weight:700;color:#071a3d;">${value}</span>`,
+    '</td></tr>'
+  ].join('');
+
+  return shell([
+    /* Plakietka z miejscem nad nagłówkiem, a nie liczba w zdaniu. To jest jedyna informacja,
+       którą ktoś chce zobaczyć w pierwszej sekundzie, i jedyna, która różni te trzy listy. */
+    '<tr><td style="padding:30px 32px 0;">',
+    '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>',
+    '<td style="width:52px;"><div style="width:44px;height:44px;border-radius:14px;',
+    'background:{{1.winColour}};color:#071a3d;font-size:20px;font-weight:800;line-height:44px;',
+    'text-align:center;">{{1.place}}</div></td>',
+    '<td style="padding-left:12px;font-size:12px;font-weight:800;letter-spacing:.16em;',
+    'text-transform:uppercase;color:#6b7c9c;">{{1.copy.winStatsTitle}}</td>',
+    '</tr></table></td></tr>',
+
+    '<tr><td style="padding:16px 32px 6px;">',
+    '<div style="font-size:15px;line-height:1.6;color:#43516f;">{{1.hi}}</div>',
+    '<h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;',
+    'letter-spacing:-.6px;">{{1.winHeading}}</h1>',
+    '<div style="font-size:15px;line-height:1.7;color:#43516f;">{{1.copy.winLead}}</div>',
+    '</td></tr>',
+
+    '<tr><td style="padding:18px 32px 4px;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"',
+    ' style="background:#f5f8ff;border:2px solid #071a3d;border-radius:18px;">',
+    '<tr><td style="padding:14px 18px;">',
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">',
+    cell('{{1.copy.winNumberLabel}}', '{{1.startNumber}}'),
+    cell('{{1.copy.winProjectLabel}}', '{{1.winProject}}'),
+    cell('{{1.copy.winCategoryLabel}}', '{{1.category}}'),
+    cell('{{1.copy.winPointsLabel}}', '{{1.totalScore}}'),
+    /* Ostatni wiersz bez kreski pod spodem — kreska na dnie ramki wygląda jak urwany wiersz. */
+    '<tr><td style="padding:7px 0;">',
+    '<span style="display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;">',
+    '{{1.copy.winVotesLabel}}</span>',
+    '<span style="font-size:15px;font-weight:700;color:#071a3d;">{{1.voteCount}}</span>',
+    '</td></tr>',
+    '</table></td></tr></table></td></tr>',
+
+    '<tr><td style="padding:18px 32px 4px;font-size:14px;line-height:1.6;color:#43516f;">',
+    '{{1.copy.winPickup}}</td></tr>',
+
+    '<tr><td style="padding:16px 32px 30px;">',
+    '<a href="{{1.resultsUrl}}" style="display:inline-block;background:#071a3d;color:#ffffff;',
+    'font-size:14px;font-weight:800;text-decoration:none;padding:13px 22px;border-radius:999px;">',
+    '{{1.copy.winCta}} &rarr;</a></td></tr>'
+  ].join(''));
+}
 
 /**
  * The e-mail carrying a six-digit code.
@@ -1225,6 +1454,15 @@ const EMAIL_TEMPLATES = {
      the start by the scheduled scenario — which until now rendered it inside Make out of
      a Google Sheet row. */
   reminderDue: forWorker(REM_DUE_HTML),
+  /* Gratulacje dla podium Nagrody publiczności.
+     Wysyła je gałąź `voting-winner` w Make, nie worker — ten wpis istnieje po to, żeby list
+     przechodził przez tools/preview-emails.mjs razem z pozostałymi. To tam stoi sprawdzian,
+     który łapie ścieżkę bez wartości w payloadzie, a szablon złożony z dwudziestu dwóch
+     ścieżek jest dokładnie tym, na czym taki sprawdzian zarabia. */
+  winner: forWorker(winnerHtml()),
+  /* Potwierdzenie głosu — tu z tego samego powodu co `winner`: żeby list przechodził przez
+     podgląd i przez sprawdzian brakujących ścieżek. */
+  voteReceipt: forWorker(receiptHtml()),
   /* The six-digit code for turning reminders off. Not sent by any Make route: the function
      renders it and pushes it straight to the outbox when somebody presses the link at the
      foot of a letter. */

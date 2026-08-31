@@ -995,6 +995,40 @@
                   ]
                 ]
               },
+              "onerror": [
+                {
+                  "id": 41,
+                  "module": "builtin:Break",
+                  "version": 1,
+                  "mapper": {
+                    "retry": true,
+                    "count": 3,
+                    "interval": 15
+                  },
+                  "metadata": {
+                    "designer": {
+                      "x": 1550,
+                      "y": 1010
+                    },
+                    "restore": {
+                      "expect": {
+                        "retry": {
+                          "label": "Yes",
+                          "nested": {}
+                        }
+                      }
+                    },
+                    "expect": [
+                      {
+                        "name": "retry",
+                        "type": "boolean",
+                        "label": "Retry automatically",
+                        "required": true
+                      }
+                    ]
+                  }
+                }
+              ],
               "mapper": {
                 "to": [
                   "{{1.to}}"
@@ -1017,6 +1051,232 @@
                 "designer": {
                   "x": 1250,
                   "y": 860
+                },
+                "restore": {
+                  "expect": {
+                    "to": {
+                      "mode": "chose",
+                      "items": [
+                        null
+                      ]
+                    },
+                    "cc": {
+                      "mode": "chose"
+                    },
+                    "bcc": {
+                      "mode": "chose"
+                    },
+                    "priority": {
+                      "label": "Normal"
+                    },
+                    "references": {
+                      "mode": "chose"
+                    },
+                    "attachments": {
+                      "mode": "chose"
+                    },
+                    "contentType": {
+                      "label": "HTML"
+                    }
+                  },
+                  "parameters": {
+                    "saveAfterSent": {
+                      "label": "No"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "account",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  },
+                  {
+                    "name": "saveAfterSent",
+                    "type": "boolean",
+                    "label": "Save message after sending",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 32,
+              "module": "email:ActionSendEmail",
+              "version": 7,
+              "parameters": {
+                "account": null,
+                "saveAfterSent": false
+              },
+              "filter": {
+                "name": "voting-receipt",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.branch}}",
+                      "b": "voting-receipt",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {
+                "to": [
+                  "{{1.email}}"
+                ],
+                "subject": "{{1.copy.rcptSubject}}",
+                "contentType": "html",
+                "html": "<!doctype html><html><body style=\"margin:0;padding:0;background:#e9f1ff;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#e9f1ff;\"><tr><td align=\"center\" style=\"padding:24px 12px;\"><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;font-family:'Segoe UI',Helvetica,Arial,sans-serif;\"><tr><td style=\"background:#071a3d;padding:24px 32px;font-size:19px;font-weight:800;color:#ffffff;\">CARRULEDDHI <span style=\"color:#ffc928;\">SHOW 2026</span></td></tr><tr><td style=\"padding:30px 32px 6px;\"><div style=\"font-size:15px;line-height:1.6;color:#43516f;\">{{1.hi}}</div><h1 style=\"margin:8px 0 10px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;letter-spacing:-.6px;\">{{1.copy.rcptHeading}}</h1><div style=\"font-size:15px;line-height:1.7;color:#43516f;\">{{1.copy.rcptLead}}</div></td></tr><tr><td style=\"padding:18px 32px 4px;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#f5f8ff;border:2px solid #071a3d;border-radius:18px;\"><tr><td style=\"padding:14px 18px;\"><div style=\"font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#6b7c9c;padding-bottom:6px;\">{{1.copy.rcptVoteTitle}}</div><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winNumberLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.startNumber}}</span></td></tr><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winProjectLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.rcptProject}}</span></td></tr><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winCategoryLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.category}}</span></td></tr><tr><td style=\"padding:7px 0;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.rcptScoreLabel}}</span><span style=\"font-size:19px;font-weight:800;color:#071a3d;\">{{1.score}}</span></td></tr></table></td></tr></table></td></tr><tr><td style=\"padding:18px 32px 4px;font-size:14px;line-height:1.6;color:#43516f;\">{{1.copy.rcptChange}}</td></tr><tr><td style=\"padding:12px 32px 4px;\"><a href=\"{{1.rcptUrl}}\" style=\"display:inline-block;background:#071a3d;color:#ffffff;font-size:14px;font-weight:800;text-decoration:none;padding:13px 22px;border-radius:999px;\">{{1.copy.rcptCta}} &rarr;</a></td></tr><tr><td style=\"padding:16px 32px 30px;font-size:13px;line-height:1.6;color:#6b7c9c;\">{{1.copy.rcptResults}}</td></tr><tr><td style=\"background:#f2f6ff;padding:20px 32px;border-top:1px solid #dbe6fb;\"><div style=\"font-size:14px;line-height:1.6;color:#20304f;\">{{1.copy.askAny}}</div><div style=\"margin-top:12px;\"><a href=\"mailto:info@carruleddhishow.com\" style=\"display:inline-block;background:#071a3d;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;padding:11px 18px;border-radius:999px;margin:0 8px 8px 0;\">&#9993;&nbsp; info@carruleddhishow.com</a><a href=\"https://www.carruleddhishow.com/#contact\" style=\"display:inline-block;background:#ffffff;color:#071a3d;border:2px solid #071a3d;font-size:13px;font-weight:700;text-decoration:none;padding:9px 18px;border-radius:999px;margin:0 0 8px 0;\">{{1.copy.askCta}} &rarr;</a></div></td></tr><tr><td style=\"background:#071a3d;padding:20px 32px;font-size:12px;line-height:1.6;color:#8fb0e8;\">{{1.copy.footerNote}}<br><a href=\"mailto:info@carruleddhishow.com\" style=\"color:#ffc928;\">info@carruleddhishow.com</a> &middot; <a href=\"https://www.carruleddhishow.com/#contact\" style=\"color:#ffc928;\">{{1.copy.askCta}}</a></td></tr></table></td></tr></table></body></html>",
+                "attachments": [],
+                "cc": [],
+                "bcc": [],
+                "from": "",
+                "sender": "",
+                "replyTo": "info@carruleddhishow.com",
+                "headers": [],
+                "priority": "normal",
+                "inReplyTo": "",
+                "references": []
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": 1140
+                },
+                "restore": {
+                  "expect": {
+                    "to": {
+                      "mode": "chose",
+                      "items": [
+                        null
+                      ]
+                    },
+                    "cc": {
+                      "mode": "chose"
+                    },
+                    "bcc": {
+                      "mode": "chose"
+                    },
+                    "priority": {
+                      "label": "Normal"
+                    },
+                    "references": {
+                      "mode": "chose"
+                    },
+                    "attachments": {
+                      "mode": "chose"
+                    },
+                    "contentType": {
+                      "label": "HTML"
+                    }
+                  },
+                  "parameters": {
+                    "saveAfterSent": {
+                      "label": "No"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "account",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  },
+                  {
+                    "name": "saveAfterSent",
+                    "type": "boolean",
+                    "label": "Save message after sending",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 33,
+              "module": "email:ActionSendEmail",
+              "version": 7,
+              "parameters": {
+                "account": null,
+                "saveAfterSent": false
+              },
+              "filter": {
+                "name": "voting-winner",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.branch}}",
+                      "b": "voting-winner",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "onerror": [
+                {
+                  "id": 42,
+                  "module": "builtin:Break",
+                  "version": 1,
+                  "mapper": {
+                    "retry": true,
+                    "count": 3,
+                    "interval": 15
+                  },
+                  "metadata": {
+                    "designer": {
+                      "x": 1550,
+                      "y": 1150
+                    },
+                    "restore": {
+                      "expect": {
+                        "retry": {
+                          "label": "Yes",
+                          "nested": {}
+                        }
+                      }
+                    },
+                    "expect": [
+                      {
+                        "name": "retry",
+                        "type": "boolean",
+                        "label": "Retry automatically",
+                        "required": true
+                      }
+                    ]
+                  }
+                }
+              ],
+              "mapper": {
+                "to": [
+                  "{{1.email}}"
+                ],
+                "subject": "{{1.winSubject}}",
+                "contentType": "html",
+                "html": "<!doctype html><html><body style=\"margin:0;padding:0;background:#e9f1ff;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#e9f1ff;\"><tr><td align=\"center\" style=\"padding:24px 12px;\"><table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"width:600px;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;font-family:'Segoe UI',Helvetica,Arial,sans-serif;\"><tr><td style=\"background:#071a3d;padding:24px 32px;font-size:19px;font-weight:800;color:#ffffff;\">CARRULEDDHI <span style=\"color:#ffc928;\">SHOW 2026</span></td></tr><tr><td style=\"padding:30px 32px 0;\"><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td style=\"width:52px;\"><div style=\"width:44px;height:44px;border-radius:14px;background:{{1.winColour}};color:#071a3d;font-size:20px;font-weight:800;line-height:44px;text-align:center;\">{{1.place}}</div></td><td style=\"padding-left:12px;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#6b7c9c;\">{{1.copy.winStatsTitle}}</td></tr></table></td></tr><tr><td style=\"padding:16px 32px 6px;\"><div style=\"font-size:15px;line-height:1.6;color:#43516f;\">{{1.hi}}</div><h1 style=\"margin:8px 0 10px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;letter-spacing:-.6px;\">{{1.winHeading}}</h1><div style=\"font-size:15px;line-height:1.7;color:#43516f;\">{{1.copy.winLead}}</div></td></tr><tr><td style=\"padding:18px 32px 4px;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#f5f8ff;border:2px solid #071a3d;border-radius:18px;\"><tr><td style=\"padding:14px 18px;\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winNumberLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.startNumber}}</span></td></tr><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winProjectLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.winProject}}</span></td></tr><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winCategoryLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.category}}</span></td></tr><tr><td style=\"padding:7px 0;border-bottom:1px solid #e2eaf9;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winPointsLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.totalScore}}</span></td></tr><tr><td style=\"padding:7px 0;\"><span style=\"display:inline-block;min-width:150px;font-size:13px;color:#6b7c9c;\">{{1.copy.winVotesLabel}}</span><span style=\"font-size:15px;font-weight:700;color:#071a3d;\">{{1.voteCount}}</span></td></tr></table></td></tr></table></td></tr><tr><td style=\"padding:18px 32px 4px;font-size:14px;line-height:1.6;color:#43516f;\">{{1.copy.winPickup}}</td></tr><tr><td style=\"padding:16px 32px 30px;\"><a href=\"{{1.resultsUrl}}\" style=\"display:inline-block;background:#071a3d;color:#ffffff;font-size:14px;font-weight:800;text-decoration:none;padding:13px 22px;border-radius:999px;\">{{1.copy.winCta}} &rarr;</a></td></tr><tr><td style=\"background:#f2f6ff;padding:20px 32px;border-top:1px solid #dbe6fb;\"><div style=\"font-size:14px;line-height:1.6;color:#20304f;\">{{1.copy.askAny}}</div><div style=\"margin-top:12px;\"><a href=\"mailto:info@carruleddhishow.com\" style=\"display:inline-block;background:#071a3d;color:#ffffff;font-size:13px;font-weight:700;text-decoration:none;padding:11px 18px;border-radius:999px;margin:0 8px 8px 0;\">&#9993;&nbsp; info@carruleddhishow.com</a><a href=\"https://www.carruleddhishow.com/#contact\" style=\"display:inline-block;background:#ffffff;color:#071a3d;border:2px solid #071a3d;font-size:13px;font-weight:700;text-decoration:none;padding:9px 18px;border-radius:999px;margin:0 0 8px 0;\">{{1.copy.askCta}} &rarr;</a></div></td></tr><tr><td style=\"background:#071a3d;padding:20px 32px;font-size:12px;line-height:1.6;color:#8fb0e8;\">{{1.copy.footerNote}}<br><a href=\"mailto:info@carruleddhishow.com\" style=\"color:#ffc928;\">info@carruleddhishow.com</a> &middot; <a href=\"https://www.carruleddhishow.com/#contact\" style=\"color:#ffc928;\">{{1.copy.askCta}}</a></td></tr></table></td></tr></table></body></html>",
+                "attachments": [],
+                "cc": [],
+                "bcc": [],
+                "from": "",
+                "sender": "",
+                "replyTo": "info@carruleddhishow.com",
+                "headers": [],
+                "priority": "normal",
+                "inReplyTo": "",
+                "references": []
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1250,
+                  "y": 1000
                 },
                 "restore": {
                   "expect": {
