@@ -12,8 +12,15 @@
  *
  * DWIE STRONY, BO GŁOSOWANIE MIESZKA NA DWÓCH
  *   Od wyniesienia ocen na `votazione.html` strona główna odpowiada za zaproszenie, chowanie
- *   dwóch pozostałych przycisków w hero, podium i wstrzymanie zapisów. Ocenianie — dwanaście
- *   nagród, siatka, trzy kroki przy pojeździe, okno z adresem — jest na podstronie.
+ *   dwóch pozostałych przycisków w hero, podium i wstrzymanie zapisów. Ocenianie — siatka,
+ *   nakładka na zdjęciu, okno z adresem, klasyfikacja — jest na podstronie.
+ *
+ * TRZECIA SONDA, KTÓREJ TU NIE MA
+ *   `tools/probe-vote-veil.mjs` mierzy samą interakcję na kafelku w czterdziestu punktach:
+ *   krycie nakładki, morfowanie przycisku w suwak, cele dotykowe, jeden odsłonięty kafelek na
+ *   stronę. Ta sonda przechodzi tę drogę najkrótszym możliwym sposobem i pyta o to, czego
+ *   tamta nie dotyka. Podział jest celowy: dwie sondy mierzące to samo rozjeżdżają się przy
+ *   pierwszej zmianie i wtedy nie wiadomo, która kłamie.
  *
  * DLACZEGO PRZEZ cdp.mjs, A NIE PRZEZ --dump-dom
  *   Poprzednia wersja wstrzykiwała skrypt w pobrany HTML i zrzucała DOM przy
@@ -99,7 +106,7 @@ console.log('\n--- faza 3: podium');
 const c = h.closed;
 check(c.podiumShown, 'podium widoczne');
 check(c.podiumCards === 3, `trzy karty zwyciezcow: ${c.podiumCards}`);
-check(c.svgBlocks === 3, `trzy schodki w rysunku SVG: ${c.svgBlocks}`);
+check(c.svgBlocks === 3, `trzy stopnie cokolu, po jednym na karte: ${c.svgBlocks}`);
 check(c.podiumPlaces.join(' | ').startsWith('1:'), `kolejnosc w tresci to 1,2,3: ${c.podiumPlaces.join(' | ')}`);
 check(c.ctaShown.every((v) => v === false), 'przycisk „zaglosuj" znowu ukryty');
 check(c.raceHideShown >= 2, 'dwa przyciski w hero wracaja po zamknieciu');
@@ -119,12 +126,14 @@ const head = p.head;
 check(head.lang === 'pl', `jezyk z adresu: ${head.lang}`);
 check(/nagroda publiczno/i.test(head.h1), `naglowek mowi, o co chodzi: „${head.h1}"`);
 check(head.awardTabs === 0, `nie ma zakladek nagrod (publicznosc przyznaje jedna): ${head.awardTabs}`);
-check(head.ruleShown && /jeden g/i.test(head.rule), `regula powiedziana wprost: „${head.rule.slice(0, 54)}…"`);
+check(head.ruleBadgeGone, 'plakietki z regula nie ma — regula jest w akapicie i w oknie oceny');
+check(/opcjonaln/i.test(head.lead), `akapit mowi, ze imie i adres sa opcjonalne: „${head.lead.slice(0, 62)}…"`);
 check(head.languageButtons === 6, `szesc jezykow do wyboru: ${head.languageButtons}`);
-check(head.clock === false, 'na podstronie NIE ma licznika czasu');
+check(head.eventClock === false, 'na podstronie NIE ma licznika odliczania do wydarzenia');
+check(head.timerShown, 'ale JEST zegar glosowania w przyklejonym pasku');
 check(head.signupLinks === 0, 'na podstronie NIE ma odsylacza „Zapisz sie"');
 check(head.attendButtons === 0, 'na podstronie NIE ma przycisku „Bede tam"');
-check(head.photoIsButton === false, 'zdjecie nie jest przyciskiem');
+check(head.photoIsTarget, 'zdjecie jest celem dotkniecia');
 check(head.mineShown === false, 'panel „Twoj glos" ukryty, dopoki nie ma glosu');
 
 console.log('\n--- filtr kategorii pojazdu');
@@ -146,26 +155,32 @@ check(g.moreShown, `„Pokaz wiecej" widoczne, gdy zostalo wiecej: „${g.moreLa
 check(g.after > g.first, `porcja doklada kafelki: ${g.first} -> ${g.after}`);
 check(g.moreShownAfter === false, 'przycisk znika, gdy nie ma czego doczytac');
 
-console.log('\n--- trzy kroki przy pojezdzie');
-const s1 = p.step1;
-check(s1.startHidden && s1.pickerShown, 'przycisk „Zaglosuj" ustepuje miejsca ocenom');
-check(s1.openPickers === 1, `dokladnie jeden otwarty wybor na strone: ${s1.openPickers}`);
-check(s1.labels === '3,4,5,6,7,8,9,10', `oceny od 3 do 10: ${s1.labels}`);
-check(s1.smallestTarget >= 44, `najmniejszy cel dotykowy: ${s1.smallestTarget} px`);
-check(s1.rows === 2, `oceny w dwoch rzedach po cztery, nie w jednym po osiem: ${s1.rows}`);
-check(s1.confirmDisabled, 'potwierdzenie wylaczone, dopoki nie ma oceny');
-check(p.step2.confirmDisabled === false, 'wybor oceny odblokowuje potwierdzenie');
-check(p.step2.picked === '8', `zaznaczona dokladnie jedna ocena: ${p.step2.picked}`);
+/* Geometrie nakladki, morfowanie przycisku w suwak i cele dotykowe mierzy
+   tools/probe-vote-veil.mjs. Tu sprawdzamy tylko, ze droga jest przejezdna. */
+console.log('\n--- droga do glosu: dotkniecie, przycisk, suwak');
+check(p.armed.cardArmed, 'dotkniecie zdjecia odslania nakladke');
+check(p.armed.ctaLabel.length > 0, `zaproszenie ma napis: „${p.armed.ctaLabel}"`);
+check(p.picking.cardPicking, 'klik w zaproszenie otwiera wybor oceny');
+check(p.picking.range === '3-10', `zakres ocen z serwera: ${p.picking.range}`);
+check(p.picking.openPickers === 1, `dokladnie jeden otwarty wybor na strone: ${p.picking.openPickers}`);
+check(p.picking.readout === '8', `suwak pokazuje wybrana ocene: „${p.picking.readout}"`);
+check(p.picking.sendLabel.length > 0, `wysylka ma napis: „${p.picking.sendLabel}"`);
 
 console.log('\n--- okno z adresem');
 const s3 = p.step3;
-check(s3.open, 'okno otwiera sie dopiero po potwierdzeniu oceny');
+check(s3.open, 'okno otwiera sie dopiero po nacisnieciu wysylki');
 check(s3.bodyLocked, 'tlo zablokowane, gdy okno jest otwarte');
 check(s3.who.length > 0, `okno mowi, o ktory pojazd chodzi: „${s3.who}"`);
 check(s3.rider.length > 0, `okno mowi, czyj to pojazd: „${s3.rider}"`);
 check(s3.score === '8', `okno niesie wybrana ocene: ${s3.score}`);
 check(s3.formShown && s3.knownShown === false, 'bez zapamietanego adresu widac pola');
-check(s3.blockedWhenEmpty, 'puste imie i adres zatrzymuja wysylke');
+/* Odwrotnie niz przed zmiana: adres jest OPCJONALNY, glos bez niego przechodzi. Kosztem
+   jest brak zmiany i brak wiadomosci o wyniku — i to jest widoczne w oknie, bo zgoda na
+   powiadomienie jest wylaczona az do wpisania adresu. */
+check(s3.nameRequired === false, 'imie NIE jest wymagane');
+check(s3.emailRequired === false, 'adres NIE jest wymagany');
+check(s3.notifyDisabled === true, 'zgoda na wynik wylaczona, dopoki nie ma adresu');
+check(s3.notifyEnabledWithEmail === true, 'wpisanie adresu wlacza zgode na wynik');
 
 console.log('\n--- po oddaniu glosu');
 const v = p.afterVote;
@@ -183,20 +198,34 @@ check(v.votedCards === 1, `dokladnie jeden kafelek oznaczony jako oceniony: ${v.
 check(v.mineBadges === 1, `plakietka „twoj glos" na jednym zdjeciu: ${v.mineBadges}`);
 check(v.yourScore.includes('8'), `kafelek pokazuje wlasna ocene: „${v.yourScore}"`);
 check(v.usedOnOthers > 0, `pozostale kafelki mowia, ze glos jest juz oddany (${v.usedOnOthers})`);
-/* Jeden glos na osobe, wiec po oddaniu nie ma juz na co kliknac NIGDZIE na stronie. To jest
-   rdzen zmiany zglaszanej jako „publicznosc glosuje tylko na jedna kategorie". */
-check(v.startButtonsLeft === 0, `nie ma na co kliknac po oddaniu glosu: ${v.startButtonsLeft}`);
+/* Jeden glos na urzadzenie, wiec po oddaniu nie ma juz czego dotknac NIGDZIE na stronie. */
+check(v.hitsLeft === 0, `zadne zdjecie nie zaprasza juz do glosowania: ${v.hitsLeft}`);
+check(v.armedLeft === 0, `zaden kafelek nie zostal odslony: ${v.armedLeft}`);
 check(v.toastTone === 'success', `pasek w odmianie potwierdzenia: ${v.toastTone}`);
 
+/* Wynik ma JEDEN widok: podium i pelna tabela. Siatka kart po zamknieciu jest celowo pusta —
+   patrz komentarz przy galezi `closed` w paintGrid. Poprzednia wersja tych asercji szukala
+   rankingu na kafelkach i przy pustej siatce polowa przechodzila trywialnie, bo zero rowna
+   sie zero: sonda mowila „ok" o stronie, na ktorej nie bylo niczego. */
 console.log('\n--- faza 3: klasyfikacja nagrody publicznosci');
 const cl = p.closed;
-check(cl.startButtons === 0, 'po zamknieciu nie da sie glosowac');
-check(cl.ruleShown === false, '„jeden glos na osobe" znika, gdy nie ma czego obiecywac');
-check(cl.stats === cl.cards && cl.cards > 0, `srednie przy kazdym kafelku (${cl.stats}/${cl.cards})`);
-check(cl.ranks === cl.cards, 'kazdy kafelek ma miejsce w rankingu');
-check(cl.firstRank === '#1', `pierwszy kafelek to pierwsze miejsce: ${cl.firstRank}`);
-check(cl.firstPlaceMarked, 'pierwsze miejsce wyroznione');
-check(cl.sorted, `kolejnosc jest wynikiem: ${cl.averages.join(' > ')}`);
+check(cl.hits === 0, `po zamknieciu nie da sie glosowac: ${cl.hits} celow dotkniecia`);
+check(cl.gridCards === 0, `siatka kart ustepuje miejsca wynikowi: ${cl.gridCards} kafelkow`);
+check(cl.timerShown, 'zegar zostaje i mowi, ze glosowanie jest zamkniete');
+check(cl.resultsShown, 'sekcja wynikow widoczna');
+check(cl.podiumEmpty === 0, 'podium ma zwyciezcow, a nie komunikat „brak glosow"');
+check(cl.podiumPlaces.join(',') === '1,2,3', `trzy miejsca na podium po kolei: ${cl.podiumPlaces.join(',')}`);
+check(cl.standingsRows > 3, `pelna tabela siega dalej niz podium: ${cl.standingsRows} wierszy`);
+check(cl.firstRank === '1', `pierwszy wiersz tabeli to pierwsze miejsce: ${cl.firstRank}`);
+check(cl.scrollFocusable, 'tabele da sie przewijac z klawiatury');
+/* Na telefonie tabela rozklada sie na kartki. Trzy liczby — punkty, srednia, glosy — musza
+   stac KAZDA w swojej kolumnie: przy jednej komorce dwucyfrowa suma nachodzila na srednia. */
+const nc = cl.numberColumns;
+check(nc?.count === 3, `trzy liczby w wierszu: ${nc?.count}`);
+check(nc?.distinct === 3, `kazda w swojej kolumnie: ${nc?.distinct} roznych pozycji`);
+check(nc?.ascending, 'kolumny ida po kolei w prawo');
+check(nc?.overlap === false, 'zadna liczba nie nachodzi na nastepna');
+check(cl.sorted, `kolejnosc jest wynikiem: ${cl.points.slice(0, 5).join(' > ')}`);
 check(cl.kicker.length > 0, `naglowek mowi, ze to wynik: „${cl.kicker}"`);
 
 console.log(`\n${fails ? `${fails} niezaliczonych` : 'wszystko zaliczone'}`);

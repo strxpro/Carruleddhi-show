@@ -26,7 +26,11 @@ async (document, window) => {
       .map((el) => el.textContent.replace(/\s+/g, ' ').trim()),
     raceHideShown: $$('[data-race-hide]').filter(shown).length,
     podiumCards: $$('.podium-card').length,
-    svgBlocks: $$('.podium__block').length,
+    /* `.podium-card__block`, nie `.podium__block`. Cokół przestał być jednym rysunkiem SVG
+       pod kartami: każda karta nosi teraz swój stopień, bo dzięki temu układ z jednym albo
+       dwoma wozami nie wymaga warunku w JavaScripcie (patrz komentarz przy `.podium__steps`
+       w voting.css). Sonda pytała o klasę, której nie ma, i zwracała zero. */
+    svgBlocks: $$('.podium-card__block').length,
     signupLocked: shown($('[data-signup-locked]')),
     submitDisabled: Boolean($('[data-registration-form] button[type="submit"]')?.disabled),
     signupLinks: $$('a[href="#signup"], a[data-feature-link="registration"]')

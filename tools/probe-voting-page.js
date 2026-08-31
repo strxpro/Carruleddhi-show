@@ -1,29 +1,33 @@
 /**
- * Podstrona głosowania: nagroda publiczności, dwie kolumny, porcje, trzy kroki, okno z adresem.
+ * Podstrona głosowania: nagroda publiczności, dwie kolumny, porcje, oddany głos, klasyfikacja.
  *
  * Uruchamiana przez tools/probe-voting.mjs, wykonywana przez tools/cdp.mjs w prawdziwej
  * przeglądarce i w prawdziwym czasie.
  *
- * UWAGA: CZĘŚĆ TEJ SONDY JEST NIEAKTUALNA I WYWALA SIĘ Z PREMEDYTACJĄ.
+ * PRZEPISANA NA NAKŁADKĘ NA ZDJĘCIU.
  * ===========================================================================
- * Opisuje POPRZEDNI układ kafelka: przycisk „Zagłosuj" POD zdjęciem, osobny krok „zagłosować
- * na ten wóz?" i oceny jako siatka 4×2. Wszystkie trzy zostały zastąpione nakładką na zdjęciu
- * — kafelek jest czysty, dotknięcie odsłania jedno zaproszenie, a ono przeistacza się w suwak.
- * Zniknęła też plakietka z regułą (`[data-vote-rule]`), przeniesiona do akapitu nagłówka.
+ * Poprzednia wersja opisywała układ, którego już nie ma: przycisk „Zagłosuj" POD zdjęciem,
+ * osobny krok „zagłosować na ten wóz?" i oceny jako siatka 4×2. Wszystkie trzy zostały
+ * zastąpione nakładką, więc sonda mierzyła stan sprzed zmiany i przewracała się kaskadowo —
+ * trzydzieści jeden błędów, z których żaden nie był błędem strony. Sonda, która krzyczy
+ * zawsze, nie mówi nic w dniu, w którym coś naprawdę pęknie.
  *
- * Skutek: sekcje „trzy kroki przy pojeździe", „okno z adresem" i „po oddaniu głosu" nie mają
- * czego znaleźć i przewracają się kaskadowo. To NIE są błędy w kodzie strony.
- *
- * Aktualny przepływ mierzy tools/probe-vote-veil.mjs — i tam wszystko przechodzi. Sekcje
- * nagłówka, filtra kategorii i doczytywania porcjami nadal są tu prawdziwe i nadal przechodzą,
- * więc plik zostaje do przepisania, a nie do wyrzucenia.
+ * PODZIAŁ PRACY Z tools/probe-vote-veil.mjs
+ *   Tamta sonda mierzy SAMĄ interakcję na kafelku: krycie nakładki, morfowanie przycisku
+ *   w suwak, cele dotykowe, jeden odsłonięty kafelek na stronę. Tu jej nie powtarzamy.
+ *   Ta sonda przechodzi ten przepływ najkrótszą drogą i pyta o to, czego tamta nie dotyka:
+ *   nagłówek, filtr kategorii, doczytywanie porcjami, stan PO oddaniu głosu i klasyfikację
+ *   po zamknięciu.
  */
 async (document, window) => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));
 
-  for (let i = 0; i < 60 && !$('[data-vote-start]'); i += 1) await wait(150);
+  /* Czekamy na kafelek, nie na `[data-vote-start]` — tego przycisku nie ma od czasu, gdy
+     ocenianie przeniosło się na zdjęcie. Poprzednia wersja czekała na coś, co nigdy nie
+     wchodzi, przez pełne dziewięć sekund, i dopiero potem zaczynała mierzyć puste drzewo. */
+  for (let i = 0; i < 80 && !$('[data-vote-grid] .vote-card'); i += 1) await wait(150);
 
   const kill = document.createElement('style');
   kill.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}';
@@ -46,18 +50,27 @@ async (document, window) => {
     title: document.title,
     h1: $('.vote-head h1')?.textContent.trim() || '',
     kicker: $('[data-vote-kicker]')?.textContent.trim() || '',
-    ruleShown: shown($('[data-vote-rule]')),
-    rule: $('[data-vote-rule]')?.textContent.replace(/\s+/g, ' ').trim() || '',
-    languageButtons: $$('[data-vote-lang]').length,
+    /* Plakietki `[data-vote-rule]` nie ma — powtarzala akapit nad soba i zajmowala osobny
+       prostokat z kreska przez pol szerokosci naglowka. Regula stoi teraz w akapicie
+       (`voting.pageLead`) i w oknie oceny, wiec pytamy o akapit. */
+    ruleBadgeGone: !$('[data-vote-rule]'),
+    lead: $('[data-vote-lead]')?.textContent.replace(/\s+/g, ' ').trim() || '',
+    /* `[data-language-option]`, nie `[data-vote-lang]`. Podstrona dostala ten sam wybor jezyka
+       co strona glowna — jedna rozwijana lista w pasku, a nie wlasny rzad przyciskow. Sonda
+       celujaca w stary znacznik zwracala zero i wygladalo to na brakujacy przelacznik. */
+    languageButtons: $$('[data-language-option]').length,
     /* Nie ma juz zakladek nagrod: publicznosc przyznaje JEDNA nagrode. */
     awardTabs: $$('[data-award-tab]').length,
-    /* Trzy rzeczy, ktorych na tej stronie NIE ma byc. Zgloszone wprost: „wylaczone jest to, ze
-       pokazuje sie czas, te guziki zapisz sie albo ze bede tam — jest tylko zaglosuj". */
-    clock: Boolean($('[data-voting-clock]')),
+    /* Dwie rzeczy, ktorych na tej stronie NIE ma byc — zgloszone wprost: „te guziki zapisz
+       sie albo ze bede tam". Licznik odliczania do wydarzenia tez nie, ale zegar glosowania
+       JEST, i to osobny element: `[data-vote-timer]` w przyklejonym pasku. */
+    eventClock: Boolean($('[data-voting-clock]')),
     signupLinks: $$('a[href="#signup"]').length,
     attendButtons: $$('[data-open-reminder]').length,
-    /* Zdjecie nie jest przyciskiem — czynnosc ma wlasny przycisk pod spodem. */
-    photoIsButton: Boolean($('.vote-card__photo button') || $('button .vote-card__photo')),
+    timerShown: Boolean($('[data-vote-timer]')) && !$('[data-vote-timer]').hidden,
+    /* Zdjecie JEST celem dotkniecia — na tym polegala cala zmiana. Przezroczysty
+       `.vote-card__hit` lezy na zdjeciu i odslania nakladke. */
+    photoIsTarget: Boolean($('.vote-card__hit')),
     mineShown: shown($('[data-vote-mine]'))
   };
 
@@ -101,38 +114,42 @@ async (document, window) => {
     out.filters.afterReset = cards().length;
   }
 
-  /* Krok pierwszy: „Zagłosuj" na kafelku odsłania oceny i chowa sam siebie. */
-  const start = $('[data-vote-start]');
-  const card = start?.closest('.vote-card');
-  start?.click();
-  await wait(350);
-  const picker = card?.querySelector('.vote-picker');
-  /* Zakres zawężony do otwartego wyboru: `[data-vote-score]` w całym dokumencie to osiemnaście
-     kafelków po osiem przycisków, z których siedemnaście jest ukrytych i ma wysokość zero —
-     minimum z takiego zbioru zawsze wyszłoby zerem i nie mierzyłoby niczego. */
-  const scores = Array.from(picker?.querySelectorAll('[data-vote-score]') || []);
-  out.step1 = {
-    startHidden: Boolean(start?.hidden),
-    pickerShown: shown(picker),
-    /* Jeden otwarty wybór na całą stronę: dwa otwarte rzędy ocen to pytanie „którą z nich
-       właśnie wysyłam", zadane w chwili wysyłania. */
-    openPickers: $$('.vote-picker').filter(shown).length,
-    labels: scores.map((b) => b.textContent.trim()).join(','),
-    smallestTarget: scores.length
-      ? Math.min(...scores.map((b) => Math.round(b.getBoundingClientRect().height)))
-      : null,
-    rows: new Set(scores.map((b) => Math.round(b.getBoundingClientRect().top))).size,
-    confirmDisabled: Boolean(picker?.querySelector('.vote-picker__confirm')?.disabled)
+  /* Głos oddany przez nakładkę: dotknięcie zdjęcia, przycisk na środku, suwak, wysyłka.
+     Mierzymy tu tylko to, że droga jest przejezdna i co niesie okno — geometrię nakładki,
+     morfowanie i cele dotykowe mierzy probe-vote-veil.mjs i nie ma sensu robić tego dwa razy. */
+  const card = $('[data-vote-grid] .vote-card');
+  $('.vote-card__hit', card)?.click();
+  await wait(160);
+  out.armed = {
+    cardArmed: Boolean(card?.classList.contains('is-armed')),
+    ctaLabel: $('.vote-veil__cta', card)?.textContent.trim() || ''
   };
 
-  scores.find((b) => b.textContent.trim() === '8')?.click();
+  $('.vote-veil__cta', card)?.click();
   await wait(200);
-  out.step2 = {
-    confirmDisabled: Boolean(picker?.querySelector('.vote-picker__confirm')?.disabled),
-    picked: $$('[data-vote-score].is-picked').map((b) => b.textContent.trim()).join(',')
+  const slider = $('.vote-slider', card);
+  out.picking = {
+    cardPicking: Boolean(card?.classList.contains('is-picking')),
+    /* Zakres bierzemy z suwaka, nie z listy przycisków: oceny to teraz jeden `input[type=range]`
+       o granicach podanych przez serwer, a nie osiem osobnych przycisków. */
+    range: slider ? `${slider.min}-${slider.max}` : '',
+    /* Jeden otwarty wybór na całą stronę — dwa naraz to pytanie „którą właśnie wysyłam",
+       zadane w chwili wysyłania. */
+    openPickers: $$('.vote-card.is-picking').length,
+    sendLabel: $('.vote-veil__send', card)?.textContent.trim() || ''
   };
 
-  picker?.querySelector('.vote-picker__confirm')?.click();
+  if (slider) {
+    slider.value = '8';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  await wait(120);
+  /* `.vote-slider__value`, nie `.vote-picker__score`. Ta druga klasa nadal istnieje, ale to
+     przyciski ocen w oknie zmiany głosu z odsyłacza w mailu — inny widok i inny element.
+     Sonda celująca w nią zwracała pusty napis i wyglądało to na zepsuty odczyt suwaka. */
+  out.picking.readout = $('.vote-slider__value', card)?.textContent.trim() || '';
+
+  $('.vote-veil__send', card)?.click();
   await wait(450);
   const dialog = $('[data-vote-dialog]');
   out.step3 = {
@@ -142,13 +159,14 @@ async (document, window) => {
     rider: $('[data-vote-dialog-rider]')?.textContent.trim() || '',
     score: $('[data-vote-dialog-score]')?.textContent.trim() || '',
     knownShown: shown($('[data-vote-known]')),
-    formShown: shown($('[data-vote-form]'))
+    formShown: shown($('[data-vote-form]')),
+    /* Odwrotnie niż w poprzedniej wersji tej sondy, i to jest zmiana zamówiona wprost:
+       imię i adres są OPCJONALNE. Głos bez adresu przechodzi — kosztem jest to, że nie da
+       się go potem zmienić ani dowiedzieć się o wyniku, i okno o tym mówi. */
+    nameRequired: Boolean($('#vote-name')?.required),
+    emailRequired: Boolean($('#vote-email')?.required),
+    notifyDisabled: $('[data-vote-notify]') ? $('[data-vote-notify]').disabled : null
   };
-
-  /* Puste pola muszą zatrzymać wysyłkę — ten sam warunek co w formularzu zapisów. */
-  $('[data-vote-form] button[type="submit"]')?.click();
-  await wait(350);
-  out.step3.blockedWhenEmpty = Boolean(dialog?.open);
 
   const form = $('[data-vote-form]');
   const fill = (name, value) => {
@@ -158,8 +176,14 @@ async (document, window) => {
       field.dispatchEvent(new Event('input', { bubbles: true }));
     }
   };
+  /* Z adresem, bo dalej sprawdzamy panel „Twój głos" i obietnicę jednej zmiany — a ta
+     istnieje tylko dla podpisanych. Ścieżka anonimowa ma własne teksty i własną sondę. */
   fill('name', 'Marco');
   fill('email', 'marco@example.com');
+  await wait(120);
+  out.step3.notifyEnabledWithEmail = $('[data-vote-notify]')
+    ? !$('[data-vote-notify]').disabled
+    : null;
   form?.querySelector('button[type="submit"]')?.click();
   await wait(900);
   out.afterVote = {
@@ -176,31 +200,79 @@ async (document, window) => {
     mineBadges: $$('.vote-card__mine').length,
     yourScore: $('.vote-card__yours')?.textContent.trim() || '',
     usedOnOthers: $$('.vote-card__used').length,
-    /* Jeden glos na cala strone, wiec po oddaniu nie ma juz na co kliknac NIGDZIE. */
-    startButtonsLeft: $$('[data-vote-start]').length,
+    /* Jeden glos na urzadzenie, wiec po oddaniu nie ma juz na co dotknac NIGDZIE. Liczymy
+       przezroczyste cele na zdjeciach, a nie przyciski `[data-vote-start]` — tych nie ma
+       od czasu, gdy ocenianie przenioslo sie na zdjecie, i pusty zbior przechodzilby ten
+       warunek zawsze, nie mierzac niczego. */
+    hitsLeft: $$('.vote-card__hit:not([hidden])').length,
+    armedLeft: $$('.vote-card.is-armed, .vote-card.is-picking').length,
     toast: $('[data-toast-text]')?.textContent.trim() || '',
     toastTone: $('[data-toast]')?.dataset.toastTone || ''
   };
 
-  /* Faza trzecia: ta sama siatka jest rankingiem nagrody publiczności. */
+  /* Faza trzecia: wynik ma JEDEN widok — podium i pełna tabela.
+     ---------------------------------------------------------------------------
+     Poprzednia wersja tej sekcji szukała rankingu na kafelkach (`.vote-card__rank`,
+     `.vote-card__stats`, `.vote-card.is-place-1`) i wychodziło jej zero. To nie był błąd
+     strony: `paintGrid` po zamknięciu celowo opróżnia siatkę, żeby ranking nie istniał
+     w dwóch miejscach naraz — jest to napisane w komentarzu przy tej gałęzi.
+
+     Gorsze niż same błędy było to, co przechodziło. Przy pustej siatce `ranks === cards`
+     i „po zamknieciu nie da sie glosowac" dawały prawdę, bo zero równa się zero. Sonda
+     mówiła „ok" o stronie, na której nie było niczego. */
   const bar = $('[data-voting-demo]');
   if (bar && !bar.classList.contains('is-open')) bar.querySelector('[data-demo-toggle]').click();
   $$('[data-demo-phase]').find((b) => b.dataset.demoPhase === 'closed')?.click();
-  await wait(1000);
+  // Czekamy na WYNIK przełączenia, nie na stałą liczbę milisekund: zmiana fazy czyta stan od nowa.
+  for (let i = 0; i < 40 && !$('[data-vote-standings] tr'); i += 1) await wait(150);
+  await wait(200);
+
+  const standings = $$('[data-vote-standings] tr');
+  const points = standings.map((tr) => tr.querySelector('.vote-standings__points')?.textContent.trim() || '');
   out.closed = {
-    cards: cards().length,
-    stats: $$('.vote-card__stats').length,
-    ranks: $$('.vote-card__rank').length,
-    startButtons: $$('[data-vote-start]').length,
-    ruleShown: shown($('[data-vote-rule]')),
-    firstRank: $('.vote-card__rank')?.textContent.trim() || '',
-    firstPlaceMarked: Boolean($('.vote-card.is-place-1')),
+    // Siatka kart ma zniknąć — ranking mieszka w tabeli i na podium, nie w trzech miejscach.
+    gridCards: cards().length,
+    hits: $$('.vote-card__hit:not([hidden])').length,
+    /* Zegar zostaje w pasku i po zamknieciu — mowi wtedy, ze glosowanie jest zamkniete,
+       zamiast znikac i zostawiac pytanie bez odpowiedzi. */
+    timerShown: Boolean($('[data-vote-timer]')) && !$('[data-vote-timer]').hidden,
+    resultsShown: shown($('[data-vote-results]')),
+    podiumPlaces: $$('[data-vote-podium] .vote-podium__item').map((li) => li.dataset.place),
+    podiumEmpty: $$('[data-vote-podium] .vote-podium__empty').length,
+    standingsRows: standings.length,
+    firstRank: standings[0]?.querySelector('.vote-standings__rank')?.textContent.trim() || '',
+    scrollFocusable: $('.vote-standings__scroll')?.tabIndex === 0,
+    /* Na telefonie tabela NIE przewija się w środku — rozkłada się na kartki, po jednej na
+       zawodnika, bo pięć kolumn na 390 px to pięć nieczytelnych kolumn. Sonda chodzi w oknie
+       390×844, więc pytamy o to, co tam faktycznie ma być.
+       ---------------------------------------------------------------------------
+       Punkty, średnia i liczba głosów muszą stać KAŻDE w swojej kolumnie. To był mój własny
+       błąd w poprzedniej turze: trzy liczby wpadały do jednej komórki i przy dwucyfrowej
+       sumie nachodziły na siebie. Trzy różne pozycje w poziomie i rosnące lewe krawędzie to
+       dokładnie ten warunek, i dlatego jest tu na stałe. */
+    numberColumns: (() => {
+      const first = standings[0];
+      if (!first) return null;
+      const lefts = Array.from(first.querySelectorAll('.vote-standings__number'))
+        .map((td) => Math.round(td.getBoundingClientRect().left));
+      return {
+        count: lefts.length,
+        distinct: new Set(lefts).size,
+        ascending: lefts.every((value, i) => i === 0 || value > lefts[i - 1]),
+        overlap: Array.from(first.querySelectorAll('.vote-standings__number')).some((td, i, list) => {
+          const next = list[i + 1];
+          return next && td.getBoundingClientRect().right > next.getBoundingClientRect().left + 1;
+        })
+      };
+    })(),
     kicker: $('[data-vote-kicker]')?.textContent.trim() || '',
-    averages: $$('.vote-card__stats b').slice(0, 3).map((el) => el.textContent.trim())
+    points
   };
-  /* Kolejność ma być wynikiem: średnie nierosnąco. */
-  out.closed.sorted = out.closed.averages
-    .map(Number)
+  /* Kolejność ma być wynikiem: punkty nierosnąco. Kreska znaczy „zero głosów" i stoi na
+     końcu, więc do porównania idzie jako minus nieskończoność, a nie jako NaN. */
+  const asNumber = (value) => (value === '—' ? -Infinity : Number(value));
+  out.closed.sorted = points
+    .map(asNumber)
     .every((value, index, list) => index === 0 || list[index - 1] >= value);
 
   return out;
