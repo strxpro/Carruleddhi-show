@@ -258,12 +258,14 @@
 
                Podmiana, a nie dodanie obok: dwa zegary jeden pod drugim kazałyby czytającemu
                zgadywać, który z nich go dotyczy. -->
+          <!-- Bez drugiego „zagłosuj".
+               Stał tu przycisk prowadzący na podstronę głosowania, a dokładnie taki sam stoi
+               kilkanaście pikseli wyżej w `hero__actions` — dwa identyczne zaproszenia obok
+               siebie każą wybierać między tym samym i tym samym. Zostaje sam zegar, a po
+               zamknięciu jedno przejście na cokół, bo to jest inna czynność. -->
           <div class="hero-vote" data-hero-vote hidden aria-live="polite">
             <span class="hero-vote__label" data-hero-vote-label></span>
             <strong class="hero-vote__time" data-hero-vote-time></strong>
-            <a class="btn btn--yellow hero-vote__go" href="votazione.html" data-hero-vote-go hidden>
-              <span data-i18n="voting.cta">Vota ora</span><span aria-hidden="true">★</span>
-            </a>
             <a class="btn btn--blue hero-vote__go" href="#podium" data-hero-vote-podium hidden>
               <span data-i18n="voting.seeWinners">Guarda i vincitori</span><span aria-hidden="true">↘</span>
             </a>
@@ -305,7 +307,7 @@
         <header class="section-head">
           <span class="eyebrow" data-i18n="voting.podiumKicker">Risultato del pubblico</span>
           <h2 id="podium-title" data-i18n="voting.podiumTitle" data-text-effect="jump">Il podio.</h2>
-          <p class="section-lead" data-i18n="voting.podiumLead">Media dei voti del pubblico. Tre carretti su tre gradini.</p>
+          <p class="section-lead" data-i18n="voting.podiumLead">Classifica per punti totali, poi numero di voti e media.</p>
         </header>
 
         <!-- ZDJĘCIA STOJĄ NA COKOLE, NIE OBOK NIEGO.
@@ -327,7 +329,34 @@
 
              Kolejność w znaczniku to 2, 1, 3 — tak stoi prawdziwe podium i tak je czyta każdy
              bez podpisu. Kolejność wyniku dla czytnika ekranu niesie lista niżej. -->
+        <!-- ZDRAPKA NAD COKOŁEM.
+             ==========================================================================
+             Wynik jest gotowy w chwili zamknięcia głosowania i bez tego pojawiał się na
+             ekranie sam, po przewinięciu — czyli największa niespodzianka dnia była
+             kolejną sekcją do przescrollowania. Warstwa zakrywa cokół i prosi o jeden ruch
+             palcem; kto go zrobi, dostaje wynik i konfetti.
+
+             Odsłonięcie jest ZAPAMIĘTANE w localStorage pod kluczem z rocznikiem edycji, więc
+             po odświeżeniu strony i po powrocie następnego dnia cokół stoi odkryty. Zdrapka,
+             która wraca po każdym wejściu, przestaje być niespodzianką i zaczyna być przeszkodą
+             między człowiekiem a wynikiem.
+
+             Rysowana na `canvas`, nie maską CSS: ścieranie palcem to zamalowywanie w trybie
+             `destination-out`, a mierzenie odsłoniętej powierzchni wymaga dostępu do pikseli.
+             Przycisk „odkryj wszystko" stoi obok, bo zdrapywanie na klawiaturze i na czytniku
+             ekranu nie istnieje. -->
         <div class="podium__stage" data-podium-stage>
+          <div class="podium-scratch" data-podium-scratch hidden>
+            <canvas class="podium-scratch__canvas" data-podium-scratch-canvas aria-hidden="true"></canvas>
+            <div class="podium-scratch__copy">
+              <span class="podium-scratch__spark" aria-hidden="true">🎉</span>
+              <strong data-i18n="voting.scratchTitle">Gratta e scopri chi ha vinto</strong>
+              <span class="podium-scratch__hint" data-i18n="voting.scratchHint">Passa il dito sulla superficie</span>
+              <button class="btn btn--yellow podium-scratch__reveal" type="button" data-podium-scratch-reveal>
+                <span data-i18n="voting.scratchReveal">Scopri il primo posto</span><span aria-hidden="true">★</span>
+              </button>
+            </div>
+          </div>
           <ol class="podium__steps" data-podium-winners></ol>
           <!-- Kreska, na której stoją bloki. Jeden element, bo to jest jedna linia — trzy
                krawędzie bloków nie tworzą jej same, gdy któryś jest pusty. -->

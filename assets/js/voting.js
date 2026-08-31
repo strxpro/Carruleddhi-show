@@ -24,7 +24,7 @@
  */
 import {
   $, $$, reducedMotion, demoMode, text, toast,
-  stamp, remaining, readState, paintDemoBar, avatarFor
+  stamp, remaining, readState, paintDemoBar, avatarFor, votesLabel, tieNotes
 } from './voting-core.js';
 
 (function () {
@@ -146,17 +146,30 @@ import {
       return;
     }
 
-    box.hidden = false;
+    /* Reszta stawki czeka na zdrapkę razem z cokołem.
+       `paintField()` biegnie w `paint()` PO `paintPodium()`, więc bez tego warunku odsłaniałby
+       miejsca od czwartego w dół nad zakrytym cokołem — a wtedy niespodzianka jest już
+       zepsuta: kto zna czwarte miejsce, zna też stawkę, z której zostały trzy nazwy. */
+    box.hidden = !scratchRevealed();
     /* Ile tego jest, powiedziane nad listą. Bez tego długość stawki jest niespodzianką po
        przewinięciu — a przy kilkudziesięciu wozach to długie przewijanie. */
     if (title) {
       title.textContent = `${text('voting.restTitle')} · ${rest.length}`;
     }
 
+    /* Ta sama mapa remisów co na cokole. Liczy się ją tu drugi raz, a nie przekazuje z
+       paintPodium(), bo obie funkcje są wołane niezależnie z paint() i wiązanie ich jedną
+       zmienną znaczyłoby, że kolejność tych dwóch wywołań staje się nagle istotna. */
+    const ties = tieNotes(standingsRows());
+
     list.replaceChildren(...rest.map((row, index) => {
       const item = document.createElement('li');
       item.className = 'podium__field-item';
 
+      /* Kafelek to samo zdjęcie z podpisem na nim — ta sama zasada, co na cokole wyżej i na
+         kafelkach na podstronie głosowania. Wcześniej był tu biały prostokąt z obwódką, w nim
+         małe zdjęcie z lewej i tekst z prawej; przy dwudziestu wozach dawało to dwadzieścia
+         ramek i dwadzieścia znaczków zamiast dwudziestu fotografii. */
       const figure = document.createElement('figure');
       figure.className = 'podium__field-photo';
       const image = document.createElement('img');
@@ -166,13 +179,18 @@ import {
       image.decoding = 'async';
       figure.append(image);
 
+      const scrim = document.createElement('span');
+      scrim.className = 'podium__field-scrim';
+      scrim.setAttribute('aria-hidden', 'true');
+      figure.append(scrim);
+
       const place = document.createElement('span');
       place.className = 'podium__field-place';
       // Numeracja od czwartego, nie od pierwszego wiersza tej listy.
       place.textContent = String(index + 4);
       figure.append(place);
 
-      const body = document.createElement('div');
+      const body = document.createElement('figcaption');
       body.className = 'podium__field-body';
       const project = document.createElement('strong');
       project.textContent = row.projectName || text('voting.noProject');
@@ -182,11 +200,19 @@ import {
       const points = document.createElement('b');
       points.textContent = String(row.totalScore);
       const count = document.createElement('small');
-      count.textContent = `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`;
+      count.textContent = `${text('voting.points')} · ${row.voteCount} ${votesLabel(row.voteCount)}`;
       stats.append(points, count);
       body.append(project, rider, stats);
 
-      item.append(figure, body);
+      if (ties.get(row.id)) {
+        const tie = document.createElement('span');
+        tie.className = 'podium__field-tie';
+        tie.textContent = ties.get(row.id);
+        body.append(tie);
+      }
+
+      figure.append(body);
+      item.append(figure);
       return item;
     }));
   }
@@ -250,8 +276,11 @@ import {
       const points = document.createElement('b');
       points.textContent = String(row.totalScore);
       const note = document.createElement('small');
-      note.textContent = `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
-        + ` · ${text('voting.avgShort')} ${row.averageScore.toFixed(1)}`;
+      /* Średnia dopisywana dopiero od DRUGIEGO głosu. Przy jednym jest co do joty równa sumie
+         punktów stojącej obok — „10 punktów · 1 głos · śr. 10.0" podaje tę samą liczbę dwa
+         razy i wygląda na usterkę, a nie na wynik. */
+      note.textContent = `${text('voting.points')} · ${row.voteCount} ${votesLabel(row.voteCount)}`
+        + (row.voteCount > 1 ? ` · ${text('voting.avgShort')} ${row.averageScore.toFixed(1)}` : '');
       score.append(points, note);
 
       item.append(rank, photo, who, score);
@@ -291,8 +320,8 @@ import {
     if (countdown) countdown.hidden = voting || hasPodium;
     if (box) box.hidden = !(voting || hasPodium);
 
-    const go = $('[data-hero-vote-go]');
-    if (go) go.hidden = !voting;
+    /* `[data-hero-vote-go]` już nie istnieje: drugi przycisk „zagłosuj" obok tego samego
+       przycisku w hero został usunięty ze znacznika. Zostaje przejście na cokół. */
     const toPodium = $('[data-hero-vote-podium]');
     if (toPodium) toPodium.hidden = !hasPodium;
 
@@ -396,9 +425,13 @@ import {
     });
   }
 
+
   function paintPodium() {
     const list = $('[data-podium-winners]');
     if (!list) return;
+    /* Liczone z pełnej stawki, nie z tych trzech wierszy — patrz tieNotes(). Remis trzeciego
+       z czwartym jest jedynym, o który ktoś zapyta, a z samej trójki go nie widać. */
+    const ties = tieNotes(standingsRows());
     // Kolejność w rysunku to 2, 1, 3 — tak stoi podium. Kolejność w liście to 1, 2, 3, bo
     // czytnik ekranu czyta wynik, nie patrzy na cokół; CSS ustawia je na właściwych schodkach.
     list.replaceChildren(...state.podium.map((row, index) => {
@@ -406,10 +439,16 @@ import {
       item.className = 'podium-card';
       item.dataset.podiumPlace = String(index + 1);
 
-      /* Karta i blok to dwa dzieci kolumny, w tej kolejności — patrz `.podium-card` w
-         voting.css. Karta jest osobnym pudełkiem, a nie samym `li`, bo blok musi mieć własne
-         tło i własną animację wznoszenia; jedno pudełko na oba znaczyłoby jeden `transform`
-         dzielony przez dwie rzeczy, które ruszają się w innym czasie. */
+      /* KAFELEK TO SAMO ZDJĘCIE. CAŁY PODPIS LEŻY NA NIM.
+         ---------------------------------------------------------------------------
+         Było tu białe pudełko z obwódką, w środku zdjęcie, a pod zdjęciem drugie pudełko z
+         tekstem. Trzy prostokąty na jednego zwycięzcę, z czego dwa nie niosły nic poza
+         własną ramką — a fotografia wozu, jedyna rzecz, na którą tego dnia patrzy plac,
+         była najmniejszą z nich.
+
+         Teraz jest jedno zaokrąglone zdjęcie z przyciemnieniem u dołu i napisami na nim.
+         Ta sama zasada, co na kafelkach na podstronie głosowania: kto na to patrzy, widzi
+         wóz, a nie kartę z wozem w środku. */
       const top = document.createElement('div');
       top.className = 'podium-card__top';
 
@@ -424,6 +463,13 @@ import {
       image.loading = 'lazy';
       figure.append(image);
 
+      /* Przyciemnienie osobnym elementem, nie tłem figury: leży NAD zdjęciem i POD
+         napisami, więc biały tekst trzyma kontrast także na jasnym niebie w kadrze. */
+      const scrim = document.createElement('span');
+      scrim.className = 'podium-card__scrim';
+      scrim.setAttribute('aria-hidden', 'true');
+      figure.append(scrim);
+
       const place = document.createElement('span');
       place.className = 'podium-card__place';
       place.textContent = String(index + 1);
@@ -435,13 +481,15 @@ import {
       start.textContent = String(row.startNumber).padStart(3, '0');
       figure.append(start);
 
-      const body = document.createElement('div');
+      const body = document.createElement('figcaption');
       body.className = 'podium-card__body';
       const project = document.createElement('strong');
       project.textContent = row.projectName || text('voting.noProject');
       const rider = document.createElement('span');
+      rider.className = 'podium-card__rider';
       rider.textContent = `${row.firstName} ${row.lastName}`.trim();
       const stats = document.createElement('p');
+      stats.className = 'podium-card__stats';
       /* Suma punktów, bo to ona ustawiła kolejność na cokole. Ze średnią na pierwszym planie
          zwycięzca pokazywałby 9.12 obok 9.47 u wicemistrza i cokół czytałoby się jako pomyłka
          — a to jedyne trzy kafelki, na które tego dnia patrzy cały plac. */
@@ -452,12 +500,24 @@ import {
          nikt nie porównuje w biegu — a to i tak nie ona ustawia kolejność, tylko suma
          punktów obok. Setne udawały precyzję, której ten wynik nie ma. */
       count.textContent = row.voteCount
-        ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
-          + ` · ${text('voting.avgShort')} ${row.averageScore.toFixed(1)}`
+        ? `${text('voting.points')} · ${row.voteCount} ${votesLabel(row.voteCount)}`
+          + (row.voteCount > 1 ? ` · ${text('voting.avgShort')} ${row.averageScore.toFixed(1)}` : '')
         : text('voting.noVotes');
       stats.append(points, count);
       body.append(project, rider, stats);
-      top.append(figure, body);
+
+      /* Remis dostaje własną linijkę pod statystykami, nie plakietkę w rogu: to jest zdanie
+         do przeczytania, a nie etykieta do rozpoznania. Stoi tylko na kafelkach, które
+         naprawdę z kimś remisują — patrz tieNotes(). */
+      if (ties.get(row.id)) {
+        const tie = document.createElement('span');
+        tie.className = 'podium-card__tie';
+        tie.textContent = ties.get(row.id);
+        body.append(tie);
+      }
+
+      figure.append(body);
+      top.append(figure);
 
       /* Blok cokołu. Wysokość, kolor i opóźnienie animacji bierze z CSS po
          `data-podium-place` na kolumnie — tutaj powstaje tylko element i cyfra w nim, bo
@@ -472,9 +532,214 @@ import {
       return item;
     }));
 
+    /* Ilu ich faktycznie stoi na cokole — dla CSS, nie dla ozdoby.
+       ---------------------------------------------------------------------------
+       Cokół zaprojektowany jest na trójkę: trzy szerokości, trzy wysokości bloków, złoto
+       w środku. Przy jednym uczestniku z głosem zostawała z tego jedna wąska kolumna na
+       wysokim złotym słupku — czyli kształt, który obiecuje porównanie, i nie ma z czym.
+       Zmierzone na produkcji przy pierwszym prawdziwym głosie.
+
+       Liczba idzie na listę, a nie warunek do JS: to jest decyzja wyglądu i cała mieści się
+       w CSS, obok szerokości, które i tak trzeba wtedy zmienić. */
+    list.dataset.podiumCount = String(state.podium.length);
+
     /* Klasa na scenie, nie na rysunku: rysunku SVG już nie ma, a wznoszenie bloków i
        lądowanie kart są animacjami potomków tej scenki. */
     if (!reducedMotion) $('[data-podium-stage]')?.classList.add('is-drawn');
+    setupScratch();
+  }
+
+  /* ===========================================================================
+     ZDRAPKA NAD COKOŁEM
+     ===========================================================================
+     Wynik był gotowy w chwili zamknięcia głosowania i pojawiał się na ekranie sam — czyli
+     największa niespodzianka dnia była kolejną sekcją do przewinięcia. Warstwa zakrywa cokół
+     i prosi o jeden ruch palcem.
+
+     Trzy decyzje, które są tu treścią, nie ozdobą:
+
+     ZAPAMIĘTANE. Klucz zawiera rocznik edycji, więc odsłonięcie przeżywa odświeżenie strony i
+     powrót następnego dnia, a nowa edycja dostaje własną zdrapkę. Warstwa wracająca po każdym
+     wejściu przestaje być niespodzianką i zaczyna być przeszkodą.
+
+     CANVAS, NIE MASKA CSS. Ścieranie palcem to zamalowywanie w `destination-out`, a próg
+     „starczy, odsłaniamy resztę" wymaga policzenia przezroczystych pikseli.
+
+     PRZYCISK OBOK. Zdrapywanie nie istnieje na klawiaturze ani w czytniku ekranu, a wynik nie
+     może być zdolnością dostępną tylko dla palca. */
+  const SCRATCH_RADIUS = 26;
+  const SCRATCH_DONE = 0.42;
+
+  function scratchKey() {
+    const when = stamp(state.raceStartsAt) || stamp(state.votingEndsAt);
+    const year = when ? new Date(when).getFullYear() : 'current';
+    return `carruleddhi.podiumRevealed.${year}`;
+  }
+
+  function scratchRevealed() {
+    try { return localStorage.getItem(scratchKey()) === '1'; } catch (_) { return true; }
+  }
+
+  function rememberReveal() {
+    try { localStorage.setItem(scratchKey(), '1'); } catch (_) { /* prywatne okno */ }
+  }
+
+  let scratchWired = false;
+
+  function setupScratch() {
+    const layer = $('[data-podium-scratch]');
+    if (!layer) return;
+
+    // Nie ma czego zakrywać, dopóki cokół jest pusty.
+    if (!state.podium.length) {
+      layer.hidden = true;
+      return;
+    }
+    if (scratchRevealed()) {
+      layer.hidden = true;
+      return;
+    }
+
+    layer.hidden = false;
+    if (scratchWired) return;
+    scratchWired = true;
+
+    const canvas = $('[data-podium-scratch-canvas]', layer);
+    const context = canvas?.getContext('2d', { willReadFrequently: true }) || null;
+
+    const reveal = () => {
+      if (layer.hidden) return;
+      layer.hidden = true;
+      rememberReveal();
+      paintField();
+      confetti();
+      // Ogłoszone, bo dla czytnika ekranu nic się nie zmieniło poza zniknięciem warstwy.
+      toast(text('voting.scratchDone'), 'success');
+    };
+
+    $('[data-podium-scratch-reveal]', layer)?.addEventListener('click', reveal);
+
+    /* Bez canvasu zostaje sam przycisk. Zdrapka jest przyjemnością, wynik jest treścią —
+       więc brak jednej nie ma prawa zabrać drugiej. */
+    if (!context || reducedMotion) return;
+
+    const paintCover = () => {
+      const rect = layer.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const ratio = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.round(rect.width * ratio);
+      canvas.height = Math.round(rect.height * ratio);
+      const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#ffd75e');
+      gradient.addColorStop(0.45, '#ff83ae');
+      gradient.addColorStop(1, '#8d76ff');
+      context.globalCompositeOperation = 'source-over';
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      /* Kropki na wierzchu, żeby powierzchnia wyglądała na zdrapywalną, a nie na kolorowy
+         prostokąt: to jedyna podpowiedź, że da się ją w ogóle ruszyć. */
+      context.fillStyle = 'rgba(255,255,255,.22)';
+      for (let y = 0; y < canvas.height; y += 26 * ratio) {
+        for (let x = 0; x < canvas.width; x += 26 * ratio) {
+          context.beginPath();
+          context.arc(x, y, 3 * ratio, 0, Math.PI * 2);
+          context.fill();
+        }
+      }
+      context.globalCompositeOperation = 'destination-out';
+      /* PEŁNA KRYCIE PRZED ŚCIERANIEM, I TO JEST CAŁA NAPRAWA ZDRAPKI.
+         ---------------------------------------------------------------------------
+         `fillStyle` zostawał tu `rgba(255,255,255,.22)` — kolorem kropek malowanych linijkę
+         wyżej. W trybie `destination-out` liczy się wyłącznie ALFA pędzla: 0.22 znaczy „zetrzyj
+         dwadzieścia dwa procent tego, co tu jest", a nie „zetrzyj". Powłoka więc bladła zamiast
+         znikać, a próg niżej liczy piksele o alfie DOKŁADNIE zero — do których taki pędzel
+         dochodzi po kilkunastu przejściach po tym samym miejscu.
+
+         Z zewnątrz wyglądało to jak zdrapka, która nie działa: palec jedzie, kolor ledwo
+         mętnieje, wynik nie odsłania się nigdy. Kolor jest tu bez znaczenia, alfa musi być 1. */
+      context.fillStyle = 'rgba(0,0,0,1)';
+    };
+
+    paintCover();
+    window.addEventListener('resize', () => { if (!layer.hidden) paintCover(); });
+
+    let scratching = false;
+    let checked = 0;
+
+    const erase = (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = canvas.width / (rect.width || 1);
+      context.beginPath();
+      context.arc(
+        (event.clientX - rect.left) * ratio,
+        (event.clientY - rect.top) * ratio,
+        SCRATCH_RADIUS * ratio,
+        0,
+        Math.PI * 2
+      );
+      context.fill();
+
+      /* Próg liczony co dwudzieste zamalowanie, nie co ruch palca: `getImageData` na całym
+         obrazie przy każdym `pointermove` to jedyna rzecz w tej sekcji, która potrafiłaby
+         zająć klatkę. Próbka co czwarty piksel wystarcza do progu 42%. */
+      checked += 1;
+      if (checked % 20) return;
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let clear = 0;
+      for (let at = 3; at < pixels.length; at += 16) {
+        if (pixels[at] === 0) clear += 1;
+      }
+      if (clear / (pixels.length / 16) > SCRATCH_DONE) reveal();
+    };
+
+    canvas.addEventListener('pointerdown', (event) => {
+      scratching = true;
+      canvas.setPointerCapture?.(event.pointerId);
+      /* Zaproszenie schodzi z drogi przy pierwszym dotknięciu. Leży NAD powłoką, żeby w ogóle
+         było widać, że tu się zdrapuje — ale gdy zdrapywanie się zaczęło, wisi już nad
+         odsłanianym zdjęciem i przeszkadza w jedynej rzeczy, po którą tu ktoś przyszedł. */
+      layer.classList.add('is-scratching');
+      erase(event);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!scratching) return;
+      // Bez tego przeglądarka przewija stronę zamiast zdrapywać — na telefonie to cała różnica.
+      event.preventDefault();
+      erase(event);
+    });
+    const stop = () => { scratching = false; };
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    canvas.addEventListener('pointerleave', stop);
+  }
+
+  /**
+   * Konfetti na odsłonięcie wyniku.
+   *
+   * Własne, bez biblioteki: to trzydzieści rozpędzonych prostokątów, a każda zewnętrzna
+   * zależność w tym miejscu to kilkadziesiąt kilobajtów wciągane na stronę, która ma je
+   * pokazać raz w roku. Elementy sprzątają się same po animacji, żeby nie zostawić trzydziestu
+   * węzłów w drzewie do końca wizyty.
+   */
+  function confetti() {
+    if (reducedMotion) return;
+    const host = $('[data-podium-stage]');
+    if (!host) return;
+    const colors = ['#ffd75e', '#ff83ae', '#8d76ff', '#37c9a5', '#9ad9ff'];
+    const box = document.createElement('div');
+    box.className = 'podium-confetti';
+    box.setAttribute('aria-hidden', 'true');
+    for (let piece = 0; piece < 30; piece += 1) {
+      const bit = document.createElement('i');
+      bit.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`);
+      bit.style.setProperty('--tilt', `${Math.round(Math.random() * 260 - 130)}px`);
+      bit.style.setProperty('--spin', `${Math.round(Math.random() * 900 - 450)}deg`);
+      bit.style.setProperty('--wait', `${(Math.random() * 0.35).toFixed(2)}s`);
+      bit.style.background = colors[piece % colors.length];
+      box.append(bit);
+    }
+    host.append(box);
+    window.setTimeout(() => box.remove(), 2600);
   }
 
   /**

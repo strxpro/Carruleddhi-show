@@ -25,8 +25,8 @@
  *   jest węzłem w drzewie i nadal ma swój układ do policzenia.
  */
 import {
-  $, $$, demoMode, text, toast,
-  deviceId, savedVoter, rememberVoter, readState, paintDemoBar, avatarFor
+  $, $$, demoMode, text, toast, stamp, remaining,
+  deviceId, savedVoter, rememberVoter, readState, paintDemoBar, avatarFor, votesLabel, tieNotes
 } from './voting-core.js';
 
 (function () {
@@ -37,6 +37,9 @@ import {
 
   const state = {
     phase: 'scheduled',
+    /** Termin startu i koniec okna — dla zegara w pasku na górze strony. */
+    raceStartsAt: null,
+    votingEndsAt: null,
     scoreMin: 3,
     scoreMax: 10,
     categories: [],
@@ -45,8 +48,14 @@ import {
     myVote: null,
     /** Filtr kategorii pojazdu. Pusty znaczy „wszystkie". */
     category: '',
+    /** Szukana fraza: numer startowy, nazwa wózka, imię, nazwisko albo kategoria. */
+    query: '',
     /** Ile kafelków jest już narysowanych. */
     shown: BATCH,
+    editions: [],
+    selectedEdition: null,
+    requestedEdition: new URLSearchParams(location.search).get('edition') || '',
+    isArchive: false,
     loaded: false
   };
 
@@ -155,6 +164,13 @@ import {
   function absorb(result) {
     const mine = Array.isArray(result.myVotes) ? result.myVotes[0] : null;
     const incoming = Array.isArray(result.participants) ? result.participants : [];
+    const nextEditionKey = result.selectedEdition?.key || '';
+    if (state.selectedEdition?.key !== nextEditionKey) {
+      knownIds = null;
+      freshIds = new Set();
+      cardCache = new Map();
+      state.shown = BATCH;
+    }
 
     /* Adres zdjęcia przepisywany z pamięci, jeśli już go mamy. Podmieniany jest obiekt
        uczestnika, a nie tablica w miejscu: `state.participants` jest czytane w kilku miejscach
@@ -182,11 +198,33 @@ import {
 
     Object.assign(state, {
       phase: result.phase,
+      raceStartsAt: result.raceStartsAt || null,
+      votingEndsAt: result.votingEndsAt || null,
       scoreMin: Number(result.scoreMin) || 3,
       scoreMax: Number(result.scoreMax) || 10,
       categories: Array.isArray(result.categories) ? result.categories : [],
       participants,
-      myVote: mine ? { participantId: mine.participantId, score: mine.score } : null,
+      editions: Array.isArray(result.editions) ? result.editions : [],
+      selectedEdition: result.selectedEdition || null,
+      isArchive: Boolean(result.isArchive),
+      myVote: mine
+        ? {
+          participantId: mine.participantId,
+          score: mine.score,
+          /* Ile zmian jeszcze zostało. Limit to jedna i pilnuje go baza — patrz `edit_count`
+             w migracji 0030. Tutaj służy do tego, żeby nie pokazywać przycisku, który i tak
+             dostanie odmowę: zaproszenie do czynności zakończonej błędem jest gorsze niż
+             brak zaproszenia. */
+          editsLeft: mine.editsLeft === undefined ? 1 : Number(mine.editsLeft) || 0,
+          /* Czy ten głos wolno w ogóle zmieniać. Wymaga imienia i adresu — patrz `votingEdit`
+             w Workerze. Anonimowy głos jest ostateczny i strona ma to powiedzieć wprost,
+             zamiast pokazywać przycisk, który dostanie odmowę. */
+          identified: Boolean(mine.identified),
+          canChange: mine.canChange === undefined
+            ? Boolean(mine.identified)
+            : Boolean(mine.canChange)
+        }
+        : null,
       loaded: true
     });
     if (state.category && !state.categories.includes(state.category)) state.category = '';
@@ -194,7 +232,7 @@ import {
   }
 
   async function pull() {
-    const result = await readState(demoPhase);
+    const result = await readState(demoPhase, state.requestedEdition);
     if (!result) {
       paintPhase();
       return;
@@ -211,12 +249,68 @@ import {
 
   /* -------------------------------------------------------------------------- rysowanie */
 
+  function paintEditions() {
+    const section = $('[data-vote-editions]');
+    const select = $('[data-vote-edition]');
+    const meta = $('[data-vote-edition-meta]');
+    if (!section || !select) return;
+    section.hidden = state.editions.length < 2;
+    const options = state.editions.map((edition) => {
+      const option = document.createElement('option');
+      option.value = edition.key;
+      option.textContent = `${edition.name} · ${edition.key}`;
+      option.selected = edition.key === state.selectedEdition?.key;
+      return option;
+    });
+    select.replaceChildren(...options);
+    const edition = state.selectedEdition;
+    if (meta && edition) {
+      let date = edition.date;
+      try {
+        date = new Intl.DateTimeFormat(document.documentElement.lang || 'it', {
+          day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome'
+        }).format(new Date(edition.date));
+      } catch (_) { /* raw ISO is still understandable */ }
+      meta.textContent = `${state.isArchive ? text('voting.editionArchive') : text('voting.editionCurrent')} · ${date} · ${edition.location}`;
+    }
+  }
+
   function paint() {
+    paintEditions();
     paintPhase();
     paintMyVote();
+    paintSearch();
     paintFilters();
     paintResults();
     paintGrid();
+  }
+
+  /**
+   * Pole szukania i licznik trafień.
+   *
+   * Ukryte, gdy stawka jest krótsza niż osiem pozycji: przy sześciu wózkach szuka się wzrokiem,
+   * a pole nad listą byłoby wtedy tylko elementem do zignorowania. Znika też po zamknięciu
+   * głosowania, bo wynik ma wtedy własny widok — podium i pełną tabelę.
+   */
+  function paintSearch() {
+    const box = $('[data-vote-search]');
+    const input = $('[data-vote-query]');
+    const clear = $('[data-vote-query-clear]');
+    const count = $('[data-vote-count]');
+    const usable = state.loaded && state.phase !== 'closed' && state.participants.length >= 8;
+
+    if (box) box.hidden = !usable;
+    if (clear) clear.hidden = !state.query;
+    if (input && input.value !== state.query) input.value = state.query;
+
+    if (count) {
+      const shown = rows().length;
+      const filtering = Boolean(state.query || state.category);
+      count.hidden = !usable || !filtering;
+      count.textContent = shown
+        ? `${shown} / ${state.participants.length}`
+        : text('voting.searchEmpty');
+    }
   }
 
   function paintPhase() {
@@ -252,9 +346,46 @@ import {
     const lead = $('[data-vote-lead]');
     if (lead) lead.textContent = text(closed ? 'voting.resultsLead' : 'voting.pageLead');
 
-    // „Jeden głos na osobę" jest obietnicą, więc znika, gdy nie ma już czego obiecywać.
-    const rule = $('[data-vote-rule]');
-    if (rule) rule.hidden = !open;
+    /* Plakietki `[data-vote-rule]` już nie ma — reguła stoi w akapicie nagłówka i w oknie
+       oceny. Zostaje zegar, który jest jedyną liczbą pilną w tej fazie. */
+    paintTimer();
+  }
+
+  /**
+   * Zegar w pasku na samej górze strony.
+   *
+   * Trzy stany, bo trzy różne pytania: przed startem „ile do startu", w trakcie „ile mam czasu
+   * na głos", po zamknięciu „koniec". Tyka co sekundę tylko wtedy, gdy jest co pokazywać —
+   * przy zamkniętym głosowaniu licznik sekundowy nie ma czego odliczać, więc go nie ma.
+   */
+  function paintTimer() {
+    const box = $('[data-vote-timer]');
+    if (!box) return;
+    const label = $('[data-vote-timer-label]', box);
+    const time = $('[data-vote-timer-time]', box);
+    if (!state.loaded) {
+      box.hidden = true;
+      return;
+    }
+
+    box.hidden = false;
+    box.dataset.phase = state.phase;
+
+    if (state.phase === 'closed') {
+      if (label) label.textContent = text('voting.resultsKicker');
+      if (time) time.textContent = text('voting.closed');
+      return;
+    }
+
+    const target = state.phase === 'voting' ? stamp(state.votingEndsAt) : stamp(state.raceStartsAt);
+    const left = target ? target - Date.now() : 0;
+    if (!target || left <= 0) {
+      if (label) label.textContent = text('voting.pageKicker');
+      if (time) time.textContent = text(state.phase === 'voting' ? 'voting.openNoLimit' : 'voting.notOpenYet');
+      return;
+    }
+    if (label) label.textContent = text(state.phase === 'voting' ? 'voting.timeLeft' : 'voting.startsIn');
+    if (time) time.textContent = remaining(left);
   }
 
   /**
@@ -300,7 +431,15 @@ import {
     const note = $('[data-vote-mine-note]', panel);
     if (note) {
       note.hidden = state.phase !== 'voting';
-      note.textContent = text('voting.changeHere');
+      // Jedna zmiana na głos: dopóki jest niezużyta, zdanie mówi jak jej użyć; potem mówi,
+      // że została już wykorzystana. Zgadywanie, dlaczego przycisk zniknął, nie jest potrzebne.
+      /* Trzy stany, trzy zdania: zmiana możliwa, zmiana zużyta, głos anonimowy i ostateczny.
+         Zgadywanie, dlaczego przycisk zniknął, nie jest częścią głosowania. */
+      note.textContent = text(
+        mine.canChange ? 'voting.changeHere'
+          : mine.identified ? 'voting.editUsedMine'
+            : 'voting.editNeedsContact'
+      );
     }
   }
 
@@ -349,8 +488,46 @@ import {
       a.startNumber - b.startNumber);
   }
 
+  /**
+   * Remisy punktowe w bieżącej klasyfikacji, po `id`.
+   *
+   * Ta sama funkcja co na stronie głównej — mieszka w voting-core.js właśnie dlatego, że
+   * odpowiada tu i tam na to samo pytanie, a dwie kopie tej reguły to dwa miejsca, w których
+   * cokół i tabela mogą zacząć tłumaczyć ten sam remis inaczej.
+   *
+   * Liczone z PEŁNEJ posortowanej stawki, nie z widocznej porcji ani z samej trójki: remis,
+   * o który ktoś zapyta, wypada na granicy podium.
+   */
+  function closedTies() {
+    return state.phase === 'closed' ? tieNotes(standingsRows()) : new Map();
+  }
+
+  /**
+   * Widoczna stawka: filtr kategorii i szukana fraza.
+   *
+   * Numer dopasowywany na dwa sposoby, bo tak go ludzie wpisują: „7" i „007" mają znaleźć ten
+   * sam wózek. Reszta to zwykłe zawieranie tekstu bez rozróżniania wielkości liter i bez
+   * znaków diakrytycznych — „Nino" ma znaleźć „Niño", bo na placu nikt nie przełącza
+   * klawiatury, żeby wpisać nazwisko.
+   */
+  const fold = (value) => String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  function matchesQuery(row) {
+    const needle = fold(state.query);
+    if (!needle) return true;
+    const number = String(row.startNumber || '');
+    const haystack = [
+      row.projectName, row.firstName, row.lastName, row.category,
+      number, number.padStart(3, '0')
+    ].map(fold);
+    return haystack.some((value) => value.includes(needle));
+  }
+
   function rows() {
-    return state.participants.filter((row) => !state.category || row.category === state.category);
+    return state.participants
+      .filter((row) => !state.category || row.category === state.category)
+      .filter(matchesQuery);
   }
 
   function formattedAverage(row) {
@@ -377,7 +554,9 @@ import {
     }
 
     const ranked = standingsRows();
-    const podiumNodes = ranked.slice(0, 3).map((row, index) => {
+    const ties = closedTies();
+    const podiumRows = ranked.filter((row) => row.voteCount > 0).slice(0, 3);
+    const podiumNodes = podiumRows.map((row, index) => {
       const place = index + 1;
       const item = document.createElement('li');
       item.className = 'vote-podium__item';
@@ -409,10 +588,18 @@ import {
       points.textContent = row.voteCount ? String(row.totalScore) : '—';
       const scoreLabel = document.createElement('small');
       scoreLabel.textContent = row.voteCount
-        ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+        ? `${text('voting.points')} · ${row.voteCount} ${votesLabel(row.voteCount)}`
         : text('voting.noVotes');
       score.append(points, scoreLabel);
       copy.append(title, rider, score);
+
+      const tie = ties.get(row.id);
+      if (tie) {
+        const chip = document.createElement('span');
+        chip.className = 'vote-podium__tie';
+        chip.textContent = tie;
+        copy.append(chip);
+      }
       winner.append(photo, copy);
 
       const step = document.createElement('div');
@@ -424,11 +611,17 @@ import {
       item.append(winner, step);
       return item;
     });
+    if (!podiumNodes.length) {
+      const empty = document.createElement('li');
+      empty.className = 'vote-podium__empty';
+      empty.textContent = text('voting.noVotes');
+      podiumNodes.push(empty);
+    }
     podium.replaceChildren(...podiumNodes);
 
     const tableRows = ranked.map((row, index) => {
       const tr = document.createElement('tr');
-      if (index < 3) tr.dataset.place = String(index + 1);
+      if (row.voteCount > 0 && index < 3) tr.dataset.place = String(index + 1);
 
       const rank = document.createElement('th');
       rank.scope = 'row';
@@ -563,7 +756,7 @@ import {
 
            Cały głos w kluczu znaczy, że zmiana czegokolwiek w nim przebudowuje KAŻDY kafelek.
            Kosztuje to jedno przerysowanie siatki na oddany głos, czyli raz na wizytę. */
-        mine ? `vote:${mine.participantId}:${mine.score}` : 'novote',
+        mine ? `vote:${mine.participantId}:${mine.score}:${mine.canChange ? 'open' : 'final'}` : 'novote',
         state.phase, freshIds.has(row.id) ? 'fresh' : ''
       ].join('|');
 
@@ -629,7 +822,25 @@ import {
        Kafelek dopisany w panelu w trakcie wyścigu doszedłby inaczej bez śladu — siatka
        przeskakuje, bo doszedł jeden element, i trzeba go odnaleźć wzrokiem między
        kilkudziesięcioma innymi. Klasa gaśnie po sześciu sekundach; patrz `freshIds`. */
-    if (freshIds.has(row.id)) article.classList.add('is-fresh');
+    if (freshIds.has(row.id)) {
+      article.classList.add('is-fresh');
+      const magic = document.createElement('span');
+      magic.className = 'vote-card__magic';
+      magic.setAttribute('aria-hidden', 'true');
+      const wand = document.createElement('b');
+      wand.textContent = '🪄';
+      const label = document.createElement('span');
+      const newLabel = { it: 'NUOVO', pl: 'NOWY', en: 'NEW', de: 'NEU', es: 'NUEVO', fr: 'NOUVEAU' };
+      label.textContent = newLabel[document.documentElement.lang] || newLabel.it;
+      magic.append(wand);
+      for (let spark = 0; spark < 6; spark += 1) {
+        const star = document.createElement('i');
+        star.style.setProperty('--spark', String(spark));
+        magic.append(star);
+      }
+      magic.append(label);
+      article.append(magic);
+    }
 
     /* CAŁE zdjęcie jest teraz celem dotknięcia.
        ---------------------------------------------------------------------------
@@ -652,6 +863,23 @@ import {
     image.alt = '';
     image.loading = 'lazy';
     image.decoding = 'async';
+    /* SZKIELET, DOPÓKI ZDJĘCIE SIĘ NIE WCZYTA.
+       ---------------------------------------------------------------------------
+       Zdjęcia wózków to fotografie z telefonu, podpisane adresy z prywatnego bucketa, wczytywane
+       w dniu zjazdu na sieci obciążonej przez cały plac. Do tej pory na ich miejscu stał
+       ciemny prostokąt — nieodróżnialny od kafelka, który się nie wczytał. Teraz w tym miejscu
+       przesuwa się połysk, a klasa schodzi po `load` albo po `error`, więc zepsuty adres nie
+       zostawia migającego szkieletu na zawsze.
+
+       `complete` sprawdzane od razu: obrazek z pamięci przeglądarki bywa gotowy, zanim zdąży
+       się podpiąć nasłuch, i wtedy `load` już nie przyjdzie. */
+    figure.classList.add('is-loading');
+    const settled = () => figure.classList.remove('is-loading');
+    if (image.complete) settled();
+    else {
+      image.addEventListener('load', settled, { once: true });
+      image.addEventListener('error', settled, { once: true });
+    }
     figure.append(image);
 
     /* Przyciemnienie od dołu. Osobny element, nie `background` na figurze: leży NAD zdjęciem,
@@ -677,6 +905,16 @@ import {
     title.className = 'vote-card__title';
     title.textContent = cartLabel(row);
     caption.append(who, title);
+
+    /* Nazwisko i kategoria leżą teraz NA zdjęciu, razem z resztą podpisu.
+       ---------------------------------------------------------------------------
+       Stały pod nim, w osobnym pasku, który razem z obwódką kafelka był jedynym powodem, dla
+       którego kafelek musiał być pudełkiem. Jedna linijka tekstu nie jest wart własnego
+       prostokąta — a odkąd zeszła na zdjęcie, kafelek jest zdjęciem i niczym więcej. */
+    const rider = document.createElement('span');
+    rider.className = 'vote-card__rider';
+    rider.textContent = `${riderName(row)} · ${row.category}`;
+    caption.append(rider);
     figure.append(caption);
 
     if (rank) {
@@ -693,15 +931,10 @@ import {
     }
     article.append(figure);
 
+    /* Pod zdjęciem zostają WYŁĄCZNIE rzeczy, które się naciska: ocena, przycisk, komunikat o
+       zużytej poprawce. Wszystko, co się czyta, jest w kadrze. */
     const body = document.createElement('div');
     body.className = 'vote-card__body';
-    /* Nazwa pojazdu i imię stoją już na zdjęciu, więc tu zostaje to, czego tam nie ma:
-       pełne nazwisko i kategoria. Powtórzenie nazwy pod zdjęciem, na którym ta nazwa właśnie
-       stoi, zajmowałoby drugi wiersz, żeby nie powiedzieć nic nowego. */
-    const rider = document.createElement('span');
-    rider.className = 'vote-card__rider';
-    rider.textContent = `${riderName(row)} · ${row.category}`;
-    body.append(rider);
 
     if (state.phase === 'closed') {
       const stats = document.createElement('p');
@@ -714,10 +947,22 @@ import {
       const count = document.createElement('small');
       /* Bez „punktów" gołe 374 nie znaczy nic — ani to ocena, ani liczba głosujących. */
       count.textContent = row.voteCount
-        ? `${text('voting.points')} · ${row.voteCount} ${text('voting.votes')}`
+        ? `${text('voting.points')} · ${row.voteCount} ${votesLabel(row.voteCount)}`
         : text('voting.noVotes');
       stats.append(points, count);
-      body.append(stats);
+      caption.append(stats);
+
+      /* Remis: to samo zdanie i ta sama zasada, co na cokole strony głównej. Tutaj jest
+         potrzebne bardziej niż tam, bo ta siatka pokazuje CAŁĄ stawkę naraz — dwa sąsiednie
+         kafelki z tą samą sumą punktów i bez wyjaśnienia to najczęstsze miejsce, w którym
+         wynik zaczyna wyglądać na wymyślony. */
+      const tie = closedTies().get(row.id);
+      if (tie) {
+        const chip = document.createElement('span');
+        chip.className = 'vote-card__tie';
+        chip.textContent = tie;
+        caption.append(chip);
+      }
     } else if (state.phase === 'voting') {
       /* GŁOS DA SIĘ ZMIENIĆ Z TEGO SAMEGO URZĄDZENIA, WIĘC KAFELEK NIE MÓWI JUŻ „NIE".
          ---------------------------------------------------------------------------
@@ -733,23 +978,30 @@ import {
         yours.textContent = `${text('voting.yourScore')} ${mine.score}`;
         body.append(yours);
       }
-      const controls = voteControls(row);
-      body.append(controls);
 
-      /* Dotknięcie zdjęcia wchodzi w ten sam przepływ co przycisk pod spodem — nie w skrót
-         obok niego. Przezroczysty przycisk NA zdjęciu, a nie obsługa kliknięcia na figurze:
-         dostaje fokus i reaguje na enter, więc droga z klawiatury jest ta sama co palcem. */
-      const hit = document.createElement('button');
-      hit.type = 'button';
-      hit.className = 'vote-card__hit';
-      /* Nazwa dla czytnika ekranu musi mówić to, co robi przycisk — a robi trzy różne rzeczy
-         w zależności od tego, czy głos jest już oddany i na który wóz. „Zagłosuj" na kafelku,
-         który przenosi cudzy głos, byłoby po prostu nieprawdą. */
-      hit.setAttribute('aria-label', `${isMine
-        ? text('voting.changeScore')
-        : mine ? text('voting.moveVote') : text('voting.cta')} — ${cartLabel(row)}`);
-      hit.addEventListener('click', () => controls.openVote());
-      figure.append(hit);
+      /* KIEDY KAFELEK NIE PROSI JUŻ O NIC.
+         ---------------------------------------------------------------------------
+         Dwa różne powody, dwa różne zdania i żaden z nich nie jest błędem do poprawienia:
+
+           — głos był anonimowy, więc jest ostateczny (zmiana wymaga imienia i adresu),
+           — jedyna zmiana została już zużyta.
+
+         Rozstrzyga to serwer; tutaj chodzi o to, żeby nie stawiać na ekranie suwaka, który
+         dostanie odmowę. */
+      const canEdit = !mine || mine.canChange;
+      if (!canEdit) {
+        const used = document.createElement('p');
+        used.className = 'vote-card__used';
+        used.textContent = text(mine.identified ? 'voting.editUsedMine' : 'voting.editNeedsContact');
+        body.append(used);
+        article.append(body);
+        return article;
+      }
+
+      /* Ocenianie odbywa się NA zdjęciu — patrz voteOverlay(). Kafelek zostaje czysty,
+         dopóki ktoś nie najedzie kursorem albo nie dotknie go palcem. */
+      const overlay = voteOverlay(row);
+      figure.append(overlay.veil, overlay.hit);
       figure.classList.add('is-tappable');
     }
     article.append(body);
@@ -757,33 +1009,36 @@ import {
   }
 
   /**
-   * Dwa kroki przy pojeździe: „Zagłosuj" → oceny 3–10 i potwierdzenie.
+   * Ocenianie ODBYWA SIĘ NA ZDJĘCIU, a nie pod nim.
+   * ===========================================================================
    *
-   * Potwierdzenie jest osobnym naciśnięciem, mimo że dałoby się wysyłać od razu po wybraniu
-   * oceny. Głos jest jeden na cały konkurs i nieodwracalny aż do maila ze żetonem, a rząd ośmiu
-   * przycisków na telefonie to osiem sąsiadujących celów — trafienie w ósemkę zamiast w
-   * dziewiątkę bez możliwości cofnięcia byłoby oszczędnością jednego naciśnięcia okupioną
-   * cudzym wynikiem.
-   */
-  /**
-   * Trzy kroki przy pojeździe: dotknięcie → „zagłosować na ten wóz?" → suwak i potwierdzenie.
+   * Poprzednia wersja stawiała pod każdym kafelkiem żółty przycisk „Zagłosuj", a pod nim
+   * wyrastało pytanie i suwak. Przy dwóch kolumnach na telefonie znaczyło to dwa rzędy
+   * przycisków krzyczących to samo w kółko — siatka wyglądała jak formularz, nie jak galeria
+   * wózków, po którą ktoś tu przyszedł.
    *
-   * DLACZEGO PYTANIE JEST OSOBNYM KROKIEM
-   *   Całe zdjęcie jest celem dotknięcia, a na telefonie trzymanym w jednej ręce zdarza się
-   *   trafić w nie przy przewijaniu. Gdyby dotknięcie od razu otwierało oceny, przypadkowe
-   *   muśnięcie stawiałoby człowieka przed rzędem liczb bez wyjaśnienia, w co właśnie wszedł.
-   *   Pytanie z nazwą wozu odpowiada na „czy to na pewno ten" zanim padnie „ile punktów".
+   * Teraz kafelek jest czysty: samo zdjęcie z podpisem. Zaproszenie pojawia się DOPIERO wtedy,
+   * gdy ktoś wykaże zainteresowanie tym konkretnym wozem:
+   *
+   *   MYSZ — najechanie przygasza zdjęcie i wynosi na jego środek jeden przycisk;
+   *   PALEC — dotknięcie robi to samo, bo `:hover` na telefonie nie istnieje;
+   *   KLIK  — przycisk PRZEISTACZA SIĘ w suwak z oceną i przyciskiem wysyłki, w miejscu,
+   *           w którym stał, więc wzrok nie musi nigdzie skakać.
    *
    * DLACZEGO SUWAK, A NIE OSIEM PRZYCISKÓW
-   *   Osiem sąsiadujących celów na szerokości telefonu to osiem okazji do trafienia w ósemkę
-   *   zamiast w dziewiątkę. Suwak ma jeden uchwyt, który się CIĄGNIE — pomyłkę widać i
-   *   poprawia się ją bez podnoszenia palca, a wartość stoi wypisana wielką liczbą obok.
-   *   Zakres bierze się z serwera (`scoreMin`/`scoreMax`), nie z liczby wpisanej tutaj.
+   *   Osiem sąsiadujących celów na szerokości pół telefonu to osiem okazji do trafienia w
+   *   ósemkę zamiast w dziewiątkę. Suwak ma jeden uchwyt, który się ciągnie — pomyłkę widać i
+   *   poprawia się ją bez podnoszenia palca, a wartość stoi obok wielką liczbą. Zakres bierze
+   *   się z serwera (`scoreMin`/`scoreMax`), nie z liczby wpisanej tutaj.
    *
-   * Potwierdzenie zostaje osobnym naciśnięciem: głos jest jeden na cały konkurs i do maila
-   * ze żetonem nieodwracalny.
+   * DLACZEGO WYSYŁKA JEST OSOBNYM NACIŚNIĘCIEM
+   *   Głos jest jeden, a jego zmiana wymaga imienia i adresu. Wysyłanie od razu po puszczeniu
+   *   suwaka znaczyłoby, że muśnięcie ekranu przy przewijaniu oddaje cudzy głos bez odwrotu.
+   *
+   * Zwraca `{ veil, hit }`: nakładkę na zdjęcie i przezroczysty przycisk, który ją odsłania na
+   * dotknięcie. Dwa elementy, nie jeden, bo przycisk w przycisku jest niepoprawnym HTML-em.
    */
-  function voteControls(row) {
+  function voteOverlay(row) {
     const mine = state.myVote;
     const isMine = Boolean(mine && mine.participantId === row.id);
     /* Trzy stany, trzy napisy, jedna ścieżka pod nimi. Napis jest tu jedyną różnicą, bo
@@ -792,51 +1047,26 @@ import {
       ? text('voting.changeScore')
       : mine ? text('voting.moveVote') : text('voting.cta');
 
-    const wrap = document.createElement('div');
-    wrap.className = 'vote-card__act';
-
-    const open = document.createElement('button');
-    open.type = 'button';
-    /* Zmiana jest cofnięciem decyzji, nie decyzją — więc nie żółty przycisk zapraszający do
-       naciśnięcia, tylko obrysowany. Żółty zostaje dla oddania głosu, którego jeszcze nie ma. */
-    open.className = mine
-      ? 'btn btn--outline btn--small vote-card__start'
-      : 'btn btn--yellow btn--small vote-card__start';
-    open.dataset.voteStart = '';
-    open.textContent = startLabel;
-    open.setAttribute('aria-expanded', 'false');
-
-    /* ---------------------------------------------------------------- krok 1: pytanie */
-    const ask = document.createElement('div');
     const flowId = `vote-flow-${String(row.id).replace(/[^a-z0-9_-]/gi, '-')}`;
-    ask.id = `${flowId}-ask`;
-    open.setAttribute('aria-controls', ask.id);
-    ask.className = 'vote-ask';
-    ask.hidden = true;
-    const question = document.createElement('p');
-    question.className = 'vote-ask__q';
-    /* Przeniesienie głosu pyta inaczej niż jego oddanie: to jest zabranie punktów jednemu
-       wozowi i danie ich drugiemu, więc pytanie musi powiedzieć, co się traci. */
-    question.textContent = mine && !isMine
-      ? `${text('voting.askMove')} ${cartLabel(row)}?`
-      : `${text('voting.askVote')} ${cartLabel(row)}?`;
-    const askYes = document.createElement('button');
-    askYes.type = 'button';
-    askYes.className = 'btn btn--yellow btn--small';
-    askYes.textContent = text('voting.askYes');
-    const askNo = document.createElement('button');
-    askNo.type = 'button';
-    askNo.className = 'vote-picker__cancel';
-    askNo.textContent = text('voting.askNo');
-    const askRow = document.createElement('div');
-    askRow.className = 'vote-ask__actions';
-    askRow.append(askYes, askNo);
-    ask.append(question, askRow);
 
-    /* ---------------------------------------------------------------- krok 2: suwak */
+    /* Nakładka: przygaszenie zdjęcia plus to, co na nim staje. Jeden element na oba stany,
+       bo przejście „przycisk → suwak" ma być morfowaniem w miejscu, a nie zniknięciem jednego
+       pudełka i pojawieniem się drugiego kilka pikseli dalej. */
+    const veil = document.createElement('div');
+    veil.className = 'vote-veil';
+
+    const cta = document.createElement('button');
+    cta.type = 'button';
+    cta.className = 'vote-veil__cta';
+    cta.dataset.voteStart = '';
+    cta.textContent = startLabel;
+    cta.setAttribute('aria-expanded', 'false');
+    cta.setAttribute('aria-controls', `${flowId}-picker`);
+
+    /* ---------------------------------------------------------------- suwak z oceną */
     const picker = document.createElement('div');
     picker.id = `${flowId}-picker`;
-    picker.className = 'vote-picker';
+    picker.className = 'vote-veil__pick';
     picker.hidden = true;
 
     const label = document.createElement('span');
@@ -884,8 +1114,9 @@ import {
 
     const confirm = document.createElement('button');
     confirm.type = 'button';
-    confirm.className = 'btn btn--blue btn--small vote-picker__confirm';
-    confirm.textContent = text('voting.confirm');
+    confirm.className = 'btn btn--yellow btn--small vote-veil__send';
+    // „Wyślij głos", nie „Potwierdź": po tym naciśnięciu głos jedzie na serwer.
+    confirm.textContent = text('voting.send');
     /* Głos już oddany idzie inną drogą: bez okna z adresem. Adres jest znany — leży w wierszu,
        który właśnie poprawiamy — a pytanie o niego dawałoby możliwość podania cudzego i zamiany
        zmiany oceny w drugi głos. */
@@ -897,62 +1128,97 @@ import {
 
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.className = 'vote-picker__cancel';
+    cancel.className = 'vote-veil__cancel';
     cancel.textContent = text('a11y.close');
 
     const actions = document.createElement('div');
-    actions.className = 'vote-picker__actions';
+    actions.className = 'vote-veil__actions';
     actions.append(confirm, cancel);
     picker.append(label, track, scale, actions);
+    veil.append(cta, picker);
+
+    /* Przezroczysty przycisk na całym zdjęciu. Na telefonie to on odsłania nakładkę — bez
+       niego nie byłoby jak jej wywołać, bo `:hover` nie istnieje. Na myszy jest niewidoczny
+       i nieużywany: CSS zdejmuje go, gdy kursor wejdzie na kafelek. */
+    const hit = document.createElement('button');
+    hit.type = 'button';
+    hit.className = 'vote-card__hit';
+    hit.setAttribute('aria-label', `${startLabel} — ${cartLabel(row)}`);
 
     /* ---------------------------------------------------------------- przechodzenie */
-    const reset = () => {
-      ask.hidden = true;
-      picker.hidden = true;
-      open.hidden = false;
-      open.setAttribute('aria-expanded', 'false');
-      open.setAttribute('aria-controls', ask.id);
-    };
-    /* Jeden otwarty wybór na całą stronę. Dwa otwarte suwaki na dwóch kafelkach to pytanie
-       „który z nich właśnie wysyłam", zadane w chwili wysyłania. */
+    const card = () => veil.closest('.vote-card');
+
+    /* Jeden odsłonięty kafelek na całą stronę. Dwa otwarte suwaki to pytanie „który z nich
+       właśnie wysyłam", zadane w chwili wysyłania. */
     const closeOthers = () => {
-      $$('[data-vote-start]').forEach((other) => {
-        other.hidden = false;
-        other.setAttribute('aria-expanded', 'false');
+      $$('.vote-card.is-armed, .vote-card.is-picking').forEach((other) => {
+        if (other === card()) return;
+        other.classList.remove('is-armed', 'is-picking');
+        const otherPick = $('.vote-veil__pick', other);
+        if (otherPick) otherPick.hidden = true;
+        const otherCta = $('.vote-veil__cta', other);
+        if (otherCta) otherCta.setAttribute('aria-expanded', 'false');
+        const otherHit = $('.vote-card__hit', other);
+        if (otherHit) otherHit.hidden = false;
       });
-      $$('.vote-ask').forEach((other) => { other.hidden = true; });
-      $$('.vote-picker').forEach((other) => { other.hidden = true; });
     };
 
-    const toAsk = () => {
+    const disarm = () => {
+      const node = card();
+      if (!node) return;
+      node.classList.remove('is-armed', 'is-picking');
+      picker.hidden = true;
+      cta.setAttribute('aria-expanded', 'false');
+      hit.hidden = false;
+    };
+
+    const arm = () => {
       closeOthers();
-      open.hidden = true;
-      open.setAttribute('aria-expanded', 'true');
-      open.setAttribute('aria-controls', ask.id);
-      ask.hidden = false;
-      askYes.focus({ preventScroll: true });
+      const node = card();
+      if (node) node.classList.add('is-armed');
+      // Przycisk dotknięcia schodzi z drogi, żeby następne dotknięcie trafiło w „Zagłosuj".
+      hit.hidden = true;
+      cta.focus({ preventScroll: true });
     };
-    open.addEventListener('click', toAsk);
-    /* Uchwyt dla dotknięcia w zdjęcie — kafelek woła to zamiast powielać kroki u siebie. */
-    wrap.openVote = toAsk;
 
-    askYes.addEventListener('click', () => {
-      ask.hidden = true;
+    const toPick = () => {
+      closeOthers();
+      const node = card();
+      if (node) node.classList.add('is-armed', 'is-picking');
+      hit.hidden = true;
       picker.hidden = false;
-      open.setAttribute('aria-controls', picker.id);
+      cta.setAttribute('aria-expanded', 'true');
       slider.focus({ preventScroll: true });
-    });
-    askNo.addEventListener('click', () => { reset(); open.focus({ preventScroll: true }); });
-    cancel.addEventListener('click', () => { reset(); open.focus({ preventScroll: true }); });
-    wrap.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || (!open.hidden && ask.hidden && picker.hidden)) return;
+    };
+
+    hit.addEventListener('click', arm);
+    cta.addEventListener('click', toPick);
+    cancel.addEventListener('click', () => { disarm(); hit.focus({ preventScroll: true }); });
+
+    /* Escape wychodzi z wyboru, nie z całej strony — a wychodzi krok po kroku: z suwaka do
+       przycisku, z przycisku do czystego kafelka. */
+    veil.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
       event.preventDefault();
-      reset();
-      open.focus({ preventScroll: true });
+      if (!picker.hidden) {
+        picker.hidden = true;
+        card()?.classList.remove('is-picking');
+        cta.setAttribute('aria-expanded', 'false');
+        cta.focus({ preventScroll: true });
+        return;
+      }
+      disarm();
     });
 
-    wrap.append(open, ask, picker);
-    return wrap;
+    /* Zejście fokusem poza kafelek składa go z powrotem. Bez tego na klawiaturze zostawał
+       otwarty suwak na kafelku, którego już nie widać. */
+    veil.addEventListener('focusout', (event) => {
+      if (veil.contains(event.relatedTarget)) return;
+      if (!picker.hidden) return;
+      disarm();
+    });
+
+    return { veil, hit };
   }
 
   /* --------------------------------------------------------------- zmiana własnego głosu */
@@ -1003,8 +1269,8 @@ import {
       toast(text('voting.changed'), 'success');
       /* Stan lokalny przestawiony od razu, nie dopiero po odczycie: `pull()` idzie do serwera i
          na wolnej sieci kafelki jeszcze kilka sekund pokazywałyby stary głos, mimo że
-         potwierdzenie już wyskoczyło. */
-      state.myVote = { participantId: row.id, score };
+         potwierdzenie już wyskoczyło. Razem z głosem zużywa się jedyna zmiana. */
+      state.myVote = { participantId: row.id, score, editsLeft: 0 };
       paint();
       await pull();
     } catch (error) {
@@ -1014,11 +1280,17 @@ import {
         VOTING_BAD_SCORE: 'voting.badScore',
         VOTING_NO_VOTE: 'voting.tokenGone',
         VOTING_NO_PARTICIPANT: 'voting.notOpen',
-        VOTING_BAD_TOKEN: 'voting.tokenGone'
+        VOTING_BAD_TOKEN: 'voting.tokenGone',
+        VOTING_EDIT_USED: 'voting.editUsedMine',
+        VOTING_EDIT_NEEDS_CONTACT: 'voting.editNeedsContact'
       }[code] || 'form.sendError';
       toast(text(key), 'error');
-      // Głosowanie zamknięte w międzyczasie to nie błąd do poprawienia — to nowy stan strony.
-      if (code === 'VOTING_NOT_OPEN') await pull();
+      /* Zamknięte głosowanie, zużyta zmiana i głos anonimowy to nie błędy do poprawienia, tylko
+         stan, którego strona jeszcze nie znała — po każdym lista jest odczytywana, żeby
+         kontrolki zniknęły same. */
+      if (['VOTING_NOT_OPEN', 'VOTING_EDIT_USED', 'VOTING_EDIT_NEEDS_CONTACT'].includes(code)) {
+        await pull();
+      }
     }
   }
 
@@ -1046,6 +1318,8 @@ import {
     if (saved) {
       known.hidden = false;
       $('[data-vote-known-email]', known).textContent = saved.email;
+      const knownNotify = $('[data-vote-known-notify]', known);
+      if (knownNotify) knownNotify.checked = false;
       form.hidden = true;
     } else {
       known.hidden = true;
@@ -1084,7 +1358,8 @@ import {
 
     $('[data-vote-known-send]', known)?.addEventListener('click', () => {
       const saved = savedVoter();
-      if (saved) send(saved.name || text('voting.name'), saved.email);
+      const notifyResults = Boolean($('[data-vote-known-notify]', known)?.checked);
+      if (saved) send(saved.name || '', saved.email, notifyResults);
     });
     $('[data-vote-known-other]', known)?.addEventListener('click', () => {
       known.hidden = true;
@@ -1092,14 +1367,24 @@ import {
       form.elements.namedItem('email')?.focus();
     });
 
+    const emailInput = form?.elements.namedItem('email');
+    const notifyInput = form?.elements.namedItem('notifyResults');
+    const syncNotify = () => {
+      if (!notifyInput) return;
+      notifyInput.disabled = !String(emailInput?.value || '').trim();
+      if (notifyInput.disabled) notifyInput.checked = false;
+    };
+    emailInput?.addEventListener('input', syncNotify);
+    syncNotify();
+
     form?.addEventListener('submit', (event) => {
       event.preventDefault();
       const name = String(form.elements.namedItem('name')?.value || '').trim();
       const email = String(form.elements.namedItem('email')?.value || '').trim();
-      // Ta sama para reguł co w formularzu zapisów, żeby komunikat był ten sam.
-      if (!name) { markInvalid(form, 'name'); return; }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { markInvalid(form, 'email'); return; }
-      send(name, email);
+      const notifyResults = Boolean(form.elements.namedItem('notifyResults')?.checked && email);
+      // Imię i e-mail są dobrowolne. Niepusty adres nadal musi być poprawny.
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { markInvalid(form, 'email'); return; }
+      send(name, email, notifyResults);
     });
   }
 
@@ -1110,7 +1395,7 @@ import {
     control?.focus({ preventScroll: true });
   }
 
-  async function send(name, email) {
+  async function send(name, email, notifyResults = false) {
     if (!pending) return;
     const dialog = $('[data-vote-dialog]');
     const status = $('[data-vote-status]', dialog);
@@ -1121,7 +1406,7 @@ import {
        kafelki bez przycisku. Odczyt z serwera odtworzyłby stan wyjściowy i głos by zniknął. */
     if (demoDriven) {
       state.myVote = { participantId: pending.participantId, score: pending.score };
-      rememberVoter(name, email);
+      if (email) rememberVoter(name, email);
       closeDialog();
       toast(text('voting.thanks'), 'success');
       paint();
@@ -1141,13 +1426,17 @@ import {
         editToken: pending.editToken,
         name,
         email,
+        notifyResults,
         deviceId: deviceId(),
         score: pending.score
       }));
       if (!result?.ok) throw Object.assign(new Error('vote'), { payload: result });
-      rememberVoter(name, email);
+      if (email) rememberVoter(name, email);
       closeDialog();
-      toast(text(result.mailed === false ? 'voting.thanksNoMail' : 'voting.thanks'), 'success');
+      const thanksKey = result.anonymous
+        ? 'voting.thanksAnonymous'
+        : result.mailed === false ? 'voting.thanksNoMail' : 'voting.thanks';
+      toast(text(thanksKey), 'success');
       await pull();
     } catch (error) {
       const code = error.payload?.code || '';
@@ -1265,6 +1554,60 @@ import {
     if (!$('[data-vote-shell]')) return;
     setupDialog();
     $('[data-vote-more]')?.addEventListener('click', showMore);
+
+    /* Szukanie bez przycisku „szukaj": lista jest już w przeglądarce, więc filtrowanie jest
+       darmowe i ma się dziać w trakcie pisania. Porcja wraca do dwunastu przy każdej zmianie
+       frazy — inaczej po wyczyszczeniu pola zostawałaby rozwinięta na sto kafelków. */
+    const query = $('[data-vote-query]');
+    query?.addEventListener('input', () => {
+      state.query = String(query.value || '');
+      state.shown = BATCH;
+      paintSearch();
+      paintGrid();
+    });
+    $('[data-vote-query-clear]')?.addEventListener('click', () => {
+      state.query = '';
+      state.shown = BATCH;
+      if (query) query.value = '';
+      paintSearch();
+      paintGrid();
+      query?.focus();
+    });
+    $('[data-vote-edition]')?.addEventListener('change', (event) => {
+      const key = String(event.target.value || '');
+      state.requestedEdition = key;
+      const url = new URL(location.href);
+      if (key) url.searchParams.set('edition', key);
+      else url.searchParams.delete('edition');
+      history.replaceState(null, '', url);
+      knownIds = null;
+      freshIds = new Set();
+      state.loaded = false;
+      paint();
+      pull();
+    });
+
+    /* Kliknięcie POZA kafelkiem składa go z powrotem.
+       Bez tego odsłonięty suwak zostawał na ekranie po odejściu palca gdzie indziej, a przy
+       dwóch kolumnach na telefonie łatwo wtedy wysłać ocenę nie tego wozu, o którym się myśli.
+       Nasłuch jeden, na dokumencie: kafelki powstają i giną przy każdym odczycie. */
+    document.addEventListener('click', (event) => {
+      const inside = event.target.closest?.('.vote-card');
+      $$('.vote-card.is-armed, .vote-card.is-picking').forEach((card) => {
+        if (card === inside) return;
+        card.classList.remove('is-armed', 'is-picking');
+        const pick = $('.vote-veil__pick', card);
+        if (pick) pick.hidden = true;
+        const cta = $('.vote-veil__cta', card);
+        if (cta) cta.setAttribute('aria-expanded', 'false');
+        const hit = $('.vote-card__hit', card);
+        if (hit) hit.hidden = false;
+      });
+    });
+
+    /* Zegar w pasku tyka co sekundę. Osobno od odczytu z serwera, który chodzi co pół minuty:
+       licznik przeskakujący raz na trzydzieści sekund nie jest licznikiem. */
+    window.setInterval(paintTimer, 1000);
 
     /* Szkielet od pierwszej klatki, nie po pierwszej odpowiedzi.
        `paint()` był wołany wyłącznie z `absorb()`, czyli już PO odczycie — więc przez cały czas

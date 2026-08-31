@@ -54,6 +54,8 @@ export const toast = (message, tone = 'info') => api()?.toast?.(message, 5200, t
  * znaków (migracja 0022), więc taka wartość zostałaby odrzucona dopiero przy oddawaniu
  * głosu. Sprawdzany jest więc kształt, nie samo istnienie.
  */
+let sessionDeviceId = '';
+
 export function deviceId() {
   const shaped = (value) => /^[0-9a-f-]{32,36}$/.test(String(value || '').toLowerCase());
 
@@ -62,14 +64,19 @@ export function deviceId() {
 
   const own = readStore('carruleddhi.voteDevice');
   if (shaped(own)) return String(own).toLowerCase();
+  if (shaped(sessionDeviceId)) return sessionDeviceId;
 
-  /* Zapas z getRandomValues, nie z Date.now(): 32 znaki szesnastkowe zawsze spełniają
-     warunek z bazy, a znacznik czasu z losową końcówką raz spełnia, raz nie. */
-  const fresh = globalThis.crypto?.randomUUID?.()
-    || [...globalThis.crypto.getRandomValues(new Uint8Array(16))]
-      .map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  writeStore('carruleddhi.voteDevice', fresh);
-  return fresh.toLowerCase();
+  /* Keep one identity in memory when storage is blocked. Web Crypto is preferred, but the
+     final fallback still has the exact 32-hex shape required by the database. */
+  const cryptoApi = globalThis.crypto;
+  const fresh = cryptoApi?.randomUUID?.()
+    || (cryptoApi?.getRandomValues
+      ? [...cryptoApi.getRandomValues(new Uint8Array(16))]
+        .map((byte) => byte.toString(16).padStart(2, '0')).join('')
+      : Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''));
+  sessionDeviceId = fresh.toLowerCase();
+  writeStore('carruleddhi.voteDevice', sessionDeviceId);
+  return sessionDeviceId;
 }
 
 export function readStore(key) {
@@ -149,7 +156,7 @@ export function remaining(milliseconds) {
  * przed pierwszym udanym odczytem to jest strona bez głosowania, czyli dokładnie to, co widać
  * przez cały rok poza dniem wyścigu.
  */
-export async function readState(demoPhase = 'scheduled') {
+export async function readState(demoPhase = 'scheduled', edition = '') {
   if (demoMode) return demoVotingState(demoPhase);
 
   const bridge = api();
@@ -158,7 +165,8 @@ export async function readState(demoPhase = 'scheduled') {
   try {
     const result = await bridge.post(endpoint, bridge.payload('voting', {
       action: 'state',
-      deviceId: deviceId()
+      deviceId: deviceId(),
+      ...(edition ? { edition } : {})
     }));
     // Brak Workera odpowiada `{ ok, demo }` bez fazy — patrz postJSON w app.js.
     if (!result?.ok || !result.phase) return null;
@@ -329,4 +337,88 @@ export function avatarFor(row) {
     '</svg>'
   ].join('');
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Odmiana słowa „głos" przez liczbę.
+ * ---------------------------------------------------------------------------
+ * Zmierzone na produkcji przy pierwszym prawdziwym głosie: „10 PUNTI · 1 VOTI · MEDIA 10.0".
+ * „1 voti" to po włosku błąd, a nie skrót — i stoi na cokole, czyli w jedynym miejscu, na
+ * które tego dnia patrzy cały plac.
+ *
+ * Nie da się tego załatwić jedną formą w słowniku, bo języki nie zgadzają się co do tego, ile
+ * ich mają: włoski, angielski, niemiecki, hiszpański i francuski dwie, a polski trzy —
+ * 1 głos, 2–4 głosy, 5+ głosów. Ręczne `if (n === 1)` dałoby więc „5 głosy".
+ *
+ * `Intl.PluralRules` zna te reguły dla każdego z sześciu języków i jest w każdej przeglądarce,
+ * która obsługuje resztę tej strony. Kategoria `many` (polskie 5+) spada na `voting.votes`,
+ * czyli formę, która już w słowniku była — dlatego istniejące tłumaczenia zostają nietknięte.
+ */
+/* ===========================================================================
+   REMIS PUNKTOWY: POWIEDZIEĆ, CO ROZSTRZYGNĘŁO
+   ===========================================================================
+   Dwa wozy z tą samą sumą punktów stoją jeden nad drugim i do tej pory nic na ekranie nie
+   mówiło dlaczego. Z zewnątrz wygląda to na losowe albo na błąd — a jest to najstarszy
+   sposób, w jaki wynik traci zaufanie: nie przez pomyłkę, tylko przez brak wyjaśnienia.
+
+   Kolejność rozstrzyga zawsze ten sam łańcuch, w bazie (migracja 0030), w Workerze
+   (votingAdminWinners) i tutaj: suma punktów → liczba głosów → średnia → numer startowy.
+   Ta funkcja szuka PIERWSZEGO ogniwa, które w danej grupie remisujących naprawdę je
+   rozdzieliło, i zwraca jego nazwę. Nie zgaduje i nie tłumaczy całego łańcucha: mówi to
+   jedno, co zadecydowało tutaj.
+
+   Grupa, nie para. Trzy wozy po 268 punktów to jedna grupa i jedno kryterium na wszystkie
+   trzy — inaczej sąsiednie kafelki nosiłyby dwa różne wyjaśnienia tego samego remisu.
+
+   CAŁA STAWKA, NIE SAMA TRÓJKA, I TO JEST TU NAJWAŻNIEJSZE
+     Remis, który naprawdę wymaga wyjaśnienia, wypada na GRANICY cokołu: trzeci i czwarty
+     z tą samą sumą punktów, jeden na podium i drugi pod nim. Liczony po samym
+     `state.podium` taki remis jest niewidoczny, bo czwartego w tej tablicy nie ma — czyli
+     jedyny przypadek, o który ktoś naprawdę zapyta, byłby jedynym, którego nie widać.
+     W danych demonstracyjnych ta para stoi na trzecim i czwartym miejscu z rozmysłu.
+
+     Dlatego wejściem jest pełna posortowana stawka, a wyjściem mapa po `id`: cokół i
+     siatka pod nim biorą z niej to, co dotyczy ich własnych wierszy.
+
+   @param {Array} rows  CAŁA stawka posortowana tak, jak stoi na ekranie
+   @returns {Map<string, string>} id wiersza → gotowa linijka; remisujący tylko
+*/
+export function tieNotes(rows) {
+  const notes = new Map();
+  let start = 0;
+
+  while (start < rows.length) {
+    let end = start;
+    while (end + 1 < rows.length
+      && Number(rows[end + 1].totalScore) === Number(rows[start].totalScore)) end += 1;
+
+    // Remis liczy się tylko wtedy, gdy ktoś w ogóle zagłosował: wozy po zero punktów nie są
+    // remisem do rozstrzygnięcia, tylko wozami bez głosów.
+    if (end > start && Number(rows[start].voteCount) > 0) {
+      const group = rows.slice(start, end + 1);
+      const varies = (pick) => new Set(group.map((row) => Number(pick(row)))).size > 1;
+      const key = varies((row) => row.voteCount) ? 'voting.tieVotes'
+        : varies((row) => row.averageScore) ? 'voting.tieAvg'
+          : 'voting.tieNumber';
+      /* Ostatnie ogniwo nie ma warunku: numery startowe są unikalne, więc jeśli łańcuch
+         doszedł aż tutaj, to one rozdzieliły grupę i nic innego nie mogło. */
+      const line = `${text('voting.tie')} · ${text('voting.tieAhead')}: ${text(key)}`;
+      for (const row of group) notes.set(row.id, line);
+    }
+    start = end + 1;
+  }
+  return notes;
+}
+
+export function votesLabel(count) {
+  const lang = document.documentElement.lang || 'it';
+  let form = 'other';
+  try {
+    form = new Intl.PluralRules(lang).select(Number(count) || 0);
+  } catch (_) {
+    /* Nieznany język albo brak Intl — zostaje forma mnoga, czyli to, co było wcześniej. */
+  }
+  if (form === 'one') return text('voting.voteOne');
+  if (form === 'few') return text('voting.voteFew');
+  return text('voting.votes');
 }
