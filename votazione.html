@@ -16,7 +16,22 @@
 <body class="vote-page">
   <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
   <div class="noise" aria-hidden="true"></div>
-  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
+
+  <!-- ZEGAR NA SAMEJ GÓRZE, W MIEJSCE PASKA POSTĘPU.
+       ==========================================================================
+       Stała tu cienka kreska pokazująca, ile strony zostało do przewinięcia — informacja,
+       której w trakcie głosowania nikt nie potrzebuje, zajmująca najbardziej widoczny pas
+       ekranu. Teraz jest tam jedyna liczba, która w tych kilkudziesięciu minutach jest pilna:
+       ile czasu zostało do zamknięcia głosowania. Przed startem odlicza do startu, po
+       zamknięciu mówi, że już zamknięte.
+
+       `position: sticky`, więc jedzie z przewijaniem: kto zszedł w połowę listy wózków, nadal
+       widzi, ile ma czasu, bez wracania na górę. -->
+  <div class="vote-timer" data-vote-timer hidden aria-live="polite">
+    <span class="vote-timer__pulse" aria-hidden="true"></span>
+    <span class="vote-timer__label" data-vote-timer-label></span>
+    <strong class="vote-timer__time" data-vote-timer-time></strong>
+  </div>
 
   <!-- Nagłówek: ten sam pasek co na stronie głównej, z tym samym przełącznikiem języka.
        ==========================================================================
@@ -30,16 +45,15 @@
     <div class="nav-shell">
       <a class="brand" href="index.html" data-vote-back aria-label="Carruleddhi Show">
         <span class="brand__name">Carruleddhi</span>
-        <span class="brand__date">17 · 10 · 2026</span>
+        <span class="brand__date" data-header-date>17 · 10 · 2026</span>
       </a>
 
-      <div class="nav-current" data-nav-current aria-live="polite">
-        <span class="nav-current__pulse" aria-hidden="true"></span>
-        <span class="nav-current__copy">
-          <small class="nav-current__progress" data-nav-progress>00%</small>
-          <strong data-i18n="voting.pageKicker">Voto del pubblico</strong>
-        </span>
-      </div>
+      <!-- Bez plakietki „00% Voto del pubblico".
+           Procent przewinięcia i nazwa sekcji, w której i tak jesteś, to dwie informacje,
+           których nikt tu nie potrzebuje — a stały w najbardziej widocznym miejscu paska i na
+           telefonie ściskały flagę z przyciskiem powrotu. Pasek postępu na górze ekranu
+           zostaje, bo nie zabiera miejsca. Obsługa `[data-nav-progress]` w voting-boot.js jest
+           warunkowa, więc brak tego elementu niczego nie psuje. -->
 
       <div class="nav-actions">
         <div class="language-picker" data-language-picker>
@@ -82,8 +96,8 @@
   <nav class="mobile-nav" id="site-menu" data-mobile-menu aria-label="Main navigation" aria-hidden="true">
     <div class="menu-panel__inner">
       <div class="menu-panel__heading">
-        <span class="menu-panel__eyebrow">Carruleddhi Show 2026</span>
-        <span data-i18n="hero.kicker">17 ottobre 2026 · Santa Teresa Gallura</span>
+        <span class="menu-panel__eyebrow" data-config-event-name>Carruleddhi Show 2026</span>
+        <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
       </div>
 
       <div class="menu-panel__grid">
@@ -108,13 +122,21 @@
         <h1 data-i18n="voting.pageTitle">Premio del pubblico.</h1>
         <p class="lead" data-vote-lead data-i18n="voting.pageLead">Un premio, assegnato da chi guarda. Tocca “Vota”, dai da 3 a 10 punti e lascia la mail.</p>
 
-        <!-- Reguła powiedziana wprost, nie ukryta w regulaminie: jeden głos na osobę.
-             Znika po zamknięciu głosowania, bo obietnica bez czego dotyczyć jest tylko hałasem. -->
-        <p class="vote-rule" data-vote-rule>
-          <span class="vote-rule__mark" aria-hidden="true">★</span>
-          <span data-i18n="voting.oneVote">Un voto a persona. Puoi cambiarlo dal link nella mail finché il voto è aperto.</span>
-        </p>
+        <!-- Plakietka z regułą zdjęta.
+             Powtarzała to, co i tak stoi w akapicie nad nią i w oknie oceny, a zajmowała
+             osobny prostokąt z kreską przez pół szerokości nagłówka. Reguła „jeden głos, jedna
+             zmiana, imię i e-mail opcjonalne" jest teraz w `voting.pageLead` i w oknie, w
+             którym naprawdę o niej decydujesz. -->
       </header>
+
+      <section class="vote-editions" data-vote-editions hidden aria-label="Edizioni">
+        <label for="vote-edition" data-i18n="voting.editionLabel">Edizione dei risultati</label>
+        <div class="vote-editions__select">
+          <select id="vote-edition" data-vote-edition></select>
+          <span aria-hidden="true">⌄</span>
+        </div>
+        <small data-vote-edition-meta></small>
+      </section>
 
       <!-- Głosowanie zamknięte albo jeszcze nieotwarte: jedno zdanie zamiast pustej siatki.
            Pusta siatka z zerem kafelków wygląda na stronę, która się nie wczytała. -->
@@ -166,10 +188,27 @@
           <p class="vote-mine__score"><b data-vote-mine-score>—</b></p>
         </section>
 
+        <!-- Szukanie po numerze startowym, nazwie wózka, imieniu i kategorii.
+             Filtr kategorii radzi sobie z podziałem na Classic i ART, ale nie z pytaniem
+             „gdzie jest numer 27", a to jest pytanie, które publiczność zadaje najczęściej:
+             numer widać na wózku z trasy i po nim się go potem szuka na liście. Pole jest
+             `type="search"`, więc na telefonie dostaje klawiaturę z krzyżykiem do czyszczenia. -->
+        <div class="vote-search" data-vote-search hidden>
+          <span class="vote-search__icon" aria-hidden="true">🔍</span>
+          <input type="search" inputmode="search" autocomplete="off" data-vote-query
+                 data-i18n-placeholder="voting.searchPlaceholder"
+                 data-i18n-aria-label="voting.searchLabel"
+                 placeholder="Cerca: numero, nome, carretto…" aria-label="Cerca un carretto">
+          <button class="vote-search__clear" type="button" data-vote-query-clear hidden
+                  data-i18n-aria-label="voting.searchClear" aria-label="Cancella">×</button>
+        </div>
+
         <!-- Filtr kategorii POJAZDU, nie kategorii głosowania: głos jest jeden. To sposób na
              znalezienie wózka w liście, która w dniu zawodów ma kilkadziesiąt pozycji.
              Budowany z danych — kategorie ustawia organizator przy uczestniku. -->
         <div class="vote-filters" data-vote-filters role="group" aria-label="Categorie" hidden></div>
+
+        <p class="vote-count" data-vote-count aria-live="polite" hidden></p>
 
         <div class="vote-grid" data-vote-grid></div>
 
@@ -210,6 +249,10 @@
            równie ważny jak pierwszy. -->
       <div class="vote-known" data-vote-known hidden>
         <p class="vote-known__email" data-vote-known-email></p>
+        <label class="vote-notify">
+          <input type="checkbox" data-vote-known-notify>
+          <span data-i18n="voting.notifyResults">Avvisami quando saranno pubblicati i vincitori</span>
+        </label>
         <button class="btn btn--yellow" type="button" data-vote-known-send>
           <span data-i18n="voting.voteAs">Vota con questo indirizzo</span><span aria-hidden="true">★</span>
         </button>
@@ -219,17 +262,20 @@
       <form class="vote-identity" data-vote-form hidden>
         <div class="form-grid">
           <div class="field" data-field>
-            <input id="vote-name" name="name" type="text" autocomplete="given-name" placeholder=" " required>
-            <label for="vote-name" data-i18n="voting.name">Nome *</label>
-            <span class="field__error" data-i18n="validation.required">Compila questo campo.</span>
+            <input id="vote-name" name="name" type="text" autocomplete="given-name" placeholder=" ">
+            <label for="vote-name" data-i18n="voting.name">Nome (facoltativo)</label>
           </div>
           <div class="field" data-field>
-            <input id="vote-email" name="email" type="email" autocomplete="email" placeholder=" " required>
-            <label for="vote-email" data-i18n="voting.email">E-mail *</label>
+            <input id="vote-email" name="email" type="email" autocomplete="email" placeholder=" ">
+            <label for="vote-email" data-i18n="voting.email">E-mail (facoltativa)</label>
             <span class="field__error" data-i18n="validation.email">Inserisci un indirizzo e-mail valido.</span>
           </div>
         </div>
-        <p class="vote-dialog__note" data-i18n="voting.note">Ti mandiamo la conferma e un link per cambiare idea finché il voto è aperto.</p>
+        <p class="vote-dialog__note" data-i18n="voting.note">Senza e-mail puoi cambiare il voto su questo dispositivo. Lascia l’indirizzo solo se vuoi il link e il risultato.</p>
+        <label class="vote-notify">
+          <input type="checkbox" name="notifyResults" data-vote-notify>
+          <span data-i18n="voting.notifyResults">Avvisami quando saranno pubblicati i vincitori</span>
+        </label>
         <button class="btn btn--yellow" type="submit">
           <span data-i18n="voting.send">Invia il voto</span><span aria-hidden="true">★</span>
         </button>
@@ -260,7 +306,7 @@
     <div class="container">
       <div class="footer__top">
         <div class="footer__brandwrap">
-          <div class="footer__brand">CARRULEDDHI<br><span>SHOW 2026</span></div>
+          <div class="footer__brand">CARRULEDDHI<br><span>SHOW <span data-config-event-year>2026</span></span></div>
           <p class="footer__copy" data-i18n="footer.copy">Una discesa, un paese, una storia costruita a mano.</p>
         </div>
         <div class="footer__group">
@@ -282,8 +328,12 @@
           </div>
         </div>
       </div>
+      <div class="patron patron--footer">
+        <span class="patron__label" data-i18n="patron.thanks">Grazie a loro c’è la festa</span>
+        <img class="patron__logo" src="/assets/images/fidali.jpeg" alt="Fidali 1982" width="720" height="293" decoding="async" loading="lazy">
+      </div>
       <div class="footer__bottom">
-        <span>© <span data-current-year>2026</span> Carruleddhi Show · Santa Teresa Gallura</span>
+        <span>© <span data-config-event-name>Carruleddhi Show 2026</span> · <span data-config-event-location>Santa Teresa Gallura</span></span>
         <span data-i18n="footer.credit">Progetto digitale Carruleddhi Show</span>
       </div>
     </div>

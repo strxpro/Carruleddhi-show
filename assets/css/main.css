@@ -2275,3 +2275,59 @@ body { font-variation-settings: 'opsz' 16; }
   .quick-actions, .config-preview-banner { display: none !important; }
   .stack-card { position: relative; top: auto; min-height: 0; margin: 0 0 20px; transform: none !important; filter: none !important; break-inside: avoid; }
 }
+
+/* ===========================================================================
+   Podziękowanie dla Fidali 1982
+   ===========================================================================
+   Bez nich nie ma imprezy — i to jest cała treść tego bloku. Stoi w dwóch miejscach na
+   każdej stronie serwisu: w hero, bo tam trafia każdy, i w stopce, bo tam się takich
+   rzeczy szuka. Do stopki dociera ułamek odwiedzających, więc sama stopka by nie
+   wystarczyła; samo hero znikałoby po pierwszym przewinięciu.
+
+   Baner jest gotową grafiką z własnym, mocno niebieskim tłem — nie logo na przezroczystości.
+   Dlatego dostaje zaokrąglenie i obwódkę: bez nich na granatowej stopce zlewa się z nią w
+   jeden prostokąt, a na jasnym hero wygląda jak wklejony zrzut ekranu. Obwódka jest inna w
+   każdym z tych dwóch miejsc, bo jasna kreska na kremowym tle jest niewidoczna, a ciemna na
+   granacie tak samo. */
+.patron {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.patron__label {
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  /* `currentColor` z przezroczystością, a nie ustalony kolor: ten sam blok stoi na kremowym
+     hero i na granatowej stopce, a tekst ma w obu brać kolor po rodzicu. */
+  opacity: .62;
+}
+
+/* `width: 100%` z `max-width`, a nie sama szerokość: na wąskim telefonie baner ma się
+   zmieścić, a nie wystawać poza kolumnę. `height: auto` przy podanych `width`/`height` w
+   znaczniku trzyma proporcje i rezerwuje miejsce, więc nic nie przeskakuje przy wczytaniu. */
+.patron__logo {
+  display: block;
+  width: 100%;
+  max-width: 210px;
+  height: auto;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  box-shadow: 0 10px 24px -16px rgb(0 0 0 / .55);
+}
+
+.patron--hero { margin-top: clamp(18px, 2.4vw, 28px); }
+.patron--hero .patron__logo { border-color: rgb(7 26 61 / .18); }
+
+.patron--footer { margin: clamp(22px, 3vw, 34px) 0 0; }
+.patron--footer .patron__logo { border-color: rgb(255 255 255 / .18); }
+
+/* Stopka stron prawnych to jeden rząd bez siatki, więc blok idzie tam nad kreską z prawami
+   autorskimi i potrzebuje własnego odstępu od niej. */
+.site-footer .patron--footer + .footer__bottom { margin-top: clamp(18px, 2.4vw, 26px); }
+
+@media (max-width: 560px) {
+  .patron__logo { max-width: 180px; }
+}

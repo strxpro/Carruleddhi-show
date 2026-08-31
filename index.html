@@ -237,6 +237,15 @@
             <a class="btn magnetic" href="#signup" data-feature-link="registration" data-race-hide><span data-i18n="hero.signup">Iscriviti alla gara</span><span class="btn__icon" aria-hidden="true">↘</span></a>
             <button class="btn btn--outline magnetic" type="button" data-open-reminder data-race-hide><span data-i18n="hero.attend">Ci sarò</span><span class="btn__icon" aria-hidden="true">＋</span></button>
           </div>
+
+          <!-- Kto sprawia, ze ta impreza w ogole sie odbywa.
+               Pod przyciskami, nie nad tytulem: to podziekowanie, a nie naglowek — ale w hero,
+               a nie tylko w stopce, bo do stopki dochodzi ulamek odwiedzajacych. Bez `lazy`,
+               inaczej niz w stopce: to jest pierwszy ekran, wiec obrazek ma byc od razu. -->
+          <div class="patron patron--hero reveal" data-delay="4">
+            <span class="patron__label" data-i18n="patron.thanks">Grazie a loro c’è la festa</span>
+            <img class="patron__logo" src="/assets/images/fidali.jpeg" alt="Fidali 1982" width="720" height="293" decoding="async">
+          </div>
         </div>
         <aside class="hero__aside reveal" data-delay="2" aria-label="Event statistics">
           <div class="countdown" data-countdown aria-label="Countdown to event">
@@ -1677,6 +1686,10 @@
            strangers to try the door. It is not a security measure — the panel reads
            nothing without the passphrase from ROSTER_KEY, which is checked in the
            function, not here — it is just not advertising. -->
+      <div class="patron patron--footer">
+        <span class="patron__label" data-i18n="patron.thanks">Grazie a loro c’è la festa</span>
+        <img class="patron__logo" src="/assets/images/fidali.jpeg" alt="Fidali 1982" width="720" height="293" decoding="async" loading="lazy">
+      </div>
       <div class="footer__bottom"><span>© <span data-current-year>2026</span> Carruleddhi Show · Santa Teresa Gallura</span><span data-i18n="footer.credit">Progetto digitale Carruleddhi Show</span><a class="footer__admin" href="admin.html" rel="nofollow">Admin</a></div>
     </div>
 
