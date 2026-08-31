@@ -7154,8 +7154,21 @@ import {
       if (!message && !attached) return;
       /* Kreator ma pierwszeństwo: gdy czeka na adres albo na kod, ta wiadomość jest
          odpowiedzią jemu, a nie nowym pytaniem do automatu. Bez tego adres wpisany w rozmowie
-         poleciałby do modelu i zapisał się w historii wątku jako zwykła wiadomość. */
-      if (!attached && await flowHandled(message)) return;
+         poleciałby do modelu i zapisał się w historii wątku jako zwykła wiadomość.
+
+         `flow &&` PRZED `await`, i to nie jest mikrooptymalizacja.
+         ---------------------------------------------------------------------------
+         `flowHandled` zaczyna od `if (!flow) return false`, więc bez kreatora nie robi nic —
+         ale jest `async`, a `await` na funkcji, która nic nie robi, i tak oddaje sterowanie.
+         Skutek: `showTyping()` niżej nie wykonywało się już w tym samym zadaniu co
+         naciśnięcie przycisku. Zmierzone sondą: zaraz po kliknięciu `.chat-typing` nie
+         istniało, choć w kodzie stoi kilka linijek dalej.
+
+         Dla człowieka to jedno mikrozadanie, czyli nic. Ale to jedna z tych rzeczy, gdzie
+         „prawie natychmiast" i „natychmiast" różnią się tym, że pierwsze zależy od kolejki
+         zadań, a wystarczy, że coś ją zapcha — i kropki pojawiają się po bąbelku, a nie
+         razem z nim. Bez kreatora nie ma tu teraz żadnego oddania sterowania. */
+      if (!attached && flow && await flowHandled(message)) return;
       /* One in flight at a time.
          The submit handler and the Enter handler both call this, and a fast double press —
          or a click on the button while Enter is still being processed — used to start two

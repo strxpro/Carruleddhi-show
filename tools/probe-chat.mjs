@@ -62,6 +62,27 @@ const probe = `
     const cs = input ? getComputedStyle(input) : null;
     out.inputWidth = input ? Math.round(input.getBoundingClientRect().width) : 0;
     out.logMaxHeight = cs ? getComputedStyle(chat.querySelector('.chat__log')).maxHeight : '';
+
+    /* DLACZEGO inputWidth I logChildren WYCHODZA ZEREM — I ZE TO NIE JEST BLAD.
+       ---------------------------------------------------------------------------
+       Uwaga na skladnie: cialo tej sondy jedzie do przegladarki jako szablon, wiec zaden
+       znak wstecznego apostrofu nie moze sie tu pojawic. Nazwy w komentarzu sa golym tekstem
+       wlasnie dlatego.
+
+       Czat ma bramke: dopoki gosc nie poda imienia i adresu, formularz [data-chat-form] jest
+       ukryty przez display: none, wiec pole ma zero szerokosci, a rozmowy jeszcze nie ma,
+       wiec log jest pusty. Ta sonda tylko klika w zakladke i nie przechodzi bramki, wiec
+       zero jest tu poprawnym pomiarem.
+
+       Zapisywane wprost, bo dwa zera w zrzucie wygladaja na zepsuty uklad i raz mnie na to
+       nabraly. Bramke i pelne pisanie mierzy tools/probe-chat-ui.mjs, ktore ja przechodzi. */
+    const gate = chat.querySelector('[data-chat-gate]');
+    const form = chat.querySelector('[data-chat-form]');
+    out.gate = {
+      visible: gate ? !gate.hidden : null,
+      formHidden: form ? form.hidden : null,
+      explains: 'pole i log sa puste, dopoki bramka nie przejdzie — patrz probe-chat-ui.mjs'
+    };
   }
 
   const marker = document.createElement('pre');
