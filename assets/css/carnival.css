@@ -3180,3 +3180,99 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   /* Stopka ma własny cień tej samej wielkości (experience.css), więc i tej samej wagi. */
   .site-footer { box-shadow: 0 -10px 18px rgba(7, 26, 61, .34); }
 }
+
+/* ============================================================
+   18b. Dolny dok — hierarchia i wejście
+   ============================================================
+   PROBLEM, KTÓRY TO NAPRAWIA
+   Oba przyciski były pełnymi, nasyconymi plamami: żółty „Będę tam" obok czerwonego
+   „Zapisz się". Dwie równie głośne propozycje obok siebie znaczą, że żadna nie prowadzi —
+   patrzący musi je najpierw przeczytać, żeby się dowiedzieć, która jest którą. A to są dwie
+   zupełnie różne rzeczy: „będę tam" to jedno stuknięcie, „zapisz się do wyścigu" to
+   formularz, zgody i numer startowy.
+
+   Zapis prowadzi więc jako jedyny wypełniony kolorem, a obecność stoi obok jako obrys na
+   szkle doku. Ten sam rozmiar celu dla palca, inna waga w oku.
+
+   STAN TO NIE ZAPROSZENIE
+   „Obecność potwierdzona" wyglądała jak przycisk do naciśnięcia — pełna zielona plama tej
+   samej wielkości co czerwone „Zapisz się". Potwierdzenie ma się cofnąć, a nie krzyczeć:
+   przygaszona zieleń, a znaczek staje się pełnym zielonym kołem z czarnym ptaszkiem. To jest
+   odpowiedź „już to zrobiłeś", a nie kolejna prośba.
+   =========================================================================== */
+@media (max-width: 760px) {
+  /* Obecność: obrys na szkle. `box-shadow: inset`, nie `border` — obramowanie zmieniłoby
+     wysokość pudełka i rozjechało dwa przyciski o dwa piksele względem siebie. */
+  .quick-action--attend {
+    background: rgb(255 255 255 / .07);
+    color: var(--white);
+  }
+  .quick-action--attend .quick-action__icon {
+    background: rgb(255 255 255 / .14);
+    color: var(--white);
+  }
+  .quick-action--attend::after { border-color: rgb(255 255 255 / .34); }
+
+  .quick-action--attend.is-complete {
+    background: rgb(40 182 122 / .15);
+    color: #86efc0;
+  }
+  .quick-action--attend.is-complete::after { border-color: rgb(40 182 122 / .55); }
+  /* Znaczek odwraca kontrast: to jedyny element, który po potwierdzeniu ma być jasny. */
+  .quick-action--attend.is-complete .quick-action__icon {
+    background: var(--green);
+    color: var(--navy-950);
+  }
+
+  /* Zapis prowadzi. Cień w kolorze przycisku, żeby odklejał się od szkła doku. */
+  .quick-action--signup {
+    background: var(--coral);
+    color: var(--white);
+    box-shadow: 0 10px 22px -12px rgb(246 73 79 / .85);
+  }
+  .quick-action--signup::after { border-color: rgb(255 255 255 / .3); }
+
+  /* ---------------------------------------------------------------- wejście i wyjście
+     Dok zjeżdża w dół i lekko się kurczy, zamiast po prostu zniknąć pod krawędzią —
+     `scale` jest tu po to, żeby ruch miał kierunek „odchodzi", a nie „ucieka".
+
+     `translateX(-50%)` MUSI zostać w każdym stanie ukrycia: bez niego dok traci wyśrodkowanie
+     i zjeżdża skosem w prawo. W regule dla otwartego menu w main.css tego brakowało. */
+  body.is-menu-open .quick-actions,
+  body.is-modal-open .quick-actions,
+  .quick-actions.is-over-form,
+  .quick-actions.is-keyboard-hidden {
+    transform: translateX(calc(-50% + var(--dock-nudge-x))) translateY(calc(100% + 34px)) scale(.97);
+  }
+
+  /* Przyciski wchodzą po kolei, nie razem. Opóźnienie jest TYLKO w stanie widocznym —
+     przy chowaniu obie znikają naraz, bo czekanie na wyjście jest wyłącznie irytujące. */
+  .quick-action { transition-property: width, padding, transform, background, border-radius, opacity, box-shadow; }
+  .quick-action:nth-child(1) { transition-delay: .05s; }
+  .quick-action:nth-child(2) { transition-delay: .11s; }
+
+  body.is-menu-open .quick-actions .quick-action,
+  body.is-modal-open .quick-actions .quick-action,
+  .quick-actions.is-over-form .quick-action,
+  .quick-actions.is-keyboard-hidden .quick-action {
+    opacity: 0;
+    transition-delay: 0s;
+  }
+}
+
+/* Etykieta w zwiniętym doku: wysuwa się, zamiast rozciągać.
+   `width` animowane od zera przelicza układ na każdej klatce i na starszym telefonie widać
+   z tego skoki. `max-width` z przesunięciem daje ten sam efekt, a szerokość zmienia się raz. */
+.quick-actions.is-mini .quick-action > span:not(.quick-action__icon) {
+  max-width: 0;
+  transform: translateX(-6px);
+}
+.quick-action > span:not(.quick-action__icon) {
+  max-width: 24ch;
+  transition: max-width .34s var(--ease-out), opacity .26s ease, transform .34s var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-action,
+  .quick-action > span:not(.quick-action__icon) { transition-delay: 0s; }
+}
