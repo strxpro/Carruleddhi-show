@@ -150,6 +150,17 @@
             <p data-i18n="voting.resultsLead">Il voto è chiuso. Ecco tutti i partecipanti, dal punteggio più alto.</p>
           </header>
           <ol class="vote-podium" data-vote-podium aria-label="Podio"></ol>
+          <!-- Pełna tabela wyników, dziesięć wierszy naraz.
+               Do tej pory rysowała CAŁĄ stawkę od razu, a pudełko miało tylko `overflow-x`.
+               Przy osiemdziesięciu wozach to osiemdziesiąt wierszy rozpychających sekcję na
+               monitorze i osiemdziesiąt kartek jedna pod drugą na telefonie — podium, czyli
+               to, po co ktoś tu wszedł, znikało poza ekranem po pierwszym przewinięciu.
+
+               Ta sama zasada co w cokole na stronie głównej (`podium__field` w index.html):
+               przewijanie WEWNĄTRZ pudełka pokazuje to, co już jest, a przycisk niżej dokłada
+               kolejne dziesięć. Dwie różne czynności, dwa różne elementy. `tabindex="0"` na
+               przewijanym pudełku, bo obszar z własnym paskiem musi dać się przewinąć
+               z klawiatury. -->
           <div class="vote-standings">
             <h3 data-i18n="voting.seeAll">Classifica completa</h3>
             <div class="vote-standings__scroll" tabindex="0">
@@ -165,6 +176,11 @@
                 </thead>
                 <tbody data-vote-standings></tbody>
               </table>
+            </div>
+            <div class="vote-standings__more">
+              <button class="btn btn--outline btn--small" type="button" data-vote-standings-more hidden>
+                <span data-vote-standings-more-label data-i18n="voting.loadMore">Mostra altri</span>
+              </button>
             </div>
           </div>
         </section>

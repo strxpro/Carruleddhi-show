@@ -1473,8 +1473,37 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 .vote-standings { margin-top: clamp(34px, 6vw, 68px); }
 .vote-standings h3 { margin: 0 0 16px; font-family: var(--font-display); font-size: clamp(22px, 3vw, 34px); }
-.vote-standings__scroll { overflow-x: auto; border: 3px solid var(--navy-950); border-radius: 22px; background: #fff; box-shadow: 8px 8px 0 #ffc6dc; }
+/* Przewijanie WEWNĄTRZ pudełka, nie rozpychanie sekcji.
+   ---------------------------------------------------------------------------
+   Stało tu samo `overflow-x: auto`, więc pion rósł bez ograniczeń: przy osiemdziesięciu
+   wozach tabela zjeżdżała na trzy ekrany, a podium — to, po co ktoś tu wszedł — znikało
+   po pierwszym przewinięciu. Ta sama reguła co w cokole na stronie głównej
+   (`.podium__field-scroll`), z tym samym budżetem: 42% wysokości okna, ale nie więcej niż
+   380 px, żeby na dużym monitorze tabela nie stawała się drugą stroną.
+
+   `overscroll-behavior: contain`, bo bez tego dojechanie do końca listy przewija stronę
+   pod nią — palec „przeskakuje" z tabeli na sekcję i wygląda to na skok układu.
+
+   Nagłówek przyklejony: bez niego przewinięcie o trzy wiersze zabiera podpisy kolumn
+   i zostają trzy kolumny liczb bez wyjaśnienia, która jest którą. */
+.vote-standings__scroll {
+  max-height: min(42dvh, 380px);
+  overflow: auto;
+  border: 3px solid var(--navy-950);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 8px 8px 0 #ffc6dc;
+  overscroll-behavior: contain;
+}
 .vote-standings__scroll:focus-visible { outline: 4px solid #a96cff; outline-offset: 4px; }
+/* Tło na `th`, nie na `thead` — i to nie jest kwestia gustu.
+   Przyklejony jest `th`, a `thead` zostaje na swoim miejscu w przepływie. Tło zadeklarowane
+   na `thead` nie jedzie więc razem z komórką: nagłówek staje się przezroczysty w chwili
+   przewinięcia i wiersze przechodzą pod napisami. Ten sam wzorzec co `.podium__table thead th`
+   w cokole na stronie głównej. */
+.vote-standings thead th { position: sticky; top: 0; z-index: 2; background: var(--navy-950); }
+.vote-standings__more { display: flex; justify-content: center; margin-top: 14px; }
+.vote-standings__more button[hidden] { display: none; }
 .vote-standings table { width: 100%; border-collapse: collapse; }
 .vote-standings thead { background: var(--navy-950); color: #fff; }
 .vote-standings th, .vote-standings td { padding: 12px 14px; border-bottom: 1px solid #d9e5ee; text-align: left; }
@@ -1522,7 +1551,12 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   .vote-podium__item[data-place='2'] .vote-podium__step { --podium-step: 62px; }
   .vote-podium__item[data-place='3'] .vote-podium__step { --podium-step: 42px; }
 
-  .vote-standings__scroll { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+  /* `max-height: none` razem z `overflow: visible` — te dwie muszą chodzić w parze.
+     Sam `overflow: visible` przy odziedziczonym pułapie wysokości znaczyłby kartki
+     wylewające się z pudełka i wchodzące pod przycisk „pokaż więcej". Na telefonie tabela
+     nie przewija się w sobie: rozkłada się na kartki i przewija razem ze stroną, a długość
+     ogranicza porcja po dziesięć, nie sztywna klatka. */
+  .vote-standings__scroll { max-height: none; overflow: visible; border: 0; background: transparent; box-shadow: none; }
   .vote-standings table, .vote-standings tbody { display: block; }
   .vote-standings thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .vote-standings tbody { display: grid; gap: 10px; }

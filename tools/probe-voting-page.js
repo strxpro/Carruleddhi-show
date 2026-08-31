@@ -229,6 +229,7 @@ async (document, window) => {
 
   const standings = $$('[data-vote-standings] tr');
   const points = standings.map((tr) => tr.querySelector('.vote-standings__points')?.textContent.trim() || '');
+  const moreButton = $('[data-vote-standings-more]');
   out.closed = {
     // Siatka kart ma zniknąć — ranking mieszka w tabeli i na podium, nie w trzech miejscach.
     gridCards: cards().length,
@@ -266,6 +267,11 @@ async (document, window) => {
       };
     })(),
     kicker: $('[data-vote-kicker]')?.textContent.trim() || '',
+    /* Porcje po dziesięć, tak jak w cokole na stronie głównej. Do tej zmiany tabela rysowała
+       CAŁĄ stawkę od razu i przy osiemdziesięciu wozach zjeżdżała na trzy ekrany, wypychając
+       podium poza widok. */
+    moreShown: Boolean(moreButton) && !moreButton.hidden,
+    moreLabel: $('[data-vote-standings-more-label]')?.textContent.trim() || '',
     points
   };
   /* Kolejność ma być wynikiem: punkty nierosnąco. Kreska znaczy „zero głosów" i stoi na
@@ -274,6 +280,26 @@ async (document, window) => {
   out.closed.sorted = points
     .map(asNumber)
     .every((value, index, list) => index === 0 || list[index - 1] >= value);
+
+  /* Doczytanie kolejnej dziesiątki. Numeracja liczona od PEŁNEJ klasyfikacji, nie od porcji —
+     inaczej jedenasty wiersz dostawałby numer 1, bo jest pierwszy w swojej dziesiątce. */
+  moreButton?.click();
+  await wait(400);
+  const grown = $$('[data-vote-standings] tr');
+  out.closed.after = {
+    rows: grown.length,
+    /* Pudełko przewija się w sobie i nie rozpycha sekcji — na monitorze, bo na telefonie
+       tabela rozkłada się na kartki i celowo przewija razem ze stroną. */
+    innerScroll: (() => {
+      const box = $('.vote-standings__scroll');
+      if (!box) return null;
+      return getComputedStyle(box).overflowY === 'visible'
+        ? 'unfolded'
+        : box.scrollHeight > box.clientHeight + 1;
+    })(),
+    lastRank: grown[grown.length - 1]?.querySelector('.vote-standings__rank')?.textContent.trim() || '',
+    moreShown: Boolean(moreButton) && !moreButton.hidden
+  };
 
   return out;
 }

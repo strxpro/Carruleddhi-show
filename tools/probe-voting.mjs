@@ -215,8 +215,17 @@ check(cl.timerShown, 'zegar zostaje i mowi, ze glosowanie jest zamkniete');
 check(cl.resultsShown, 'sekcja wynikow widoczna');
 check(cl.podiumEmpty === 0, 'podium ma zwyciezcow, a nie komunikat „brak glosow"');
 check(cl.podiumPlaces.join(',') === '1,2,3', `trzy miejsca na podium po kolei: ${cl.podiumPlaces.join(',')}`);
-check(cl.standingsRows > 3, `pelna tabela siega dalej niz podium: ${cl.standingsRows} wierszy`);
+check(cl.standingsRows === 10, `pierwsza porcja tabeli to dziesiec wierszy: ${cl.standingsRows}`);
 check(cl.firstRank === '1', `pierwszy wiersz tabeli to pierwsze miejsce: ${cl.firstRank}`);
+/* Porcje po dziesiec, jak w cokole na stronie glownej. Do tej zmiany tabela rysowala CALA
+   stawke od razu i przy osiemdziesieciu wozach zjezdzala na trzy ekrany, wypychajac podium
+   poza widok — czyli to, po co ktos w ogole wchodzi na te strone. */
+check(cl.moreShown, `„Pokaz wiecej" widoczne, gdy zostalo wiecej: „${cl.moreLabel}"`);
+check(cl.after.rows === 20, `porcja doklada dziesiec wierszy: ${cl.standingsRows} -> ${cl.after.rows}`);
+check(cl.after.lastRank === '20', `numeracja liczy od pelnej klasyfikacji: ostatni to ${cl.after.lastRank}`);
+check(cl.after.moreShown === false, 'przycisk znika, gdy nie ma czego doczytac');
+check(cl.after.innerScroll === 'unfolded' || cl.after.innerScroll === true,
+  `tabela nie rozpycha sekcji: ${cl.after.innerScroll}`);
 check(cl.scrollFocusable, 'tabele da sie przewijac z klawiatury');
 /* Na telefonie tabela rozklada sie na kartki. Trzy liczby — punkty, srednia, glosy — musza
    stac KAZDA w swojej kolumnie: przy jednej komorce dwucyfrowa suma nachodzila na srednia. */

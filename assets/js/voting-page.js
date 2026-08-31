@@ -538,11 +538,28 @@ import {
     }).format(Number(row.averageScore) || 0);
   }
 
+  /**
+   * Ile wierszy pełnej tabeli jest widocznych. Dziesięć, potem po dziesięć więcej.
+   *
+   * Ta sama liczba i ta sama zasada co w cokole na stronie głównej (`FIELD_BATCH`
+   * w voting.js): tyle wchodzi bez przewijania na zwykłym ekranie. Trzymane osobno od
+   * `state.shown`, które liczy kafelki siatki — to dwa różne widoki, w dwóch różnych
+   * fazach, i wspólny licznik znaczyłby, że rozwinięcie jednego rozwija drugi.
+   */
+  const STANDINGS_BATCH = 10;
+  let standingsShown = STANDINGS_BATCH;
+
+  function showMoreStandings() {
+    standingsShown += STANDINGS_BATCH;
+    paintResults();
+  }
+
   /** Osobny finał: podium i pełna tabela istnieją wyłącznie po zamknięciu głosowania. */
   function paintResults() {
     const section = $('[data-vote-results]');
     const podium = $('[data-vote-podium]');
     const standings = $('[data-vote-standings]');
+    const more = $('[data-vote-standings-more]');
     if (!section || !podium || !standings) return;
 
     const closed = state.loaded && state.phase === 'closed';
@@ -550,6 +567,11 @@ import {
     if (!closed) {
       podium.replaceChildren();
       standings.replaceChildren();
+      if (more) more.hidden = true;
+      /* Licznik wraca do dziesięciu razem ze zniknięciem tabeli. Bez tego powrót do fazy
+         `closed` — przez zmianę na serwerze albo pasek demo — pokazywał tabelę rozwiniętą
+         tak, jak ją ktoś zostawił, z przyciskiem „pokaż więcej" mówiącym o czymś innym. */
+      standingsShown = STANDINGS_BATCH;
       return;
     }
 
@@ -619,7 +641,11 @@ import {
     }
     podium.replaceChildren(...podiumNodes);
 
-    const tableRows = ranked.map((row, index) => {
+    /* Porcja liczona od PEŁNEJ klasyfikacji, nie od widocznych wierszy: miejsce w tabeli
+       musi być miejscem w całej stawce. Gdyby numerować po pokrojeniu, doczytanie kolejnej
+       dziesiątki zaczynało numerację od jedynki w każdej porcji. */
+    const visible = ranked.slice(0, standingsShown);
+    const tableRows = visible.map((row, index) => {
       const tr = document.createElement('tr');
       if (row.voteCount > 0 && index < 3) tr.dataset.place = String(index + 1);
 
@@ -659,6 +685,13 @@ import {
       return tr;
     });
     standings.replaceChildren(...tableRows);
+
+    if (more) {
+      const left = Math.max(0, ranked.length - visible.length);
+      more.hidden = left === 0;
+      const label = $('[data-vote-standings-more-label]', more) || more;
+      label.textContent = `${text('voting.loadMore')} (${left})`;
+    }
   }
 
   /**
@@ -1575,6 +1608,10 @@ import {
     if (!$('[data-vote-shell]')) return;
     setupDialog();
     $('[data-vote-more]')?.addEventListener('click', showMore);
+    /* Osobny przycisk dla tabeli wyników. Nie ten sam co dla siatki: siatka istnieje przed
+       zamknięciem, tabela po nim, i nigdy nie widać ich obu naraz — ale wspólny licznik
+       znaczyłby, że rozwinięcie siatki rozwija też tabelę, której nikt jeszcze nie widział. */
+    $('[data-vote-standings-more]')?.addEventListener('click', showMoreStandings);
 
     /* Szukanie bez przycisku „szukaj": lista jest już w przeglądarce, więc filtrowanie jest
        darmowe i ma się dziać w trakcie pisania. Porcja wraca do dwunastu przy każdej zmianie
