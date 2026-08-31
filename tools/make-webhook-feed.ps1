@@ -1,4 +1,4 @@
-# Carruleddhi - feed the Make webhook with sample data.
+﻿# Carruleddhi - feed the Make webhook with sample data.
 #
 # WHAT IT IS FOR
 #   In Make, a webhook does not know what fields to expect until it has actually
@@ -263,6 +263,87 @@ $payloads = [ordered]@{
     email       = "test.contact+$run@example.com"
     message     = "Frage zum Helm. Test der Sonderzeichen: $aOgonek $eGrave"
     branch      = 'contact'
+  }
+
+  # ---------------------------------------------------------------- Nagroda publicznosci
+  #
+  #   Oba listy nizej sklada worker z bloku jezykowego (emails/copy.json), wiec payload
+  #   musi ten blok niesc - inaczej modul w Make dostanie puste sciezki i wysle list bez
+  #   naglowka. Tutaj jest przyciety do kluczy, ktore czytaja szablony modulow 32 i 33;
+  #   worker wysyla caly blok, ale do sprawdzenia trasy tyle wystarczy.
+  #
+  #   Adresy sa na @example.com i nie ma ich w zadnej tabeli - test nie dotyka nikogo
+  #   prawdziwego. Zadna z tych wiadomosci nie zapisuje sie tez do bazy: gałąź w Make
+  #   tylko wysyła e-mail, a stan glosowania zmienia panel, nie webhook.
+
+  'voting-winner (podium)' = [ordered]@{
+    type            = 'voting-winner'
+    branch          = 'voting-winner'
+    locale          = 'pl'
+    email           = "test.winner+$run@example.com"
+    name            = 'Marco Rossi'
+    place           = 1
+    category        = 'classic'
+    startNumber     = 41
+    projectName     = 'Fulmine di Gallura'
+    participantName = 'Marco Rossi'
+    totalScore      = 268
+    voteCount       = 34
+    averageScore    = 7.88
+    # Pola, ktore worker rozstrzyga przed wyslaniem - patrz votingAdminWinners().
+    hi              = 'Cze&#347;&#263; Marco,'
+    winSubject      = 'Wygrywasz Nagrode publicznosci!'
+    winHeading      = 'Pierwsze miejsce. Publicznosc wybrala Ciebie.'
+    winColour       = '#ffca28'
+    winProject      = 'Fulmine di Gallura'
+    resultsUrl      = 'https://www.carruleddhishow.com/votazione.html'
+    copy            = [ordered]@{
+      winLead          = 'Nagrody publicznosci nie przyznaje jury ani stoper - glosuja ludzie.'
+      winStatsTitle    = 'Twoj wynik'
+      winNumberLabel   = 'Numer startowy'
+      winProjectLabel  = 'Wozek'
+      winCategoryLabel = 'Kategoria'
+      winPointsLabel   = 'Punkty'
+      winVotesLabel    = 'Glosy'
+      winPickup        = 'Nagrode odbierasz u organizatorow - napisz do nas.'
+      winCta           = 'Zobacz wyniki'
+      askAny           = 'Pytania? Odpowiedz na tego maila.'
+      askCta           = 'Napisz przez strone'
+      footerNote       = 'Dostajesz tego maila, bo bierzesz udzial w Carruleddhi Show 2026.'
+    }
+  }
+
+  'voting-receipt (glos oddany)' = [ordered]@{
+    type            = 'voting-receipt'
+    branch          = 'voting-receipt'
+    locale          = 'pl'
+    email           = "test.vote+$run@example.com"
+    name            = 'Giulia Prova'
+    category        = 'classic'
+    startNumber     = 41
+    projectName     = 'Fulmine di Gallura'
+    participantName = 'Marco Rossi'
+    score           = 9
+    editUrl         = 'https://www.carruleddhishow.com/votazione.html#vote=TEST0000'
+    hi              = 'Cze&#347;&#263; Giulia,'
+    rcptProject     = 'Fulmine di Gallura'
+    rcptUrl         = 'https://www.carruleddhishow.com/votazione.html#vote=TEST0000'
+    copy            = [ordered]@{
+      rcptSubject      = 'Twoj glos jest zapisany'
+      rcptHeading      = 'Glos zapisany. Dzieki.'
+      rcptLead         = 'Nagrode publicznosci rozstrzygacie wy, glos po glosie.'
+      rcptVoteTitle    = 'Twoj glos'
+      rcptScoreLabel   = 'Ocena'
+      rcptChange       = 'Glos mozesz poprawic tylko raz.'
+      rcptResults      = 'Wyniki wysylamy zaraz po zamknieciu glosowania.'
+      rcptCta          = 'Otworz strone glosowania'
+      winNumberLabel   = 'Numer startowy'
+      winProjectLabel  = 'Wozek'
+      winCategoryLabel = 'Kategoria'
+      askAny           = 'Pytania? Odpowiedz na tego maila.'
+      askCta           = 'Napisz przez strone'
+      footerNote       = 'Dostajesz tego maila, bo zaglosowales na stronie Carruleddhi Show 2026.'
+    }
   }
 }
 

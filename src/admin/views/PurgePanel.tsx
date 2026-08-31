@@ -27,6 +27,9 @@ const SCOPES: { scope: PurgeScope; label: TranslateKey }[] = [
   { scope: 'messages', label: 'set.purgeMessages' },
   { scope: 'chat', label: 'set.purgeChat' },
   { scope: 'wall', label: 'set.purgeWall' },
+  /* Lista do głosowania razem z oddanymi głosami. Osobno od „wszystko naraz", bo po testach
+     najczęściej trzeba wyczyścić właśnie ją, a zgłoszenia i sponsorów zostawić. */
+  { scope: 'voting', label: 'set.purgeVoting' },
   { scope: 'everything', label: 'set.purgeEverything' }
 ];
 
@@ -97,6 +100,12 @@ export function PurgePanel({ t, apiKey }: { t: (key: TranslateKey) => string; ap
           <p className="text-[13px] font-semibold text-white">
             {t(SCOPES.find((entry) => entry.scope === asking)!.label)}
           </p>
+          {/* CO ZOSTAJE, powiedziane w chwili potwierdzania, a nie w akapicie nad przyciskami.
+              Zgłoszone jako „klikam i usuwa się wszystko, sponsorzy też". Sponsorzy, logotypy,
+              zdjęcia galerii, blokada strony i data wydarzenia siedzą w `site_settings`, której
+              czyszczenie NIE dotyka — ale nikt nie ma obowiązku tego wiedzieć, stojąc nad
+              przyciskiem bez cofnięcia. Zdanie stoi więc tam, gdzie jest podejmowana decyzja. */}
+          <p className="mt-2 text-[12px] leading-relaxed text-emerald-300/90">{t('set.purgeKeeps')}</p>
           <label className="mt-3 block text-[12px] text-white/55" htmlFor="purge-confirm">
             {t('set.purgeAsk')}
           </label>

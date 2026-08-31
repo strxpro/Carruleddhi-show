@@ -1487,9 +1487,30 @@ import {
       /* Głos wpisany w stan strony, więc kafelki od razu wiedzą, który jest jego: własny mówi
          „zmień ocenę", pozostałe „przenieś tu swój głos". To ta sama droga, którą ma osoba
          siedząca na własnym telefonie — a nie druga, osobna. */
+      /* Ile zmian zostało — serwer liczy to w bazie (`edit_count`). Peek NIE zużywa niczego,
+         więc ta liczba jest tu prawdziwa także przy drugim wejściu tym samym odsyłaczem. */
+      const left = result.vote.editsLeft === undefined ? 1 : Number(result.vote.editsLeft) || 0;
+
       if (result.vote.participantId) {
-        state.myVote = { participantId: result.vote.participantId, score: Number(result.vote.score) };
+        state.myVote = {
+          participantId: result.vote.participantId,
+          score: Number(result.vote.score),
+          identified: true,
+          editsLeft: left
+        };
         paint();
+      }
+
+      /* ODSYŁACZ Z MAILA JEST JEDNORAZOWY.
+         ---------------------------------------------------------------------------
+         Zmiana jest jedna, więc po jej zużyciu drugie wejście tym samym odsyłaczem nie ma co
+         otwierać. Wcześniej okno oceny wstawało mimo to i odmawiało dopiero po naciśnięciu
+         „Potwierdź" — czyli człowiek wybierał ocenę, wysyłał ją i wtedy dowiadywał się, że
+         nie miał już do tego prawa. Teraz mówimy to od razu, a kafelek jego wozu i tak jest
+         już oznaczony przez `state.myVote` wyżej. */
+      if (left <= 0) {
+        toast(text('voting.editUsedMine'), 'info');
+        return;
       }
 
       openEdit(result.vote, editToken);

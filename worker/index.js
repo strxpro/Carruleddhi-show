@@ -55,6 +55,17 @@ const ALLOWED_TYPES = new Set([
      nie rzucał się w oczy. */
   'unsub-start', 'unsub-confirm', 'purge',
 
+  /* Wyłączenie powiadomień podane adresem, nie żetonem z listu — droga dla czatu.
+     Dopisywane w CZTERECH miejscach naraz i to nie jest przypadek: `ALLOWED_TYPES` decyduje,
+     czy żądanie w ogóle wejdzie, `SUPABASE_TYPES` czy odpowie Worker zamiast Make, a lista
+     pól niżej czy dane przeżyją sanitizację. Pominięcie któregokolwiek daje awarię, która
+     wygląda jak działająca końcówka — dokładnie ta pomyłka opisana wyżej przy `roster`. */
+  'notify-code', 'notify-off',
+
+  /* Zgłoszenie sponsora z czatu. Bez passphrase, bo to publiczny formularz w rozmowie — i bez
+     kodu na skrzynkę, bo tu ktoś zostawia WŁASNY kontakt, a nie rusza cudzych danych. */
+  'sponsor-lead',
+
   /* Zawodnik, który już jest na liście i wpisuje swój adres w formularzu.
        entry-lookup   „czy ten adres jest zapisany" — tyle, ile trzeba, żeby zaproponować
                       wyjście, i nic więcej
@@ -72,7 +83,7 @@ const ALLOWED_TYPES = new Set([
 const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
-  'unsub-start', 'unsub-confirm',
+  'unsub-start', 'unsub-confirm', 'notify-code', 'notify-off', 'sponsor-lead',
   'chat', 'chat-admin', 'chat-inbound', 'inbox',
   'entry-lookup', 'entry-code', 'entry-manage',
   /* `roster` belongs here and did not, which is why the entries screen in the panel showed
@@ -195,6 +206,15 @@ const FIELD_WHITELIST = {
   'unsub-start': ['token', 'peek'],
   'unsub-confirm': ['token', 'code'],
 
+  /* Ta sama para co wyżej, tylko wejściem jest adres, a nie żeton z listu. `locale` służy
+     wyłącznie do wyboru języka listu, gdy adresu nie ma jeszcze na żadnej liście. */
+  'notify-code': ['email', 'locale'],
+  'notify-off': ['email', 'code'],
+
+  /* Nazwa na carruleddhi bywa nazwą restauracji z apostrofem albo znakiem `&`, więc jedzie
+     przez zwykłą sanitizację tekstu; telefon i mail tak jak wszędzie. */
+  'sponsor-lead': ['cartName', 'phone', 'email', 'locale'],
+
   /* Zgłoszenie widziane oczami zawodnika.
      `entry-lookup` bierze adres, a od niedawna także imię i nazwisko — oba opcjonalne.
      ---------------------------------------------------------------------------
@@ -220,7 +240,7 @@ const FIELD_WHITELIST = {
     'entryId',
     'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes'
   ],
-  voting: ['action', 'participantId', 'name', 'email', 'deviceId', 'score', 'editToken'],
+  voting: ['action', 'participantId', 'name', 'email', 'deviceId', 'score', 'editToken', 'edition', 'notifyResults'],
   'voting-admin': [
     'action', 'id', 'registrationId', 'category', 'startNumber', 'firstName', 'lastName',
     'projectName', 'imagePath', 'active', 'raceStartsAt', 'durationMinutes', 'status', 'photo'
@@ -445,6 +465,131 @@ const FAQ_TOPICS = [
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}${suffix}`, 'iu');
   })
 }));
+
+/* UWAGA PRZY DOPISYWANIU TU FUNKCJI.
+   ---------------------------------------------------------------------------
+   `tools/check-minor-blueprint.mjs` wycina ze źródła blok od `const FAQ_TOPICS` do końca
+   `faqAnswer`, żeby przetestować sam słownik pytań bez uruchamiania Workera. Funkcja z
+   `return null;` wstawiona MIĘDZY te dwa punkty ucinała ten blok w połowie i checker padał na
+   `faqAnswer is not defined`. Dlatego wszystko, co dochodzi, stoi PO `faqAnswer`. */
+
+/**
+ * Czy gość prosi o powrót do automatu.
+ *
+ * Sprawdzane listą słów, nie modelem — i to jest cały powód, dla którego ta funkcja istnieje
+ * osobno. Wyjście z kolejki do człowieka nie może zależeć od tej samej rzeczy, która do tej
+ * kolejki wtrąciła: gdy model jest niedostępny, wątek idzie na `'human'`, a wtedy „poproszę
+ * automat" musi zadziałać tym bardziej, nie mniej.
+ *
+ * Sześć języków w jednej liście, bo to sześć słów, a nie sześć zdań do tłumaczenia. „bot"
+ * wymaga całego słowa (patrz granice), inaczej trafiałby w środek innych wyrazów.
+ */
+const AUTOMATION_WORDS = [
+  'automat', 'automatu', 'automacie', 'automatico', 'automatique', 'automatisch', 'automatico',
+  'bot', 'chatbot', 'asystent', 'assistente', 'assistant', 'asistente'
+];
+const AUTOMATION_PATTERNS = AUTOMATION_WORDS.map((word) =>
+  new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
+
+function wantsAutomation(question) {
+  const text = String(question || '');
+  return AUTOMATION_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/**
+ * Czy wiadomość jest sprawą własnych danych, i którą z trzech.
+ *
+ * Kolejność sprawdzania jest treścią tej funkcji, nie szczegółem. Najpierw wycofanie, potem
+ * powiadomienia, na końcu poprawa danych — bo „usuńcie mnie z wyścigu i z powiadomień" ma
+ * pójść drogą wycofania, która wypisuje z listów po drodze, a nie odwrotnie. Zdanie trafiające
+ * w dwie grupy naraz zawsze idzie tą o poważniejszym skutku.
+ *
+ * Dopasowanie po pełnych słowach z `\p{L}` na granicach, tak samo jak w FAQ_TOPICS: `\b` w
+ * JavaScripcie nie zna „ą" ani „ż", więc przy `\b` „rezygnuję" trafiałoby w środek innego
+ * wyrazu. Sześć języków w jednej liście, bo to lista słów, nie zdań do tłumaczenia.
+ */
+const DATA_INTENTS = [
+  ['withdraw', [
+    'wycofaj', 'wycofac', 'wycofać', 'wycofanie', 'rezygnuje', 'rezygnuję', 'rezygnacja',
+    'wypisz', 'wypisac', 'wypisać', 'usun', 'usunac', 'usunąć', 'skasuj', 'skasowac',
+    'ritira', 'ritirare', 'ritiro', 'cancella', 'cancellare', 'annulla', 'annullare',
+    'withdraw', 'cancel', 'delete', 'remove',
+    'zurückziehen', 'zuruckziehen', 'abmelden', 'loschen', 'löschen',
+    'retirar', 'cancelar', 'borrar', 'eliminar',
+    'retirer', 'annuler', 'supprimer'
+  ]],
+  ['notifications', [
+    'powiadomienia', 'powiadomien', 'powiadomień', 'przypomnienia', 'przypomnien',
+    'przypomnień', 'newsletter', 'newslettera', 'spam',
+    'notifiche', 'promemoria', 'notifications', 'reminders',
+    'benachrichtigungen', 'erinnerungen',
+    'notificaciones', 'recordatorios', 'rappels'
+  ]],
+  ['edit', [
+    'zmien', 'zmień', 'zmienic', 'zmienić', 'popraw', 'poprawic', 'poprawić', 'edytuj',
+    'aktualizuj', 'dane', 'telefon', 'adres',
+    'modifica', 'modificare', 'cambia', 'cambiare', 'correggi', 'aggiorna', 'dati',
+    'change', 'edit', 'update', 'correct', 'data', 'details',
+    'ändern', 'andern', 'korrigieren', 'aktualisieren', 'daten',
+    'cambiar', 'modificar', 'corregir', 'actualizar', 'datos',
+    'changer', 'modifier', 'corriger', 'données', 'donnees'
+  ]]
+];
+const DATA_INTENT_PATTERNS = DATA_INTENTS.map(([intent, words]) => [
+  intent,
+  words.map((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu');
+  })
+]);
+
+/* Słowa, bez których „zmień" jest pytaniem o regulamin, a nie o własne dane.
+   Bez tego warunku „czy mogę zmienić koła w wózku?" otwierałoby kreator weryfikacji adresu.
+   Wymagany jest więc drugi sygnał: wskazanie SIEBIE albo swojego zgłoszenia. */
+const DATA_SELF_PATTERNS = [
+  'moje', 'moja', 'moj', 'mój', 'mnie', 'mi', 'siebie', 'zgloszenie', 'zgłoszenie',
+  'mio', 'mia', 'miei', 'mie', 'iscrizione',
+  'my', 'me', 'mine', 'entry', 'registration',
+  'mein', 'meine', 'mich', 'anmeldung',
+  'mi', 'mis', 'inscripcion', 'inscripción',
+  'mon', 'ma', 'mes', 'moi', 'inscription'
+].map((word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
+
+/**
+ * Czy ktoś pyta o sponsorowanie.
+ *
+ * Sprawdzane PRZED słownikiem FAQ i przed modelem, bo to jedyna rozmowa na tej stronie, która
+ * jest warta pieniądze — a model potrafi na „ile kosztuje sponsoring" odpowiedzieć regułką o
+ * wpisowym dla zawodników, i tak właśnie ginie zapytanie od firmy.
+ *
+ * Ofertę i dalsze kroki prowadzi kreator w przeglądarce, tak samo jak sprawy własnych danych:
+ * tu powstaje wyłącznie rozpoznanie.
+ */
+const SPONSOR_PATTERNS = [
+  'sponsor', 'sponsora', 'sponsorem', 'sponsoring', 'sponsoringu', 'sponsorzy',
+  'sponsorowac', 'sponsorować', 'sponsorship', 'sponsorizzazione', 'sponsorizzare',
+  'reklama', 'reklame', 'reklamę', 'reklamy', 'pubblicita', 'pubblicità',
+  'werbung', 'publicidad', 'publicite', 'publicité', 'advertising',
+  'partner', 'partnerstwo', 'partnership', 'collaborazione'
+].map((word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
+
+function sponsorIntent(question) {
+  const text = String(question || '');
+  return SPONSOR_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function dataIntent(question) {
+  const text = String(question || '');
+  if (!text.trim()) return null;
+  const mine = DATA_SELF_PATTERNS.some((pattern) => pattern.test(text));
+  for (const [intent, patterns] of DATA_INTENT_PATTERNS) {
+    if (!patterns.some((pattern) => pattern.test(text))) continue;
+    /* Powiadomienia same z siebie są jednoznaczne: „nie chcę newslettera" nie jest pytaniem o
+       regulamin. Wycofanie i zmiana danych wymagają wskazania siebie. */
+    if (intent === 'notifications' || mine) return intent;
+  }
+  return null;
+}
 
 /** Answers built from the copy deck. Keys are the FAQ entries the site already has. */
 function faqAnswer(deck, question) {
@@ -689,6 +834,10 @@ function chatSystemPrompt(deck) {
 let lastModelFailure = '';
 function noteModelFailure(reason) {
   lastModelFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
+  /* Also logged, because the variable above is per-isolate. On Vercel the panel almost never
+     reads the isolate that failed, so without this line a silent model failure has no trace
+     anywhere — which is exactly how "the chat is quiet with a full configuration" happens. */
+  if (reason) console.error(`[ai] ${reason}`);
 }
 
 /* To samo dla WhatsAppa, z tego samego powodu: CallMeBot odmawia ze statusem 200,
@@ -736,28 +885,44 @@ async function askModel(env, deck, history, question, imageUrl = '') {
        this function used, and a deployment that already has it set should not go quiet
        after an update. */
     const endpoint = env.AI_API_URL || env.AI_BASE_URL || 'https://api.openai.com/v1/chat/completions';
+    /* Klucz przycięty. Wklejony w panelu Vercela potrafi przynieść spację albo znak nowej
+       linii, a taka wartość nagłówka wywala `fetch` TypeError-em — czyli znowu ciszą. */
+    const key = String(env.AI_API_KEY).trim();
+    /* Gemini przez końcówkę zgodną z OpenAI domyślnie „myśli", a tokeny myślenia idą z tego
+       samego budżetu co odpowiedź. Przy małym `max_tokens` wracało `finish_reason:
+       MAX_TOKENS` i PUSTA treść — dokładnie objaw „czat milczy przy pełnej konfiguracji".
+       Dlatego budżet jest większy, a myślenie wyłączone. Wysyłane tylko do Gemini: Groq i
+       OpenAI odrzuciłyby nieznane pole. */
+    const isGemini = endpoint.includes('generativelanguage.googleapis.com');
+    /* Historia bez pustych treści: Gemini odrzuca wiadomość z pustym `content` błędem 400 i
+       pada CAŁE wywołanie, nie jedna tura. */
+    const past = history
+      .map((m) => ({
+        role: m.author === 'visitor' ? 'user' : 'assistant',
+        content: String(m.body || (m.image_path ? '[zdjęcie]' : '')).trim()
+      }))
+      .filter((m) => m.content)
+      .slice(-6);
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.AI_API_KEY}`
+        Authorization: `Bearer ${key}`
       },
       body: JSON.stringify({
         model: imageUrl ? env.AI_VISION_MODEL : (env.AI_MODEL || 'gpt-4o-mini'),
         /* Więcej miejsca na odpowiedź o zdjęciu: opis tego, co widać na kole, i wniosek, czy
            przejdzie kontrolę, nie mieszczą się w dwustu tokenach. */
-        max_tokens: imageUrl ? 320 : 200,
+        max_tokens: imageUrl ? 1400 : 900,
         temperature: 0.2,
+        ...(isGemini ? { reasoning_effort: 'none' } : {}),
         messages: [
           { role: 'system', content: system },
           /* Historia zawsze jako czysty tekst, także gdy niesie zdjęcia.
              Wysłanie wszystkich wcześniejszych obrazów przy każdym pytaniu byłoby liczone i
              płacone od nowa za każdą wiadomość w rozmowie, a model potrzebuje obrazu, o który
              pyta się teraz — nie albumu. */
-          ...history.slice(-6).map((m) => ({
-            role: m.author === 'visitor' ? 'user' : 'assistant',
-            content: m.body || (m.image_path ? '[zdjęcie]' : '')
-          })),
+          ...past,
           /* Treść jako tablica tylko wtedy, gdy naprawdę jest obraz. Tablica z jednym wpisem
              tekstowym jest dla modeli tekstowych poprawna, ale nie każdy dostawca ją przyjmuje
              — a tu nie ma powodu tego sprawdzać. */
@@ -772,7 +937,9 @@ async function askModel(env, deck, history, question, imageUrl = '') {
             : { role: 'user', content: question }
         ]
       }),
-      signal: AbortSignal.timeout(12000)
+      /* Dwanaście sekund było za mało: Gemini na darmowym kluczu regularnie odpowiada
+         wolniej, a `TimeoutError` wyglądał na stronie identycznie jak brak konfiguracji. */
+      signal: AbortSignal.timeout(28000)
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
@@ -780,14 +947,19 @@ async function askModel(env, deck, history, question, imageUrl = '') {
       return null;
     }
     const body = await response.json();
-    const answer = String(body?.choices?.[0]?.message?.content || '').trim();
+    const choice = body?.choices?.[0];
+    const answer = String(choice?.message?.content || '').trim();
     if (!answer) {
-      noteModelFailure('model oddal pusta odpowiedz');
+      // Powód dopisany, bo „pusto" ma kilka przyczyn i tylko ta jedna jest do naprawienia
+      // zmianą budżetu tokenów.
+      noteModelFailure(`model oddal pusta odpowiedz (finish=${choice?.finish_reason || '?'})`);
       return null;
     }
     // ESCALATE to nie awaria, tylko model robiacy dokladnie to, o co go poproszono.
     noteModelFailure('');
-    return answer.includes('ESCALATE') ? null : answer;
+    /* Porównanie dokładne, nie `includes`. Model, który w poprawnej odpowiedzi wspomniał to
+       słowo, tracił całą odpowiedź i wątek szedł do człowieka bez powodu. */
+    return answer.toUpperCase().replace(/[^A-Z]/g, '') === 'ESCALATE' ? null : answer;
   } catch (error) {
     /* AbortSignal.timeout rzuca TimeoutError, reszta to zwykle DNS albo zerwane
        polaczenie — sama nazwa bledu wystarczy, zeby je rozroznic. */
@@ -1308,7 +1480,22 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   /* `|| 0` po Date.parse, nie przed nim. `Date.parse(0)` to nie „brak daty" — V8 czyta to jako
      napis "0" i zwraca 1 stycznia 2000, czyli poprawną datę w przeszłości. Tu wyszłoby na to
      samo, ale tylko przypadkiem, a świeży wątek nie ma tej kolumny w SELECT po INSERT. */
-  const humanTyping = thread.mode === 'human'
+  /* POWRÓT DO AUTOMATU JEDNYM ZDANIEM.
+     ---------------------------------------------------------------------------
+     Wątek raz przekazany człowiekowi zostaje oznaczony `'human'` i dopóki organizator pisze,
+     automat milczy — słusznie, bo nie mówi się człowiekowi przez ramię. Ale zdarza się, że
+     gość napisał „nie wiem", trafił do kolejki, a chwilę później ma zwykłe pytanie o kask i
+     nie chce czekać do rana na coś, co stoi w słowniku.
+
+     Wystarczy więc, że o to poprosi własnymi słowami — „automat", „bot", „wróć do
+     automatu". Rozpoznanie jest po liście słów w sześciu językach, a nie przez model: to
+     musi działać także wtedy, gdy model jest niedostępny, bo inaczej wyjście z kolejki
+     zależałoby od tej samej rzeczy, która do niej wtrąciła.
+
+     Wątek NIE przestaje czekać na człowieka. `mode` zostaje `'human'`, więc dzwonek i panel
+     nadal go pokazują; zdejmowane jest tylko wyciszenie automatu na tę jedną wiadomość. */
+  const wantsBot = wantsAutomation(body);
+  const humanTyping = !wantsBot && thread.mode === 'human'
     && Date.now() - (Date.parse(thread.admin_typing_at || '') || 0) < CHAT_TYPING_TTL_MS;
   if (humanTyping) {
     // Zdjęcie w wiadomości do człowieka nie zmienia niczego w tej gałęzi: organizator
@@ -1328,9 +1515,40 @@ async function chatVisitor(env, request, payload, cors, ctx) {
      hasło o kołach i odpowie regułką z regulaminu — nie patrząc na zdjęcie, o które człowiek
      właśnie zapytał. Gotowa odpowiedź obok zignorowanego obrazka jest gorsza niż brak
      odpowiedzi, bo wygląda na odpowiedź. */
+  /* SPRAWY WŁASNYCH DANYCH ROZSTRZYGA KREATOR, NIE MODEL.
+     ---------------------------------------------------------------------------
+     „Chcę usunąć dane", „wypiszcie mnie", „zmieńcie mi telefon" — na to nie odpowiada się
+     zdaniem, tylko czynnością. A czynność dotyczy czyichś danych, więc wymaga dowodu, że to
+     jego skrzynka: kodu na adres.
+
+     Rozpoznanie jest po słowach, nie przez model, z dwóch powodów. Pierwszy: to musi działać
+     także wtedy, gdy model milczy, bo inaczej „usuńcie moje dane" trafiałoby do kolejki i
+     czekało do rana. Drugi: model, który sam decyduje, że pora wycofać kogoś z wyścigu, jest
+     modelem z dostępem do nieodwracalnej czynności — a tego nie chcemy nawet, gdy działa
+     dobrze.
+
+     Worker oddaje tylko znacznik `selfService`. Zdania kreatora są w słowniku strony, bo to
+     interfejs, a nie treść rozmowy — i dlatego nie zapisujemy ich do historii wątku. Wątek
+     ZOSTAJE w trybie `ai`: nikt tu nie czeka na człowieka. */
+  /* Sponsoring pierwszy, przed sprawami danych i przed słownikiem. „Chcę reklamę na wózku"
+     zawiera słowo „chcę", ale nie jest prośbą o zmianę własnych danych — a odpowiedź regułką o
+     wpisowym byłaby najdroższą pomyłką, jaką ten czat może zrobić. */
+  if (!hasPhoto && sponsorIntent(body)) {
+    return json({ ok: true, mode: thread.mode === 'human' ? 'human' : 'ai', reply: null, selfService: 'sponsor', ...echo }, 200, cors);
+  }
+
+  const intent = dataIntent(body);
+  if (!hasPhoto && intent) {
+    return json({ ok: true, mode: thread.mode === 'human' ? 'human' : 'ai', reply: null, selfService: intent, ...echo }, 200, cors);
+  }
+
   let reply = hasPhoto ? null : faqAnswer(deck, body);
   if (!reply) {
-    const history = await chatMessages(env, thread.id) || [];
+    /* Historia czytana JUŻ PO zapisie tej wiadomości, więc bieżące pytanie stoi w niej jako
+       ostatni wiersz — a niżej jedzie drugi raz jako `question`. Ten sam tekst dwa razy pod
+       rząd to dla modelu sygnał, że gość się powtarza. Odsiewany po identyfikatorze. */
+    const history = (await chatMessages(env, thread.id) || [])
+      .filter((row) => row.id !== stored.row?.id);
     reply = await askModel(env, deck, history, body, imageUrl);
   }
 
@@ -1761,33 +1979,51 @@ function remindersStillAhead(signedUpAt, startAt) {
     .map((window) => window.code);
 }
 
-/** The start of the race, from the one place that already knew it. */
-function eventStartAt(env) {
-  const parsed = new Date(env.EVENT_DATE || '2026-10-17T14:30:00+02:00');
-  return Number.isNaN(parsed.getTime()) ? new Date('2026-10-17T14:30:00+02:00') : parsed;
+/** Event date from the same settings row the public page and admin use, with env as fallback. */
+function eventStartAt(env, settings = null) {
+  const raw = settings?.eventDate || env.EVENT_DATE || SETTINGS_DEFAULTS.eventDate;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? new Date(SETTINGS_DEFAULTS.eventDate) : parsed;
+}
+
+function outboxView(messages) {
+  return messages.map(({ receipt: _receipt, ...message }) => message);
 }
 
 async function remindersDue(env, payload, cors) {
-  const hoursLeft = (eventStartAt(env).getTime() - Date.now()) / 3_600_000;
+  const settings = await readSettings(env);
+  const startAt = eventStartAt(env, settings);
+  const hoursLeft = (startAt.getTime() - Date.now()) / 3_600_000;
   const due = reminderWindow(hoursLeft);
   const hours = Math.round(hoursLeft);
 
-  /* The newsletter queue is drained on every run, whether or not a reminder is due.
-     It has to be: the race is a year of "too early" and one week of "due", and those
-     confirmations cannot wait for October. */
-  const newsletters = await pendingNewsletters(env, Boolean(payload.dryRun));
+  /* Confirmation notes, annual announcements and archived result opt-ins are drained on
+     every run, whether or not a countdown reminder is currently due. */
+  const [newsletters, announcements, votingResults] = await Promise.all([
+    pendingNewsletters(env, Boolean(payload.dryRun)),
+    pendingEditionAnnouncements(env, settings, Boolean(payload.dryRun)),
+    pendingVotingResultNotifications(env)
+  ]);
 
   // Too early for a reminder, or the race has been and gone. Answered plainly so a run
   // that sent nothing is distinguishable from a run that broke.
   if (!due) {
+    const all = [...votingResults.messages, ...announcements.messages, ...newsletters.messages];
+    if (payload.deliver) {
+      return deliverOutbox(env, all, { due: '', hoursLeft: hours }, cors);
+    }
     return json({
       ok: true,
       due: '',
       hoursLeft: hours,
       dryRun: Boolean(payload.dryRun),
-      count: newsletters.messages.length,
-      messages: newsletters.messages,
-      ...(newsletters.note ? { note: newsletters.note } : {})
+      count: all.length,
+      votingResults: votingResults.messages.length,
+      announcements: announcements.messages.length,
+      messages: outboxView(all),
+      ...(newsletters.note || announcements.note || votingResults.note
+        ? { note: [newsletters.note, announcements.note, votingResults.note].filter(Boolean).join('; ') }
+        : {})
     }, 200, cors);
   }
 
@@ -1806,7 +2042,7 @@ async function remindersDue(env, payload, cors) {
      date. The cut-off is the reminder's own moment, so this single filter is the whole of
      that rule — see remindersStillAhead() for the same arithmetic from the other side. */
   const window = REMINDER_WINDOWS.find((entry) => entry.code === due);
-  const cutOff = new Date(eventStartAt(env).getTime() - window.at * 3_600_000).toISOString();
+  const cutOff = new Date(startAt.getTime() - window.at * 3_600_000).toISOString();
   url.searchParams.set('created_at', `lte.${cutOff}`);
 
   url.searchParams.set('order', 'created_at.asc');
@@ -1818,14 +2054,18 @@ async function remindersDue(env, payload, cors) {
   }
   const rows = await response.json();
   if (!Array.isArray(rows) || rows.length === 0) {
-    // Nobody is owed this reminder, but the newsletter queue may still have something.
+    // Nobody is owed this reminder, but the other outbox queues must still drain.
+    const all = [...votingResults.messages, ...announcements.messages, ...newsletters.messages];
+    if (payload.deliver) return deliverOutbox(env, all, { due, hoursLeft: hours }, cors);
     return json({
       ok: true,
       due,
       hoursLeft: hours,
       dryRun: Boolean(payload.dryRun),
-      count: newsletters.messages.length,
-      messages: newsletters.messages
+      count: all.length,
+      votingResults: votingResults.messages.length,
+      announcements: announcements.messages.length,
+      messages: outboxView(all)
     }, 200, cors);
   }
 
@@ -1906,9 +2146,8 @@ async function remindersDue(env, payload, cors) {
     }
   }
 
-  /* Reminders first, newsletter notes after, so the letter with a race number in it is
-     handed over before the courtesy note about next year. */
-  const all = [...messages, ...newsletters.messages];
+  /* Reminders first, result notifications second, then annual/newsletter notes. */
+  const all = [...messages, ...votingResults.messages, ...announcements.messages, ...newsletters.messages];
 
   if (payload.deliver) return deliverOutbox(env, all, { due, hoursLeft: hours }, cors);
 
@@ -1919,8 +2158,10 @@ async function remindersDue(env, payload, cors) {
     dryRun: Boolean(payload.dryRun),
     count: all.length,
     reminders: messages.length,
+    votingResults: votingResults.messages.length,
+    announcements: announcements.messages.length,
     newsletters: newsletters.messages.length,
-    messages: all
+    messages: outboxView(all)
   }, 200, cors);
 }
 
@@ -1961,25 +2202,56 @@ async function deliverOutbox(env, messages, meta, cors) {
   let delivered = 0;
   const failures = [];
   for (const message of messages) {
+    const { receipt, ...outbound } = message;
     try {
       const response = await fetch(env.MAKE_WEBHOOK_URL, {
         method: 'POST',
         headers,
         /* `branch` is what the router reads, exactly as it does for a registration. The
            letter is already rendered, so this route carries no copy deck and no language:
-           three fields and nothing to resolve. */
-        body: JSON.stringify({ type: 'outbox', branch: 'outbox', ...message })
+           three fields and nothing to resolve. Internal delivery receipts never leave here. */
+        body: JSON.stringify({ type: 'outbox', branch: 'outbox', ...outbound })
       });
-      if (response.ok) delivered += 1;
-      else failures.push(`${message.to}: HTTP ${response.status}`);
+      if (!response.ok) {
+        failures.push(`${message.to}: HTTP ${response.status}`);
+        continue;
+      }
+
+      /* Edition announcements are marked only after Make accepted this exact letter.
+         A failed webhook therefore remains pending for the next hourly run instead of
+         disappearing from the queue before it was actually handed over. */
+      if (receipt?.kind === 'edition-announcement') {
+        const markUrl = new URL(`${env.SUPABASE_URL}/rest/v1/newsletter_subscribers`);
+        markUrl.searchParams.set('id', `eq.${receipt.subscriberId}`);
+        const marked = await fetch(markUrl, {
+          method: 'PATCH',
+          headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+          body: JSON.stringify({ last_announcement_event: receipt.eventKey })
+        });
+        if (!marked.ok) {
+          failures.push(`${message.to}: announcement mark HTTP ${marked.status}`);
+          continue;
+        }
+      } else if (receipt?.kind === 'voting-result') {
+        const marked = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/voting_result_notifications?id=eq.${receipt.notificationId}`,
+          {
+            method: 'PATCH',
+            headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+            body: JSON.stringify({ sent_at: new Date().toISOString() })
+          }
+        );
+        if (!marked.ok) {
+          failures.push(`${message.to}: voting result mark HTTP ${marked.status}`);
+          continue;
+        }
+      }
+      delivered += 1;
     } catch (error) {
       failures.push(`${message.to}: ${error.message}`);
     }
   }
 
-  /* Reported, not thrown. The rows were already marked, so a letter that failed here is
-     lost — and the honest thing is to say which one in a response the cron logs, rather
-     than to fail the whole run and leave it unclear whether anything went out. */
   return json({
     ok: failures.length === 0,
     ...meta,
@@ -2064,6 +2336,60 @@ async function pendingNewsletters(env, dryRun) {
   return { messages };
 }
 
+/* Annual announcement: armed by the admin, drained by the same reliable hourly outbox. */
+const EDITION_COPY = {
+  pl: { subject: 'Nowa edycja Carruleddhi Show', hello: 'Cześć', lead: 'Ogłaszamy nową edycję Carruleddhi Show.', date: 'Data', place: 'Miejsce', cta: 'Zobacz wydarzenie', footer: 'Dostajesz tę wiadomość, bo zapisałeś się na informacje o kolejnych edycjach.', unsub: 'Nie chcę kolejnych powiadomień' },
+  it: { subject: 'Nuova edizione del Carruleddhi Show', hello: 'Ciao', lead: 'Abbiamo annunciato una nuova edizione del Carruleddhi Show.', date: 'Data', place: 'Luogo', cta: 'Scopri l’evento', footer: 'Ricevi questo messaggio perché hai chiesto notizie sulle prossime edizioni.', unsub: 'Non voglio altri avvisi' },
+  en: { subject: 'A new Carruleddhi Show edition', hello: 'Hello', lead: 'We have announced a new Carruleddhi Show edition.', date: 'Date', place: 'Place', cta: 'See the event', footer: 'You receive this because you asked for news about future editions.', unsub: 'Stop future notifications' },
+  de: { subject: 'Eine neue Carruleddhi-Show-Ausgabe', hello: 'Hallo', lead: 'Wir haben eine neue Ausgabe der Carruleddhi Show angekündigt.', date: 'Datum', place: 'Ort', cta: 'Event ansehen', footer: 'Du erhältst diese Nachricht, weil du Informationen zu neuen Ausgaben angefordert hast.', unsub: 'Keine weiteren Hinweise' },
+  es: { subject: 'Nueva edición de Carruleddhi Show', hello: 'Hola', lead: 'Hemos anunciado una nueva edición de Carruleddhi Show.', date: 'Fecha', place: 'Lugar', cta: 'Ver el evento', footer: 'Recibes este mensaje porque pediste noticias de próximas ediciones.', unsub: 'No recibir más avisos' },
+  fr: { subject: 'Nouvelle édition du Carruleddhi Show', hello: 'Bonjour', lead: 'Nous annonçons une nouvelle édition du Carruleddhi Show.', date: 'Date', place: 'Lieu', cta: 'Voir l’événement', footer: 'Vous recevez ce message car vous avez demandé les nouvelles des prochaines éditions.', unsub: 'Ne plus recevoir d’alertes' }
+};
+
+function editionAnnouncementHtml(row, settings) {
+  const locale = localeOf(row.locale);
+  const copy = EDITION_COPY[locale] || EDITION_COPY.it;
+  const firstName = String(row.name || '').trim().split(/\s+/)[0];
+  const event = new Date(settings.eventDate);
+  const when = new Intl.DateTimeFormat(locale, {
+    dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Rome'
+  }).format(event);
+  const site = publicSiteUrl();
+  return `<!doctype html><html lang="${locale}"><body style="margin:0;background:#eef5ff;font-family:Segoe UI,Arial,sans-serif;color:#071a3d"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#fff;border-radius:24px;overflow:hidden"><tr><td style="padding:24px 30px;background:linear-gradient(100deg,#ffca28,#ff6f9f,#8f71ff);font-size:20px;font-weight:900">${escapeHtml(settings.eventName)}</td></tr><tr><td style="padding:34px 30px"><p style="margin:0 0 10px;font-size:15px">${escapeHtml(copy.hello)}${firstName ? ` ${escapeHtml(firstName)}` : ''},</p><h1 style="margin:0 0 24px;font-size:28px;line-height:1.15">${escapeHtml(copy.lead)}</h1><div style="padding:18px;border:2px solid #071a3d;border-radius:16px;background:#fff8cf"><b>${escapeHtml(copy.date)}:</b> ${escapeHtml(when)}<br><b>${escapeHtml(copy.place)}:</b> ${escapeHtml(settings.eventLocation)}</div><p style="margin:24px 0"><a href="${escapeHtml(site)}" style="display:inline-block;padding:13px 22px;border-radius:999px;background:#071a3d;color:#fff;text-decoration:none;font-weight:800">${escapeHtml(copy.cta)} →</a></p><p style="margin:28px 0 0;color:#65718b;font-size:12px;line-height:1.6">${escapeHtml(copy.footer)}<br><a href="${escapeHtml(unsubscribeUrl(row.unsubscribe_token))}" style="color:#65718b">${escapeHtml(copy.unsub)}</a></p></td></tr></table></td></tr></table></body></html>`;
+}
+
+async function pendingEditionAnnouncements(env, settings, dryRun) {
+  const eventKey = String(settings.announcementEventDate || '');
+  if (!eventKey || eventKey !== settings.eventDate) return { messages: [] };
+
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/newsletter_subscribers`);
+  url.searchParams.set('select', 'id,name,email,locale,unsubscribe_token');
+  url.searchParams.set('status', 'eq.active');
+  url.searchParams.set('or', `(last_announcement_event.is.null,last_announcement_event.neq.${eventKey})`);
+  url.searchParams.set('order', 'created_at.asc');
+  url.searchParams.set('limit', String(NEWSLETTER_BATCH));
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return { messages: [], note: 'edition announcement read failed' };
+  const rows = await response.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) return { messages: [] };
+
+  const messages = rows.map((row) => {
+    const locale = localeOf(row.locale);
+    return {
+      to: String(row.email || '').trim().toLowerCase(),
+      subject: (EDITION_COPY[locale] || EDITION_COPY.it).subject,
+      html: editionAnnouncementHtml(row, settings),
+      receipt: {
+        kind: 'edition-announcement',
+        subscriberId: row.id,
+        eventKey
+      }
+    };
+  });
+
+  return { messages };
+}
+
 /* ============================================================================
    Turning reminders off
    ============================================================================
@@ -2140,11 +2466,37 @@ function maskEmail(email) {
  * list that happened to send the letter is how a person ends up unsubscribing three times
  * and still hearing from you.
  */
+const SUBSCRIPTION_LISTS = [
+  { name: 'reminders', table: 'reminder_subscribers' },
+  { name: 'newsletter', table: 'newsletter_subscribers' }
+];
+
+/**
+ * Te same listy, ale znalezione po ADRESIE, nie po żetonie z maila.
+ *
+ * Żeton jest zdolnością, którą dostaje się w liście — i to jest właściwa droga, gdy ktoś
+ * klika „nie chcę więcej". Ale w czacie tej zdolności nie ma: rozmowa zaczyna się od zdania
+ * „nie chcę powiadomień", a nie od odsyłacza. Adres sam z siebie nie jest dowodem niczego,
+ * więc ta funkcja NIE wypisuje nikogo — tylko mówi, czy jest co wypisywać. Dowodem jest kod
+ * wysłany na ten adres i sprawdzony niżej.
+ */
+async function findSubscriptionsByEmail(env, email) {
+  const found = [];
+  for (const list of SUBSCRIPTION_LISTS) {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${list.table}`);
+    url.searchParams.set('select', 'id,email,locale,status');
+    url.searchParams.set('email', `eq.${email}`);
+    url.searchParams.set('limit', '1');
+    const response = await fetch(url, { headers: supabaseHeaders(env) });
+    if (!response.ok) continue;
+    const row = (await response.json().catch(() => []))?.[0];
+    if (row?.email) found.push({ ...list, row });
+  }
+  return found;
+}
+
 async function findSubscriptions(env, token) {
-  const lists = [
-    { name: 'reminders', table: 'reminder_subscribers' },
-    { name: 'newsletter', table: 'newsletter_subscribers' }
-  ];
+  const lists = SUBSCRIPTION_LISTS;
 
   let email = '';
   const found = [];
@@ -2249,6 +2601,213 @@ async function unsubStart(env, payload, cors) {
     email: maskEmail(email),
     lists: active.map((entry) => entry.name)
   }, 200, cors);
+}
+
+/* ============================================================================
+   Wyłączenie powiadomień z czatu: kod na adres, potem wypisanie
+   ============================================================================
+   Dotąd jedyną drogą do „nie chcę powiadomień" był odsyłacz w stopce listu, czyli żeton.
+   W rozmowie na czacie żetonu nie ma i nie będzie — jest zdanie „nie chcę już przypomnień".
+
+   Dlatego dwa kroki i ani jednego mniej:
+     `notify-code`  bierze adres i wysyła na niego szcześciocyfrowy kod,
+     `notify-off`   przyjmuje adres i kod, i dopiero wtedy wypisuje.
+
+   Adres podany w czacie nie jest dowodem tożsamości: gdyby wystarczał, każdy mógłby wypisać
+   każdego, znając tylko jego mail. Kod na skrzynkę jest tym dowodem — ta sama reguła, ten sam
+   `purpose = 'unsubscribe'` i ta sama tabela `verification_codes` co przy odsyłaczu z listu,
+   więc nie powstaje druga, równoległa ścieżka o innych regułach wygaszania i prób.
+
+   ODPOWIEDŹ JEST TAKA SAMA DLA NIEZNANEGO ADRESU. Inaczej ta końcówka odpowiadałaby na
+   pytanie „czy ten człowiek jest na Waszej liście", a to jest pytanie, na które nie wolno
+   odpowiadać nikomu, kto nie ma dostępu do tej skrzynki.
+   ========================================================================== */
+
+async function notifyCode(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'NOTIFY_BAD_EMAIL' }, 422, cors);
+
+  const lists = await findSubscriptionsByEmail(env, email);
+  const active = lists.filter((entry) => entry.row.status !== 'unsubscribed');
+
+  /* Nieznany adres i adres bez aktywnych zapisów dostają tę samą odpowiedź co znany: „kod
+     poszedł". Kod nie jest wtedy wysyłany, bo nie ma po co, ale rozmowa nie zdradza, którego
+     z trzech przypadków dotyczy. */
+  if (!active.length) return json({ ok: true, email: maskEmail(email), sent: false }, 200, cors);
+
+  const locale = localeOf(active[0].row.locale || payload.locale);
+  const deck = COPY_DECK[locale] || COPY_DECK.it;
+  const code = newVerificationCode();
+
+  const stored = await insertRow(env, 'verification_codes', {
+    purpose: 'unsubscribe',
+    email,
+    code_hash: await hashCode(env, email, code)
+  });
+  if (!stored.ok) return json({ ok: false, code: 'NOTIFY_CODE_FAILED' }, 502, cors);
+
+  const delivered = await sendThroughOutbox(env, {
+    to: email,
+    subject: fill(deck.unsubSubject, { CODE: code }),
+    html: renderTemplate(EMAIL_TEMPLATES.code, {
+      copy: deck,
+      ev: COPY_DECK._event || {},
+      loc: locale,
+      codeTitle: deck.unsubCodeTitle,
+      codeLead: deck.unsubCodeLead,
+      code,
+      codeNote: deck.unsubCodeNote
+    })
+  });
+  if (!delivered) return json({ ok: false, code: 'NOTIFY_MAIL_FAILED' }, 502, cors);
+
+  return json({ ok: true, email: maskEmail(email), sent: true }, 200, cors);
+}
+
+async function notifyOff(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  const code = String(payload.code || '').replace(/\D/g, '');
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'NOTIFY_BAD_EMAIL' }, 422, cors);
+  if (code.length !== 6) return json({ ok: false, code: 'NOTIFY_BAD_CODE' }, 422, cors);
+
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/verification_codes`);
+  url.searchParams.set('select', 'id,code_hash,expires_at,attempts');
+  url.searchParams.set('email', `eq.${email}`);
+  url.searchParams.set('purpose', 'eq.unsubscribe');
+  url.searchParams.set('consumed_at', 'is.null');
+  url.searchParams.set('order', 'created_at.desc');
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  const row = response.ok ? (await response.json().catch(() => []))?.[0] : null;
+  if (!row) return json({ ok: false, code: 'NOTIFY_NO_CODE' }, 410, cors);
+
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    return json({ ok: false, code: 'NOTIFY_CODE_EXPIRED' }, 410, cors);
+  }
+  if (row.attempts >= CODE_ATTEMPT_LIMIT) {
+    return json({ ok: false, code: 'NOTIFY_TOO_MANY_TRIES' }, 429, cors);
+  }
+
+  if (row.code_hash !== (await hashCode(env, email, code))) {
+    // Liczone przed odpowiedzią — sześć cyfr to milion możliwości, czyli mało dla skryptu.
+    await fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${row.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ attempts: row.attempts + 1 })
+    }).catch(() => {});
+    return json({
+      ok: false,
+      code: 'NOTIFY_CODE_WRONG',
+      left: Math.max(CODE_ATTEMPT_LIMIT - row.attempts - 1, 0)
+    }, 422, cors);
+  }
+
+  // Zużyty najpierw: kod, który kogoś wypisał, nie ma prawa zadziałać po raz drugi.
+  await fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${row.id}`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify({ consumed_at: new Date().toISOString() })
+  }).catch(() => {});
+
+  /* Obie listy naraz. „Nie chcę powiadomień" powiedziane w rozmowie znaczy jedno i drugie —
+     wypisanie z samych przypomnień i zostawienie newslettera jest sposobem, w którym ktoś
+     rezygnuje trzy razy i nadal coś dostaje. */
+  const cleared = [];
+  for (const entry of await findSubscriptionsByEmail(env, email)) {
+    const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/${entry.table}?id=eq.${entry.row.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ status: 'unsubscribed' })
+    });
+    if (patch.ok) cleared.push(entry.name);
+  }
+  if (!cleared.length) return json({ ok: false, code: 'NOTIFY_WRITE_FAILED' }, 502, cors);
+
+  return json({ ok: true, email: maskEmail(email), cleared }, 200, cors);
+}
+
+/* ============================================================================
+   Zgłoszenie sponsora z czatu
+   ============================================================================
+   Najdroższa wiadomość, jaka przychodzi na tę stronę, więc jedzie DWOMA kanałami naraz:
+   WhatsAppem, bo organizatorzy trzymają telefon w ręku, i mailem, bo WhatsApp przez
+   CallMeBota ma darmowy limit i potrafi odmówić ze statusem 200.
+
+   Nie ma tu weryfikacji kodem i to jest świadome. Kod na skrzynkę chroni CZYJEŚ DANE od
+   obcego; tutaj ktoś zostawia własny kontakt i chce, żeby ktoś zadzwonił. Bramka
+   z sześciocyfrowym kodem między firmą a rozmową z organizatorem odsiałaby zainteresowanych,
+   nie nadużycia — a najgorszy przypadek to jedno fałszywe zgłoszenie do odrzucenia telefonem.
+
+   Nic nie jest zapisywane w bazie: to nie jest lista, którą ktokolwiek będzie przeglądał, a
+   dodanie tabeli znaczyłoby dane osobowe firmy leżące bez powodu. Wiadomość dochodzi do
+   ludzi, którzy odpowiadają, i tam żyje.
+   ========================================================================== */
+async function sponsorLead(env, payload, cors) {
+  const cartName = trimmed(payload.cartName, '');
+  const phone = trimmed(payload.phone, '');
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!cartName || cartName.length > 120) return json({ ok: false, code: 'SPONSOR_BAD_NAME' }, 422, cors);
+  /* Telefon ALBO mail — jeden z dwóch wystarczy, żeby oddzwonić. Wymaganie obu odsiewałoby
+     kogoś, kto nie chce podawać numeru, a to jest zgłoszenie, nie formularz urzędowy. */
+  if (!phone && !email) return json({ ok: false, code: 'SPONSOR_NO_CONTACT' }, 422, cors);
+  if (email && !EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'SPONSOR_BAD_EMAIL' }, 422, cors);
+  if (phone.length > 40) return json({ ok: false, code: 'SPONSOR_BAD_PHONE' }, 422, cors);
+
+  const locale = localeOf(payload.locale);
+  const lines = [
+    '🏁 CARRULEDDHI — SPONSOR',
+    '',
+    `🛒 ${cartName}`,
+    phone ? `📞 ${phone}` : '',
+    email ? `✉️ ${email}` : '',
+    `🌐 ${locale.toUpperCase()}`,
+    '',
+    'Zainteresowany sponsoringiem (100 EUR + wozek z nazwa). Oddzwon.'
+  ].filter(Boolean).join('\n');
+
+  /* WhatsApp do wszystkich numerów z konfiguracji, tą samą drogą co powiadomienia z czatu —
+     razem z tym samym czytaniem treści odpowiedzi, bo CallMeBot odmawia ze statusem 200. */
+  await Promise.all(whatsappTargets(env).map(async ({ phone: number, apikey }) => {
+    const url = new URL('https://api.callmebot.com/whatsapp.php');
+    url.searchParams.set('phone', number);
+    url.searchParams.set('apikey', apikey);
+    url.searchParams.set('text', lines);
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const body = (await response.text().catch(() => '')).replace(/<[^>]*>/g, ' ');
+      const tail = number.slice(-4);
+      if (!response.ok) noteWhatsappFailure(`...${tail}: HTTP ${response.status}`);
+      else if (/not sent|0 messages left|APIKey is not valid|not registered/i.test(body)) {
+        noteWhatsappFailure(`...${tail}: ${body.replace(/\s+/g, ' ').trim().slice(0, 160)}`);
+      }
+    } catch (error) {
+      noteWhatsappFailure(`...${number.slice(-4)}: ${error?.name || 'Error'}`);
+    }
+  }));
+
+  /* Mail do organizatorów, na ten sam adres co wiadomości z formularza. Drugi kanał, bo
+     pierwszy potrafi zniknąć bez śladu — a to jest zgłoszenie, którego nie wolno zgubić. */
+  const to = env.ORGANISER_EMAIL || COPY_DECK._event?.email || '';
+  if (to) {
+    await sendThroughOutbox(env, {
+      to,
+      subject: `Sponsor: ${cartName}`,
+      html: '<!doctype html><html><body style="margin:0;padding:24px;background:#eef5ff;'
+        + 'font-family:system-ui,sans-serif;color:#071a3d">'
+        + '<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;'
+        + 'background:#fff;border-radius:16px;padding:24px"><tr><td>'
+        + '<h1 style="margin:0 0 14px;font-size:20px">Zgłoszenie sponsora z czatu</h1>'
+        + `<p style="margin:0 0 8px"><b>Nazwa na carruleddhi:</b> ${escapeHtml(cartName)}</p>`
+        + (phone ? `<p style="margin:0 0 8px"><b>Telefon:</b> ${escapeHtml(phone)}</p>` : '')
+        + (email ? `<p style="margin:0 0 8px"><b>E-mail:</b> ${escapeHtml(email)}</p>` : '')
+        + `<p style="margin:0 0 8px"><b>Język:</b> ${escapeHtml(locale.toUpperCase())}</p>`
+        + '<p style="margin:16px 0 0;color:#65718b;font-size:13px">Pakiet: 100 EUR — logo na '
+        + 'stronie plus carruleddhi z nazwą sponsora.</p>'
+        + '</td></tr></table></body></html>'
+    });
+  }
+
+  return json({ ok: true }, 200, cors);
 }
 
 async function unsubConfirm(env, payload, cors) {
@@ -3179,9 +3738,23 @@ const PURGE_SCOPES = {
   messages: ['contact_messages'],
   chat: ['chat_messages', 'chat_threads'],
   wall: ['wall_comments'],
+  /* GŁOSOWANIE: testowe wózki i oddane na nie głosy.
+     ---------------------------------------------------------------------------
+     Tego zakresu tu nie było i to jest cała przyczyna zgłoszenia „czyszczę dane, a testowe
+     zostają". „Wszystko naraz" kasowało zgłoszenia, zapisy i czat, ale lista do głosowania
+     jest osobną tabelą — więc pizze i burgery wgrane przy próbach zostawały na ekranie.
+
+     `votes` PRZED `participants`: głos wskazuje uczestnika kluczem obcym, więc odwrotna
+     kolejność kasuje wiersz, do którego ktoś jeszcze się odwołuje.
+
+     Harmonogram (`voting_settings`) NIE jest tu ruszany. To jedna godzina startu, nie dane
+     testowe — a jej wyzerowanie przy sprzątaniu znaczyłoby, że odliczanie na stronie znika
+     razem z testowymi wózkami. */
+  voting: ['votes', 'participants'],
   everything: [
     'registrations', 'attendance', 'reminder_subscribers', 'newsletter_subscribers',
-    'contact_messages', 'chat_messages', 'chat_threads', 'wall_comments'
+    'contact_messages', 'chat_messages', 'chat_threads', 'wall_comments',
+    'votes', 'participants'
   ]
 };
 
@@ -3260,11 +3833,25 @@ const SETTINGS_DEFAULTS = {
   showGallery: true,
   showWall: true,
   showPrizes: true,
-  showCounters: true
+  showCounters: true,
+  eventName: 'Carruleddhi Show 2026',
+  eventDate: '2026-10-17T14:30:00+02:00',
+  eventLocation: 'Santa Teresa Gallura',
+  galleryImages: [
+    '/assets/images/gallery-start.svg',
+    '/assets/images/gallery-race.svg',
+    '/assets/images/gallery-craft.svg',
+    '/assets/images/gallery-crowd.svg',
+    '/assets/images/gallery-finish.svg'
+  ],
+  /* Set only by the explicit announce action. Matching eventDate means the hourly outbox
+     may drain this edition; changing a date alone never sends mail. */
+  announcementEventDate: ''
 };
 
 const SETTINGS_FLAGS = ['siteLocked', 'showGallery', 'showWall', 'showPrizes', 'showCounters'];
 const MAX_SPONSORS = 30;
+const GALLERY_SIZE = 5;
 
 /**
  * Validates a settings object from the panel.
@@ -3325,6 +3912,35 @@ function cleanSettings(input) {
     out.sponsors = sponsors;
   }
 
+  for (const [field, limit] of [['eventName', 80], ['eventLocation', 120]]) {
+    if (input[field] === undefined) continue;
+    if (typeof input[field] !== 'string') return { error: `SETTINGS_${field}` };
+    const value = input[field].replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, limit);
+    if (!value) return { error: `SETTINGS_${field}` };
+    out[field] = value;
+  }
+
+  if (input.eventDate !== undefined) {
+    const value = String(input.eventDate || '').trim();
+    const date = new Date(value);
+    if (!value || Number.isNaN(date.getTime())) return { error: 'SETTINGS_EVENT_DATE' };
+    out.eventDate = date.toISOString();
+  }
+
+  if (input.galleryImages !== undefined) {
+    if (!Array.isArray(input.galleryImages) || input.galleryImages.length !== GALLERY_SIZE) {
+      return { error: 'SETTINGS_GALLERY_SIZE' };
+    }
+    const images = input.galleryImages.map((raw) => String(raw || '').trim().slice(0, 260));
+    const valid = images.every((path) => (
+      !path.includes('..')
+      && (/^galleries\/[A-Za-z0-9._/-]+$/.test(path)
+        || /^\/assets\/images\/[A-Za-z0-9._/-]+\.(?:svg|webp|avif|png|jpe?g)$/i.test(path))
+    ));
+    if (!valid) return { error: 'SETTINGS_GALLERY_IMAGE' };
+    out.galleryImages = images;
+  }
+
   if (Object.keys(out).length === 0) return { error: 'SETTINGS_EMPTY' };
   return { value: out };
 }
@@ -3365,13 +3981,35 @@ async function withSignedLogos(env, sponsors) {
   }));
 }
 
+/** Gallery files uploaded in the panel share the private wall-media bucket. Local assets pass through. */
+async function withSignedGallery(env, images) {
+  const list = Array.isArray(images) ? images : SETTINGS_DEFAULTS.galleryImages;
+  return Promise.all(list.map(async (path) => (
+    !path || path.startsWith('/') ? path : await signPhoto(env, path)
+  )));
+}
+
+async function settingsShape(env, settings) {
+  const { announcementEventDate: _announcementEventDate, ...publicSettings } = settings;
+  return {
+    ...publicSettings,
+    sponsors: await withSignedLogos(env, settings.sponsors),
+    galleryImages: await withSignedGallery(env, settings.galleryImages)
+  };
+}
+
+async function adminSettingsShape(env, settings) {
+  return {
+    ...settings,
+    sponsors: await withSignedLogos(env, settings.sponsors),
+    galleryPreviewUrls: await withSignedGallery(env, settings.galleryImages)
+  };
+}
+
 /** Public read. No input, and `siteLocked` is included because the page says so. */
 async function settingsRead(env, cors) {
   const settings = await readSettings(env);
-  return json({
-    ok: true,
-    settings: { ...settings, sponsors: await withSignedLogos(env, settings.sponsors) }
-  }, 200, cors);
+  return json({ ok: true, settings: await settingsShape(env, settings) }, 200, cors);
 }
 
 /**
@@ -3381,29 +4019,86 @@ async function settingsRead(env, cors) {
  * arrived are written, so the panel can save one switch without having to send — and
  * risk clobbering — everything else.
  */
-async function settingsAdmin(env, payload, cors) {
-  /* Uploading a logo, which is a separate step from saving the list.
-     The panel uploads first, gets a path back, and only then saves a sponsor pointing
-     at it — so a failed upload leaves the stored list exactly as it was rather than
-     half-updated with a broken image in it.
+async function rolloverVotingEdition(env, settings) {
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/rollover_voting_edition`, {
+    method: 'POST',
+    headers: supabaseHeaders(env),
+    body: JSON.stringify({
+      p_event_name: settings.eventName,
+      p_event_date: settings.eventDate,
+      p_event_location: settings.eventLocation
+    })
+  }).catch(() => null);
+  if (!response?.ok) {
+    return { ok: false, detail: response ? await response.text().catch(() => '') : 'network' };
+  }
+  const result = await response.json().catch(() => null);
+  return { ok: true, result: result && typeof result === 'object' ? result : {} };
+}
 
-     Same decoder and the same bucket as the wall: media type checked against the allow
-     list and the first bytes of the file checked as well, because a declaration is a
-     string the caller chose and the magic bytes are not. */
-  if (String(payload.action || '') === 'logo') {
+async function settingsAdmin(env, payload, cors) {
+  const action = String(payload.action || '').toLowerCase();
+
+  /* Upload first, save the returned stable bucket path second. Signed URLs are previews only. */
+  if (action === 'logo' || action === 'gallery') {
     const photo = decodePhoto(payload.photo);
     if (photo.error) return json({ ok: false, code: photo.error }, 422, cors);
-    const path = await uploadPhoto(env, photo, 'sponsors');
-    if (!path) return json({ ok: false, code: 'SETTINGS_LOGO_UPLOAD_FAILED' }, 502, cors);
-    return json({ ok: true, logo: path, url: await signPhoto(env, path) }, 200, cors);
+    const folder = action === 'logo' ? 'sponsors' : 'galleries';
+    const path = await uploadPhoto(env, photo, folder);
+    if (!path) {
+      return json({ ok: false, code: action === 'logo' ? 'SETTINGS_LOGO_UPLOAD_FAILED' : 'SETTINGS_GALLERY_UPLOAD_FAILED' }, 502, cors);
+    }
+    return json({
+      ok: true,
+      ...(action === 'logo' ? { logo: path } : { imagePath: path }),
+      url: await signPhoto(env, path)
+    }, 200, cors);
   }
+
+  /* One explicit click arms exactly the currently saved date. Editing a date never sends mail. */
+  if (action === 'announce') {
+    const current = await readSettings(env);
+    const event = new Date(current.eventDate);
+    if (Number.isNaN(event.getTime())) return json({ ok: false, code: 'SETTINGS_EVENT_DATE' }, 422, cors);
+
+    /* One transaction freezes the previous public result and prepares a clean scheduled
+       edition. Repeating the same date is idempotent and leaves the live edition untouched. */
+    const rollover = await rolloverVotingEdition(env, current);
+    if (!rollover.ok) {
+      const detail = String(rollover.detail || '');
+      if (detail.includes('PENDING_RESULT_NOTIFICATIONS')) {
+        return json({ ok: false, code: 'VOTING_RESULT_NOTIFICATIONS_PENDING' }, 409, cors);
+      }
+      if (detail.includes('VOTING_EDITION_NOT_CLOSED')) {
+        return json({ ok: false, code: 'VOTING_EDITION_NOT_CLOSED' }, 409, cors);
+      }
+      return json({ ok: false, code: 'VOTING_EDITION_ROLLOVER_FAILED' }, 502, cors);
+    }
+
+    if (current.announcementEventDate === current.eventDate) {
+      return json({
+        ok: true, queued: false, eventDate: current.eventDate,
+        edition: rollover.result
+      }, 200, cors);
+    }
+    const merged = { ...current, announcementEventDate: current.eventDate };
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ data: merged })
+    });
+    if (!response.ok) return json({ ok: false, code: 'SETTINGS_WRITE_FAILED' }, 502, cors);
+    return json({
+      ok: true, queued: true, eventDate: current.eventDate,
+      edition: rollover.result
+    }, 200, cors);
+  }
+
+  if (action) return json({ ok: false, code: 'SETTINGS_UNKNOWN_ACTION' }, 400, cors);
 
   if (payload.settings === undefined) {
     const settings = await readSettings(env);
-    return json({
-      ok: true,
-      settings: { ...settings, sponsors: await withSignedLogos(env, settings.sponsors) }
-    }, 200, cors);
+    return json({ ok: true, settings: await adminSettingsShape(env, settings) }, 200, cors);
   }
 
   const cleaned = cleanSettings(payload.settings);
@@ -3424,10 +4119,7 @@ async function settingsAdmin(env, payload, cors) {
     return json({ ok: false, code: 'SETTINGS_WRITE_FAILED', detail: await response.text() }, 502, cors);
   }
 
-  return json({
-    ok: true,
-    settings: { ...merged, sponsors: await withSignedLogos(env, merged.sponsors) }
-  }, 200, cors);
+  return json({ ok: true, settings: await adminSettingsShape(env, merged) }, 200, cors);
 }
 
 /* ============================================================================
@@ -4580,7 +5272,10 @@ async function readRanking(env) {
 async function readDeviceVotes(env, deviceId) {
   if (!deviceId) return [];
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/votes`);
-  url.searchParams.set('select', 'participant_id,category,score');
+  /* Adres i imię czytane, ale NIGDY nie odsyłane — na stronę idzie z nich jedna wartość
+     logiczna „czy ten głos wolno zmienić". Zwrócenie samego adresu zamieniłoby identyfikator
+     urządzenia z localStorage w sposób na wyciągnięcie cudzego maila. */
+  url.searchParams.set('select', 'participant_id,category,score,edit_count,voter_email,voter_name');
   url.searchParams.set('device_id', `eq.${deviceId}`);
   url.searchParams.set('limit', '40');
   const response = await fetch(url, { headers: supabaseHeaders(env) });
@@ -4608,6 +5303,53 @@ function participantShape(row, signed, tally) {
   };
 }
 
+async function readVotingEditions(env) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_editions`);
+  url.searchParams.set('select', 'id,edition_key,event_name,event_date,event_location,status,participant_count,vote_count');
+  url.searchParams.set('order', 'event_date.desc');
+  url.searchParams.set('limit', '40');
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return [];
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows.map((row) => ({
+    id: row.id,
+    key: row.edition_key,
+    name: row.event_name,
+    date: row.event_date,
+    location: row.event_location,
+    status: row.status,
+    participantCount: Number(row.participant_count) || 0,
+    voteCount: Number(row.vote_count) || 0
+  })) : [];
+}
+
+async function readVotingArchive(env, editionKey) {
+  if (!/^\d{4}$/.test(String(editionKey || ''))) return null;
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_editions`);
+  url.searchParams.set('select', 'id,edition_key,event_name,event_date,event_location,status,results');
+  url.searchParams.set('edition_key', `eq.${editionKey}`);
+  url.searchParams.set('status', 'eq.archived');
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return null;
+  const row = (await response.json().catch(() => []))?.[0];
+  if (!row || !Array.isArray(row.results)) return null;
+  const signed = await signPhotos(env, row.results.map((entry) => entry.imagePath));
+  const participants = row.results.map((entry) => ({
+    id: String(entry.id || ''),
+    category: String(entry.category || ''),
+    startNumber: Number(entry.startNumber) || 0,
+    firstName: String(entry.firstName || ''),
+    lastName: String(entry.lastName || ''),
+    projectName: String(entry.projectName || ''),
+    photo: signed.get(entry.imagePath) || '',
+    voteCount: Number(entry.voteCount) || 0,
+    averageScore: Number(entry.averageScore) || 0,
+    totalScore: Number(entry.totalScore) || 0
+  }));
+  return { row, participants };
+}
+
 /**
  * Wszystko, co strona potrzebuje wiedzieć o głosowaniu, w jednym odczycie.
  *
@@ -4617,6 +5359,45 @@ function participantShape(row, signed, tally) {
  * bo on ma je do czego użyć.
  */
 async function votingState(env, payload, cors) {
+  const editions = await readVotingEditions(env);
+  const activeEdition = editions.find((edition) => edition.status === 'active') || null;
+  const requestedKey = /^\d{4}$/.test(String(payload.edition || '')) ? String(payload.edition) : '';
+
+  if (requestedKey && requestedKey !== activeEdition?.key) {
+    const archive = await readVotingArchive(env, requestedKey);
+    if (archive) {
+      const shaped = archive.participants;
+      const podium = shaped
+        .filter((row) => row.voteCount > 0)
+        .sort((a, b) => b.totalScore - a.totalScore || b.voteCount - a.voteCount
+          || b.averageScore - a.averageScore || a.startNumber - b.startNumber)
+        .slice(0, 3);
+      return json({
+        ok: true,
+        phase: 'closed',
+        isArchive: true,
+        editions,
+        selectedEdition: {
+          id: archive.row.id,
+          key: archive.row.edition_key,
+          name: archive.row.event_name,
+          date: archive.row.event_date,
+          location: archive.row.event_location,
+          status: archive.row.status
+        },
+        raceStartsAt: archive.row.event_date,
+        votingEndsAt: archive.row.event_date,
+        durationMinutes: 0,
+        scoreMin: VOTE_MIN,
+        scoreMax: VOTE_MAX,
+        categories: [...new Set(shaped.map((row) => row.category))],
+        participants: shaped,
+        podium,
+        myVotes: []
+      }, 200, cors);
+    }
+  }
+
   const [settings, participants] = await Promise.all([
     readVotingSettings(env),
     readParticipants(env)
@@ -4628,48 +5409,53 @@ async function votingState(env, payload, cors) {
   const ranking = closed ? await readRanking(env) : [];
   const tally = new Map(ranking.map((row) => [row.participant_id, row]));
   const signed = await signPhotos(env, participants.map((row) => row.image_path));
-
   const shaped = participants.map((row) => participantShape(row, signed, tally));
-  const categories = [...new Set(shaped.map((row) => row.category))];
-
-  /* Podium liczone po sumie punktów, przy remisie po liczbie głosów, a dopiero na końcu po
-     średniej — ta sama kolejność co w readRanking() i w votingAdminWinners(), bo to musi być
-     jeden wynik, nie trzy.
-
-     Poprzednia wersja obiecywała w komentarzu, że „sama średnia stawiałaby jedną dziesiątkę nad
-     ośmioma dziewiątkami", po czym sortowała właśnie po samej średniej: liczba głosów wchodziła
-     dopiero przy remisie, a 10.00 i 9.00 remisem nie są. Suma zamyka tę dziurę bez żadnego
-     progu typu „minimum pięć głosów", który trzeba by wymyślić i potem tłumaczyć. */
   const podium = closed
     ? [...shaped]
       .filter((row) => row.voteCount > 0)
-      .sort((a, b) =>
-        b.totalScore - a.totalScore ||
-        b.voteCount - a.voteCount ||
-        b.averageScore - a.averageScore)
+      .sort((a, b) => b.totalScore - a.totalScore || b.voteCount - a.voteCount
+        || b.averageScore - a.averageScore || a.startNumber - b.startNumber)
       .slice(0, 3)
     : [];
-
   const mine = await readDeviceVotes(env, String(payload.deviceId || '').trim().toLowerCase());
 
   return json({
     ok: true,
     phase,
+    isArchive: false,
+    editions,
+    selectedEdition: activeEdition,
     raceStartsAt: settings?.race_starts_at || null,
     votingEndsAt: settings?.voting_ends_at || null,
     durationMinutes: settings?.duration_minutes ?? 30,
     scoreMin: VOTE_MIN,
     scoreMax: VOTE_MAX,
-    /* Kategorie uczestników (`classic` / `art`) opisują pojazd na kafelku i pozwalają odsiać
-       listę. Nie są kategoriami głosowania — ta jest jedna i nazywa się nagrodą publiczności. */
-    categories,
+    categories: [...new Set(shaped.map((row) => row.category))],
     participants: shaped,
     podium,
-    /* Co najwyżej jeden wiersz: jeden głos na urządzenie. Tablica, a nie pojedynczy obiekt, bo
-       stare wiersze z prób sprzed 0026 też tu wejdą, a strona ma je umieć pominąć. */
     myVotes: mine
       .filter((row) => row.category === PUBLIC_AWARD)
-      .map((row) => ({ participantId: row.participant_id, score: row.score }))
+      .map((row) => {
+        /* ZMIANA GŁOSU JEST DLA TYCH, KTÓRZY SIĘ PODPISALI.
+           ---------------------------------------------------------------------------
+           Głos anonimowy liczy się dokładnie tyle samo, ale jest ostateczny. Poprawka wymaga
+           imienia i adresu, bo tylko wtedy istnieje cokolwiek poza identyfikatorem urządzenia
+           z localStorage — czyli poza wartością, którą wyczyszczenie danych przeglądarki
+           zamienia w nową tożsamość. Bez tego „jedna zmiana" byłaby dowolną liczbą zmian dla
+           kogoś, kto wie, gdzie kliknąć.
+
+           Na stronę idą dwie wartości logiczne i ani jedno pole osobowe. */
+        const identified = Boolean(row.voter_email && row.voter_name);
+        const editsLeft = Math.max(0, 1 - (Number(row.edit_count) || 0));
+        return {
+          participantId: row.participant_id,
+          score: row.score,
+          editCount: Number(row.edit_count) || 0,
+          editsLeft,
+          identified,
+          canChange: identified && editsLeft > 0
+        };
+      })
   }, 200, cors);
 }
 
@@ -4703,9 +5489,10 @@ async function votingVote(env, payload, cors) {
   const name = trimmed(payload.name, '');
   const deviceId = String(payload.deviceId || '').trim().toLowerCase();
   const score = Number(payload.score);
+  const notifyResults = Boolean(payload.notifyResults && email);
 
-  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'VOTING_BAD_EMAIL' }, 422, cors);
-  if (!name || name.length > 120) return json({ ok: false, code: 'VOTING_BAD_NAME' }, 422, cors);
+  if (email && !EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'VOTING_BAD_EMAIL' }, 422, cors);
+  if (name.length > 120) return json({ ok: false, code: 'VOTING_BAD_NAME' }, 422, cors);
   // 32–36 znaków, tak jak wymaga tego baza: crypto.randomUUID() z kreskami albo bez.
   if (!/^[0-9a-f-]{32,36}$/.test(deviceId)) return json({ ok: false, code: 'VOTING_BAD_DEVICE' }, 422, cors);
   /* Odrzucane, nie przycinane. Przycięta setka zapisałaby się jako dziesiątka, której nikt
@@ -4723,8 +5510,10 @@ async function votingVote(env, payload, cors) {
     participant_id: participant.id,
     // Stała, nie wartość z żądania — patrz PUBLIC_AWARD i migracja 0026.
     category: PUBLIC_AWARD,
-    voter_name: name,
-    voter_email: email,
+    voter_name: name || null,
+    voter_email: email || null,
+    voter_locale: localeOf(payload.locale),
+    notify_results: notifyResults,
     device_id: deviceId,
     score
   }, 'edit_token');
@@ -4744,12 +5533,27 @@ async function votingVote(env, payload, cors) {
      Bez „await": głos jest już zapisany, a wolna albo niedostępna automatyka poczty nie ma
      prawa zamienić oddanego głosu w błąd na ekranie. */
   const editToken = stored.row?.edit_token || '';
+  /* Ten sam układ, co przy zwycięzcach: blok językowy plus to, czego szablon nie rozstrzygnie.
+     Powitanie jest tu, bo głos bywa oddany bez imienia — `voter_name` jest opcjonalne od
+     migracji 0030 — a „Cześć ," z przecinkiem po pustym miejscu to pierwsza linijka listu. */
+  const receiptLocale = localeOf(payload.locale);
+  const receiptDeck = COPY_DECK[receiptLocale] || COPY_DECK.it;
+  const voterFirstName = String(name || '').trim().split(/\s+/)[0] || '';
   const letter = {
     type: 'voting-receipt',
     branch: 'voting-receipt',
-    locale: localeOf(payload.locale),
+    locale: receiptLocale,
     name,
     email,
+    copy: receiptDeck,
+    ev: COPY_DECK._event || {},
+    loc: receiptLocale,
+    hi: voterFirstName
+      ? fill(receiptDeck.rcptHi, { FIRSTNAME: voterFirstName })
+      : receiptDeck.rcptHiPlain,
+    /* Uczestnik bez nazwy wózka: w liście staje tam jego imię i nazwisko, tak samo jak w
+       gratulacjach dla podium. */
+    rcptProject: participant.project_name || `${participant.first_name} ${participant.last_name}`.trim(),
     // Kategoria pojazdu, nie kategoria głosu: „Classic nr 12" mówi czytającemu, o który wóz
     // chodziło.
     category: participant.category,
@@ -4760,15 +5564,24 @@ async function votingVote(env, payload, cors) {
     /* Odsyłacz do zmiany prowadzi na podstronę głosowania, nie na stronę główną: okno oceny
        stoi od teraz tam i tylko tam. Adres wskazujący korzeń otwierałby stronę, na której nie
        ma czym obsłużyć żetonu — i milczałby o tym. */
-    editUrl: editToken ? `${publicSiteUrl()}/votazione.html#vote=${editToken}` : ''
+    editUrl: editToken ? `${publicSiteUrl()}/votazione.html#vote=${editToken}` : '',
+    /* Adres, pod którym przycisk zawsze coś otwiera. `editUrl` bywa pusty, gdy baza nie odda
+       żetonu, a przycisk z pustym href to linijka tekstu udająca wyjście — ten sam błąd, co
+       opisany przy UNSUB_FOOTER w generatorze blueprintu. Bez żetonu prowadzi na samą
+       podstronę głosowania, a zdanie obok i tak mówi, na czym polega zmiana. */
+    rcptUrl: editToken
+      ? `${publicSiteUrl()}/votazione.html#vote=${editToken}`
+      : `${publicSiteUrl()}/votazione.html`
   };
 
   return json({
     ok: true,
     category: participant.category,
     score,
-    // Sygnał dla strony, że list poszedł; nigdy sam żeton.
-    mailed: await sendToMake(env, letter)
+    anonymous: !email,
+    notifyResults,
+    // E-mail is optional. Anonymous voters edit from the same device instead.
+    mailed: email ? await sendToMake(env, letter) : false
   }, 200, cors);
 }
 
@@ -4805,7 +5618,7 @@ async function votingEdit(env, payload, cors) {
   if (!byToken && !byDevice) return json({ ok: false, code: 'VOTING_BAD_TOKEN' }, 422, cors);
 
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/votes`);
-  url.searchParams.set('select', 'id,participant_id,category,score');
+  url.searchParams.set('select', 'id,participant_id,category,score,edit_count,voter_email,voter_name');
   if (byToken) {
     url.searchParams.set('edit_token', `eq.${token}`);
   } else {
@@ -4830,6 +5643,11 @@ async function votingEdit(env, payload, cors) {
        „przenieś tu". Nie jest tajemnicą: ten sam identyfikator wychodzi w liście uczestników. */
     participantId: vote.participant_id,
     score: vote.score,
+    editCount: Number(vote.edit_count) || 0,
+    editsLeft: Math.max(0, 1 - (Number(vote.edit_count) || 0)),
+    /* Sam fakt podpisania się, bez adresu. Strona rysuje po tym „możesz zmienić" albo
+       „zmiana wymagała imienia i adresu". */
+    identified: Boolean(vote.voter_email && vote.voter_name),
     startNumber: participant?.start_number ?? null,
     projectName: participant?.project_name || '',
     participantName: participant
@@ -4846,6 +5664,30 @@ async function votingEdit(env, payload, cors) {
   const phase = votingPhase(await readVotingSettings(env));
   if (phase !== 'voting') return json({ ok: false, code: 'VOTING_NOT_OPEN', phase }, 409, cors);
 
+  /* ZMIANA WYMAGA PODPISU: IMIENIA I ADRESU.
+     ---------------------------------------------------------------------------
+     Głos anonimowy jest ostateczny i to jest świadoma reguła, nie ograniczenie techniczne.
+     Anonimowy wiersz ma jako jedyną tożsamość identyfikator urządzenia z localStorage —
+     wartość, którą wyczyszczenie danych przeglądarki zamienia w nową. Gdyby wolno było go
+     zmieniać, „jedna zmiana" znaczyłaby „dowolna liczba zmian dla kogoś, kto wie, gdzie
+     kliknąć", a suma punktów przestałaby cokolwiek znaczyć.
+
+     Sprawdzane TYLKO na drodze przez urządzenie. Żeton przyszedł mailem, więc jego posiadacz
+     adres podał — inaczej nie miałby czym wejść. */
+  if (byDevice && !(vote.voter_email && vote.voter_name)) {
+    return json({ ok: false, code: 'VOTING_EDIT_NEEDS_CONTACT', vote: shape }, 409, cors);
+  }
+
+  /* JEDNA ZMIANA NA GŁOS.
+     ---------------------------------------------------------------------------
+     Poprawka pomyłki jest uczciwa; przestawianie oceny dowolną liczbę razy do końca okna
+     zamienia głos w suwak, którym da się dowozić wynik ulubieńcowi aż do gwizdka. Licznik
+     stoi w bazie, nie w przeglądarce: identyfikator urządzenia leży w localStorage i nie
+     jest niczym, na czym można oprzeć limit. */
+  if ((Number(vote.edit_count) || 0) >= 1) {
+    return json({ ok: false, code: 'VOTING_EDIT_USED', vote: shape }, 409, cors);
+  }
+
   /* Ocena podana albo zostawiona. Zmiana samego wozu bez ruszania oceny jest sensowną
      czynnością („pomyliłem kafelki, ale ósemkę dałbym tak samo"), więc brak `score` nie jest
      tu błędem — jest wyborem. */
@@ -4860,7 +5702,7 @@ async function votingEdit(env, payload, cors) {
      organizatora o rękę w bazie. Schemat na to pozwalał od początku: `participant_id` jest
      tylko kluczem obcym, nie ma go w żadnym indeksie unikalnym, więc przeniesienie głosu nie
      narusza reguły „jeden głos na osobę i na urządzenie". */
-  const patch = { score };
+  const patch = { score, edit_count: 1 };
   let moved = shape;
   if (payload.participantId !== undefined) {
     const target = await findParticipant(env, payload.participantId);
@@ -4890,7 +5732,7 @@ async function votingEdit(env, payload, cors) {
   });
   if (!saved.ok) return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
 
-  return json({ ok: true, vote: { ...moved, score } }, 200, cors);
+  return json({ ok: true, vote: { ...moved, score, editCount: 1, editsLeft: 0 } }, 200, cors);
 }
 
 /**
@@ -4914,13 +5756,32 @@ async function voting(env, payload, cors) {
 
 /* --------------------------------------------------------------- strona organizatora */
 
+/**
+ * Zapis singletonu ustawień głosowania.
+ *
+ * UPSERT, nie PATCH — i to jest naprawa „zamknij teraz nic nie robi".
+ * ---------------------------------------------------------------------------
+ * PATCH na `id=is.true` w tabeli BEZ tego wiersza dopasowuje zero wierszy i odpowiada 204,
+ * czyli `response.ok`. Panel dostawał więc potwierdzenie i odczytywał stan, w którym nic się
+ * nie zmieniło: głosowanie zostawało otwarte, mimo że organizator je zamknął.
+ *
+ * `resolution=merge-duplicates` wstawia wiersz, gdy go nie ma, i scala, gdy jest. Zwrot
+ * reprezentacji jest sprawdzany, więc „udało się" znaczy „w bazie stoi to, co wysłano".
+ */
 async function patchVotingSettings(env, patch) {
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/voting_settings?id=is.true`, {
-    method: 'PATCH',
-    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-    body: JSON.stringify(patch)
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/voting_settings`, {
+    method: 'POST',
+    headers: supabaseHeaders(env, {
+      Prefer: 'resolution=merge-duplicates,return=representation'
+    }),
+    body: JSON.stringify({ id: true, ...patch })
   });
-  return response.ok;
+  if (!response.ok) {
+    console.error(`[voting] settings write HTTP ${response.status} — ${await response.text().catch(() => '')}`);
+    return false;
+  }
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows.length > 0 : Boolean(rows);
 }
 
 /**
@@ -5144,6 +6005,34 @@ async function votingAdminOpen(env, payload, cors) {
   return votingAdminState(env, cors);
 }
 
+/**
+ * Powrót do odliczania, z datą wydarzenia jako jedynym źródłem prawdy.
+ *
+ * Po testach zostaje zwykle stan „zamknięte" albo godzina startu przestawiona na potrzeby
+ * próby — a wtedy licznik w hero pokazuje coś innego niż zapisany termin wydarzenia. Ten
+ * przycisk kasuje ręczne zamknięcie i przepisuje start z `site_settings.eventDate`, czyli z
+ * tego samego miejsca, z którego licznik i formularze biorą datę. Jedno kliknięcie zamiast
+ * przepisywania godziny w dwóch miejscach.
+ */
+async function votingAdminCountdown(env, cors) {
+  const settings = await readSettings(env);
+  const startsAt = stamp(settings.eventDate);
+  if (!startsAt) return json({ ok: false, code: 'SETTINGS_EVENT_DATE' }, 422, cors);
+
+  const current = await readVotingSettings(env);
+  const duration = current?.duration_minutes ?? 30;
+  const window = votingWindow(new Date(startsAt).toISOString(), duration);
+  const ok = await patchVotingSettings(env, {
+    status: 'scheduled',
+    duration_minutes: duration,
+    race_starts_at: window.startsAt,
+    voting_started_at: null,
+    voting_ends_at: window.endsAt
+  });
+  if (!ok) return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
+  return votingAdminState(env, cors);
+}
+
 /** Zamknięcie natychmiast. `status = 'closed'` wygrywa z zegarem — patrz votingPhase. */
 async function votingAdminClose(env, cors) {
   const ok = await patchVotingSettings(env, {
@@ -5151,6 +6040,18 @@ async function votingAdminClose(env, cors) {
     voting_ends_at: new Date().toISOString()
   });
   if (!ok) return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
+  return votingAdminState(env, cors);
+}
+
+/** Deletes votes only. Participants, photos and schedule remain untouched. Protected by ROSTER_KEY. */
+async function votingAdminClear(env, cors) {
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/votes?id=neq.00000000-0000-0000-0000-000000000000`,
+    { method: 'DELETE', headers: supabaseHeaders(env, { Prefer: 'return=minimal' }) }
+  );
+  if (!response.ok) {
+    return json({ ok: false, code: 'VOTING_CLEAR_FAILED', detail: await response.text() }, 502, cors);
+  }
   return votingAdminState(env, cors);
 }
 
@@ -5165,6 +6066,155 @@ async function votingAdminClose(env, cors) {
  * bez `registration_id`, nie ma gdzie dostać listu i wraca na liście `unreachable`, żeby
  * organizator wiedział, do kogo zadzwonić, zamiast zakładać, że poszło do wszystkich.
  */
+/* Trzy kolory podium to trzy kolory strony, w tej samej kolejności co na cokole.
+   Nie złoto-srebro-brąz: ta paleta nigdzie na tej stronie nie występuje, a list, który
+   wygląda jak dyplom z innego wydarzenia, czyta się jak spam. */
+const PODIUM_COLOURS = ['#ffca28', '#8f71ff', '#ff6f9f'];
+
+/**
+ * List z wynikami dla głosujących.
+ *
+ * WYGLĄDAŁ JAK SUROWY HTML I TO NIE BYŁA DROBNOSTKA
+ *   Poprzednia wersja to była biała karta z gołym `<h1>`, listą `<ol>` w domyślnym stylu
+ *   przeglądarki i niebieskim odnośnikiem `#0358f7` — kolorem, którego nie ma nigdzie ani na
+ *   stronie, ani w pozostałych listach. Każdy inny list tego projektu ma granatowo-żółty
+ *   nagłówek, zaokrągloną kartę i pigułkę z odnośnikiem; ten jeden wypadał z zestawu, a jest
+ *   jedynym, który dostają ludzie spoza listy zapisanych — czyli najszersza publiczność, jaką
+ *   ta skrzynka ma.
+ *
+ *   Wzorem jest editionAnnouncementHtml() kilka tysięcy linii wyżej, nie shell() z generatora
+ *   blueprintu: tamten shell składa się w Make z `{{1.copy.*}}`, a ten list renderuje worker
+ *   i wysyła gotowy przez gałąź `outbox`.
+ *
+ * TEKSTY IDĄ Z COPY_DECK, NIE Z TABLICY W TYM PLIKU
+ *   Stała tu własna tabela sześciu języków, obok emails/copy.json, które ma sprawdzian
+ *   kompletności (tools/add-copy-keys.mjs czyta plik z powrotem i porównuje każdy język z
+ *   włoskim). Druga tabela to drugie miejsce, w którym można zapomnieć francuskiego, i żaden
+ *   sprawdzian by tego nie złapał. Klucze `voteRes*` są teraz w tamtym pliku.
+ */
+function votingResultLetter(recipient, podium) {
+  const locale = localeOf(recipient.voter_locale);
+  const deck = COPY_DECK[locale] || COPY_DECK.it;
+  const event = COPY_DECK._event || {};
+  const site = publicSiteUrl();
+
+  const rows = podium.map((entry, index) => {
+    const colour = PODIUM_COLOURS[index] || PODIUM_COLOURS[2];
+    return `<tr><td style="padding:0 0 10px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>`
+      + `<td width="44" style="width:44px;vertical-align:top"><div style="width:36px;height:36px;border-radius:12px;background:${colour};color:#071a3d;font-size:17px;font-weight:800;line-height:36px;text-align:center">${index + 1}</div></td>`
+      + `<td style="vertical-align:middle;padding-left:12px">`
+      + `<div style="font-size:16px;font-weight:800;color:#071a3d;line-height:1.3">${escapeHtml(entry.name)}</div>`
+      + `<div style="font-size:13px;color:#5a6a8a;line-height:1.5">${Number(entry.totalScore) || 0} ${escapeHtml(deck.voteResPoints)}</div>`
+      + `</td></tr></table></td></tr>`;
+  }).join('');
+
+  const helloName = recipient.voter_name ? ` ${escapeHtml(String(recipient.voter_name).trim())}` : '';
+  const html = `<!doctype html><html lang="${locale}"><body style="margin:0;padding:0;background:#e9f1ff;">`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#e9f1ff;">`
+    + `<tr><td align="center" style="padding:24px 12px;">`
+    + `<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:24px;overflow:hidden;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">`
+    + `<tr><td style="padding:24px 30px;background:linear-gradient(100deg,#ffca28,#ff6f9f,#8f71ff);font-size:19px;font-weight:900;color:#071a3d;">CARRULEDDHI <span style="color:#071a3d;opacity:.72">SHOW</span></td></tr>`
+    + `<tr><td style="padding:30px 30px 6px;">`
+    + `<p style="margin:0 0 10px;font-size:15px;color:#43516f;">${escapeHtml(deck.voteResHi)}${helloName},</p>`
+    + `<h1 style="margin:0 0 6px;font-size:26px;line-height:1.15;color:#071a3d;font-weight:800;letter-spacing:-.6px;">${escapeHtml(deck.voteResLead)}</h1>`
+    + `</td></tr>`
+    + `<tr><td style="padding:16px 30px 4px;">`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f5f8ff;border:2px solid #071a3d;border-radius:18px;">`
+    + `<tr><td style="padding:18px 18px 8px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows}</table></td></tr>`
+    + `</table></td></tr>`
+    + `<tr><td style="padding:18px 30px 4px;font-size:14px;line-height:1.6;color:#43516f;">${escapeHtml(deck.voteResThanks)}</td></tr>`
+    + `<tr><td style="padding:16px 30px 30px;">`
+    + `<a href="${escapeHtml(site)}/votazione.html" style="display:inline-block;background:#071a3d;color:#ffffff;font-size:14px;font-weight:800;text-decoration:none;padding:13px 22px;border-radius:999px;">${escapeHtml(deck.voteResCta)} &rarr;</a>`
+    + `</td></tr>`
+    + `<tr><td style="background:#071a3d;padding:20px 30px;font-size:12px;line-height:1.6;color:#8fb0e8;">`
+    + `${escapeHtml(deck.footerNote)}<br>`
+    + `<a href="mailto:${escapeHtml(event.email || '')}" style="color:#ffca28;">${escapeHtml(event.email || '')}</a>`
+    + `</td></tr></table></td></tr></table></body></html>`;
+  return { locale, subject: deck.voteResSubject, html };
+}
+
+/** Result opt-ins copied by the rollover. Private rows are paired with the immutable public
+ * snapshot only while rendering the letter; voter identity never enters `voting_editions`. */
+async function pendingVotingResultNotifications(env) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_result_notifications`);
+  url.searchParams.set('select', 'id,edition_id,voter_name,voter_email,voter_locale');
+  url.searchParams.set('sent_at', 'is.null');
+  url.searchParams.set('order', 'created_at.asc');
+  url.searchParams.set('limit', String(NEWSLETTER_BATCH));
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return { messages: [], note: 'voting result queue read failed' };
+  const rows = await response.json().catch(() => []);
+  if (!Array.isArray(rows) || rows.length === 0) return { messages: [] };
+
+  const editionIds = [...new Set(rows.map((row) => row.edition_id).filter(Boolean))];
+  const editionsUrl = new URL(`${env.SUPABASE_URL}/rest/v1/voting_editions`);
+  editionsUrl.searchParams.set('select', 'id,results');
+  editionsUrl.searchParams.set('id', `in.(${editionIds.join(',')})`);
+  const editionsResponse = await fetch(editionsUrl, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!editionsResponse?.ok) return { messages: [], note: 'voting result archive read failed' };
+  const editionRows = await editionsResponse.json().catch(() => []);
+  const editions = new Map((Array.isArray(editionRows) ? editionRows : []).map((row) => [row.id, row.results]));
+
+  const messages = [];
+  for (const row of rows) {
+    const results = editions.get(row.edition_id);
+    if (!Array.isArray(results)) continue;
+    const podium = [...results]
+      .filter((entry) => Number(entry.voteCount) > 0)
+      .sort((a, b) => Number(b.totalScore) - Number(a.totalScore)
+        || Number(b.voteCount) - Number(a.voteCount)
+        || Number(b.averageScore) - Number(a.averageScore)
+        || Number(a.startNumber) - Number(b.startNumber))
+      .slice(0, 3)
+      .map((entry) => ({
+        name: String(entry.projectName || `${entry.firstName || ''} ${entry.lastName || ''}`.trim()),
+        totalScore: Number(entry.totalScore) || 0
+      }));
+    if (!podium.length) continue;
+    const letter = votingResultLetter(row, podium);
+    messages.push({
+      to: String(row.voter_email || '').trim().toLowerCase(),
+      subject: letter.subject,
+      html: letter.html,
+      receipt: { kind: 'voting-result', notificationId: row.id }
+    });
+  }
+  return { messages };
+}
+
+async function notifyVotingFollowers(env, podium) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/votes`);
+  url.searchParams.set('select', 'id,voter_name,voter_email,voter_locale');
+  url.searchParams.set('category', `eq.${PUBLIC_AWARD}`);
+  url.searchParams.set('notify_results', 'is.true');
+  url.searchParams.set('result_notified_at', 'is.null');
+  url.searchParams.set('voter_email', 'not.is.null');
+  url.searchParams.set('limit', '1000');
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return { notified: 0, failed: 0 };
+  const rows = await response.json().catch(() => []);
+  let notified = 0;
+  let failed = 0;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const letter = votingResultLetter(row, podium.map((entry) => ({
+      name: entry.row.project_name || `${entry.row.first_name} ${entry.row.last_name}`.trim(),
+      totalScore: Number(entry.stats.total_score) || 0
+    })));
+    const sent = await sendToMake(env, {
+      type: 'outbox', branch: 'outbox', to: row.voter_email,
+      subject: letter.subject, html: letter.html
+    });
+    if (!sent) { failed += 1; continue; }
+    const marked = await fetch(`${env.SUPABASE_URL}/rest/v1/votes?id=eq.${row.id}`, {
+      method: 'PATCH', headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ result_notified_at: new Date().toISOString() })
+    });
+    if (marked.ok) notified += 1;
+    else failed += 1;
+  }
+  return { notified, failed };
+}
+
 async function votingAdminWinners(env, cors) {
   const settings = await readVotingSettings(env);
   if (votingPhase(settings) !== 'closed') {
@@ -5187,7 +6237,8 @@ async function votingAdminWinners(env, cors) {
     .sort((a, b) =>
       Number(b.stats.total_score) - Number(a.stats.total_score) ||
       Number(b.stats.vote_count) - Number(a.stats.vote_count) ||
-      Number(b.stats.average_score) - Number(a.stats.average_score))
+      Number(b.stats.average_score) - Number(a.stats.average_score) ||
+      Number(a.row.start_number) - Number(b.row.start_number))
     .slice(0, 3);
 
   if (!podium.length) return json({ ok: false, code: 'VOTING_NO_RESULTS' }, 409, cors);
@@ -5225,18 +6276,43 @@ async function votingAdminWinners(env, cors) {
       unreachable.push(shared);
       continue;
     }
+    /* Ten sam układ, co przy zapisach: cały blok językowy plus to, czego szablon w Make nie
+       umie rozstrzygnąć sam. Renderer podstawia ścieżki i nic więcej — nie ma warunków, nie
+       ma `||` — więc wybór między pierwszym, drugim i trzecim miejscem oraz zastępstwo dla
+       pustej nazwy wózka muszą być zrobione tutaj, a nie w szablonie. */
+    const locale = localeOf(contact.locale);
+    const deck = COPY_DECK[locale] || COPY_DECK.it;
+    const firstName = String(contact.first_name || '').trim();
     const mailed = await sendToMake(env, {
       type: 'voting-winner',
       branch: 'voting-winner',
-      locale: localeOf(contact.locale),
+      locale,
       email: contact.email,
       name: `${contact.first_name} ${contact.last_name}`.trim(),
+      copy: deck,
+      ev: COPY_DECK._event || {},
+      loc: locale,
+      hi: fill(deck.winHi, { FIRSTNAME: firstName }),
+      winSubject: deck[`winSubject${place}`] || deck.winSubject1,
+      winHeading: deck[`winHeading${place}`] || deck.winHeading1,
+      /* Uczestnik bez nazwy wózka nie jest błędem — pole jest opcjonalne w panelu — więc
+         w liście staje tam jego imię i nazwisko zamiast pustej komórki. */
+      winProject: entry.row.project_name || `${entry.row.first_name} ${entry.row.last_name}`.trim(),
+      /* Kolor plakietki z miejscem. Te same trzy, co na cokole w liście do głosujących i w tej
+         samej kolejności; wybrany tutaj, bo szablon w Make nie ma jak wybrać jednego z trzech. */
+      winColour: PODIUM_COLOURS[place - 1] || PODIUM_COLOURS[2],
+      resultsUrl: `${publicSiteUrl()}/votazione.html`,
       ...shared
     });
     (mailed ? sent : unreachable).push(shared);
   }
 
-  return json({ ok: true, sent, unreachable, podium: podium.length }, 200, cors);
+  const followers = await notifyVotingFollowers(env, podium);
+  return json({
+    ok: true, sent, unreachable, podium: podium.length,
+    notifiedVoters: followers.notified,
+    failedVoterNotifications: followers.failed
+  }, 200, cors);
 }
 
 async function votingAdmin(env, payload, cors) {
@@ -5257,6 +6333,8 @@ async function votingAdmin(env, payload, cors) {
   if (action === 'schedule') return votingAdminSchedule(env, payload, cors);
   if (action === 'open') return votingAdminOpen(env, payload, cors);
   if (action === 'close') return votingAdminClose(env, cors);
+  if (action === 'countdown') return votingAdminCountdown(env, cors);
+  if (action === 'clear') return votingAdminClear(env, cors);
   if (action === 'winners') return votingAdminWinners(env, cors);
   return json({ ok: false, code: 'VOTING_UNKNOWN_ACTION' }, 400, cors);
 }
@@ -5590,6 +6668,9 @@ export default {
       if (type === 'settings-admin') return settingsAdmin(env, payload, cors);
       if (type === 'reminders-due') return remindersDue(env, payload, cors);
       if (type === 'purge') return purge(env, payload, cors);
+      if (type === 'sponsor-lead') return sponsorLead(env, payload, cors);
+      if (type === 'notify-code') return notifyCode(env, payload, cors);
+      if (type === 'notify-off') return notifyOff(env, payload, cors);
       if (type === 'unsub-start') return unsubStart(env, payload, cors);
       if (type === 'unsub-confirm') return unsubConfirm(env, payload, cors);
       if (type === 'entry-lookup') return entryLookup(env, payload, cors);
@@ -5635,8 +6716,8 @@ export default {
     // the browser's flag would let a crafted request pick the adult liberatoria for
     // a child.
     if (type === 'registration') {
-      const eventDate = new Date(env.EVENT_DATE || '2026-10-17T14:30:00+02:00');
-      const age = ageOn(payload.birthDate, Number.isNaN(eventDate.getTime()) ? new Date() : eventDate);
+      const eventDate = eventStartAt(env, await readSettings(env));
+      const age = ageOn(payload.birthDate, eventDate);
       payload.riderAge = String(age);
       payload.isMinor = age < ADULT_AGE;
       if (!payload.isMinor) {

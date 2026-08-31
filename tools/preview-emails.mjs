@@ -89,7 +89,28 @@ function payloadFor({ locale, isMinor }) {
        wygląda i czy się nie zawija — a nie o to, żeby link działał. Adres liczy worker
        (patrz formUrl w handlerze i w entryManage), tutaj nie ma z czego. */
     formUrl: 'https://www.carruleddhishow.com/api/carruleddhi/form'
-      + '?id=1f2e3d4c-5b6a-4798-8899-aabbccddeeff&t=8f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f'
+      + '?id=1f2e3d4c-5b6a-4798-8899-aabbccddeeff&t=8f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f',
+
+    /* Podium Nagrody publiczności. Pierwsze miejsce, bo to jedyny wariant, w którym nagłówek
+       i temat mówią „wygrałeś" — pozostałe dwa różnią się wyłącznie tymi dwoma polami, a
+       votingAdminWinners() wybiera je tym samym kluczem. Kolor plakietki też przychodzi
+       gotowy, z tej samej trójki co cokół w liście do głosujących. */
+    winSubject: deck.winSubject1,
+    winHeading: deck.winHeading1,
+    winColour: '#ffca28',
+    winProject: 'Fulmine di Gallura',
+    place: 1,
+    startNumber: 41,
+    category: 'classic',
+    totalScore: 268,
+    voteCount: 34,
+    resultsUrl: 'https://www.carruleddhishow.com/votazione.html',
+
+    /* Potwierdzenie głosu. Wariant z imieniem, bo bez imienia różni się wyłącznie pierwszą
+       linijką, a z imieniem widać, czy podstawienie %FIRSTNAME% zadziałało. */
+    rcptProject: 'Fulmine di Gallura',
+    rcptUrl: 'https://www.carruleddhishow.com/votazione.html#vote=8f1c2d3e4a5b6c7d',
+    score: 9
   };
   /* The attachment block. One form for an Italian rider, two for everybody else, which
      is the same choice attachCopy() makes and the reason these are fields at all. */
@@ -134,7 +155,11 @@ const wanted = [
   ['reminder', 'pl', false], ['contact', 'pl', false], ['newsletter', 'pl', false],
   // The letter that actually goes out 7 days / 1 day / 3 hours before, and the one
   // carrying an unsubscribe code. Both were only visible in production until now.
-  ['reminderDue', 'pl', false], ['code', 'pl', false]
+  ['reminderDue', 'pl', false], ['code', 'pl', false],
+  // Dwa języki, bo `winHeading`/`winSubject` są jedynymi polami, które worker wybiera z
+  // trzech wariantów — a wariant wybrany źle widać dopiero w gotowym liście.
+  ['winner', 'it', false], ['winner', 'pl', false],
+  ['voteReceipt', 'it', false], ['voteReceipt', 'pl', false]
 ];
 
 /**

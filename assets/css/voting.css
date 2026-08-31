@@ -407,127 +407,10 @@
   text-transform: uppercase;
 }
 
-/* `auto-fill` z minimum, nie stała liczba kolumn: stawka ma od jednego do kilkudziesięciu
-   wozów, a siatka o trzech kolumnach przy czterech uczestnikach zostawia dziurę w drugim
-   rzędzie.
-
-   Minimum podniesione ze 132 na 158 px razem z przejściem podpisu NA zdjęcie: podpis leży
-   teraz w kadrze, a nie pod nim, więc szerokość kolumny decyduje o tym, na ile wierszy łamie
-   się nazwa — a każdy wiersz podpisu zjada kawałek wozu. Przy 132 px „Luna di Capo Testa"
-   zajmowała trzy wiersze i zasłaniała pół zdjęcia. */
-.podium__field-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
-  gap: clamp(10px, 1.4vw, 16px);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Kafelek nie ma już własnego pudełka: jest nim samo zdjęcie. Dwadzieścia białych ramek z
-   miniaturą w środku to było dwadzieścia ramek i dwadzieścia znaczków — a miało być
-   dwadzieścia fotografii. Ta sama zasada, co na cokole wyżej. */
-.podium__field-item {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  transition: transform .3s var(--ease-out);
-}
-@media (hover: hover) {
-  .podium__field-item:hover { transform: translateY(-4px); }
-}
-
-/* Najmniejsze zdjęcia w całym cokole — czwarte miejsce i dalsze. 16/10 zamiast 4/3, bo
-   niski kadr w wąskiej kolumnie czyta się jako miniatura, a nie jako przycięta karta. */
-/* Wyższy kadr niż wcześniejsze 16/10: podpis leży teraz NA zdjęciu i przy niskim kadrze
-   zajmował jego połowę. 4/5 zostawia wozowi dwie trzecie wysokości. */
-.podium__field-photo {
-  position: relative;
-  margin: 0;
-  aspect-ratio: 4 / 5;
-  overflow: hidden;
-  border-radius: 16px;
-  background: var(--navy-900);
-  box-shadow: 0 14px 28px -20px rgb(7 26 61 / .7);
-}
-.podium__field-scrim {
-  position: absolute; inset: auto 0 0; height: 88%;
-  background: linear-gradient(
-    to top,
-    rgb(4 14 34 / .93) 0%,
-    rgb(4 14 34 / .74) 28%,
-    rgb(4 14 34 / .3) 60%,
-    rgb(4 14 34 / 0) 100%
-  );
-  pointer-events: none;
-}
-.podium__field-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-/* Miejsce w rogu miniatury, nie osobną kolumną: kolumna z cyfrą zabiera z wąskiego kafelka
-   tyle, ile sama miniatura. */
-.podium__field-place {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  display: grid;
-  min-width: 24px;
-  height: 24px;
-  place-items: center;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgb(7 26 61 / .86);
-  color: var(--yellow);
-  font: 900 12px/1 var(--font-meta);
-  font-variant-numeric: tabular-nums;
-  z-index: 2;
-}
-/* -------------------------------------------------------- podpis NA miniaturze */
-.podium__field-body {
-  position: absolute; inset: auto 0 0; z-index: 2;
-  display: grid; gap: 1px; min-width: 0;
-  padding: 9px 10px 10px;
-  color: var(--white);
-  text-shadow: 0 1px 3px rgb(4 14 34 / .85);
-}
-.podium__field-body strong {
-  font: 400 clamp(13px, 1.05vw, 16px)/1.1 var(--font-display);
-  overflow-wrap: anywhere;
-}
-.podium__field-body span {
-  color: rgb(255 255 255 / .68);
-  font: 800 8.5px/1.25 var(--font-meta);
-  letter-spacing: .09em; text-transform: uppercase;
-}
-.podium__field-body p { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; margin: 4px 0 0; }
-.podium__field-body p b {
-  color: var(--yellow);
-  font: 900 clamp(15px, 1.2vw, 19px)/1 var(--font-meta);
-  font-variant-numeric: tabular-nums;
-}
-.podium__field-body p small {
-  color: rgb(255 255 255 / .66);
-  font: 800 8px/1.25 var(--font-meta);
-  letter-spacing: .06em; text-transform: uppercase;
-}
-/* Ten sam pasek remisu co na cokole, mniejszy. Na tej siatce jest ważniejszy niż tam: to tutaj
-   stoi czwarty z tą samą sumą co trzeci na podium. */
-.podium__field-tie {
-  justify-self: start;
-  margin: 6px 0 0;
-  padding: 4px 7px;
-  border-radius: 999px;
-  background: rgb(255 201 40 / .18);
-  box-shadow: inset 0 0 0 1px rgb(255 201 40 / .4);
-  color: #ffe08a;
-  font: 800 8px/1.3 var(--font-meta);
-  letter-spacing: .03em;
-  text-shadow: none;
-}
-
-@media (max-width: 480px) {
-  /* Dwie kolumny, nie jedna: przy jednej kolumnie miniatura rośnie do szerokości ekranu i
-     przestaje być miniaturą, czyli znika różnica względem cokołu. */
-  .podium__field-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-}
+/* Siatka kafelków pozostałej stawki została zastąpiona tabelą — patrz sekcja „cokół w jednym
+   ekranie" na końcu pliku. Reguły `.podium__field-list`, `.podium__field-item`,
+   `.podium__field-photo`, `.podium__field-scrim`, `.podium__field-place`, `.podium__field-body`
+   i `.podium__field-tie` usunięto razem ze znacznikiem, który je nosił. */
 
 /* Na telefonie trzy kolumny cokołu robią trzy nieczytelne kolumny: zdjęcie w kolumnie o
    szerokości 100 px to znaczek. Cokół schodzi wtedy do listy w kolejności wyniku, a blok
@@ -2163,3 +2046,147 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 .vote-veil__pick .vote-slider__row { gap: 10px; }
 .vote-veil__pick .vote-slider { height: 40px; min-height: 40px; }
+
+/* ============================================================ cokół w jednym ekranie */
+/* ZMIEŚCIĆ WYNIK NA JEDNYM EKRANIE.
+   ---------------------------------------------------------------------------
+   Sekcja z cokołem rosła w nieskończoność: trzy karty, a pod nimi siatka ze zdjęciami całej
+   pozostałej stawki. Przy dwudziestu wozach podium wyjeżdżało z kadru w chwili, w której ktoś
+   zaczynał czytać resztę — czyli wynik i jego kontekst nigdy nie były widoczne razem.
+
+   Teraz sekcja ma budżet wysokości równy ekranowi. Cokół dostaje z niego tyle, ile potrzebuje,
+   a tabela poniżej bierze resztę i przewija się WEWNĄTRZ siebie. `dvh`, nie `vh`: na telefonie
+   pasek adresu zmienia widoczną wysokość, a `vh` liczy ten stan, w którym go nie ma.
+
+   Cokół nie kurczy się do zera przy krótkim ekranie — `min-height` na scenie pilnuje, żeby
+   zdjęcia zwycięzców zostały zdjęciami, a nie znaczkami. Gdy naprawdę nie ma miejsca, sekcja
+   przewinie się normalnie; to jest budżet, nie sztywna klatka. */
+.podium__field { margin-top: clamp(18px, 2.6vw, 30px); }
+
+/* Tabela: własny pasek przewijania, nagłówek przyklejony u góry.
+   Bez przyklejonego nagłówka przewinięcie o trzy wiersze zabiera podpisy kolumn i zostają
+   cztery kolumny liczb bez wyjaśnienia, która jest którą. */
+.podium__field-scroll {
+  max-height: min(42dvh, 380px);
+  overflow: auto;
+  border: 3px solid var(--navy-950);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 7px 7px 0 #9ad9ff;
+  overscroll-behavior: contain;
+}
+.podium__field-scroll:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+
+.podium__table { width: 100%; border-collapse: collapse; }
+.podium__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  background: var(--navy-950);
+  color: rgb(255 255 255 / .72);
+  font: 900 9.5px/1 var(--font-meta);
+  letter-spacing: .1em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.podium__table thead th:nth-child(n + 3) { text-align: right; }
+.podium__table tbody tr { border-top: 2px solid rgb(7 26 61 / .1); }
+.podium__table tbody tr:nth-child(odd) { background: rgb(154 217 255 / .12); }
+.podium__table td, .podium__table tbody th { padding: 9px 12px; vertical-align: middle; }
+
+.podium__table-rank {
+  width: 44px;
+  color: var(--blue-700);
+  font: 900 15px/1 var(--font-meta);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+.podium__table-who { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 10px; align-items: center; }
+.podium__table-who img {
+  width: 46px;
+  height: 34px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: var(--blue-100);
+}
+.podium__table-who span { display: grid; gap: 1px; min-width: 0; }
+/* `min-width: 0` wyżej i obcinanie tutaj: bez tego długa nazwa wozu rozpycha kolumnę i psuje
+   wyrównanie liczb po prawej. */
+.podium__table-who strong {
+  overflow: hidden;
+  color: var(--navy-950);
+  font-size: 13.5px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.podium__table-who small {
+  overflow: hidden;
+  color: var(--muted);
+  font: 800 9.5px/1.25 var(--font-meta);
+  letter-spacing: .06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.podium__table-tie {
+  color: #a06b00;
+  font: 800 9px/1.3 var(--font-meta);
+  font-style: normal;
+}
+.podium__table-number {
+  color: var(--navy-950);
+  font: 800 12.5px/1 var(--font-meta);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.podium__table-points { color: var(--blue-700); font-size: 16px; font-weight: 900; }
+
+.podium__field-more { display: flex; justify-content: center; margin-top: 14px; }
+.podium__field-more button[hidden] { display: none; }
+
+/* Telefon: tabela rozkłada się na kartki, bo pięć kolumn na 360 px to pięć kolumn po 70 px.
+   Nagłówek schodzi, a każdą liczbę podpisuje jej własne `data-label`. */
+@media (max-width: 640px) {
+  .podium__field-scroll { max-height: min(46dvh, 340px); box-shadow: 5px 5px 0 #9ad9ff; }
+  .podium__table thead { display: none; }
+  .podium__table tbody tr {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 2px 8px;
+    padding: 9px 10px;
+  }
+  .podium__table tbody th, .podium__table td { padding: 0; }
+  .podium__table-rank { grid-row: 1 / 3; grid-column: 1; width: auto; }
+  .podium__table-who { grid-column: 2; grid-template-columns: 40px minmax(0, 1fr); }
+  .podium__table-who img { width: 40px; height: 30px; }
+  .podium__table-number {
+    display: inline-grid;
+    grid-auto-flow: column;
+    gap: 4px;
+    align-items: baseline;
+    justify-content: start;
+    text-align: left;
+  }
+  .podium__table-number::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font: 800 8px/1 var(--font-meta);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  /* Trzy liczby w jednym rzędzie pod nazwą, nie w trzech wierszach. */
+  .podium__table tbody tr > .podium__table-number:nth-of-type(1) { grid-area: 3 / 2; }
+  .podium__table tbody tr > .podium__table-number:nth-of-type(2) { grid-area: 3 / 2; justify-self: center; }
+  .podium__table tbody tr > .podium__table-number:nth-of-type(3) { grid-area: 3 / 2; justify-self: end; }
+}
+
+/* Cokół niżej, żeby razem z tabelą zmieścił się w ekranie. Zdjęcia zostają duże — schodzą
+   same stopnie, które są tłem, nie treścią. */
+@media (min-height: 640px) {
+  .podium-card[data-podium-place='1'] .podium-card__block { --step-h: clamp(56px, 7.5vw, 96px); }
+  .podium-card[data-podium-place='2'] .podium-card__block { --step-h: clamp(38px, 5vw, 66px); }
+  .podium-card[data-podium-place='3'] .podium-card__block { --step-h: clamp(26px, 3.4vw, 46px); }
+}

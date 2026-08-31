@@ -124,18 +124,17 @@ export function DateTimeField({
     ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(selected)
     : '';
 
-  /* Pod palcem oddajemy pole systemowi. Ten sam `value` i ten sam `onChange`, więc dla strony
-     wyżej to jest dokładnie to samo pole. */
-  if (coarse) {
-    return (
-      <input
-        type="datetime-local"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={className}
-      />
-    );
-  }
+  /* WŁASNY KALENDARZ TAKŻE POD PALCEM.
+     ---------------------------------------------------------------------------
+     Stał tu warunek oddający pole systemowi, gdy przeglądarka raportuje `pointer: coarse`.
+     Zgłoszone jako „nie mam tu kalendarza": laptop z ekranem dotykowym raportuje `coarse`
+     mimo podłączonej myszy, więc na zwykłym biurku pojawiało się natywne `datetime-local`,
+     w którym kalendarz otwiera się dopiero po trafieniu w kilkupikselową ikonę — a nazwy
+     miesięcy i dni idą wtedy za językiem systemu, nie panelu.
+
+     Własny panel działa jednakowo pod myszą i pod palcem, bo jest zbudowany ze zwykłych
+     przycisków, i ma jawny przycisk otwierający z podpisem „Wybierz datę i godzinę". Dni
+     dostają większe cele na dotyku — patrz `coarse` niżej w klasach siatki. */
 
   const setDay = (day: Date) => {
     const base = selected ?? new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0);
@@ -172,7 +171,12 @@ export function DateTimeField({
         <div
           role="dialog"
           aria-label={labels.open}
-          className="absolute left-0 z-30 mt-2 w-[19rem] rounded-2xl border border-white/15 bg-navy-950 p-3 shadow-2xl"
+          /* `max-w` w jednostce viewportu: panel o stałych 19rem wychodził poza prawą krawędź
+             na telefonie trzymanym w pionie, a wtedy ostatnia kolumna dni jest nieosiągalna. */
+          className={cn(
+            'absolute left-0 z-30 mt-2 rounded-2xl border border-white/15 bg-navy-950 p-3 shadow-2xl',
+            'w-[19rem] max-w-[calc(100vw-2.5rem)]'
+          )}
         >
           <div className="flex items-center justify-between gap-2">
             <button
@@ -209,7 +213,9 @@ export function DateTimeField({
                   type="button"
                   onClick={() => setDay(day)}
                   className={cn(
-                    'rounded-lg py-1.5 text-center text-xs tabular-nums transition-colors',
+                    'rounded-lg text-center tabular-nums transition-colors',
+                    // Pod palcem dzień musi być celem, nie cyfrą: 40 px zamiast 24.
+                    coarse ? 'min-h-10 text-sm' : 'py-1.5 text-xs',
                     picked
                       ? 'bg-yellow font-extrabold text-navy-950'
                       : outside

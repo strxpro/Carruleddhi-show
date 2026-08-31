@@ -265,6 +265,14 @@ export interface SiteSettings {
   showWall: boolean;
   showPrizes: boolean;
   showCounters: boolean;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  /** Stable local or bucket paths saved in site_settings. */
+  galleryImages: string[];
+  /** Fresh signed URLs used only by the admin preview; never saved back. */
+  galleryPreviewUrls: string[];
+  announcementEventDate: string;
 }
 
 export const fetchSettings = (key: string) =>
@@ -283,6 +291,25 @@ export const saveSettings = (key: string, settings: Partial<SiteSettings>) =>
 /** Uploads a logo and returns its bucket path plus a signed URL to preview it with. */
 export const uploadSponsorLogo = (key: string, photo: string) =>
   call<{ ok: true; logo: string; url: string }>('settings-admin', key, { action: 'logo', photo });
+
+export const uploadGalleryImage = (key: string, photo: string) =>
+  call<{ ok: true; imagePath: string; url: string }>('settings-admin', key, { action: 'gallery', photo });
+
+/** Archives the previous voting edition, prepares the saved date and arms its mailing. Safe to press twice. */
+export const announceEdition = (key: string) =>
+  call<{
+    ok: true;
+    queued: boolean;
+    eventDate: string;
+    edition: {
+      rolledOver?: boolean;
+      alreadyApplied?: boolean;
+      archivedEditionKey?: string;
+      activeEditionKey?: string;
+      participantCount?: number;
+      voteCount?: number;
+    };
+  }>('settings-admin', key, { action: 'announce' });
 
 /* ------------------------------------------------------------------ voting
 
@@ -377,9 +404,29 @@ export const openVoting = (key: string, durationMinutes: number) =>
 
 export const closeVoting = (key: string) => call<VotingState>('voting-admin', key, { action: 'close' });
 
+/**
+ * Back to the countdown, using the saved event date as the single source of truth.
+ *
+ * After testing the schedule usually holds a rehearsal time or a manual close, and the
+ * countdown in the hero then disagrees with the event date shown everywhere else. This
+ * rewrites the start from `site_settings.eventDate` and clears the manual close.
+ */
+export const showCountdown = (key: string) =>
+  call<VotingState>('voting-admin', key, { action: 'countdown' });
+
+/** Removes votes only; candidates, photos and the schedule stay intact. */
+export const clearVoting = (key: string) => call<VotingState>('voting-admin', key, { action: 'clear' });
+
 /** Only answers once voting is closed; 409 VOTING_STILL_OPEN before that. */
 export const mailWinners = (key: string) =>
-  call<{ ok: true; sent: VotingWinner[]; unreachable: VotingWinner[]; podium: number }>(
+  call<{
+    ok: true;
+    sent: VotingWinner[];
+    unreachable: VotingWinner[];
+    podium: number;
+    notifiedVoters: number;
+    failedVoterNotifications: number;
+  }>(
     'voting-admin',
     key,
     { action: 'winners' }
@@ -387,6 +434,7 @@ export const mailWinners = (key: string) =>
 
 /* ------------------------------------------------------------------- purge */
 
+/** `voting` clears the candidate list and the votes cast on it; the schedule stays. */
 export type PurgeScope =
   | 'registrations'
   | 'attendance'
@@ -394,6 +442,7 @@ export type PurgeScope =
   | 'messages'
   | 'chat'
   | 'wall'
+  | 'voting'
   | 'everything';
 
 /**

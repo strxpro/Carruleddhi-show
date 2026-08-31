@@ -315,7 +315,274 @@ const EDITED = {
   fr: { editedPrefix: '[Mis à jour]' }
 };
 
-const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED];
+/* ------------------------------------------------------ Nagroda publiczności: list do podium
+   Trzy miejsca, jeden list. Nagłówek i temat są wybierane po miejscu W FUNKCJI, nie w
+   szablonie — reguła tego projektu brzmi, że renderer podstawia ścieżki i nic więcej, więc
+   trójpodział musi się rozstrzygnąć zanim payload wyjdzie z workera. Stąd trzy warianty
+   `winSubject*` i `winHeading*` zamiast jednego z warunkiem w środku.
+
+   `winLead` jest wspólny dla trzech miejsc i mówi to samo co cokół na stronie: to nagroda
+   przyznana głosami widzów, a nie przez jury i nie na czas. Bez tego zdania „drugie miejsce"
+   czyta się jak drugie miejsce w wyścigu, a to inna nagroda.
+
+   `winPickup` jest tu dlatego, że list bez niego kończy się gratulacjami i nikt nie wie, co
+   dalej zrobić. Jedno zdanie, bez godzin i miejsc — te są w `_event` i zmieniają się co rok. */
+const WINNER = {
+  it: {
+    winSubject1: 'Hai vinto il Premio del pubblico!',
+    winSubject2: 'Secondo posto al Premio del pubblico!',
+    winSubject3: 'Terzo posto al Premio del pubblico!',
+    winHi: 'Ciao %FIRSTNAME%,',
+    winHeading1: 'Primo posto. Il pubblico ha scelto te.',
+    winHeading2: 'Secondo posto. Sul podio del pubblico.',
+    winHeading3: 'Terzo posto. Sul podio del pubblico.',
+    winLead: 'Il Premio del pubblico non lo assegna una giuria e non lo decide il cronometro: lo votano le persone che erano lì, lungo la discesa. Queste sono le loro voci.',
+    winStatsTitle: 'Il tuo risultato',
+    winNumberLabel: 'Numero di partenza',
+    winProjectLabel: 'Carruleddhu',
+    winCategoryLabel: 'Categoria',
+    winPointsLabel: 'Punti',
+    winVotesLabel: 'Voti',
+    winPickup: 'Il premio si ritira dagli organizzatori: scrivici e ci mettiamo d’accordo su come e quando.',
+    winCta: 'Guarda la classifica'
+  },
+  pl: {
+    winSubject1: 'Wygrywasz Nagrodę publiczności!',
+    winSubject2: 'Drugie miejsce w Nagrodzie publiczności!',
+    winSubject3: 'Trzecie miejsce w Nagrodzie publiczności!',
+    winHi: 'Cześć %FIRSTNAME%,',
+    winHeading1: 'Pierwsze miejsce. Publiczność wybrała Ciebie.',
+    winHeading2: 'Drugie miejsce. Jesteś na podium publiczności.',
+    winHeading3: 'Trzecie miejsce. Jesteś na podium publiczności.',
+    winLead: 'Nagrody publiczności nie przyznaje jury ani stoper — głosują ludzie, którzy stali przy zjeździe. To są ich głosy.',
+    winStatsTitle: 'Twój wynik',
+    winNumberLabel: 'Numer startowy',
+    winProjectLabel: 'Wózek',
+    winCategoryLabel: 'Kategoria',
+    winPointsLabel: 'Punkty',
+    winVotesLabel: 'Głosy',
+    winPickup: 'Nagrodę odbierasz u organizatorów — napisz do nas, umówimy się jak i kiedy.',
+    winCta: 'Zobacz wyniki'
+  },
+  en: {
+    winSubject1: 'You won the Audience Award!',
+    winSubject2: 'Second place in the Audience Award!',
+    winSubject3: 'Third place in the Audience Award!',
+    winHi: 'Hello %FIRSTNAME%,',
+    winHeading1: 'First place. The audience chose you.',
+    winHeading2: 'Second place. You are on the audience podium.',
+    winHeading3: 'Third place. You are on the audience podium.',
+    winLead: 'The Audience Award is not handed out by a jury and not decided by a stopwatch — it is voted for by the people who stood along the descent. These are their votes.',
+    winStatsTitle: 'Your result',
+    winNumberLabel: 'Start number',
+    winProjectLabel: 'Carruleddhu',
+    winCategoryLabel: 'Category',
+    winPointsLabel: 'Points',
+    winVotesLabel: 'Votes',
+    winPickup: 'The prize is collected from the organisers — write to us and we will arrange how and when.',
+    winCta: 'See the results'
+  },
+  de: {
+    winSubject1: 'Du hast den Publikumspreis gewonnen!',
+    winSubject2: 'Zweiter Platz beim Publikumspreis!',
+    winSubject3: 'Dritter Platz beim Publikumspreis!',
+    winHi: 'Hallo %FIRSTNAME%,',
+    winHeading1: 'Erster Platz. Das Publikum hat dich gewählt.',
+    winHeading2: 'Zweiter Platz. Du stehst auf dem Publikumspodest.',
+    winHeading3: 'Dritter Platz. Du stehst auf dem Publikumspodest.',
+    winLead: 'Den Publikumspreis vergibt keine Jury und entscheidet keine Stoppuhr — ihn wählen die Menschen, die an der Abfahrt standen. Das sind ihre Stimmen.',
+    winStatsTitle: 'Dein Ergebnis',
+    winNumberLabel: 'Startnummer',
+    winProjectLabel: 'Carruleddhu',
+    winCategoryLabel: 'Kategorie',
+    winPointsLabel: 'Punkte',
+    winVotesLabel: 'Stimmen',
+    winPickup: 'Den Preis holst du bei den Organisatoren ab — schreib uns, dann machen wir aus, wie und wann.',
+    winCta: 'Ergebnisse ansehen'
+  },
+  es: {
+    winSubject1: '¡Has ganado el Premio del público!',
+    winSubject2: '¡Segundo puesto en el Premio del público!',
+    winSubject3: '¡Tercer puesto en el Premio del público!',
+    winHi: 'Hola %FIRSTNAME%,',
+    winHeading1: 'Primer puesto. El público te ha elegido.',
+    winHeading2: 'Segundo puesto. Estás en el podio del público.',
+    winHeading3: 'Tercer puesto. Estás en el podio del público.',
+    winLead: 'El Premio del público no lo da un jurado ni lo decide un cronómetro: lo votan las personas que estaban allí, en la bajada. Estos son sus votos.',
+    winStatsTitle: 'Tu resultado',
+    winNumberLabel: 'Número de salida',
+    winProjectLabel: 'Carruleddhu',
+    winCategoryLabel: 'Categoría',
+    winPointsLabel: 'Puntos',
+    winVotesLabel: 'Votos',
+    winPickup: 'El premio se recoge con los organizadores: escríbenos y acordamos cómo y cuándo.',
+    winCta: 'Ver la clasificación'
+  },
+  fr: {
+    winSubject1: 'Vous avez gagné le Prix du public !',
+    winSubject2: 'Deuxième place au Prix du public !',
+    winSubject3: 'Troisième place au Prix du public !',
+    winHi: 'Bonjour %FIRSTNAME%,',
+    winHeading1: 'Première place. Le public vous a choisi.',
+    winHeading2: 'Deuxième place. Vous êtes sur le podium du public.',
+    winHeading3: 'Troisième place. Vous êtes sur le podium du public.',
+    winLead: 'Le Prix du public n’est pas remis par un jury et ne se décide pas au chronomètre : il est voté par les gens qui étaient là, le long de la descente. Voici leurs voix.',
+    winStatsTitle: 'Votre résultat',
+    winNumberLabel: 'Numéro de départ',
+    winProjectLabel: 'Carruleddhu',
+    winCategoryLabel: 'Catégorie',
+    winPointsLabel: 'Points',
+    winVotesLabel: 'Voix',
+    winPickup: 'Le prix se retire auprès des organisateurs : écrivez-nous et nous conviendrons du comment et du quand.',
+    winCta: 'Voir le classement'
+  }
+};
+
+/* ------------------------------------------------- Nagroda publiczności: list do głosujących
+   Ten idzie do wszystkich, którzy zaznaczyli „powiadom mnie o wyniku", i do uczestników.
+   Renderuje go worker i wysyła gotowy przez gałąź `outbox` — te klucze są tu, a nie w
+   VOTING_RESULT_COPY w worker/index.js, żeby wszystkie teksty listów stały w jednym pliku
+   i przechodziły przez ten sam sprawdzian kompletności sześciu języków. */
+const VOTERESULT = {
+  it: {
+    voteResSubject: 'Risultati del Premio del pubblico',
+    voteResHi: 'Ciao',
+    voteResLead: 'La votazione è chiusa. Ecco il podio scelto dal pubblico.',
+    voteResPoints: 'punti',
+    voteResThanks: 'Grazie per aver votato: il podio qui sopra è fatto anche del tuo voto.',
+    voteResCta: 'Guarda la classifica completa'
+  },
+  pl: {
+    voteResSubject: 'Wyniki Nagrody publiczności',
+    voteResHi: 'Cześć',
+    voteResLead: 'Głosowanie zamknięte. Oto podium wybrane przez publiczność.',
+    voteResPoints: 'pkt',
+    voteResThanks: 'Dzięki, że zagłosowałeś — to podium jest zrobione również z Twojego głosu.',
+    voteResCta: 'Zobacz pełne wyniki'
+  },
+  en: {
+    voteResSubject: 'Audience Award results',
+    voteResHi: 'Hello',
+    voteResLead: 'Voting is closed. Here is the podium chosen by the audience.',
+    voteResPoints: 'points',
+    voteResThanks: 'Thank you for voting — the podium above is made of your vote too.',
+    voteResCta: 'See the full results'
+  },
+  de: {
+    voteResSubject: 'Ergebnisse des Publikumspreises',
+    voteResHi: 'Hallo',
+    voteResLead: 'Die Abstimmung ist geschlossen. Das ist das Podest, das das Publikum gewählt hat.',
+    voteResPoints: 'Punkte',
+    voteResThanks: 'Danke fürs Abstimmen — dieses Podest ist auch aus deiner Stimme gemacht.',
+    voteResCta: 'Alle Ergebnisse ansehen'
+  },
+  es: {
+    voteResSubject: 'Resultados del Premio del público',
+    voteResHi: 'Hola',
+    voteResLead: 'La votación está cerrada. Este es el podio elegido por el público.',
+    voteResPoints: 'puntos',
+    voteResThanks: 'Gracias por votar: este podio también está hecho con tu voto.',
+    voteResCta: 'Ver la clasificación completa'
+  },
+  fr: {
+    voteResSubject: 'Résultats du Prix du public',
+    voteResHi: 'Bonjour',
+    voteResLead: 'Le vote est clos. Voici le podium choisi par le public.',
+    voteResPoints: 'points',
+    voteResThanks: 'Merci d’avoir voté : ce podium est fait aussi de votre voix.',
+    voteResCta: 'Voir le classement complet'
+  }
+};
+
+/* ---------------------------------------------- Nagroda publiczności: potwierdzenie głosu
+   Idzie natychmiast po oddaniu głosu, z odsyłaczem, którym można ten głos raz zmienić.
+
+   DWA POWITANIA, BO GŁOS BYWA ANONIMOWY
+     `votes.voter_name` jest od migracji 0030 opcjonalny — można zagłosować nie podając ani
+     imienia, ani adresu (wtedy nie ma dokąd wysłać tego listu, ale imię bywa puste także
+     przy podanym adresie). „Cześć ," z przecinkiem po pustym miejscu to nie jest drobiazg,
+     tylko pierwsza linijka listu. Worker wybiera jedno z dwóch i wysyła gotowe w `hi`.
+
+   `rcptCta` mówi „otwórz stronę głosowania", a nie „zmień swój głos", chociaż odsyłacz
+   prowadzi dokładnie do zmiany. Powód: gdyby baza nie oddała żetonu, worker podstawia adres
+   samej podstrony — przycisk z napisem „zmień głos", który prowadzi do strony bez okna
+   zmiany, kłamie. Zdanie obok i tak tłumaczy, że zmiana jest możliwa raz. */
+const RECEIPT = {
+  it: {
+    rcptSubject: 'Il tuo voto è registrato',
+    rcptHi: 'Ciao %FIRSTNAME%,',
+    rcptHiPlain: 'Ciao,',
+    rcptHeading: 'Voto registrato. Grazie.',
+    rcptLead: 'Il Premio del pubblico lo decidete voi, un voto alla volta. Il tuo è arrivato.',
+    rcptVoteTitle: 'Il tuo voto',
+    rcptScoreLabel: 'Punteggio',
+    rcptChange: 'Puoi correggere il voto una volta sola: apri la pagina dal pulsante qui sotto. Dopo la chiusura non si cambia più nulla.',
+    rcptResults: 'Se hai chiesto i risultati, te li mandiamo appena la votazione si chiude.',
+    rcptCta: 'Apri la pagina del voto'
+  },
+  pl: {
+    rcptSubject: 'Twój głos jest zapisany',
+    rcptHi: 'Cześć %FIRSTNAME%,',
+    rcptHiPlain: 'Cześć,',
+    rcptHeading: 'Głos zapisany. Dzięki.',
+    rcptLead: 'Nagrodę publiczności rozstrzygacie wy, głos po głosie. Twój już doszedł.',
+    rcptVoteTitle: 'Twój głos',
+    rcptScoreLabel: 'Ocena',
+    rcptChange: 'Głos możesz poprawić tylko raz — otwórz stronę przyciskiem poniżej. Po zamknięciu głosowania nic już się nie zmienia.',
+    rcptResults: 'Jeśli poprosiłeś o wyniki, wyślemy je zaraz po zamknięciu głosowania.',
+    rcptCta: 'Otwórz stronę głosowania'
+  },
+  en: {
+    rcptSubject: 'Your vote is in',
+    rcptHi: 'Hello %FIRSTNAME%,',
+    rcptHiPlain: 'Hello,',
+    rcptHeading: 'Vote recorded. Thank you.',
+    rcptLead: 'The Audience Award is decided by you, one vote at a time. Yours has arrived.',
+    rcptVoteTitle: 'Your vote',
+    rcptScoreLabel: 'Score',
+    rcptChange: 'You can correct your vote once — open the page with the button below. Once voting closes nothing changes any more.',
+    rcptResults: 'If you asked for the results, we will send them as soon as voting closes.',
+    rcptCta: 'Open the voting page'
+  },
+  de: {
+    rcptSubject: 'Deine Stimme ist da',
+    rcptHi: 'Hallo %FIRSTNAME%,',
+    rcptHiPlain: 'Hallo,',
+    rcptHeading: 'Stimme gespeichert. Danke.',
+    rcptLead: 'Den Publikumspreis entscheidet ihr, Stimme für Stimme. Deine ist angekommen.',
+    rcptVoteTitle: 'Deine Stimme',
+    rcptScoreLabel: 'Bewertung',
+    rcptChange: 'Du kannst deine Stimme genau einmal korrigieren — öffne die Seite mit der Schaltfläche unten. Nach Abstimmungsende ändert sich nichts mehr.',
+    rcptResults: 'Wenn du die Ergebnisse angefordert hast, schicken wir sie, sobald die Abstimmung schließt.',
+    rcptCta: 'Abstimmungsseite öffnen'
+  },
+  es: {
+    rcptSubject: 'Tu voto está registrado',
+    rcptHi: 'Hola %FIRSTNAME%,',
+    rcptHiPlain: 'Hola,',
+    rcptHeading: 'Voto registrado. Gracias.',
+    rcptLead: 'El Premio del público lo decidís vosotros, voto a voto. El tuyo ya ha llegado.',
+    rcptVoteTitle: 'Tu voto',
+    rcptScoreLabel: 'Puntuación',
+    rcptChange: 'Puedes corregir tu voto una sola vez: abre la página con el botón de abajo. Cuando la votación cierre ya no se cambia nada.',
+    rcptResults: 'Si has pedido los resultados, te los enviamos en cuanto cierre la votación.',
+    rcptCta: 'Abrir la página del voto'
+  },
+  fr: {
+    rcptSubject: 'Votre vote est enregistré',
+    rcptHi: 'Bonjour %FIRSTNAME%,',
+    rcptHiPlain: 'Bonjour,',
+    rcptHeading: 'Vote enregistré. Merci.',
+    rcptLead: 'Le Prix du public, c’est vous qui le décidez, une voix à la fois. La vôtre est arrivée.',
+    rcptVoteTitle: 'Votre vote',
+    rcptScoreLabel: 'Note',
+    rcptChange: 'Vous pouvez corriger votre vote une seule fois : ouvrez la page avec le bouton ci-dessous. Après la clôture, plus rien ne change.',
+    rcptResults: 'Si vous avez demandé les résultats, nous vous les envoyons dès la clôture du vote.',
+    rcptCta: 'Ouvrir la page du vote'
+  }
+};
+
+const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED, WINNER, VOTERESULT, RECEIPT];
 // (Ten plik obsługuje emails/copy.json. Klucze interfejsu strony idą przez
 //  tools/add-i18n-keys.mjs — to dwa różne słowniki i mieszanie ich kończy się kluczem,
 //  którego szuka przeglądarka, a jest tylko w mailach.)

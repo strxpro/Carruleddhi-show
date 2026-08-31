@@ -117,11 +117,27 @@ import {
     return parts ? `${parts[3]} · ${parts[2]} · ${parts[1]}` : config.dateLabel;
   }
 
+  function formatEventDateLabel(value, location) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return config.dateLabel;
+    let formatted;
+    try {
+      formatted = new Intl.DateTimeFormat(state.lang || 'it', {
+        day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome'
+      }).format(date);
+    } catch (_) {
+      formatted = formatHeaderDate(value).replaceAll(' · ', '/');
+    }
+    return [formatted, location].filter(Boolean).join(' · ');
+  }
+
   function applyPublicConfig() {
     $$('[data-config-event-name]').forEach((element) => { element.textContent = config.eventName; });
     $$('[data-header-date]').forEach((element) => { element.textContent = formatHeaderDate(config.eventDate); });
+    $$('[data-config-date-label]').forEach((element) => {
+      element.textContent = formatEventDateLabel(config.eventDate, config.eventLocation);
+    });
     const configurableText = [
-      ['[data-config-date-label]', config.dateLabel, DEFAULT_SITE_CONFIG.dateLabel],
       ['[data-config-tagline]', config.tagline, DEFAULT_SITE_CONFIG.tagline],
       ['[data-config-route-distance]', config.route.distance, DEFAULT_SITE_CONFIG.route.distance],
       ['[data-config-route-road]', config.route.road, DEFAULT_SITE_CONFIG.route.road]
@@ -433,8 +449,38 @@ import {
     schedule();
     // The webfont changes every measurement, so this has to run again once it lands.
     document.fonts?.ready?.then(schedule).catch(() => {});
-    window.addEventListener('resize', schedule, { passive: true });
-    window.addEventListener('orientationchange', schedule, { passive: true });
+
+    /* ONLY WHEN THE WINDOW GOT WIDER OR NARROWER, NOT WHEN IT GOT SHORTER.
+       ---------------------------------------------------------------------------
+       `fitHeadings()` walks every heading on the page and bisects its font size eight times,
+       and each round writes `font-size` and then reads `scrollWidth` — a forced layout per
+       round, per heading. That is fine as an answer to "the column is a different width now".
+       It is not fine as an answer to a phone's address bar, which fires `resize` every time
+       the reader changes direction and does not change any heading's width by a single pixel.
+       Measured at 4x CPU throttling it was about 90 ms of the work a `resize` did, spent to
+       arrive at exactly the font sizes already on screen.
+
+       Nothing is lost by the gate. A heading whose box changes width for any other reason —
+       the card stack settling, the deck laying out, a section switching between pinned and
+       flow — is caught by the per-heading ResizeObserver above, which is the more precise
+       instrument anyway: it knows which heading moved, and it already ignores a change that
+       is not a change of inline size. The window listener only ever added the case where
+       every heading moves at once, and that is a width change.
+
+       `orientationchange` is not gated the same way: on some devices it arrives before the
+       new width is readable, so it always schedules and refreshes the remembered width after
+       the frame. */
+    let fitWidth = window.innerWidth;
+    window.addEventListener('resize', () => {
+      const width = window.innerWidth;
+      if (width === fitWidth) return;
+      fitWidth = width;
+      schedule();
+    }, { passive: true });
+    window.addEventListener('orientationchange', () => {
+      schedule();
+      requestAnimationFrame(() => { fitWidth = window.innerWidth; });
+    }, { passive: true });
     // New text, new widths: everything has to be measured again.
     window.addEventListener('carruleddhi:language', schedule);
   }
@@ -1435,13 +1481,13 @@ import {
   }
 
   function setupCountdown() {
-    const target = new Date(config.eventDate).getTime();
     const units = {
       days: $('[data-days]'), hours: $('[data-hours]'),
       minutes: $('[data-minutes]'), seconds: $('[data-seconds]')
     };
     function update() {
-      const difference = Math.max(0, target - Date.now());
+      const target = new Date(config.eventDate).getTime();
+      const difference = Number.isNaN(target) ? 0 : Math.max(0, target - Date.now());
       const days = Math.floor(difference / 86400000);
       const hours = Math.floor((difference % 86400000) / 3600000);
       const minutes = Math.floor((difference % 3600000) / 60000);
@@ -2451,6 +2497,22 @@ import {
          notes already loaded but not yet rendered, and there may be older ones still on the
          server. Local first, because it costs nothing. */
       if (more) more.hidden = shown >= ordered.length && !serverHasMore;
+
+      /* WYSOKOŚĆ SEKCJI WŁAŚNIE SIĘ ZMIENIŁA — TRZEBA TO POWIEDZIEĆ.
+         ---------------------------------------------------------------------------
+         To jest przyczyna zgłoszenia „wysyłam komentarz i przeskakuje mnie gdzieś wyżej".
+         `#wall` jest przypiętym panelem: setupPanels() rozstrzyga po JEGO WYSOKOŚCI, czy
+         sekcja mieści się na ekranie i ma zostać `sticky`, czy przewija się normalnie. Ten
+         werdykt zapada raz i jest odświeżany wyłącznie na `carruleddhi:relayout`.
+
+         Każde przerysowanie listy zmienia tę wysokość — dodany komentarz, inne sortowanie,
+         „pokaż więcej". Dotąd nikt o tym nie mówił, więc panel zostawał z werdyktem policzonym
+         dla poprzedniej wysokości, a przy najbliższym przeliczeniu przeskakiwał do właściwego
+         układu, zabierając ze sobą pozycję przewijania.
+
+         Jedno miejsce, nie cztery: `repaint()` jest wspólnym wyjściem wszystkich tych ścieżek.
+         Ta sama poprawka co przy rozwijaniu formularza wyżej, tylko tam była już zrobiona. */
+      window.dispatchEvent(new Event('carruleddhi:relayout'));
     }
 
     /** Whether the server said there are older notes past what has been fetched. */
@@ -2592,7 +2654,22 @@ import {
            right underneath still does not show it.
            `load(false)` and not `load(true)`: the new message is the newest, so the first page
            has to be fetched again rather than an older page appended. */
-        if (!result.pending) load(false);
+        if (!result.pending) {
+          /* CZYTAJĄCY ZOSTAJE TAM, GDZIE BYŁ.
+             Nowy komentarz wchodzi na początek listy, czyli NAD formularzem, w który ktoś
+             właśnie pisał — a lista rośnie o kilkadziesiąt pikseli. Bez zakotwiczenia strona
+             zjeżdża o tę różnicę i potwierdzenie „jest na tablicy" ląduje poza kadrem, razem
+             z komentarzem, o który cała rzecz szła.
+
+             Pozycja przywracana tylko wtedy, gdy naprawdę uciekła: skok o kilka pikseli bywa
+             zwykłym zaokrągleniem, a `scrollTo` na każde wysłanie byłoby ruchem strony w
+             odpowiedzi na coś, co się nie stało. */
+          const anchor = window.scrollY;
+          await load(false);
+          if (Math.abs(window.scrollY - anchor) > 8) {
+            window.scrollTo({ top: anchor, behavior: 'instant' });
+          }
+        }
       } else if (result?.code === 'WALL_RATE_LIMITED') {
         if (status) status.textContent = text('wall.tooMany');
       } else if (result?.code === 'WALL_PHOTO_TOO_LARGE' || result?.code === 'PAYLOAD_TOO_LARGE') {
@@ -2666,9 +2743,7 @@ import {
      */
     const rivals = [
       ...$$('a[href="#signup"]'),
-      ...$$('[data-open-reminder]'),
-      $('#signup'),
-      $('#contact')
+      ...$$('[data-open-reminder]')
     ].filter(Boolean).filter((element) => !dock.contains(element));
 
     const onScreen = new Set();
@@ -2811,6 +2886,7 @@ import {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       hold = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, dy: 0, moved: false };
       dock.classList.add('is-held');
+      try { dock.setPointerCapture(event.pointerId); } catch (_) { /* unsupported pointer */ }
     });
 
     dock.addEventListener('pointermove', (event) => {
@@ -4640,19 +4716,44 @@ import {
     let viewHeight = ROUTE_VIEWBOX;
     let total = 0;
 
+    /** The box the current road was built for, as "WxH". Empty until the first build. */
+    let builtFor = '';
+
     /**
      * The viewBox height tracks the frame's real aspect ratio. With a matching
      * aspect and preserveAspectRatio="none", one user unit is the same length on
      * both axes, so the ribbon normals are not skewed.
+     *
+     * @returns {'no'|'same'|'built'} — 'same' means the box has not moved and nothing was
+     *   touched, which is what almost every call is.
      */
     function layout() {
-      const box = frame.getBoundingClientRect();
-      if (!box.width || !box.height) return false;
-      viewHeight = Math.round((box.height / box.width) * ROUTE_VIEWBOX);
+      /* `offsetWidth`/`offsetHeight`, NOT `getBoundingClientRect()`, and both reasons matter.
+         ---------------------------------------------------------------------------
+         1. IT IS THE CONDITION FOR REBUILDING AT ALL. Everything below is derived from the
+            frame's own box and from nothing else, so a call that finds the same box is 120 ms
+            of work with an identical result. `getBoundingClientRect()` cannot answer "has the
+            box changed" here, because route-zoom.css puts a scroll-driven `scale()` and
+            `rotate()` on this element on a phone: its client rect changes on every frame of
+            the zoom while its layout box sits still.
+
+         2. IT IS ALSO THE RIGHT NUMBER. The aspect ratio wanted here is the element's own, and
+            the client rect of a rotated element is its *bounding* box — wider and shorter than
+            the element really is. On a phone the frame carries `rotate(-2.2deg)` at rest, so
+            the viewBox was built from a ratio the element never had and
+            `preserveAspectRatio="none"` stretched the road to fit it. */
+      const width = frame.offsetWidth;
+      const height = frame.offsetHeight;
+      if (!width || !height) return 'no';
+
+      const key = `${width}x${height}`;
+      if (key === builtFor) return 'same';
+
+      viewHeight = Math.round((height / width) * ROUTE_VIEWBOX);
       svg.setAttribute('viewBox', `0 0 ${ROUTE_VIEWBOX} ${viewHeight}`);
 
       const data = buildRoutePathData(config.route.path, ROUTE_VIEWBOX, viewHeight);
-      if (!data) return false;
+      if (!data) return 'no';
       core.setAttribute('d', data);
       mask.setAttribute('d', data);
       dash.setAttribute('d', data);
@@ -4661,12 +4762,16 @@ import {
       const near = clamp(Number(config.route.width?.near) || 26, 4, 80);
       const far = clamp(Number(config.route.width?.far) || 5, 1, 40);
       mask.setAttribute('stroke-width', String(Math.max(24, near * 3.2)));
-      // Road markings: an outlined dash run instead of one solid ribbon.
-      // Both passes share the dash rhythm; only the outline is padded outwards.
-      const dashOptions = { near, far, height: viewHeight };
-      ribbonCasing.setAttribute('d', buildDashPathData(core, { ...dashOptions, widthScale: 1, widthPad: 2.6 }));
-      ribbonFill.setAttribute('d', buildDashPathData(core, dashOptions));
-      return true;
+      // Road markings: an outlined dash run instead of one solid ribbon. One walk of the path
+      // for both widths — see the note on `passes` in route-path.js.
+      const [casing, fill] = buildDashPathData(core, {
+        near, far, height: viewHeight,
+        passes: [{ widthScale: 1, widthPad: 2.6 }, { widthScale: 1, widthPad: 0 }]
+      });
+      ribbonCasing.setAttribute('d', casing);
+      ribbonFill.setAttribute('d', fill);
+      builtFor = key;
+      return 'built';
     }
 
     const place = (element, length, insetPercent = 0) => {
@@ -4703,7 +4808,7 @@ import {
     };
     routeCartPlacer(0);
 
-    if (!layout()) {
+    if (layout() === 'no') {
       frame.classList.add('is-route-hidden');
       return;
     }
@@ -4718,12 +4823,38 @@ import {
       cancelAnimationFrame(relayoutFrame);
       relayoutFrame = requestAnimationFrame(() => {
         const drawn = frame.classList.contains('is-route-drawn');
-        if (!layout()) return;
+        // 'same' means the frame is exactly where it was: nothing to rebuild, and nothing to
+        // re-place either, so the markers are left alone as well.
+        if (layout() !== 'built') return;
         mask.style.strokeDasharray = `${total}`;
         mask.style.strokeDashoffset = drawn || reducedMotion ? '0' : `${total}`;
         placeMarkers();
       });
     };
+
+    /* THIS LISTENER IS WHY THE PAGE JUMPED UNDER A THUMB. THE GUARD IS IN `layout()`.
+       ---------------------------------------------------------------------------
+       On a phone `resize` is not a rare event. Every time the browser's address bar slides
+       away or comes back — which is every time somebody changes scroll direction — the window
+       fires it. This listener answered each one by rebuilding the road: a new `d` on three
+       paths, `getTotalLength()`, and a walk of the path sampling it hundreds of times.
+
+       MEASURED on 390x844 at 4x CPU throttling, twelve address-bar movements: twelve long
+       tasks, 2204 ms in total, 156 to 231 ms each. A long task is a main thread that answers
+       nothing — while it runs the fling carries on in the compositor and the page arrives
+       somewhere else the moment it ends. That is the "it teleports"; swiping faster moves the
+       address bar more often, which is the "and it is worse when I do it quickly".
+
+       setupPanels a few hundred lines down has this exact trap written up twice and guards
+       against it by looking at the window's WIDTH. This function never got the guard. It is
+       not repeated here as a device check, because the honest condition is narrower and does
+       not need to know what kind of device it is on: the road is derived from the frame's box,
+       so a call that finds the same box has nothing to do. An address bar does not change
+       that box.
+
+       The listener stays, and so does the observer: between them they catch a rotation, a
+       desktop window drag, and the frame changing size for a reason of its own. They simply no
+       longer cost anything when nothing has happened. */
     window.addEventListener('resize', relayout, { passive: true });
     if ('ResizeObserver' in window) new ResizeObserver(relayout).observe(frame);
 
@@ -5671,6 +5802,32 @@ import {
       return;
     }
 
+    /* One event source for the visible page, countdown and form payloads. The timer reads
+       config.eventDate on every tick, so an async settings response updates it immediately. */
+    if (typeof settings.eventName === 'string' && settings.eventName.trim()) {
+      config.eventName = settings.eventName.trim();
+    }
+    if (typeof settings.eventDate === 'string' && !Number.isNaN(new Date(settings.eventDate).getTime())) {
+      config.eventDate = settings.eventDate;
+    }
+    if (typeof settings.eventLocation === 'string' && settings.eventLocation.trim()) {
+      config.eventLocation = settings.eventLocation.trim();
+    }
+
+    if (Array.isArray(settings.galleryImages) && settings.galleryImages.length === 5) {
+      const usableImages = settings.galleryImages.map((image) => String(image || '').trim());
+      if (usableImages.every((image) => image.startsWith('/') || /^https:\/\//i.test(image))) {
+        config.media.galleryImages = usableImages;
+      }
+    }
+
+    payloadFor = null;
+    applyPublicConfig();
+    $$('.g3d__card img').forEach((image, index) => {
+      const source = config.media.galleryImages[index];
+      if (source && image.getAttribute('src') !== source) image.src = source;
+    });
+
     /* Sponsors. The panel stores a bucket path and the function hands back a signed URL,
        so what arrives here is ready to put in a src. `image` is the name the renderer
        already uses; renaming it there would touch the CSS as well for no gain. */
@@ -6573,9 +6730,13 @@ import {
     const append = (message, pending) => {
       if (!log) return null;
       if (message.id && seen.has(message.id)) return null;
+      /* Drugi bezpiecznik, na wypadek gdyby `seen` zostało wyczyszczone albo bąbelek trafił
+         na ekran wcześniej niż jego identyfikator: sprawdzany jest sam dziennik. */
+      if (message.id && log.querySelector(`[data-mid="${message.id}"]`)) return null;
       if (message.id) seen.add(message.id);
       const stick = atBottom();
       const node = bubble(message.author, message.body, pending, message.image || '');
+      if (message.id) node.dataset.mid = message.id;
       log.appendChild(node);
       if (stick) toBottom();
       if (message.at && message.at > lastAt) lastAt = message.at;
@@ -6763,12 +6924,238 @@ import {
       window.addEventListener('carruleddhi:language', paintAttach);
     }
 
+    /* ========================================================================
+       SAMOOBSŁUGA WŁASNYCH DANYCH W ROZMOWIE
+       ========================================================================
+       Cztery rzeczy, o które ludzie piszą najczęściej i na które dotąd odpowiadał człowiek
+       nazajutrz: pokaż moje dane, popraw je, wycofaj mnie z wyścigu, przestań pisać.
+
+       Kreator NIE jest drugą implementacją niczego. Wywołuje dokładnie te końcówki, których
+       używa formularz „zarządzaj zgłoszeniem": `entry-lookup`, `entry-code`, `entry-manage`
+       oraz `notify-code`/`notify-off` dla powiadomień. Reguły kodu — sześć cyfr, kwadrans
+       ważności, pięć prób, jednorazowość — stoją w bazie i są te same dla obu dróg.
+
+       KAŻDA CZYNNOŚĆ WYMAGA KODU ZE SKRZYNKI. Sam adres wpisany w czacie nie jest dowodem
+       niczego: gdyby wystarczał, każdy mógłby wycofać z wyścigu każdego, znając tylko mail.
+
+       Stan jest w przeglądarce, ale nie jest niczym chroniony — i nie musi być. Chroni serwer,
+       który przy każdym kroku żąda pary (adres, kod). Zgubiony albo podrobiony stan po stronie
+       strony nie daje ani jednej czynności więcej. */
+    let flow = null;
+
+    const flowSay = (key) => {
+      const line = text(key);
+      if (line) append({ author: 'ai', body: line, at: '' }, false);
+    };
+
+    const endFlow = () => { flow = null; paintChips(); };
+
+    /** Przyciski wyboru w rozmowie. Ten sam rząd i ta sama klasa co podpowiedzi pytań. */
+    const flowChoices = (options) => {
+      if (!chipsList) return;
+      chipsList.replaceChildren(...options.map(([label, run]) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chat__chip';
+        chip.textContent = text(label) || label;
+        chip.addEventListener('click', () => { void run(); });
+        return chip;
+      }));
+      if (chips) chips.hidden = options.length === 0;
+      setChipsOpen(options.length > 0);
+    };
+
+    const flowPost = (type, data) => postJSON(endpoint, eventPayload(type, data));
+
+    /**
+     * Wypisanie z powiadomień — jedyna z czterech spraw, która NIE ma własnego formularza.
+     *
+     * Zmiana danych i wycofanie ze wyścigu mają go od dawna: `openEntryManager` prowadzi przez
+     * wybór zawodnika, kod ze skrzynki i wszystkie kilkanaście pól z walidacją. Przepisywanie
+     * tego na wymianę zdań w czacie dałoby czternaście pytań i czternaście okazji do pomyłki w
+     * danych, które trafiają potem na podpisany formularz — więc kreator te dwie sprawy do
+     * niego ODDAJE, zamiast budować drugą, uboższą drogę o innych regułach.
+     *
+     * „Nie chcę powiadomień" zostaje tutaj, bo to jedno pytanie i jedna czynność, a jedyną
+     * dotychczasową drogą był odsyłacz w stopce listu — czyli trzeba było mieć ten list.
+     */
+    async function flowFinish(code) {
+      const result = await flowPost('notify-off', { email: flow.email, code });
+      if (!result?.ok) throw Object.assign(new Error('notify-off'), { payload: result });
+      flowSay('chat.dataNotifyOff');
+      endFlow();
+    }
+
+    /** Jedno miejsce na błędy kreatora: każdy krok mówi to samo zdanie i nie gubi rozmowy. */
+    async function flowGuard(step) {
+      try {
+        await step();
+      } catch (problem) {
+        const code = problem?.payload?.code || problem?.message || '';
+        const key = {
+          NOTIFY_CODE_EXPIRED: 'chat.dataCodeOld',
+          NOTIFY_NO_CODE: 'chat.dataCodeOld',
+          NOTIFY_CODE_WRONG: 'chat.dataCodeWrong',
+          NOTIFY_TOO_MANY_TRIES: 'chat.dataCodeBurnt'
+        }[code];
+        flowSay(key || 'chat.dataFailed');
+        // Zły kod nie kończy rozmowy: zostaje krok z kodem, żeby dało się wpisać poprawny.
+        if (key !== 'chat.dataCodeWrong') endFlow();
+      }
+    }
+
+    /**
+     * Otwiera właściwą drogę po znaczniku z serwera.
+     *
+     * Dwie z trzech intencji prowadzą do istniejącego formularza zarządzania zgłoszeniem —
+     * tego samego, który otwierają podpowiedzi „zmień dane" i „wycofaj mnie". Trzecia zostaje
+     * w rozmowie.
+     */
+    /**
+     * Sponsoring: oferta, dwie pastylki, potem trzy pytania.
+     *
+     * Oferta jest wypisana wprost — cena i to, co się za nią dostaje — bo „napisz do nas w
+     * sprawie sponsoringu" jest zaproszeniem do zadania pytania, a nie odpowiedzią na nie.
+     *
+     * „Rezygnuję" jest równie widoczne jak „chcę". Pastylka wyłącznie zgadzająca się jest
+     * pytaniem, na które da się odpowiedzieć tylko tak — a wtedy jedynym wyjściem jest
+     * zamknięcie czatu i nikt nie wie, że ktoś się rozmyślił.
+     */
+    function sponsorOffer() {
+      flow = { intent: 'sponsor', step: 'decide', cartName: '', phone: '', email: '' };
+      flowSay('chat.sponsorOffer');
+      flowChoices([
+        ['chat.sponsorYes', async () => {
+          flow.step = 'name';
+          flowSay('chat.sponsorAskName');
+          flowChoices([['chat.dataCancel', async () => { flowSay('chat.sponsorNo'); endFlow(); }]]);
+        }],
+        ['chat.sponsorNoThanks', async () => { flowSay('chat.sponsorNo'); endFlow(); }]
+      ]);
+    }
+
+    /** Kolejne odpowiedzi sponsora: nazwa → telefon → e-mail → wysyłka. */
+    async function sponsorStep(message) {
+      if (flow.step === 'name') {
+        flow.cartName = message.trim().slice(0, 120);
+        if (!flow.cartName) { flowSay('chat.sponsorAskName'); return; }
+        flow.step = 'phone';
+        flowSay('chat.sponsorAskPhone');
+        return;
+      }
+
+      if (flow.step === 'phone') {
+        /* „Pomiń" jest dozwolone: jeden kanał kontaktu wystarczy, żeby oddzwonić, a upieranie
+           się przy numerze kosztuje zgłoszenia od tych, którzy go nie podają. */
+        const digits = message.replace(/[^\d+]/g, '');
+        flow.phone = digits.length >= 6 ? message.trim().slice(0, 40) : '';
+        flow.step = 'email';
+        flowSay('chat.sponsorAskEmail');
+        return;
+      }
+
+      const email = message.trim().toLowerCase();
+      if (email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) flow.email = email;
+      if (!flow.phone && !flow.email) {
+        // Bez żadnego kontaktu zgłoszenie jest kartką bez adresu — pytamy jeszcze raz.
+        flowSay('chat.sponsorNeedContact');
+        return;
+      }
+
+      const result = await flowPost('sponsor-lead', {
+        cartName: flow.cartName,
+        phone: flow.phone,
+        email: flow.email
+      });
+      if (!result?.ok) throw Object.assign(new Error('sponsor'), { payload: result });
+      flowSay('chat.sponsorThanks');
+      endFlow();
+    }
+
+    async function startFlow(intent) {
+      if (intent === 'sponsor') {
+        sponsorOffer();
+        return;
+      }
+      if (intent === 'edit' || intent === 'withdraw') {
+        if (!openEntryManager || !visitor.email) {
+          flowSay('chat.dataNeedGate');
+          return;
+        }
+        flowSay(intent === 'withdraw' ? 'chat.dataAskWithdraw' : 'chat.dataAskEdit');
+        /* Adres z bramki czatu NIE jest tu uwierzytelnieniem — służy tylko do znalezienia
+           zgłoszeń. Formularz i tak żąda kodu ze skrzynki przed każdą czynnością. */
+        await openEntryManager(visitor.email, intent, null);
+        return;
+      }
+
+      flow = { intent, step: 'email', email: '' };
+      flowSay('chat.dataAskNotify');
+      flowSay('chat.dataAskEmail');
+      flowChoices([['chat.dataCancel', async () => { flowSay('chat.dataStopped'); endFlow(); }]]);
+    }
+
+    /**
+     * Wiadomość przechwycona przez kreator, jeśli ten czeka na adres albo na kod.
+     * Zwraca `true`, gdy obsłużył ją sam i nie ma po co jechać do serwera czatu.
+     */
+    async function flowHandled(message) {
+      if (!flow) return false;
+      // Bąbelek gościa rysowany tak jak zwykle: to nadal jego wiadomość w rozmowie.
+      append({ author: 'visitor', body: message, at: '' }, false);
+      if (input) input.value = '';
+      sizeInput();
+
+      /* Sponsoring ma własne kroki i własne pola. Osobna gałąź, nie wspólny „email/code":
+         tam adres jest tożsamością do potwierdzenia kodem, tu jest kontaktem do oddzwonienia. */
+      if (flow.intent === 'sponsor') {
+        // Pastylkami wybiera się tylko pierwszy krok; potem odpowiada się pisząc.
+        if (flow.step === 'decide') {
+          flowSay('chat.dataUseButtons');
+          return true;
+        }
+        await flowGuard(() => sponsorStep(message));
+        return true;
+      }
+
+      if (flow.step === 'email') {
+        const email = message.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+          flowSay('chat.dataBadEmail');
+          return true;
+        }
+        flow.email = email;
+        await flowGuard(async () => {
+          const result = await flowPost('notify-code', { email });
+          if (!result?.ok) throw Object.assign(new Error('notify-code'), { payload: result });
+          /* „Kod poszedł" mówione także wtedy, gdy adresu nie ma na żadnej liście — serwer
+             odpowiada tak samo (patrz notifyCode). Inaczej rozmowa odpowiadałaby na pytanie
+             „czy ten człowiek jest u Was zapisany". */
+          flow.step = 'code';
+          flowSay('chat.dataCodeSent');
+        });
+        return true;
+      }
+
+      const code = message.replace(/\D/g, '');
+      if (code.length !== 6) {
+        flowSay('chat.dataBadCode');
+        return true;
+      }
+      await flowGuard(() => flowFinish(code));
+      return true;
+    }
+
     async function send(body) {
       const message = String(body || '').trim();
       /* Samo zdjęcie wystarczy. Ktoś fotografuje koło i pyta jednym obrazkiem — a wymuszanie
          podpisu znaczyłoby, że przeglądarka dopisuje zdanie za użytkownika i w wątku
          organizatora pojawia się treść, której nikt nie napisał. */
       if (!message && !attached) return;
+      /* Kreator ma pierwszeństwo: gdy czeka na adres albo na kod, ta wiadomość jest
+         odpowiedzią jemu, a nie nowym pytaniem do automatu. Bez tego adres wpisany w rozmowie
+         poleciałby do modelu i zapisał się w historii wątku jako zwykła wiadomość. */
+      if (!attached && await flowHandled(message)) return;
       /* One in flight at a time.
          The submit handler and the Enter handler both call this, and a fast double press —
          or a click on the button while Enter is still being processed — used to start two
@@ -6817,13 +7204,29 @@ import {
            them as already shown. `lastAt` matters as much as `seen`: without it every poll
            re-requested the whole thread from the beginning. */
         if (result.messageId) seen.add(result.messageId);
-        if (result.replyId) seen.add(result.replyId);
+        /* Optymistyczny bąbelek dostaje identyfikator z bazy, więc od tej chwili jest tym
+           samym wierszem co ten, który przyniesie odczyt. Bez tego dwie kopie tej samej
+           wiadomości potrafiły stanąć obok siebie.
+
+           `replyId` NIE jest tu dopisywany do `seen`: odpowiedź jest rysowana niżej i to
+           `append` ma ją zarejestrować. Dopisanie z góry kazałoby jej pominąć samą siebie. */
+        if (pending && result.messageId) pending.dataset.mid = result.messageId;
         for (const at of [result.messageAt, result.replyAt]) {
           if (at && at > lastAt) lastAt = at;
         }
 
         mode = result.mode || mode;
-        if (result.reply) append({ author: 'ai', body: result.reply, at: '' }, false);
+        /* Odpowiedź z identyfikatorem, nie bez niego: gdyby odczyt zdążył ją dorysować
+           pierwszy, kopia bez identyfikatora przeszłaby przez każdy filtr. */
+        if (result.reply) {
+          append({ id: result.replyId || '', author: 'ai', body: result.reply, at: '' }, false);
+        }
+        /* Serwer rozpoznał sprawę własnych danych i oddał znacznik zamiast zdania. Kreator
+           przejmuje rozmowę od tej chwili — patrz `startFlow`. */
+        if (result.selfService) {
+          await startFlow(result.selfService);
+          return;
+        }
         if (mode === 'human') panel.dataset.chatMode = 'human';
         // Fresh suggestions after every answer, so the chips follow the conversation instead
         // of offering the same six openers for ever.
@@ -6874,8 +7277,10 @@ import {
 
          `auto` is still needed to let the box shrink when text is deleted; it just is not
          committed unless the answer differs from what is already there. */
-        input.style.height = 'auto';
-      const next = Math.min(input.scrollHeight, 140);
+      input.style.height = 'auto';
+      /* Sufit ten sam co `max-height` w chat.css. Dwie różne liczby znaczyłyby albo pasek
+         przewijania przy polu, które ma jeszcze miejsce, albo pole rosnące poza swój kadr. */
+      const next = Math.min(input.scrollHeight, 190);
       if (next !== lastInputHeight) {
         lastInputHeight = next;
         input.style.height = `${next}px`;
@@ -6954,6 +7359,13 @@ import {
       polling = window.setInterval(async () => {
         // Nothing to poll for behind a hidden tab or a closed panel.
         if (document.hidden || panel.hidden) return;
+        /* GŁÓWNA PRZYCZYNA DUBLOWANIA WIADOMOŚCI.
+           ---------------------------------------------------------------------------
+           Serwer zapisuje wiersz gościa i odpowiedź modelu PRZED odesłaniem odpowiedzi, a samo
+           wywołanie modelu trwa kilka sekund. Odczyt wchodzący w tym okienku pobierał oba
+           wiersze, nie znał jeszcze ich identyfikatorów — bo `send()` dostaje je dopiero na
+           końcu — i dorysowywał drugą kopię. Odczyt czeka więc na zakończenie wysyłki. */
+        if (sending) return;
         try {
           const result = await postJSON(endpoint, eventPayload('chat', {
             action: 'poll',

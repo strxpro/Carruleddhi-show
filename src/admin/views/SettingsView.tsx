@@ -2,19 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  CalendarDays,
   ExternalLink,
   Globe,
+  Images,
   ImagePlus,
   Lock,
   LogOut,
+  Megaphone,
   Plus,
   Trash2,
   Unlock
 } from 'lucide-react';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import {
+  announceEdition,
+  ApiError,
   fetchSettings,
   saveSettings,
+  uploadGalleryImage,
   uploadSponsorLogo,
   type AiStatus,
   type SiteSettings,
@@ -76,14 +82,54 @@ function downscale(file: File): Promise<string> {
   });
 }
 
+async function downscaleGallery(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const longest = Math.max(bitmap.width, bitmap.height);
+  const scale = longest > 1600 ? 1600 / longest : 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('canvas');
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL('image/jpeg', 0.84);
+}
+
 const EMPTY: SiteSettings = {
   siteLocked: true,
   sponsors: [],
   showGallery: true,
   showWall: true,
   showPrizes: true,
-  showCounters: true
+  showCounters: true,
+  eventName: 'Carruleddhi Show 2026',
+  eventDate: '2026-10-17T12:30:00.000Z',
+  eventLocation: 'Santa Teresa Gallura',
+  galleryImages: [
+    '/assets/images/gallery-start.svg',
+    '/assets/images/gallery-race.svg',
+    '/assets/images/gallery-craft.svg',
+    '/assets/images/gallery-crowd.svg',
+    '/assets/images/gallery-finish.svg'
+  ],
+  galleryPreviewUrls: [
+    '/assets/images/gallery-start.svg',
+    '/assets/images/gallery-race.svg',
+    '/assets/images/gallery-craft.svg',
+    '/assets/images/gallery-crowd.svg',
+    '/assets/images/gallery-finish.svg'
+  ],
+  announcementEventDate: ''
 };
+
+function toLocalInput(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export function SettingsView({
   t,
@@ -111,12 +157,30 @@ export function SettingsView({
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
+  const [galleryBusy, setGalleryBusy] = useState<number | null>(null);
+  const [announcement, setAnnouncement] = useState<
+    'idle' | 'queued' | 'already' | 'pendingResults' | 'votingOpen' | 'failed'
+  >('idle');
+  const [editionResult, setEditionResult] = useState<{
+    rolledOver?: boolean;
+    archivedEditionKey?: string;
+    activeEditionKey?: string;
+    participantCount?: number;
+    voteCount?: number;
+  } | null>(null);
+  const [eventDraft, setEventDraft] = useState({
+    eventName: EMPTY.eventName,
+    eventDate: toLocalInput(EMPTY.eventDate),
+    eventLocation: EMPTY.eventLocation
+  });
 
   /* The saved list, kept beside the edited one so the "unsaved changes" note is a fact
      rather than a flag somebody has to remember to set. */
   const [savedSponsors, setSavedSponsors] = useState<Sponsor[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
+  const galleryInput = useRef<HTMLInputElement>(null);
   const pendingLogoFor = useRef<number | null>(null);
+  const pendingGalleryFor = useRef<number | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -125,6 +189,11 @@ export function SettingsView({
         if (!alive) return;
         setSettings(response.settings);
         setSavedSponsors(response.settings.sponsors);
+        setEventDraft({
+          eventName: response.settings.eventName,
+          eventDate: toLocalInput(response.settings.eventDate),
+          eventLocation: response.settings.eventLocation
+        });
         setLoaded(true);
       })
       .catch(() => {
@@ -144,8 +213,10 @@ export function SettingsView({
         setSavedSponsors(response.settings.sponsors);
         setStatus('saved');
         window.setTimeout(() => setStatus('idle'), 2200);
+        return true;
       } catch (_) {
         setStatus('failed');
+        return false;
       }
     },
     [apiKey]
@@ -210,6 +281,94 @@ export function SettingsView({
   const [preview, setPreview] = useState<Record<string, string>>({});
   const logoSrc = (logo: string) =>
     !logo ? '' : logo.startsWith('/') || logo.startsWith('http') ? logo : preview[logo] || '';
+  const gallerySrc = (image: string, index: number) =>
+    preview[image]
+    || settings.galleryPreviewUrls[index]
+    || (image.startsWith('/') || image.startsWith('http') ? image : '');
+
+  const pickGallery = (index: number) => {
+    pendingGalleryFor.current = index;
+    setUploadError(false);
+    galleryInput.current?.click();
+  };
+
+  const onGalleryFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    const index = pendingGalleryFor.current;
+    event.target.value = '';
+    if (!file || index === null) return;
+    setGalleryBusy(index);
+    setUploadError(false);
+    try {
+      const uploaded = await uploadGalleryImage(apiKey, await downscaleGallery(file));
+      setPreview((current) => ({ ...current, [uploaded.imagePath]: uploaded.url }));
+      const next = settings.galleryImages.map((image, at) => (at === index ? uploaded.imagePath : image));
+      const saved = await push({ galleryImages: next });
+      if (!saved) setUploadError(true);
+    } catch (_) {
+      setUploadError(true);
+    } finally {
+      setGalleryBusy(null);
+      pendingGalleryFor.current = null;
+    }
+  };
+
+  const announce = async () => {
+    if (!window.confirm(t('set.announceConfirm'))) return;
+    setAnnouncement('idle');
+    setEditionResult(null);
+    try {
+      const result = await announceEdition(apiKey);
+      setSettings((current) => ({ ...current, announcementEventDate: result.eventDate }));
+      setEditionResult(result.edition || null);
+      setAnnouncement(result.queued ? 'queued' : 'already');
+    } catch (problem) {
+      if (problem instanceof ApiError && problem.code === 'VOTING_RESULT_NOTIFICATIONS_PENDING') {
+        setAnnouncement('pendingResults');
+      } else if (problem instanceof ApiError && problem.code === 'VOTING_EDITION_NOT_CLOSED') {
+        setAnnouncement('votingOpen');
+      } else {
+        setAnnouncement('failed');
+      }
+    }
+  };
+
+  const draftDate = new Date(eventDraft.eventDate);
+  const draftIso = Number.isNaN(draftDate.getTime()) ? '' : draftDate.toISOString();
+  const savedDate = new Date(settings.eventDate);
+  const savedIso = Number.isNaN(savedDate.getTime()) ? '' : savedDate.toISOString();
+  const eventReady = Boolean(eventDraft.eventName.trim() && eventDraft.eventLocation.trim() && draftIso);
+  const eventDirty = eventDraft.eventName.trim() !== settings.eventName
+    || eventDraft.eventLocation.trim() !== settings.eventLocation
+    || draftIso !== savedIso;
+  const alreadyAnnounced = settings.announcementEventDate === settings.eventDate;
+
+  const saveEvent = async () => {
+    if (!eventReady) {
+      setStatus('failed');
+      return;
+    }
+    setStatus('saving');
+    setAnnouncement('idle');
+    try {
+      const response = await saveSettings(apiKey, {
+        eventName: eventDraft.eventName.trim(),
+        eventDate: draftIso,
+        eventLocation: eventDraft.eventLocation.trim()
+      });
+      setSettings(response.settings);
+      setSavedSponsors(response.settings.sponsors);
+      setEventDraft({
+        eventName: response.settings.eventName,
+        eventDate: toLocalInput(response.settings.eventDate),
+        eventLocation: response.settings.eventLocation
+      });
+      setStatus('saved');
+      window.setTimeout(() => setStatus('idle'), 2200);
+    } catch (_) {
+      setStatus('failed');
+    }
+  };
 
   if (!loaded) {
     /* The heading and lead are real, not placeholders — they are the same two lines whether
@@ -311,6 +470,139 @@ export function SettingsView({
             </label>
           ))}
         </div>
+      </section>
+
+      {/* ------------------------------------------------ event and announcement */}
+      <section className="mt-4 rounded-2xl border border-yellow/25 bg-gradient-to-br from-yellow/10 via-white/4 to-blue-500/10 p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-yellow text-navy-950">
+            <CalendarDays className="size-5" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-white">{t('set.event')}</h3>
+            <p className="mt-1 text-[13px] leading-relaxed text-white/55">{t('set.eventLead')}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1.5 sm:col-span-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">{t('set.eventName')}</span>
+            <input
+              value={eventDraft.eventName}
+              maxLength={80}
+              onChange={(event) => setEventDraft((current) => ({ ...current, eventName: event.target.value }))}
+              className="rounded-xl border border-white/15 bg-navy-950/55 px-3 py-2.5 text-sm text-white outline-none focus:border-yellow"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">{t('set.eventDate')}</span>
+            <input
+              type="datetime-local"
+              value={eventDraft.eventDate}
+              onChange={(event) => setEventDraft((current) => ({ ...current, eventDate: event.target.value }))}
+              className="rounded-xl border border-white/15 bg-navy-950/55 px-3 py-2.5 text-sm text-white outline-none focus:border-yellow"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">{t('set.eventLocation')}</span>
+            <input
+              value={eventDraft.eventLocation}
+              maxLength={120}
+              onChange={(event) => setEventDraft((current) => ({ ...current, eventLocation: event.target.value }))}
+              className="rounded-xl border border-white/15 bg-navy-950/55 px-3 py-2.5 text-sm text-white outline-none focus:border-yellow"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            disabled={!eventReady || !eventDirty || status === 'saving'}
+            onClick={() => void saveEvent()}
+            className="rounded-full bg-yellow px-4 py-2 text-xs font-bold text-navy-950 disabled:opacity-40"
+          >
+            {status === 'saving' ? t('set.saving') : t('set.eventSave')}
+          </button>
+          <button
+            type="button"
+            disabled={!eventReady || eventDirty || status === 'saving'}
+            onClick={() => void announce()}
+            className="inline-flex items-center gap-2 rounded-full bg-coral px-4 py-2 text-xs font-bold text-white hover:bg-white hover:text-navy-950 disabled:opacity-40"
+          >
+            <Megaphone className="size-3.5" />
+            {t('set.announce')}
+          </button>
+          {eventDirty ? <span className="text-[12px] text-yellow">{t('set.dirty')}</span> : null}
+          {status === 'saved' ? <span className="text-[12px] text-emerald-300">{t('set.saved')}</span> : null}
+          {status === 'failed' ? <span className="text-[12px] text-coral">{t('set.saveFailed')}</span> : null}
+        </div>
+
+        {editionResult?.rolledOver ? (
+          <p className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/10 px-3 py-2 text-[12px] leading-relaxed text-blue-100">
+            {t('set.editionArchived')} {editionResult.archivedEditionKey || '—'} ({editionResult.participantCount || 0}{' '}
+            {t('set.participantsCount')}, {editionResult.voteCount || 0} {t('set.votesCount')}).{' '}
+            {t('set.editionActive')}: {editionResult.activeEditionKey || '—'}.
+          </p>
+        ) : null}
+        {announcement === 'queued' ? (
+          <p className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] text-emerald-200">{t('set.announceQueued')}</p>
+        ) : null}
+        {announcement === 'already' || alreadyAnnounced ? (
+          <p className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/60">{t('set.alreadyAnnounced')}</p>
+        ) : null}
+        {announcement === 'pendingResults' ? (
+          <p className="mt-3 rounded-xl border border-yellow/30 bg-yellow/10 px-3 py-2 text-[12px] text-yellow">{t('set.announcePendingResults')}</p>
+        ) : null}
+        {announcement === 'votingOpen' ? (
+          <p className="mt-3 rounded-xl border border-yellow/30 bg-yellow/10 px-3 py-2 text-[12px] text-yellow">{t('set.announceVotingOpen')}</p>
+        ) : null}
+        {announcement === 'failed' ? (
+          <p className="mt-3 rounded-xl border border-coral/30 bg-coral/10 px-3 py-2 text-[12px] text-coral">{t('set.saveFailed')}</p>
+        ) : null}
+      </section>
+
+      {/* ---------------------------------------------------------- gallery */}
+      <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-blue-500/15 text-blue-200">
+            <Images className="size-5" />
+          </span>
+          <div>
+            <h3 className="text-sm font-bold text-white">{t('set.gallery')}</h3>
+            <p className="mt-1 text-[13px] leading-relaxed text-white/55">{t('set.galleryLead')}</p>
+          </div>
+        </div>
+
+        <input
+          ref={galleryInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={onGalleryFile}
+          className="hidden"
+        />
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {settings.galleryImages.map((image, index) => (
+            <button
+              key={`${image}-${index}`}
+              type="button"
+              disabled={galleryBusy !== null || status === 'saving'}
+              onClick={() => pickGallery(index)}
+              aria-label={`${t('set.galleryPhoto')} ${index + 1}`}
+              className="group relative aspect-[4/3] overflow-hidden rounded-2xl border-2 border-white/10 bg-navy-950/60 text-white/50 transition hover:-translate-y-1 hover:border-yellow focus-visible:outline-2 focus-visible:outline-yellow disabled:opacity-55"
+            >
+              {gallerySrc(image, index) ? (
+                <img src={gallerySrc(image, index)} alt="" className="size-full object-cover transition duration-300 group-hover:scale-105" />
+              ) : (
+                <ImagePlus className="absolute inset-0 m-auto size-6" />
+              )}
+              <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-navy-950/80 text-[11px] font-extrabold text-yellow">{index + 1}</span>
+              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/90 to-transparent px-2 pb-2 pt-6 text-[10px] font-bold uppercase tracking-wider text-white">
+                {galleryBusy === index ? t('set.uploading') : t('set.galleryPhoto')}
+              </span>
+            </button>
+          ))}
+        </div>
+        {uploadError ? <p className="mt-3 text-[12px] text-coral">{t('set.uploadFailed')}</p> : null}
       </section>
 
       {/* ---------------------------------------------------------- sponsors */}

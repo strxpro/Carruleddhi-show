@@ -194,10 +194,15 @@
   flex: 1 1 auto;
   min-width: 0;
   /* Grown by JavaScript up to a cap, so a long message is visible while it is written
-     instead of scrolling inside three lines. */
-  height: 46px;
-  max-height: 140px;
-  padding: 12px 14px;
+     instead of scrolling inside three lines.
+     ---------------------------------------------------------------------------
+     Wyższe niż było (46 px): zgłoszone jako „pole do pisania jest za małe". 58 px to dwa
+     wiersze widoczne od razu, czyli tyle, ile ma zwykłe pytanie na czacie — przy jednym
+     wierszu każde dłuższe zdanie zaczynało się od przewijania w środku pola. Sufit też wyżej,
+     bo skoro pole rośnie z tekstem, to niech naprawdę ma gdzie rosnąć. */
+  height: 58px;
+  max-height: 190px;
+  padding: 14px 16px;
   border: 2px solid rgb(7 26 61 / 0.16);
   border-radius: 16px;
   background: #fff;

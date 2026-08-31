@@ -4,6 +4,7 @@ export const SITE_CONFIG_VERSION = 1;
 export const DEFAULT_SITE_CONFIG = Object.freeze({
   eventName: 'Carruleddhi Show 2026',
   eventDate: '2026-10-17T14:30:00+02:00',
+  eventLocation: 'Santa Teresa Gallura',
   dateLabel: '17 ottobre 2026 · Santa Teresa Gallura',
   tagline: 'Nessun motore. Solo la discesa.',
   pilotsBase: 0,
@@ -254,6 +255,7 @@ export function normalizeSiteConfig(input = {}) {
   return {
     eventName: cleanText(source.eventName, DEFAULT_SITE_CONFIG.eventName, 80),
     eventDate: cleanDate(source.eventDate, DEFAULT_SITE_CONFIG.eventDate),
+    eventLocation: cleanText(source.eventLocation, DEFAULT_SITE_CONFIG.eventLocation, 120),
     dateLabel: cleanText(source.dateLabel, DEFAULT_SITE_CONFIG.dateLabel, 100),
     tagline: cleanText(source.tagline, DEFAULT_SITE_CONFIG.tagline, 150),
     pilotsBase: cleanCount(source.pilotsBase, DEFAULT_SITE_CONFIG.pilotsBase),

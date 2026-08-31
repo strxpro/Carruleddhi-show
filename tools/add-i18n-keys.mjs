@@ -523,10 +523,65 @@ const CHAT_GATE = {
   }
 };
 
+/* ------------------------------------------------------------- remis punktowy
+   Dwa wozy z tą samą sumą punktów stoją jeden nad drugim i nic na ekranie nie mówi
+   dlaczego. Wygląda to na losowe, a nie jest: kolejność rozstrzyga liczba głosów, potem
+   średnia, a na końcu numer startowy — ten sam łańcuch w bazie (migracja 0030), w Workerze
+   i na stronie. Te napisy nazywają kryterium, które w danej grupie naprawdę zadecydowało.
+
+   `tieAhead` jest łącznikiem, nie zdaniem: składa się z etykietą kryterium w jedną linijkę
+   („Remis punktowy · wyżej dzięki: więcej głosów"), bo trzy osobne klucze na jedno zdanie
+   znaczą trzy miejsca, w których można je rozjechać między językami. */
+const TIE = {
+  it: {
+    'voting.tie': 'Pari merito',
+    'voting.tieAhead': 'davanti per',
+    'voting.tieVotes': 'più voti',
+    'voting.tieAvg': 'media più alta',
+    'voting.tieNumber': 'numero di partenza più basso'
+  },
+  pl: {
+    'voting.tie': 'Remis punktowy',
+    'voting.tieAhead': 'wyżej dzięki',
+    'voting.tieVotes': 'więcej głosów',
+    'voting.tieAvg': 'wyższa średnia',
+    'voting.tieNumber': 'niższy numer startowy'
+  },
+  en: {
+    'voting.tie': 'Tied on points',
+    'voting.tieAhead': 'ahead on',
+    'voting.tieVotes': 'more votes',
+    'voting.tieAvg': 'higher average',
+    'voting.tieNumber': 'lower start number'
+  },
+  de: {
+    'voting.tie': 'Punktgleich',
+    'voting.tieAhead': 'vorn durch',
+    'voting.tieVotes': 'mehr Stimmen',
+    'voting.tieAvg': 'höheren Schnitt',
+    'voting.tieNumber': 'niedrigere Startnummer'
+  },
+  es: {
+    'voting.tie': 'Empate a puntos',
+    'voting.tieAhead': 'por delante por',
+    'voting.tieVotes': 'más votos',
+    'voting.tieAvg': 'media más alta',
+    'voting.tieNumber': 'número de salida más bajo'
+  },
+  fr: {
+    'voting.tie': 'À égalité',
+    'voting.tieAhead': 'devant grâce à',
+    'voting.tieVotes': 'plus de voix',
+    'voting.tieAvg': 'moyenne plus haute',
+    'voting.tieNumber': 'numéro de départ plus bas'
+  }
+};
+
 const ADDITIONS = {
   it: {
     ...CHAT_UI.it,
     ...CHAT_GATE.it,
+    ...TIE.it,
     'unsub.title': 'Disattivare gli avvisi?',
     'unsub.leadStart': 'Mandiamo un codice a questo indirizzo:',
     'unsub.send': 'Manda il codice',
@@ -549,6 +604,7 @@ const ADDITIONS = {
   pl: {
     ...CHAT_UI.pl,
     ...CHAT_GATE.pl,
+    ...TIE.pl,
     'unsub.title': 'Wyłączyć powiadomienia?',
     'unsub.leadStart': 'Wyślemy kod na ten adres:',
     'unsub.send': 'Wyślij kod',
@@ -571,6 +627,7 @@ const ADDITIONS = {
   en: {
     ...CHAT_UI.en,
     ...CHAT_GATE.en,
+    ...TIE.en,
     'unsub.title': 'Switch the reminders off?',
     'unsub.leadStart': 'We will send a code to this address:',
     'unsub.send': 'Send the code',
@@ -593,6 +650,7 @@ const ADDITIONS = {
   de: {
     ...CHAT_UI.de,
     ...CHAT_GATE.de,
+    ...TIE.de,
     'unsub.title': 'Erinnerungen abschalten?',
     'unsub.leadStart': 'Wir senden einen Code an diese Adresse:',
     'unsub.send': 'Code senden',
@@ -615,6 +673,7 @@ const ADDITIONS = {
   es: {
     ...CHAT_UI.es,
     ...CHAT_GATE.es,
+    ...TIE.es,
     'unsub.title': '¿Desactivar los avisos?',
     'unsub.leadStart': 'Enviaremos un código a esta dirección:',
     'unsub.send': 'Enviar el código',
@@ -637,6 +696,7 @@ const ADDITIONS = {
   fr: {
     ...CHAT_UI.fr,
     ...CHAT_GATE.fr,
+    ...TIE.fr,
     'unsub.title': 'Désactiver les rappels ?',
     'unsub.leadStart': 'Nous envoyons un code à cette adresse :',
     'unsub.send': 'Envoyer le code',

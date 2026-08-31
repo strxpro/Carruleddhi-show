@@ -23,7 +23,7 @@
  */
 import './i18n.js';
 import { getPublicSiteConfig } from './site-config.js';
-import { installBridge, measureScreenHeight, translateDom } from './site-bridge.js';
+import { installBridge, measureScreenHeight, postJSON, translateDom } from './site-bridge.js';
 /* Flagi jako SVG: Windows nie ma kolorowych glifów flag i w ich miejsce pokazuje dwie litery.
    Ten sam moduł co na stronie głównej, więc flaga jest ta sama, a nie podobna. */
 import { flagSvg } from './flags.js';
@@ -72,6 +72,60 @@ const text = installBridge({
   getLang: () => lang
 });
 
+function eventYear() {
+  const date = new Date(config.eventDate);
+  return Number.isNaN(date.getTime()) ? String(new Date().getFullYear()) : String(date.getFullYear());
+}
+
+function eventDateLabel() {
+  const date = new Date(config.eventDate);
+  if (Number.isNaN(date.getTime())) return config.eventLocation || '';
+  let formatted;
+  try {
+    formatted = new Intl.DateTimeFormat(lang, {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome'
+    }).format(date);
+  } catch (_) {
+    formatted = config.eventDate.slice(0, 10);
+  }
+  return [formatted, config.eventLocation].filter(Boolean).join(' · ');
+}
+
+function applyEventConfig() {
+  const parts = String(config.eventDate || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const headerDate = parts ? `${parts[3]} · ${parts[2]} · ${parts[1]}` : eventYear();
+  document.querySelectorAll('[data-config-event-name]').forEach((element) => {
+    element.textContent = config.eventName;
+  });
+  document.querySelectorAll('[data-header-date]').forEach((element) => {
+    element.textContent = headerDate;
+  });
+  document.querySelectorAll('[data-config-date-label]').forEach((element) => {
+    element.textContent = eventDateLabel();
+  });
+  document.querySelectorAll('[data-config-event-year]').forEach((element) => {
+    element.textContent = eventYear();
+  });
+  document.querySelectorAll('[data-config-event-location]').forEach((element) => {
+    element.textContent = config.eventLocation || '';
+  });
+}
+
+async function loadEventConfig() {
+  if (!config.endpoints.settings) return;
+  try {
+    const result = await postJSON(config.endpoints.settings, {});
+    const settings = result?.settings;
+    if (!settings) return;
+    if (typeof settings.eventName === 'string' && settings.eventName.trim()) config.eventName = settings.eventName.trim();
+    if (typeof settings.eventDate === 'string' && !Number.isNaN(new Date(settings.eventDate).getTime())) config.eventDate = settings.eventDate;
+    if (typeof settings.eventLocation === 'string' && settings.eventLocation.trim()) config.eventLocation = settings.eventLocation.trim();
+    applyLanguage(lang, false);
+  } catch (_) {
+    /* The built-in edition remains fully usable if settings are temporarily unavailable. */
+  }
+}
+
 function applyLanguage(next, persist = true) {
   const available = Object.keys(window.CARRULEDDHI_I18N || {});
   lang = available.includes(next) ? next : 'it';
@@ -84,9 +138,10 @@ function applyLanguage(next, persist = true) {
      karty przeglądarki nie — „Zagłosuj na uczestnika. — Carruleddhi Show 2026" ma w środku
      kropkę i kreskę obok siebie. */
   if (dict['voting.pageTitle']) {
-    document.title = `${dict['voting.pageTitle'].replace(/[.。]$/, '')} — Carruleddhi Show 2026`;
+    document.title = `${dict['voting.pageTitle'].replace(/[.。]$/, '')} — ${config.eventName}`;
   }
 
+  applyEventConfig();
   paintPicker();
 
   /* Odsyłacz „wróć na stronę" niesie język dalej. Bez tego powrót ze strony po polsku na
@@ -259,6 +314,7 @@ function boot() {
   });
   // Bez zapisu: samo wejście na stronę nie jest wyborem języka, tylko odczytaniem go.
   applyLanguage(lang, false);
+  void loadEventConfig();
 
   /**
    * Wysokość ekranu zamrożona w `--screen-h`, tak samo jak na stronie głównej.

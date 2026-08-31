@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ImagePlus, ListPlus, Play, RefreshCw, Square, Trash2, Trophy } from 'lucide-react';
+import {
+  Eraser, Hourglass, ImagePlus, ListPlus, Play, RefreshCw, RotateCcw, Square, Trash2, Trophy
+} from 'lucide-react';
 import { cn, formatMoment } from '@/lib/utils';
 import { DateTimeField } from './DateTimeField';
 import type { TranslateKey } from '../i18n';
 import {
   ApiError,
+  clearVoting,
   closeVoting,
   fetchRoster,
   fetchVoting,
@@ -13,6 +16,7 @@ import {
   removeParticipant,
   saveParticipant,
   scheduleVoting,
+  showCountdown,
   uploadParticipantPhoto,
   type ParticipantEdit,
   type RosterRow,
@@ -78,7 +82,12 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [winners, setWinners] = useState<{ sent: VotingWinner[]; unreachable: VotingWinner[] } | null>(null);
+  const [winners, setWinners] = useState<{
+    sent: VotingWinner[];
+    unreachable: VotingWinner[];
+    notifiedVoters: number;
+    failedVoterNotifications: number;
+  } | null>(null);
 
   const [startAt, setStartAt] = useState('');
   const [duration, setDuration] = useState(30);
@@ -91,6 +100,10 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
   });
   const [draftPhoto, setDraftPhoto] = useState<{ imagePath: string; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  /* Który kafelek właśnie wgrywa zdjęcie: identyfikator uczestnika albo `draft` dla nowego.
+     Bez tego jedna flaga `uploading` migałaby na wszystkich wierszach naraz, a szkielet ma
+     stać dokładnie w tym miejscu, w które organizator właśnie stuknął. */
+  const [photoBusy, setPhotoBusy] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   /* Lista startowa, wczytywana dopiero przy otwarciu.
@@ -193,10 +206,11 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
 
   /** Każde działanie kończy się świeżym stanem z serwera, więc ekran nigdy nie zgaduje. */
   const run = useCallback(
-    async (action: () => Promise<unknown>, message?: string) => {
+    async (action: () => Promise<unknown>, message?: string): Promise<boolean> => {
       setBusy(true);
       setError(null);
       setNote(null);
+      setWinners(null);
       try {
         const result = await action();
         /* Część działań oddaje cały stan, część samo `ok`. Te drugie muszą go doczytać: po
@@ -207,8 +221,10 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
           absorb(await fetchVoting(apiKey));
         }
         if (message) setNote(message);
+        return true;
       } catch (problem) {
         setError(explain(problem));
+        return false;
       } finally {
         setBusy(false);
       }
@@ -232,6 +248,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
 
   async function pickPhoto(file: File, participantId?: string) {
     setUploading(true);
+    setPhotoBusy(participantId || 'draft');
     setError(null);
     try {
       const photo = await downscale(file);
@@ -250,6 +267,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
       throw problem;
     } finally {
       setUploading(false);
+      setPhotoBusy(null);
     }
   }
 
@@ -392,7 +410,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
         <div className="mt-5 flex flex-wrap gap-2.5">
           <button
             type="button"
-            disabled={busy || !startAt}
+            disabled={busy || !startAt || state?.status === 'closed'}
             onClick={() =>
               void run(
                 () => scheduleVoting(apiKey, new Date(startAt).toISOString(), duration),
@@ -402,6 +420,47 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             className={cn(chip, 'bg-yellow text-navy-950 hover:bg-white')}
           >
             {t('vote.saveSchedule')}
+          </button>
+          <button
+            type="button"
+            disabled={busy || !startAt || state?.status !== 'closed'}
+            onClick={() => {
+              if (!window.confirm(t('vote.restoreConfirm'))) return;
+              void run(
+                () => scheduleVoting(apiKey, new Date(startAt).toISOString(), duration),
+                t('vote.restored')
+              );
+            }}
+            className={cn(chip, 'inline-flex items-center gap-2 bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25')}
+          >
+            <RotateCcw size={13} /> {t('vote.restoreSchedule')}
+          </button>
+          {/* Jedno kliknięcie po testach: zdejmuje ręczne zamknięcie i przepisuje start z daty
+              wydarzenia zapisanej w Ustawieniach, więc licznik w hero znowu odlicza do tego
+              samego terminu, który widzi publiczność. Godzina bierze się z tamtego pola, nie
+              stąd — dwa miejsca na jedną godzinę to pierwsze miejsce na rozjazd. */}
+          {/* WRÓĆ DO ODLICZANIA.
+              Bierze godzinę z pola „Start wyścigu" obok, więc dokładną datę ustawia się w tym
+              samym miejscu, w którym się ją widzi. Puste pole schodzi na datę wydarzenia z
+              Ustawień — wtedy nie ma czego brać stąd, a odliczanie i tak ma się zgadzać z tym,
+              co widzi publiczność. Jedno i drugie zdejmuje ręczne zamknięcie, więc licznik na
+              stronie głównej wraca od razu. */}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (startAt) {
+                void run(
+                  () => scheduleVoting(apiKey, new Date(startAt).toISOString(), duration),
+                  t('vote.countdownDone')
+                );
+                return;
+              }
+              void run(() => showCountdown(apiKey), t('vote.countdownDone'));
+            }}
+            className={cn(chip, 'inline-flex items-center gap-2 bg-blue-400/15 text-blue-100 hover:bg-blue-400/25')}
+          >
+            <Hourglass size={13} /> {t('vote.showCountdown')}
           </button>
           <button
             type="button"
@@ -424,6 +483,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
           </button>
           {!startAt ? <p className="self-center text-xs text-white/40">{t('vote.needStart')}</p> : null}
         </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-white/40">{t('vote.countdownHint')}</p>
       </section>
 
       {error ? (
@@ -440,26 +500,40 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             <h2 className="font-extrabold text-white">{t('vote.results')}</h2>
             <p className="mt-1 max-w-lg text-xs leading-relaxed text-white/45">{t('vote.resultsLead')}</p>
           </div>
-          <button
-            type="button"
-            disabled={busy || state?.phase !== 'closed'}
-            onClick={() =>
-              void (async () => {
-                setBusy(true);
-                setError(null);
-                try {
-                  setWinners(await mailWinners(apiKey));
-                } catch (problem) {
-                  setError(explain(problem));
-                } finally {
-                  setBusy(false);
-                }
-              })()
-            }
-            className={cn(chip, 'inline-flex items-center gap-2 bg-yellow text-navy-950 hover:bg-white')}
-          >
-            <Trophy size={13} /> {t('vote.winnersSend')}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy || (state?.totalVotes ?? 0) === 0}
+              onClick={() => {
+                if (!window.confirm(t('vote.clearConfirm'))) return;
+                void run(() => clearVoting(apiKey), t('vote.cleared'));
+              }}
+              className={cn(chip, 'inline-flex items-center gap-2 border border-coral/40 text-coral hover:bg-coral hover:text-white')}
+            >
+              <Eraser size={13} /> {t('vote.clearVotes')}
+            </button>
+            <button
+              type="button"
+              disabled={busy || state?.phase !== 'closed'}
+              onClick={() => {
+                if (!window.confirm(t('vote.winnersConfirm'))) return;
+                void (async () => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    setWinners(await mailWinners(apiKey));
+                  } catch (problem) {
+                    setError(explain(problem));
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+              className={cn(chip, 'inline-flex items-center gap-2 bg-yellow text-navy-950 hover:bg-white')}
+            >
+              <Trophy size={13} /> {t('vote.winnersSend')}
+            </button>
+          </div>
         </div>
 
         {/* Trzy liczby, nie jedna.
@@ -575,6 +649,16 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                   .join(' · ')}
               </p>
             ) : null}
+            <p className="text-emerald-300">
+              <span className="text-white/50">{t('vote.votersNotified')}</span>{' '}
+              {winners.notifiedVoters}
+            </p>
+            {winners.failedVoterNotifications > 0 ? (
+              <p className="text-coral">
+                <span className="text-white/50">{t('vote.votersNotifyFailed')}</span>{' '}
+                {winners.failedVoterNotifications}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -623,17 +707,27 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                     onChange={(event) => setRosterQuery(event.target.value)}
                     className={field}
                   />
-                  <ul className="mt-2 max-h-72 divide-y divide-white/5 overflow-y-auto">
+                  {/* Lista startowa: jeden wiersz na osobę, smukły także na telefonie.
+                      Numer jest plakietką o stałej szerokości, nazwisko i wózek mają własne
+                      wiersze z obcinaniem, a „Dodaj" nie kurczy się poniżej celu dla palca.
+                      `max-h` w jednostce dvh, nie w pikselach: na telefonie 288 px to była
+                      lista pokazująca cztery osoby z kilkudziesięciu. */}
+                  <ul className="mt-2 max-h-[min(60dvh,22rem)] divide-y divide-white/5 overflow-y-auto">
                     {rosterAvailable.map((row) => (
-                      <li key={row.id} className="flex items-center gap-3 py-2">
-                        <span className="w-12 shrink-0 text-sm font-extrabold tabular-nums text-yellow">
+                      <li key={row.id} className="flex items-center gap-2.5 py-2.5 sm:gap-3">
+                        <span
+                          className={cn(
+                            'grid h-8 w-10 shrink-0 place-items-center rounded-lg bg-yellow/15',
+                            'text-[13px] font-extrabold tabular-nums text-yellow'
+                          )}
+                        >
                           {row.raceNumber || '—'}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-white">
+                          <span className="block truncate text-[13px] font-bold leading-tight text-white">
                             {row.firstName} {row.lastName}
                           </span>
-                          <span className="block truncate text-xs text-white/45">
+                          <span className="block truncate text-[11px] leading-tight text-white/45">
                             {[row.cartName, row.category].filter(Boolean).join(' · ')}
                             {row.raceNumber ? '' : ` · ${t('vote.rosterNoNumber')}`}
                           </span>
@@ -647,7 +741,10 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                               t('vote.saved')
                             )
                           }
-                          className={cn(chip, 'shrink-0 bg-yellow text-navy-950 hover:bg-white')}
+                          className={cn(
+                            chip,
+                            'shrink-0 bg-yellow px-3 py-1.5 text-[11px] text-navy-950 hover:bg-white sm:px-4 sm:py-2 sm:text-xs'
+                          )}
                         >
                           {t('vote.rosterAdd')}
                         </button>
@@ -668,18 +765,20 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
           className="mt-4 grid gap-3 sm:grid-cols-6"
           onSubmit={(event) => {
             event.preventDefault();
-            void run(
-              () =>
-                saveParticipant(apiKey, null, {
-                  startNumber: draft.startNumber.trim(),
-                  category: draft.category.trim(),
-                  firstName: draft.firstName.trim(),
-                  lastName: draft.lastName.trim(),
-                  projectName: draft.projectName.trim() || undefined,
-                  imagePath: draftPhoto?.imagePath
-                }),
-              t('vote.saved')
-            ).then(() => {
+            void (async () => {
+              const saved = await run(
+                () =>
+                  saveParticipant(apiKey, null, {
+                    startNumber: draft.startNumber.trim(),
+                    category: draft.category.trim(),
+                    firstName: draft.firstName.trim(),
+                    lastName: draft.lastName.trim(),
+                    projectName: draft.projectName.trim() || undefined,
+                    imagePath: draftPhoto?.imagePath
+                  }),
+                t('vote.saved')
+              );
+              if (!saved) return;
               setDraft({
                 startNumber: '',
                 category: draft.category,
@@ -689,7 +788,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               });
               setDraftPhoto(null);
               if (fileInput.current) fileInput.current.value = '';
-            });
+            })();
           }}
         >
           <input
@@ -738,6 +837,23 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                 if (file) void pickPhoto(file);
               }}
             />
+            {/* Podgląd wgranego zdjęcia zamiast samego „✓": po wgraniu widać, CZY to ten wózek,
+                a nie tylko że coś doszło. W trakcie wysyłki stoi tu szkielet. */}
+            {photoBusy === 'draft' ? (
+              <span
+                className="grid aspect-[4/3] w-[54px] shrink-0 place-items-center overflow-hidden rounded-lg bg-white/10"
+                role="status"
+                aria-label={t('vote.uploading')}
+              >
+                <span className="block h-full w-full animate-skeleton bg-white/15" />
+              </span>
+            ) : draftPhoto ? (
+              <img
+                src={draftPhoto.url}
+                alt=""
+                className="aspect-[4/3] w-[54px] shrink-0 rounded-lg object-cover"
+              />
+            ) : null}
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
@@ -765,7 +881,9 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               key={row.id}
               t={t}
               row={row}
+              fresh={freshIds.includes(row.id)}
               busy={busy}
+              photoBusy={photoBusy === row.id}
               field={field}
               chip={chip}
               onSave={(changes) => void run(() => saveParticipant(apiKey, row.id, changes), t('vote.saved'))}
@@ -792,7 +910,9 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
 function ParticipantRow({
   t,
   row,
+  fresh,
   busy,
+  photoBusy,
   field,
   chip,
   onSave,
@@ -801,7 +921,10 @@ function ParticipantRow({
 }: {
   t: (key: TranslateKey) => string;
   row: VotingParticipant;
+  fresh: boolean;
   busy: boolean;
+  /** Wgrywanie zdjęcia DLA TEGO wiersza — szkielet stoi wtedy na jego kafelku. */
+  photoBusy: boolean;
   field: string;
   chip: string;
   onSave: (changes: ParticipantEdit) => void;
@@ -826,17 +949,30 @@ function ParticipantRow({
   return (
     <li
       className={cn(
-        'grid gap-3 rounded-2xl border p-3 sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center',
-        row.active ? 'border-white/10 bg-white/5' : 'border-white/10 bg-transparent opacity-60'
+        /* Na telefonie zdjęcie i dane stoją w dwóch kolumnach obok siebie, a przyciski
+           w trzecim rzędzie na całą szerokość. Wcześniej wszystko było jedną kolumną, więc
+           jeden uczestnik zajmował pół ekranu i przewijanie listy startowej na zboczu było
+           przewijaniem bez końca. */
+        'grid gap-3 rounded-2xl border p-3',
+        'grid-cols-[96px_minmax(0,1fr)] items-start',
+        'sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center',
+        row.active ? 'border-white/10 bg-white/5' : 'border-white/10 bg-transparent opacity-60',
+        fresh && 'border-yellow/70 bg-yellow/10 ring-2 ring-yellow/20'
       )}
     >
       {/* Zdjęcie jest przyciskiem, nie ozdobą: w dniu zawodów pojazd wygląda inaczej niż na
-          zgłoszeniu i podmienia się je stukając w kafelek, a nie szukając osobnej ikony. */}
+          zgłoszeniu i podmienia się je stukając w kafelek, a nie szukając osobnej ikony.
+          Na telefonie kafelek jest większy, bo to jest cel dla palca, nie miniatura. */}
       <button
         type="button"
+        disabled={photoBusy}
         onClick={() => input.current?.click()}
-        className="relative aspect-[4/3] w-[72px] overflow-hidden rounded-xl bg-white/10"
+        className={cn(
+          'relative aspect-[4/3] w-[96px] overflow-hidden rounded-xl border border-white/10',
+          'bg-white/10 transition-colors hover:border-yellow/60 sm:w-[72px]'
+        )}
         aria-label={t('vote.uploadPhoto')}
+        aria-busy={photoBusy}
       >
         {row.photo ? (
           <img src={row.photo} alt="" className="h-full w-full object-cover" />
@@ -845,6 +981,18 @@ function ParticipantRow({
             <ImagePlus size={16} />
           </span>
         )}
+        {/* Szkielet NA kafelku, dopóki zdjęcie leci na serwer.
+            Zmniejszenie w przeglądarce plus wysyłka to na transmisji komórkowej kilka sekund,
+            w których nic się nie działo: kafelek wyglądał tak samo jak przed stuknięciem, więc
+            organizator stukał drugi raz i wysyłał to samo zdjęcie ponownie. */}
+        {photoBusy ? (
+          <span className="absolute inset-0 grid place-items-center bg-navy-950/70">
+            <span className="block h-full w-full animate-skeleton bg-white/10" />
+            <span className="absolute text-[10px] font-bold uppercase tracking-wider text-yellow">
+              {t('vote.uploading')}
+            </span>
+          </span>
+        ) : null}
       </button>
       <input
         ref={input}
@@ -862,7 +1010,7 @@ function ParticipantRow({
           inputMode="numeric"
           value={startNumber}
           onChange={(event) => setStartNumber(event.target.value)}
-          className={field}
+          className={cn(field, 'max-w-[110px] sm:max-w-none')}
           aria-label={t('vote.startNumber')}
         />
         <div className="grid gap-1">
@@ -892,7 +1040,9 @@ function ParticipantRow({
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2 sm:justify-end">
+      {/* Przyciski pod spodem na całą szerokość telefonu: obok danych mieściły się tylko
+          ściśnięte w dwóch rzędach, a to są trzy różne czynności, z których jedna usuwa. */}
+      <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:justify-end">
         {dirty ? (
           <button
             type="button"

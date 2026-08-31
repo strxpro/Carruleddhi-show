@@ -386,9 +386,40 @@
 
              Nagłówek nad listą mówi, ile tego jest, żeby długość listy nie była
              niespodzianką po przewinięciu. -->
+        <!-- RESZTA STAWKI JAKO TABELA, PORCJAMI PO DZIESIĘĆ.
+             ==========================================================================
+             Stała tu siatka kafelków ze zdjęciami — cała, od razu. Przy dwudziestu wozach
+             znaczyło to dwadzieścia fotografii pod cokołem i sekcję kilka ekranów długą, w
+             której podium przestawało być widoczne razem z wynikiem.
+
+             Tabela mówi to samo w jednym wierszu na wóz i mieści się pod cokołem, a nie za
+             nim. Przewijanie jest WEWNĄTRZ niej (`podium__field-scroll`), więc długa stawka
+             nie rozpycha sekcji i cokół zostaje na ekranie. `tabindex="0"` na przewijanym
+             pudełku, bo obszar z własnym paskiem musi dać się przewinąć z klawiatury.
+
+             Dziesięć wierszy naraz: tyle wchodzi bez przewijania na zwykłym ekranie, a
+             przycisk niżej dokłada kolejne dziesięć. -->
         <div class="podium__field" data-podium-field hidden>
           <h3 class="podium__field-title" data-podium-field-title></h3>
-          <ol class="podium__field-list" data-podium-field-list></ol>
+          <div class="podium__field-scroll" tabindex="0">
+            <table class="podium__table">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Carruleddhi</th>
+                  <th scope="col" data-i18n="voting.points">punti</th>
+                  <th scope="col" data-i18n="voting.avgShort">media</th>
+                  <th scope="col" data-i18n="voting.votes">voti</th>
+                </tr>
+              </thead>
+              <tbody data-podium-field-list></tbody>
+            </table>
+          </div>
+          <div class="podium__field-more">
+            <button class="btn btn--outline btn--small" type="button" data-podium-field-more hidden>
+              <span data-podium-field-more-label data-i18n="voting.loadMore">Mostra altri</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>

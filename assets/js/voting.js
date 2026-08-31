@@ -162,59 +162,79 @@ import {
        zmienną znaczyłoby, że kolejność tych dwóch wywołań staje się nagle istotna. */
     const ties = tieNotes(standingsRows());
 
-    list.replaceChildren(...rest.map((row, index) => {
-      const item = document.createElement('li');
-      item.className = 'podium__field-item';
+    /* Ile wierszy jest odsłoniętych. Rośnie przyciskiem, nie przewijaniem: przewijanie
+       wewnątrz tabeli dotyczy tego, co JUŻ jest, a doczytywanie jest osobną decyzją. */
+    const shown = Math.min(fieldShown, rest.length);
 
-      /* Kafelek to samo zdjęcie z podpisem na nim — ta sama zasada, co na cokole wyżej i na
-         kafelkach na podstronie głosowania. Wcześniej był tu biały prostokąt z obwódką, w nim
-         małe zdjęcie z lewej i tekst z prawej; przy dwudziestu wozach dawało to dwadzieścia
-         ramek i dwadzieścia znaczków zamiast dwudziestu fotografii. */
-      const figure = document.createElement('figure');
-      figure.className = 'podium__field-photo';
+    list.replaceChildren(...rest.slice(0, shown).map((row, index) => {
+      const tr = document.createElement('tr');
+
+      const rank = document.createElement('th');
+      rank.scope = 'row';
+      rank.className = 'podium__table-rank';
+      // Numeracja od czwartego, nie od pierwszego wiersza tej tabeli.
+      rank.textContent = String(index + 4);
+
+      /* Zdjęcie zostaje, tylko jako miniatura w wierszu. Bez niego tabela jest listą nazw, a
+         cała ta strona jest o tym, jak te wozy wyglądają. */
+      const who = document.createElement('td');
+      who.className = 'podium__table-who';
       const image = document.createElement('img');
       image.src = row.photo || avatarFor(row);
       image.alt = '';
       image.loading = 'lazy';
       image.decoding = 'async';
-      figure.append(image);
-
-      const scrim = document.createElement('span');
-      scrim.className = 'podium__field-scrim';
-      scrim.setAttribute('aria-hidden', 'true');
-      figure.append(scrim);
-
-      const place = document.createElement('span');
-      place.className = 'podium__field-place';
-      // Numeracja od czwartego, nie od pierwszego wiersza tej listy.
-      place.textContent = String(index + 4);
-      figure.append(place);
-
-      const body = document.createElement('figcaption');
-      body.className = 'podium__field-body';
+      const identity = document.createElement('span');
       const project = document.createElement('strong');
       project.textContent = row.projectName || text('voting.noProject');
-      const rider = document.createElement('span');
+      const rider = document.createElement('small');
       rider.textContent = `${row.firstName} ${row.lastName}`.trim();
-      const stats = document.createElement('p');
-      const points = document.createElement('b');
-      points.textContent = String(row.totalScore);
-      const count = document.createElement('small');
-      count.textContent = `${text('voting.points')} · ${row.voteCount} ${votesLabel(row.voteCount)}`;
-      stats.append(points, count);
-      body.append(project, rider, stats);
-
+      identity.append(project, rider);
       if (ties.get(row.id)) {
-        const tie = document.createElement('span');
-        tie.className = 'podium__field-tie';
+        const tie = document.createElement('em');
+        tie.className = 'podium__table-tie';
         tie.textContent = ties.get(row.id);
-        body.append(tie);
+        identity.append(tie);
       }
+      who.append(image, identity);
 
-      figure.append(body);
-      item.append(figure);
-      return item;
+      /* `data-label` na każdej liczbie: na telefonie tabela rozkłada się na wiersze bez
+         nagłówka, a goła liczba nie mówi, czy to punkty, średnia, czy głosy. */
+      const points = document.createElement('td');
+      points.className = 'podium__table-number podium__table-points';
+      points.dataset.label = text('voting.points');
+      points.textContent = String(row.totalScore);
+
+      const average = document.createElement('td');
+      average.className = 'podium__table-number';
+      average.dataset.label = text('voting.avgShort');
+      average.textContent = row.voteCount ? row.averageScore.toFixed(1) : '—';
+
+      const votes = document.createElement('td');
+      votes.className = 'podium__table-number';
+      votes.dataset.label = text('voting.votes');
+      votes.textContent = String(row.voteCount || 0);
+
+      tr.append(rank, who, points, average, votes);
+      return tr;
     }));
+
+    const more = $('[data-podium-field-more]');
+    if (more) {
+      const left = rest.length - shown;
+      more.hidden = left <= 0;
+      const label = $('[data-podium-field-more-label]', more) || more;
+      label.textContent = `${text('voting.loadMore')} (${left})`;
+    }
+  }
+
+  /** Ile wierszy pozostałej stawki jest widocznych. Dziesięć, potem po dziesięć więcej. */
+  const FIELD_BATCH = 10;
+  let fieldShown = FIELD_BATCH;
+
+  function showMoreField() {
+    fieldShown += FIELD_BATCH;
+    paintField();
   }
 
   /**
@@ -567,8 +587,12 @@ import {
 
      PRZYCISK OBOK. Zdrapywanie nie istnieje na klawiaturze ani w czytniku ekranu, a wynik nie
      może być zdolnością dostępną tylko dla palca. */
-  const SCRATCH_RADIUS = 26;
-  const SCRATCH_DONE = 0.42;
+  /* Pędzel szeroki i próg niski, żeby cztery ruchy palcem wystarczyły.
+     Przy promieniu 26 px i progu 42% zdrapywanie trwało kilkanaście przeciągnięć — a to jest
+     niespodzianka, nie zadanie. 64 px to szerokość opuszki na telefonie, 22% odsłoniętej
+     powierzchni wypada mniej więcej po czterech przejazdach przez kadr. */
+  const SCRATCH_RADIUS = 64;
+  const SCRATCH_DONE = 0.22;
 
   function scratchKey() {
     const when = stamp(state.raceStartsAt) || stamp(state.votingEndsAt);
@@ -683,7 +707,9 @@ import {
          obrazie przy każdym `pointermove` to jedyna rzecz w tej sekcji, która potrafiłaby
          zająć klatkę. Próbka co czwarty piksel wystarcza do progu 42%. */
       checked += 1;
-      if (checked % 20) return;
+      // Co szóste zamalowanie, nie co dwudzieste: przy szerokim pędzlu próg wypada tak szybko,
+      // że rzadsze sprawdzanie przegapiałoby moment i kazało zdrapywać już odsłonięte miejsca.
+      if (checked % 6) return;
       const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
       let clear = 0;
       for (let at = 3; at < pixels.length; at += 16) {
@@ -864,6 +890,10 @@ import {
       state.shown += STANDINGS_BATCH;
       paintStandings();
     });
+
+    /* Kolejne dziesięć wierszy pozostałej stawki. Przewijanie wewnątrz tabeli pokazuje to, co
+       już jest; ten przycisk dokłada więcej — dwie różne czynności, dwa różne elementy. */
+    $('[data-podium-field-more]')?.addEventListener('click', showMoreField);
 
     /* Jeden tik na sekundę dla licznika i jeden odczyt na trzydzieści sekund dla fazy — i oba
        tylko wtedy, gdy karta jest z przodu. Odliczanie w karcie schowanej za innymi to praca,

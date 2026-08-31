@@ -410,9 +410,17 @@ check('pola danych obejmuja GUARDIAN_RELATION', PRINT_DATA_KEYS.includes('GUARDI
    Zmierzone na produkcji 28.08.2026, zanim to poprawiono:
      "Czy na trasie beda punkty z woda dla widzow?" -> data i godzina startu
    Klucz "wo" (niemieckie "gdzie") trafial w srodek slowa "woda". */
+/* Wycinane od `const FAQ_TOPICS` do końca SAMEJ `faqAnswer`, a nie do pierwszego `return null;`
+   po FAQ_TOPICS. Ta pierwsza wersja zakładała, że między tymi dwoma punktami nie ma nic innego
+   — i przestała być prawdą w chwili, gdy obok stanęła druga funkcja rozpoznająca słowa
+   (`dataIntent`), też kończąca się `return null;`. Checker ucinał wtedy blok przed samą
+   `faqAnswer` i padał na `faqAnswer is not defined`, czyli na własnym wycinaniu, nie na kodzie
+   Workera. Teraz koniec liczy się od podpisu funkcji, której ten test dotyczy. */
+const faqStart = worker.indexOf('const FAQ_TOPICS');
+const faqDeclaration = worker.indexOf('function faqAnswer', faqStart);
 const faqSource = worker.slice(
-  worker.indexOf('const FAQ_TOPICS'),
-  worker.indexOf('\n}', worker.indexOf('return null;', worker.indexOf('const FAQ_TOPICS'))) + 2
+  faqStart,
+  worker.indexOf('\n}', worker.indexOf('return null;', faqDeclaration)) + 2
 );
 const faqAnswer = new Function(`${faqSource}; return faqAnswer;`)();
 const faqDeck = {
