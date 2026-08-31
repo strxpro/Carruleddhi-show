@@ -292,8 +292,8 @@ sprawdzone — nie zmieniaj ich.
 | 25 | `http:ActionGetFile` | 3 | `{{1.branch}}` = `registration-minor-xx` | URL `{{1.pdfUrl}}` |
 | 26 | `http:ActionGetFile` | 3 | — | URL `{{1.pdfUrlOwn}}` |
 | 27 | `email:ActionSendEmail` | 7 | — | jak 16, ale 2 załączniki: `{{25.data}}` i `{{26.data}}` |
-| 9 | `http:ActionSendData` | 3 | `{{1.type}}` = `registration` | GET `https://api.callmebot.com/whatsapp.php`, qs: `phone=48665626101`, `apikey=2990681`, `text=…` |
-| 30 | `http:ActionSendData` | 3 | `{{1.type}}` = `registration` | to samo, `phone=393284981574`, `apikey=3364881` |
+| 9 | `http:ActionSendData` | 3 | `{{1.type}}` = `registration` | GET `https://api.callmebot.com/whatsapp.php`, qs: `phone=48665626101`, `apikey=<z WHATSAPP_ALERTS>`, `text=…` |
+| 30 | `http:ActionSendData` | 3 | `{{1.type}}` = `registration` | to samo, `phone=393284981574`, `apikey=<z WHATSAPP_ALERTS>` |
 | 12 | `email:ActionSendEmail` | 7 | `{{1.branch}}` = `reminder` | To `{{lower(1.email)}}`, Subject `{{1.remSubject}}`, HTML `{{1.html}}` |
 | 14 | `email:ActionSendEmail` | 7 | `{{1.branch}}` = `contact` | To `info@carruleddhishow.com`, Reply-To `{{lower(1.email)}}`, Subject `{{1.contactSubject}}` |
 | 31 | `email:ActionSendEmail` | 7 | `{{1.branch}}` = `outbox` | To `{{1.to}}`, Subject `{{1.subject}}`, HTML `{{1.html}}` |

@@ -142,8 +142,8 @@ organizator dostaje powiadomienia o przypomnieniach i wiadomościach z formularz
 
 | Moduł | Numer | apikey |
 |---|---|---|
-| 9 | `48665626101` | `2990681` |
-| 30 | `393284981574` | `3364881` |
+| 9 | `48665626101` | z `WHATSAPP_ALERTS` (nie wpisuj do repo) |
+| 30 | `393284981574` | z `WHATSAPP_ALERTS` (nie wpisuj do repo) |
 
 Bez `+` i bez spacji — to trafia do query stringa, gdzie `+` oznacza spację.
 

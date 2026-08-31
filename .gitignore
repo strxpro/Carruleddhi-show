@@ -17,3 +17,9 @@ worker/.dev.vars
 # Measurement output. Screenshots are for looking at, not for keeping in history.
 shots/
 public/__probe.html
+
+# Kopia żywego scenariusza wyciągnięta z Make. Niesie wypełnione pola apikey CallMeBota,
+# a te są sekretem — patrz komentarz w tools/build-make-blueprints.mjs. Blueprint do
+# wgrania powstaje z generatora i ma tam zastępnik, więc ten plik jest tylko lokalną kopią
+# zapasową i nie ma po co wchodzić do publicznego repozytorium.
+make/blueprint-live-backup-*.json

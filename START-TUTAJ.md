@@ -148,15 +148,25 @@ a `flash` w nim został.
 Jeśli włączysz `AI_VISION_MODEL`, wróć też do `features.chatPhotos` w
 `assets/js/site-config.js` i ustaw je na `true` — spinacz w czacie jest wyłączony właśnie
 dlatego, że poprzedni dostawca nie miał modelu przyjmującego obrazy.
-| `WHATSAPP_ALERTS` | `48665626101:2990681:pl,393284981574:3364881:it` | o nowej wiadomości na czacie dowiesz się tylko mailem, nie na telefon |
+| `WHATSAPP_ALERTS` | `48665626101:KLUCZ:pl,393284981574:KLUCZ:it` | o nowej wiadomości na czacie dowiesz się tylko mailem, nie na telefon |
 
 `WHATSAPP_ALERTS` to trójki `numer:klucz:język` po przecinku, numer bez plusa. Język jest
 opcjonalny i domyślnie polski, więc stary zapis `numer:klucz` działa dalej — ale ustawiony
 sprawia, że każdy organizator dostaje powiadomienie w swoim języku. Tłumaczona jest sama
-ramka wiadomości; wypowiedź gościa zostaje dosłownie taka, jaką napisał. Te same pary, które
-scenariusz w Make ma wpisane przy zapisach — ale tu w zmiennej, a nie w kodzie, bo
-repozytorium jest publiczne. Skoro i tak są jawne w `make/blueprint-1-instant.json`,
-warto je przy okazji wygenerować od nowa w CallMeBocie.
+ramka wiadomości; wypowiedź gościa zostaje dosłownie taka, jaką napisał.
+
+Klucz dostaje się tak: organizator pisze „I allow callmebot to send me messages" na WhatsAppa
+pod `+34 621 331 709`, a bot odpowiada jego osobistym kluczem.
+
+**Ta zmienna jest teraz jedynym miejscem, gdzie te klucze mają stać.** `tools/build-make-blueprints.mjs`
+czyta ją (ze środowiska albo z `.env.local`) i dopiero wstawia klucze do
+`make/blueprint-1-instant.json` przy budowaniu. Bez niej blueprint powstaje z widocznym
+zastępnikiem `WSTAW-KLUCZ-CALLMEBOT` i generator o tym mówi.
+
+Do commita `198bbb7` klucze stały wpisane w generatorze i w blueprincie, więc **leżą w
+historii gita** — wyjęcie ich z plików tego nie cofa. Trzeba je wygenerować od nowa
+w CallMeBocie: dopóki tego nikt nie zrobi, każdy, kto przeczyta stare commity, może pisać
+na oba numery.
 
 `service_role` to klucz, który omija zabezpieczenia bazy. Nigdy nie trafia do
 przeglądarki — trzyma go tylko funkcja na Vercelu. Jeśli go gdzieś wkleisz publicznie,

@@ -113,8 +113,9 @@ Każdy punkt to stan, jaki ma zaistnieć. Nie mówię, ilu modułów potrzebujes
 **Organizator ma dostać powiadomienie na telefon, natychmiast.**
 
 - Kanał: CallMeBot (WhatsApp przez zwykłe `GET`).
-- **Dwa różne numery**, bo jest dwóch organizatorów: `48665626101` z kluczem `2990681`
-  i `393284981574` z kluczem `3364881`. Numer bez znaku `+` — to jedzie w query stringu.
+- **Dwa różne numery**, bo jest dwóch organizatorów: `48665626101` i `393284981574`.
+  Numer bez znaku `+` — to jedzie w query stringu. Klucze `apikey` bierz z `WHATSAPP_ALERTS`
+  (patrz START-TUTAJ.md); do repozytorium nie wpisujemy ich, bo jest publiczne.
 - W treści: imię i nazwisko, numer startowy, kategoria, nazwa wózka, język.
 - Jeżeli `isMinor` jest prawdą, wiadomość musi to **wyraźnie** mówić. Nieletni wymaga
   obecności opiekuna na starcie i to jest jedyna rzecz w tej wiadomości, której przeoczenie

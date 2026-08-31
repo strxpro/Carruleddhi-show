@@ -28,11 +28,51 @@ const SITE = 'https://www.carruleddhishow.com';
 const ORG_EMAIL = 'info@carruleddhishow.com';
 
 /**
- * CallMeBot pairing for the organiser's own WhatsApp number.
- * This is not a secret in the usual sense — the key only lets someone message
- * this one number, and CallMeBot ignores anything after "Stop" is sent to the
- * bot — but it is still a live credential, so keep it out of public repos.
+ * Klucze CallMeBota — czytane, nie wpisane.
+ * ==========================================
+ * Do `1e7fbb1` obie pary numer:klucz stały w tym pliku, a stąd generator przepisywał je
+ * do `make/blueprint-1-instant.json`. Repozytorium jest publiczne, więc były to dwa żywe
+ * poświadczenia w dwóch śledzonych plikach — i checker w check-minor-blueprint.mjs
+ * pilnował tylko tego, żeby nie powstała TRZECIA kopia w workerze.
+ *
+ * Klucz CallMeBota pozwala wysłać WhatsAppa na jeden konkretny numer i nic więcej, więc
+ * nie jest to hasło do konta. Ale numer należy do organizatora, a nie do nas, i każdy,
+ * kto przeczyta repo, może na niego pisać.
+ *
+ * SKĄD TERAZ: `WHATSAPP_ALERTS` — ta sama zmienna i ten sam format, z którego czyta
+ * worker (`whatsappTargets`), czyli trójki `numer:klucz:język` po przecinku. Brana ze
+ * środowiska albo z `.env.local`, a `.env.*` jest w .gitignore. Jedna prawda o tych
+ * kluczach, nie dwie, które mogą się rozjechać.
+ *
+ * CZEGO TO NIE ROBI: nie usuwa kluczy z historii gita. Stare pary trzeba przegenerować
+ * u CallMeBota — dopóki tego nikt nie zrobi, leżą w commitach 762b12d i późniejszych.
  */
+function readLocalEnv() {
+  try {
+    return Object.fromEntries(
+      read('.env.local')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#') && line.includes('='))
+        .map((line) => {
+          const at = line.indexOf('=');
+          return [line.slice(0, at).trim(), line.slice(at + 1).trim().replace(/^["']|["']$/g, '')];
+        })
+    );
+  } catch {
+    // Brak pliku to nie błąd: na maszynie bez sekretów generator ma dalej działać.
+    return {};
+  }
+}
+
+const WHATSAPP_KEYS = new Map(
+  String(process.env.WHATSAPP_ALERTS || readLocalEnv().WHATSAPP_ALERTS || '')
+    .split(',')
+    .map((triple) => triple.trim().split(':'))
+    .filter((parts) => parts.length >= 2 && parts[0] && parts[1])
+    .map(([phone, apikey]) => [phone.replace(/\D/g, ''), apikey])
+);
+
 /**
  * Who gets the WhatsApp notice.
  *
@@ -43,13 +83,22 @@ const ORG_EMAIL = 'info@carruleddhishow.com';
  *
  * To add somebody: they send "I allow callmebot to send me messages" to +34 621 331 709
  * on WhatsApp, the bot replies with their personal apikey, and both values go below.
- */
+ *
+ * Numer zostaje tutaj, klucz nie. Numer organizatora i tak jest w stopce każdej strony,
+ * a `label` to tylko podpis modułu na kanwie Make. Sekretem jest sam klucz.
+ *
+ * Zastępnik jest krzykliwy i nie jest liczbą — gdyby ktoś wgrał taki blueprint bez
+ * uzupełnienia, CallMeBot odmawia i widać to w historii scenariusza. Cichy zastępnik,
+ * który wygląda jak klucz, dałby scenariusz udający, że wysyła. */
+const CALLMEBOT_PLACEHOLDER = 'WSTAW-KLUCZ-CALLMEBOT';
 const CALLMEBOT = [
-  { label: 'organizator', phone: '48665626101', apikey: '2990681' },
+  { label: 'organizator', phone: '48665626101' },
   // No leading + and no spaces. CallMeBot reads this straight out of a query string,
   // and a "+" there is a URL-encoded space rather than a country code.
-  { label: 'Santa Teresa', phone: '393284981574', apikey: '3364881' }
-];
+  { label: 'Santa Teresa', phone: '393284981574' }
+].map((entry) => ({ ...entry, apikey: WHATSAPP_KEYS.get(entry.phone) || CALLMEBOT_PLACEHOLDER }));
+
+const MISSING_KEYS = CALLMEBOT.filter((entry) => entry.apikey === CALLMEBOT_PLACEHOLDER);
 
 /* ---------------------------------------------------------------- copy deck */
 
@@ -1595,3 +1644,15 @@ if (failures) {
   process.exit(1);
 }
 console.log(`copy deck embedded: ${(Buffer.byteLength(COPY, 'utf8') / 1024).toFixed(1)} kB, locales=${Object.keys(copyRaw).filter((k) => k[0] !== '_').join(',')}`);
+
+/* Ostrzeżenie, nie błąd. Blueprint bez klucza CallMeBota jest poprawny i importowalny —
+   brakuje mu jednego pola w dwóch modułach. Przerwanie budowy tutaj znaczyłoby, że nikt
+   bez sekretów na dysku nie zbuduje blueprintu, a `npm run make` chodzi też w CI. */
+if (MISSING_KEYS.length) {
+  console.log(
+    `\nUWAGA: brak klucza CallMeBota dla ${MISSING_KEYS.map((e) => e.phone).join(', ')}.`
+    + `\n  W blueprincie stoi „${CALLMEBOT_PLACEHOLDER}" — WhatsApp nie pójdzie, dopóki nie wpiszesz`
+    + '\n  klucza w polu apikey obu modułów HTTP w Make (albo nie ustawisz WHATSAPP_ALERTS'
+    + '\n  w .env.local w formacie numer:klucz:jezyk,numer:klucz:jezyk i nie zbudujesz ponownie).'
+  );
+}
