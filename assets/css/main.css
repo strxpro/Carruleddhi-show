@@ -45,6 +45,8 @@ html {
   scrollbar-gutter: stable;
 }
 
+
+
 /* ============================================================
    PRZEŁADOWANIE STRONY OD ZERA — TO JEST TA PRZYCZYNA.
    ============================================================
@@ -160,6 +162,30 @@ html:has(> body.is-locked) {
   scrollbar-gutter: stable;
 }
 body.is-locked { overflow: hidden; }
+
+/* Rezerwa na pasek przewijania TYLKO tam, gdzie pasek zabiera miejsce.
+   ---------------------------------------------------------------------
+   OBJAW (zmierzony w okienku 390 px): `documentElement.clientWidth` 390, ale `<html>`
+   i `<body>` po 380 px, a każdy `.container` w zakresie 12..368 zamiast 12..378. Cała
+   strona stała 10 px w lewo od środka, z martwym pasem po prawej — i to jest to
+   „nierówno na telefonie", którego nie dawało się przypisać żadnej sekcji, bo nie
+   należało do żadnej: przesunięty był korzeń.
+
+   PRZYCZYNA: `scrollbar-gutter: stable` na `html` i na `html:has(> body.is-locked)`.
+   Na monitorze robi dokładnie to, po co zostało dopisane — otwarcie okna nie przeskakuje
+   szerokością. Przy pasku nakładanym rezerwuje miejsce, którego nikt nie zajmie.
+
+   Dlaczego `pointer: coarse`, a nie `max-width`: to nie zależy od szerokości okna, tylko
+   od tego, czy pasek przewijania jest nakładką. Wąskie okno na monitorze nadal ma pasek
+   klasyczny i nadal potrzebuje rezerwy.
+
+   Dlaczego TUTAJ, a nie przy deklaracji na `html` wyżej: `html:has(> body.is-locked)`
+   ma tę samą specyficzność co ten selektor w tym bloku, więc o wyniku decyduje kolejność.
+   Blok postawiony przed tamtą regułą przegrywałby dokładnie w chwili otwarcia okna. */
+@media (pointer: coarse) {
+  html,
+  html:has(> body.is-locked) { scrollbar-gutter: auto; }
+}
 button, input, select, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; }
@@ -1051,6 +1077,14 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .footer__copy { max-width: 38ch; color: var(--blue-200); line-height: 1.6; }
 .footer__group h3 { margin: 0 0 16px; color: var(--blue-200); font-family: var(--font-meta); font-size: 14px; letter-spacing: .18em; text-transform: uppercase; }
 .footer__links { display: grid; gap: 11px; }
+/* Zmierzone na 390 px: odsyłacze stopki miały 25 px wysokości, bo wysokość brała się
+   z samej interlinii. Pod palcem to jest celowanie. Odstęp schodzi z 11 px do 2 px, a
+   wchodzi wyściółka — skok wysokości bloku to więc 11 px na odsyłacz, nie 20. */
+@media (pointer: coarse) {
+  .footer__links { gap: 2px; }
+  .footer__links a,
+  .footer__links button { display: flex; align-items: center; min-height: 44px; padding: 4px 0; }
+}
 .footer__links a, .footer__links button { width: fit-content; padding: 0; border: 0; background: transparent; color: var(--white); text-align: left; text-decoration: none; cursor: pointer; }
 .footer__links a:hover, .footer__links button:hover { color: var(--yellow); }
 .footer__bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; padding-top: 25px; color: rgba(255,255,255,.52); font-family: var(--font-meta); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }

@@ -4597,6 +4597,108 @@ async function printToken(env, id) {
 }
 
 /**
+ * Napisy paska „zapisz jako PDF", dopisywanego do formularza z danymi.
+ *
+ * DLACZEGO NIE W SZABLONIE
+ *   worker/print-templates.js jest generowany przez tools/build-pdfs.mjs, a z tych samych
+ *   dwóch szablonów powstają statyczne blankiety w public/emails/. Przycisk wpisany do
+ *   szablonu trafiłby więc także na kartkę w załączniku — tam nie ma czego kliknąć.
+ *   Dlatego pasek jest doklejany dopiero w chwili serwowania strony.
+ *
+ * DLACZEGO NIE W emails/pdf-copy.json
+ *   Tamte teksty to treść dokumentu: ta sama na ekranie i na papierze, i to ona idzie do
+ *   podpisu. To jest napis na przycisku, czyli interfejs strony — a interfejs trzymamy
+ *   osobno od treści, tak samo jak na stronie głównej (i18n.js kontra COPY_DECK).
+ */
+const PRINT_ACTIONS = {
+  it: {
+    save: 'Salva come PDF o stampa',
+    hint: 'Nella finestra di stampa scegli «Salva come PDF» come destinazione. Il modulo entra in una pagina A4.'
+  },
+  pl: {
+    save: 'Zapisz jako PDF lub wydrukuj',
+    hint: 'W oknie druku wybierz „Zapisz jako PDF" jako drukarkę. Formularz mieści się na jednej stronie A4.'
+  },
+  en: {
+    save: 'Save as PDF or print',
+    hint: 'In the print window pick “Save as PDF” as the destination. The form fits one A4 page.'
+  },
+  de: {
+    save: 'Als PDF speichern oder drucken',
+    hint: 'Wähle im Druckfenster „Als PDF speichern“ als Ziel. Das Formular passt auf eine A4-Seite.'
+  },
+  es: {
+    save: 'Guardar como PDF o imprimir',
+    hint: 'En la ventana de impresión elige «Guardar como PDF» como destino. El formulario cabe en una página A4.'
+  },
+  fr: {
+    save: 'Enregistrer en PDF ou imprimer',
+    hint: 'Dans la fenêtre d’impression, choisissez « Enregistrer au format PDF ». Le formulaire tient sur une page A4.'
+  }
+};
+
+/**
+ * Pasek akcji doklejany do formularza z danymi.
+ *
+ * `position: fixed` jest tu wybrane świadomie: pasek nie wchodzi w układ dokumentu, więc
+ * nie ma szansy zepchnąć niczego na drugą stronę wydruku — a zmieszczenie każdego z tych
+ * czternastu plików na jednej kartce kosztowało dwa przebiegi pomiarów. Zapas pod stopką
+ * dodajemy tylko w `@media screen`, żeby na papierze nie zostawił pustego pola.
+ */
+function printActionBar(locale) {
+  const words = PRINT_ACTIONS[locale] || PRINT_ACTIONS.it;
+  return `
+<style>
+  @media screen {
+    /* Zapas pod stopką, żeby pasek jej nie przykrył przy dokręconej do końca stronie.
+       Zmierzone na 390 px: pasek 127 px przy dwóch wierszach podpowiedzi, więc 40mm
+       (151 px) zostawia margines także wtedy, gdy podpowiedź złamie się na trzy. */
+    body { padding-bottom: 40mm; }
+  }
+  .sheet-bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 9;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5mm 6mm;
+    padding: 3.5mm 5mm;
+    border-top: 1pt solid #d7e2f5;
+    background: #f2f6ff;
+    text-align: center;
+  }
+  .sheet-bar__go {
+    flex: none;
+    padding: 3.4mm 8mm;
+    border: 0;
+    border-radius: 999px;
+    background: #ffc928;
+    color: #071a3d;
+    font: inherit;
+    font-size: 12pt;
+    font-weight: 800;
+    letter-spacing: .3pt;
+    cursor: pointer;
+  }
+  .sheet-bar__go:hover { background: #ffd75a; }
+  .sheet-bar__go:focus-visible { outline: 2.5pt solid #2469d8; outline-offset: 1.5pt; }
+  .sheet-bar__hint { max-width: 110mm; font-size: 9pt; line-height: 1.4; color: #45577a; }
+  /* Na papierze paska nie ma — to jedyny powód, dla którego wolno go było dokleić. */
+  @media print { .sheet-bar { display: none !important; } }
+</style>
+<div class="sheet-bar">
+  <button type="button" class="sheet-bar__go" data-print>${escapeHtml(words.save)}</button>
+  <span class="sheet-bar__hint">${escapeHtml(words.hint)}</span>
+</div>
+<script>
+  document.querySelector('[data-print]').addEventListener('click', function () { window.print(); });
+</script>
+`;
+}
+
+/**
  * Formularz tej jednej osoby, gotowy do druku.
  *
  *   GET /api/carruleddhi/form?id=<uuid>&t=<token>
@@ -4694,6 +4796,20 @@ async function printableForm(env, url, cors) {
   }
   // Data wydruku, nie data zbudowania generatora — dlatego placeholder dotrwał aż tutaj.
   html = html.split('%GENERATEDAT%').join(date(new Date().toISOString()));
+
+  /* Szablon nie miał znacznika `viewport`, bo powstał jako plik do wydruku i nikt go nie
+     otwierał na telefonie. Bez niego przeglądarka mobilna przyjmuje 980 px szerokości
+     układu i skaluje całość do ~0,4 — pismo 9,8pt schodzi wtedy do czterech pikseli.
+
+     `device-width` jest tu bezpieczne, choć dokument jest liczony w milimetrach: w
+     milimetrach są tylko marginesy, odstępy i @page, a szerokości kolumn to `1fr`.
+     Zmierzone: przy widoku 390 px `scrollWidth` też wynosi 390, czyli zero poziomego
+     przewijania. Na wydruk znacznik nie ma wpływu — dotyczy wyłącznie ekranu. */
+  html = html.replace(
+    '<meta charset="utf-8">',
+    '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">'
+  );
+  html = html.replace('</body>', `${printActionBar(locale)}</body>`);
 
   return new Response(html, { status: 200, headers: { ...headers, ...cors } });
 }

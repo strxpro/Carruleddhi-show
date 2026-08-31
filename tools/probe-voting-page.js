@@ -3,6 +3,20 @@
  *
  * Uruchamiana przez tools/probe-voting.mjs, wykonywana przez tools/cdp.mjs w prawdziwej
  * przeglądarce i w prawdziwym czasie.
+ *
+ * UWAGA: CZĘŚĆ TEJ SONDY JEST NIEAKTUALNA I WYWALA SIĘ Z PREMEDYTACJĄ.
+ * ===========================================================================
+ * Opisuje POPRZEDNI układ kafelka: przycisk „Zagłosuj" POD zdjęciem, osobny krok „zagłosować
+ * na ten wóz?" i oceny jako siatka 4×2. Wszystkie trzy zostały zastąpione nakładką na zdjęciu
+ * — kafelek jest czysty, dotknięcie odsłania jedno zaproszenie, a ono przeistacza się w suwak.
+ * Zniknęła też plakietka z regułą (`[data-vote-rule]`), przeniesiona do akapitu nagłówka.
+ *
+ * Skutek: sekcje „trzy kroki przy pojeździe", „okno z adresem" i „po oddaniu głosu" nie mają
+ * czego znaleźć i przewracają się kaskadowo. To NIE są błędy w kodzie strony.
+ *
+ * Aktualny przepływ mierzy tools/probe-vote-veil.mjs — i tam wszystko przechodzi. Sekcje
+ * nagłówka, filtra kategorii i doczytywania porcjami nadal są tu prawdziwe i nadal przechodzą,
+ * więc plik zostaje do przepisania, a nie do wyrzucenia.
  */
 async (document, window) => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));

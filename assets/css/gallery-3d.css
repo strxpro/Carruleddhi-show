@@ -261,6 +261,22 @@
 .g3d__dot.is-active { background: var(--yellow); transform: scale(1.45); }
 .g3d__dot:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
 
+/* Cel dotknięcia większy niż kropka.
+   ----------------------------------
+   Kropka ma 10 px i tak ma zostać — powiększona przestałaby być kropką, a to jest
+   wskaźnik strony, nie przycisk nawigacji (te są w .g3d__nav i mają po 42 px).
+   Rośnie więc samo pole trafienia, przez wstawkę bez treści, która nic nie rysuje.
+
+   Odstęp idzie z 10 px na 22 px, żeby pola się nie nachodziły: przy skoku 32 px między
+   środkami i polu 32 px sąsiedzi się stykają, ale nie zachodzą jeden na drugi. Pole,
+   które przykrywa cudzy środek, znaczy „dotknąłeś kropki obok" — a to gorsze niż
+   mały cel, bo wygląda jak awaria, nie jak niecelny palec. */
+@media (pointer: coarse) {
+  .g3d__dots { gap: 22px; }
+  .g3d__dot { position: relative; }
+  .g3d__dot::after { content: ''; position: absolute; inset: -15px -11px; }
+}
+
 @media (max-width: 760px) {
   /* On a phone the intro paragraph and the disclaimer eat about 120 px that the
      photographs need more. The eyebrow and the title still say what this is. */
