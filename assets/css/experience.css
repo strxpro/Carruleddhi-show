@@ -401,7 +401,23 @@
 .site-header.is-compact .nav-current {
   max-width: 260px;
   min-width: 0;
-  overflow: hidden;
+  /* BEZ `overflow: hidden` — TO ONO UCINALO PULSUJACA KROPKE.
+     ---------------------------------------------------------------------------
+     Kropka jest pierwszym dzieckiem chipu i stoi przy samej jego lewej krawedzi, a maluje
+     sie SZERZEJ niz jej pudelko: ma `box-shadow: 0 0 0 6px` jako poswiate i pierscien
+     `::after` z `inset: -6px`, ktory animacja `nav-pulse` rozciaga do skali 1.8. Przy
+     `overflow: hidden` lewa polowa tego pierscienia byla obcinana rowno wzdluz krawedzi —
+     zamiast pulsu widac bylo kropke z plaska sciana z lewej strony.
+
+     Zmierzone sonda przy pieciu szerokosciach (1920, 1440, 1100, 900, 800) i w szesciu
+     jezykach: obcinane od 6.3 do 14.4 px, ZAWSZE, w kazdym z tych trzydziestu przypadkow.
+
+     Przycinanie nie bylo tu potrzebne. Ten sam pomiar liczyl `scrollWidth - clientWidth`
+     chipu i wychodzilo 0 px w kazdym z trzydziestu przypadkow — tresc nigdy nie wystaje poza
+     pudelko, bo pilnuja tego `max-width: 260px` tutaj oraz `max-width: 25ch` z wielokropkiem
+     na samej nazwie sekcji (main.css). `overflow: hidden` nie przycinal wiec zadnego tekstu,
+     tylko animacje obok niego. */
+  overflow: visible;
   opacity: 1;
   visibility: visible;
   /* `translateX(-50%)`, nie `none`: to jest teraz wysrodkowanie chipu, a nie efekt zwijania.

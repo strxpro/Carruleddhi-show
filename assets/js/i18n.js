@@ -65,8 +65,7 @@
     'story.stat2': 'categorie',
     'story.stat3': 'premi',
     'category.kicker': 'Mezzi ammessi',
-    'category.title': 'Le carte si sovrappongono. La sfida sale.',
-    'category.intro': 'Scorri: ogni carta mostra ciò che serve per prendere parte alla discesa.',
+    'category.title': 'Due categorie, una sola discesa.',
     'category.classic.kicker': 'Categoria A · Tradizione',
     'category.classic.title': 'Carruleddhi Classic',
     'category.classic.body': 'Telaio artigianale in legno, quattro ruote piene o con cuscinetti a sfera. Guida con i piedi o con la corda; freno a piede o a leva.',
@@ -246,7 +245,7 @@
     'story.kicker': 'Tradycja, która nabiera prędkości', 'story.title': 'Całe miasteczko jedzie w dół.',
     'story.p1': 'Carruleddhi to ręcznie budowane pojazdy: drewno, łożyska i mnóstwo wyobraźni. Bez silnika i napędu — tylko grawitacja, odwaga oraz dźwięk kół na drodze.',
     'story.p2': 'Jedni ścigają się o czas, inni dla widowiska. Tutaj wygrywa szybkość, ale także najbardziej szalony pomysł.', 'story.stat1': 'silników', 'story.stat2': 'kategorie', 'story.stat3': 'nagród',
-    'category.kicker': 'Dopuszczone pojazdy', 'category.title': 'Karty nachodzą na siebie. Emocje rosną.', 'category.intro': 'Przewijaj — każda karta pokazuje, czego potrzebujesz, aby wystartować.',
+    'category.kicker': 'Dopuszczone pojazdy', 'category.title': 'Dwie kategorie, jeden zjazd.',
     'category.classic.kicker': 'Kategoria A · Tradycja', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Ręcznie wykonana drewniana rama, cztery pełne koła lub koła z łożyskami. Sterowanie stopami albo liną; hamulec nożny lub dźwignia.', 'category.classic.tag1': '4 koła', 'category.classic.tag2': 'Drewniana rama', 'category.classic.tag3': 'Bez silnika',
     'category.art.kicker': 'Kategoria B · Kreatywność', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Dowolny materiał, od czterech do dziesięciu kół i dowolne hamulce. Jedna twórcza zasada: pojazd musi być wykonany ręcznie.', 'category.art.tag1': '4–10 kół', 'category.art.tag2': 'Dowolne materiały', 'category.art.tag3': 'Efekt wow',
     'category.safety.kicker': 'Przed startem', 'category.safety.title': 'Bezpieczeństwo zawsze.', 'category.safety.body': 'Atestowany kask jest obowiązkowy. Pojazd przechodzi kontrolę przed startem. Osoby niepełnoletnie startują wyłącznie za zgodą rodzica lub opiekuna.', 'category.safety.tag1': 'Kask', 'category.safety.tag2': 'Kontrola techniczna', 'category.safety.tag3': 'Zgoda',
@@ -279,7 +278,7 @@
     'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Build · Climb · Race · Brake · Smile',
     'story.kicker': 'A tradition in motion', 'story.title': 'A whole town racing downhill.', 'story.p1': 'Carruleddhi are hand-built carts: wood, bearings and plenty of imagination. No engine, no propulsion — only gravity, courage and wheels singing on the road.', 'story.p2': 'Some race for time, others for the show. Speed wins here, but so does the wildest idea.', 'story.stat1': 'engines', 'story.stat2': 'categories', 'story.stat3': 'prizes',
-    'category.kicker': 'Eligible vehicles', 'category.title': 'Cards overlap. Excitement builds.', 'category.intro': 'Keep scrolling: each card shows what you need to join the descent.',
+    'category.kicker': 'Eligible vehicles', 'category.title': 'Two categories, one descent.',
     'category.classic.kicker': 'Category A · Tradition', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Hand-built wooden frame, four solid or ball-bearing wheels. Steer with feet or rope; brake with your foot or a lever.', 'category.classic.tag1': '4 wheels', 'category.classic.tag2': 'Wooden frame', 'category.classic.tag3': 'No engine',
     'category.art.kicker': 'Category B · Creativity', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Any material, four to ten wheels and any type of brake. One creative rule: it must be handmade.', 'category.art.tag1': '4–10 wheels', 'category.art.tag2': 'Any materials', 'category.art.tag3': 'Wow factor',
     'category.safety.kicker': 'Before the start', 'category.safety.title': 'Safety, always.', 'category.safety.body': 'An approved helmet is mandatory. Every cart is checked before the start. Minors need a waiver signed by a parent or guardian.', 'category.safety.tag1': 'Helmet', 'category.safety.tag2': 'Safety check', 'category.safety.tag3': 'Waiver',
@@ -314,7 +313,7 @@
     'count.daysShort': 'T', 'count.hoursShort': 'h', 'count.minutesShort': 'min', 'count.secondsShort': 's',
     'marquee': 'Bauen · Hochgehen · Fahren · Bremsen · Lächeln',
     'story.kicker': 'Tradition in Bewegung', 'story.title': 'Ein ganzes Dorf fährt bergab.', 'story.p1': 'Carruleddhi sind handgebaute Karren aus Holz, Lagern und viel Fantasie. Kein Motor, kein Antrieb — nur Schwerkraft, Mut und Räder auf der Straße.', 'story.p2': 'Manche fahren auf Zeit, andere für die Show. Hier gewinnen Tempo und die verrückteste Idee.', 'story.stat1': 'Motoren', 'story.stat2': 'Kategorien', 'story.stat3': 'Preise',
-    'category.kicker': 'Zugelassene Fahrzeuge', 'category.title': 'Karten überlagern sich. Die Spannung steigt.', 'category.intro': 'Weiter scrollen: Jede Karte zeigt, was du für die Abfahrt brauchst.',
+    'category.kicker': 'Zugelassene Fahrzeuge', 'category.title': 'Zwei Kategorien, eine Abfahrt.',
     'category.classic.kicker': 'Kategorie A · Tradition', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Handgefertigter Holzrahmen, vier Voll- oder Kugellagerräder. Lenkung mit Füßen oder Seil; Fuß- oder Hebelbremse.', 'category.classic.tag1': '4 Räder', 'category.classic.tag2': 'Holzrahmen', 'category.classic.tag3': 'Ohne Motor',
     'category.art.kicker': 'Kategorie B · Kreativität', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Beliebiges Material, vier bis zehn Räder und jede Art von Bremse. Eine Regel: handgefertigt.', 'category.art.tag1': '4–10 Räder', 'category.art.tag2': 'Freie Materialien', 'category.art.tag3': 'Wow-Effekt',
     'category.safety.kicker': 'Vor dem Start', 'category.safety.title': 'Sicherheit, immer.', 'category.safety.body': 'Ein zugelassener Helm ist Pflicht. Jeder Wagen wird vor dem Start geprüft. Minderjährige brauchen die Einwilligung eines Elternteils.', 'category.safety.tag1': 'Helm', 'category.safety.tag2': 'Technikcheck', 'category.safety.tag3': 'Einwilligung',
@@ -343,7 +342,7 @@
     'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Construye · Sube · Baja · Frena · Sonríe',
     'story.kicker': 'Una tradición en movimiento', 'story.title': 'Todo un pueblo cuesta abajo.', 'story.p1': 'Los Carruleddhi son carros hechos a mano: madera, rodamientos y mucha imaginación. Sin motor ni propulsión — solo gravedad, valor y ruedas sobre el asfalto.', 'story.p2': 'Unos compiten por tiempo y otros por el espectáculo. Aquí ganan la velocidad y la idea más loca.', 'story.stat1': 'motores', 'story.stat2': 'categorías', 'story.stat3': 'premios',
-    'category.kicker': 'Vehículos admitidos', 'category.title': 'Las cartas se superponen. Sube la emoción.', 'category.intro': 'Sigue desplazándote: cada carta muestra lo necesario para participar.',
+    'category.kicker': 'Vehículos admitidos', 'category.title': 'Dos categorías, una sola bajada.',
     'category.classic.kicker': 'Categoría A · Tradición', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Chasis artesanal de madera, cuatro ruedas macizas o con rodamientos. Dirección con pies o cuerda; freno de pie o palanca.', 'category.classic.tag1': '4 ruedas', 'category.classic.tag2': 'Chasis de madera', 'category.classic.tag3': 'Sin motor',
     'category.art.kicker': 'Categoría B · Creatividad', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Cualquier material, de cuatro a diez ruedas y cualquier freno. Una regla: debe estar hecho a mano.', 'category.art.tag1': '4–10 ruedas', 'category.art.tag2': 'Materiales libres', 'category.art.tag3': 'Efecto wow',
     'category.safety.kicker': 'Antes de salir', 'category.safety.title': 'Seguridad, siempre.', 'category.safety.body': 'Casco homologado obligatorio. El carro se revisa antes de la salida. Los menores necesitan autorización firmada.', 'category.safety.tag1': 'Casco', 'category.safety.tag2': 'Revisión técnica', 'category.safety.tag3': 'Autorización',
@@ -374,7 +373,7 @@
     'count.daysShort': 'j', 'count.hoursShort': 'h', 'count.minutesShort': 'min', 'count.secondsShort': 's',
     'marquee': 'Construire · Monter · Descendre · Freiner · Sourire',
     'story.kicker': 'Une tradition en mouvement', 'story.title': 'Tout un village en descente.', 'story.p1': "Les Carruleddhi sont des chariots faits main : bois, roulements et beaucoup d'imagination. Aucun moteur — seulement la gravité, le courage et les roues sur la route.", 'story.p2': "Certains courent pour le chrono, d'autres pour le spectacle. Ici gagnent la vitesse et l'idée la plus folle.", 'story.stat1': 'moteurs', 'story.stat2': 'catégories', 'story.stat3': 'prix',
-    'category.kicker': 'Véhicules admis', 'category.title': "Les cartes se superposent. L'émotion monte.", 'category.intro': 'Continuez à défiler : chaque carte montre ce qui est nécessaire pour participer.',
+    'category.kicker': 'Véhicules admis', 'category.title': 'Deux catégories, une seule descente.',
     'category.classic.kicker': 'Catégorie A · Tradition', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Châssis artisanal en bois, quatre roues pleines ou à roulements. Direction aux pieds ou à la corde ; frein au pied ou à levier.', 'category.classic.tag1': '4 roues', 'category.classic.tag2': 'Châssis en bois', 'category.classic.tag3': 'Sans moteur',
     'category.art.kicker': 'Catégorie B · Créativité', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Tout matériau, quatre à dix roues et tout type de frein. Une règle : fabrication artisanale.', 'category.art.tag1': '4–10 roues', 'category.art.tag2': 'Matériaux libres', 'category.art.tag3': 'Effet wow',
     'category.safety.kicker': 'Avant le départ', 'category.safety.title': 'La sécurité, toujours.', 'category.safety.body': 'Casque homologué obligatoire. Chaque chariot est contrôlé avant le départ. Les mineurs ont besoin d’une autorisation signée.', 'category.safety.tag1': 'Casque', 'category.safety.tag2': 'Contrôle technique', 'category.safety.tag3': 'Autorisation',
@@ -403,8 +402,16 @@
       'route.cta': 'Iscriviti e affronta la discesa',
       'gallery.kicker': 'Dentro la giornata',
       'gallery.title': 'Costruita a mano. Vissuta insieme.',
-      'gallery.intro': 'Cinque scene raccontano l’energia della partenza, della discesa e della festa. Le immagini sono illustrazioni locali pronte per essere sostituite con foto autentiche.',
+      /* Senza numero, di proposito. Diceva «Cinque scene» perché la galleria aveva
+         esattamente cinque posti scritti nel codice; ora il numero di foto lo decide chi
+         organizza, dal pannello, e una frase che ne annuncia cinque smentirebbe la pagina
+         appena sotto. */
+      'gallery.intro': 'Le scene della giornata raccontano l’energia della partenza, della discesa e della festa. Le immagini sono illustrazioni locali pronte per essere sostituite con foto autentiche.',
       'gallery.note': 'Anteprime illustrative — nessuna immagine viene presentata come fotografia dell’evento.',
+      /* Descrizione di riserva per ogni foto caricata dal pannello: non esiste un testo
+         tradotto che sappia cosa mostra, e un `alt` vuoto direbbe al lettore di schermo
+         «immagine decorativa», cosa che una foto della gara non è. */
+      'gallery.photoAlt': 'Foto della giornata del Carruleddhi Show',
       'gallery.alt1': 'Illustrazione dei carruleddhi sulla linea di partenza',
       'gallery.alt2': 'Illustrazione di un carruleddhu lanciato in discesa',
       'gallery.alt3': 'Illustrazione della costruzione artigianale di un carruleddhu',
@@ -420,45 +427,45 @@
       'quick.label': 'Azioni rapide',
       'quick.attend': 'Ci sarò',
       'quick.attended': 'Presenza confermata',
-      'quick.signup': 'Iscriviti',
+      'quick.signup': 'Iscriviti', 'quick.vote': 'Vota ora', 'quick.winners': 'Vincitori', 'quick.remind': 'Avvisami',
       'preview.title': 'Anteprima locale',
       'preview.text': 'Stai vedendo il draft salvato in questo browser.',
       'preview.back': 'Torna al pannello'
     },
     pl: {
       'nav.gallery': 'Galeria', 'route.imageAlt': 'Zjazd via Giuseppe Verdi w stronę plaży Rena Bianca', 'route.figureNote': 'Zdjęcie zjazdu. Linia trasy jest orientacyjna — poprawisz ją w panelu admina.', 'route.cta': 'Zapisz się i rusz w dół',
-      'gallery.kicker': 'W środku wydarzeń', 'gallery.title': 'Zbudowane ręcznie. Przeżywane razem.', 'gallery.intro': 'Pięć scen pokazuje energię startu, zjazdu i finałowej zabawy. To lokalne ilustracje gotowe do podmiany na autentyczne zdjęcia.', 'gallery.note': 'Podglądy ilustracyjne — żadna grafika nie jest przedstawiana jako zdjęcie wydarzenia.',
+      'gallery.kicker': 'W środku wydarzeń', 'gallery.title': 'Zbudowane ręcznie. Przeżywane razem.', 'gallery.intro': 'Sceny z tego dnia pokazują energię startu, zjazdu i finałowej zabawy. To lokalne ilustracje gotowe do podmiany na autentyczne zdjęcia.', 'gallery.note': 'Podglądy ilustracyjne — żadna grafika nie jest przedstawiana jako zdjęcie wydarzenia.', 'gallery.photoAlt': 'Zdjęcie z dnia Carruleddhi Show',
       'gallery.alt1': 'Ilustracja carruleddhi na linii startu', 'gallery.alt2': 'Ilustracja carruleddhi pędzącego w dół', 'gallery.alt3': 'Ilustracja ręcznej budowy carruleddhi', 'gallery.alt4': 'Ilustracja publiczności kibicującej przy trasie', 'gallery.alt5': 'Ilustracja świętowania na mecie',
       'gallery.caption1': 'Napięcie tuż przed startem', 'gallery.caption2': 'Grawitacja, zakręty i morze', 'gallery.caption3': 'Każdy pojazd rodzi się w warsztacie', 'gallery.caption4': 'Całe miasteczko kibicuje', 'gallery.caption5': 'Meta zmienia się w święto', 'gallery.ctaTitle': 'Następna scena może należeć do Ciebie.', 'gallery.ctaBody': 'Potwierdź obecność albo zapisz swój carruleddhu do wyścigu.',
-      'quick.label': 'Szybkie działania', 'quick.attend': 'Będę tam', 'quick.attended': 'Obecność potwierdzona', 'quick.signup': 'Zapisz się', 'preview.title': 'Podgląd lokalny', 'preview.text': 'Oglądasz wersję roboczą zapisaną w tej przeglądarce.', 'preview.back': 'Wróć do panelu'
+      'quick.label': 'Szybkie działania', 'quick.attend': 'Będę tam', 'quick.attended': 'Obecność potwierdzona', 'quick.signup': 'Zapisz się', 'quick.vote': 'Zagłosuj teraz', 'quick.winners': 'Zwycięzcy', 'quick.remind': 'Przypomnij mi', 'preview.title': 'Podgląd lokalny', 'preview.text': 'Oglądasz wersję roboczą zapisaną w tej przeglądarce.', 'preview.back': 'Wróć do panelu'
     },
     en: {
       'nav.gallery': 'Gallery', 'route.imageAlt': 'The via Giuseppe Verdi descent towards Rena Bianca beach', 'route.figureNote': 'Photograph of the descent. The route line is indicative and can be adjusted in the admin panel.', 'route.cta': 'Enter and take on the descent',
-      'gallery.kicker': 'Inside the day', 'gallery.title': 'Built by hand. Shared together.', 'gallery.intro': 'Five scenes capture the energy of the start, descent and final celebration. These local illustrations are ready to be replaced with authentic photographs.', 'gallery.note': 'Illustrative previews — no image is presented as an event photograph.',
+      'gallery.kicker': 'Inside the day', 'gallery.title': 'Built by hand. Shared together.', 'gallery.intro': 'Scenes from the day capture the energy of the start, descent and final celebration. These local illustrations are ready to be replaced with authentic photographs.', 'gallery.note': 'Illustrative previews — no image is presented as an event photograph.', 'gallery.photoAlt': 'Photograph from the Carruleddhi Show day',
       'gallery.alt1': 'Illustration of Carruleddhi at the starting line', 'gallery.alt2': 'Illustration of a Carruleddhi racing downhill', 'gallery.alt3': 'Illustration of a handmade Carruleddhi workshop', 'gallery.alt4': 'Illustration of the crowd cheering beside the route', 'gallery.alt5': 'Illustration of the finish celebration',
       'gallery.caption1': 'The tension before the start', 'gallery.caption2': 'Gravity, bends and sea', 'gallery.caption3': 'Every cart begins in the workshop', 'gallery.caption4': 'A whole town cheering', 'gallery.caption5': 'The finish becomes a celebration', 'gallery.ctaTitle': 'The next scene could be yours.', 'gallery.ctaBody': 'Confirm you are coming or enter your Carruleddhi in the race.',
-      'quick.label': 'Quick actions', 'quick.attend': "I'll be there", 'quick.attended': 'Attendance confirmed', 'quick.signup': 'Sign up', 'preview.title': 'Local preview', 'preview.text': 'You are viewing the draft saved in this browser.', 'preview.back': 'Back to admin'
+      'quick.label': 'Quick actions', 'quick.attend': "I'll be there", 'quick.attended': 'Attendance confirmed', 'quick.signup': 'Sign up', 'quick.vote': 'Vote now', 'quick.winners': 'Winners', 'quick.remind': 'Remind me', 'preview.title': 'Local preview', 'preview.text': 'You are viewing the draft saved in this browser.', 'preview.back': 'Back to admin'
     },
     de: {
       'nav.gallery': 'Galerie', 'route.imageAlt': 'Die Abfahrt der Via Giuseppe Verdi zum Strand Rena Bianca', 'route.figureNote': 'Foto der Abfahrt. Die Streckenlinie ist ein Richtwert und lässt sich im Adminbereich anpassen.', 'route.cta': 'Anmelden und die Abfahrt wagen',
-      'gallery.kicker': 'Mitten im Tag', 'gallery.title': 'Handgebaut. Gemeinsam erlebt.', 'gallery.intro': 'Fünf Szenen zeigen die Energie von Start, Abfahrt und Abschlussfest. Die lokalen Illustrationen können später durch echte Fotos ersetzt werden.', 'gallery.note': 'Illustrative Vorschauen — kein Bild wird als Veranstaltungsfoto ausgegeben.',
+      'gallery.kicker': 'Mitten im Tag', 'gallery.title': 'Handgebaut. Gemeinsam erlebt.', 'gallery.intro': 'Szenen des Tages zeigen die Energie von Start, Abfahrt und Abschlussfest. Die lokalen Illustrationen können später durch echte Fotos ersetzt werden.', 'gallery.note': 'Illustrative Vorschauen — kein Bild wird als Veranstaltungsfoto ausgegeben.', 'gallery.photoAlt': 'Foto vom Tag der Carruleddhi Show',
       'gallery.alt1': 'Illustration der Carruleddhi an der Startlinie', 'gallery.alt2': 'Illustration eines Carruleddhi bei der Abfahrt', 'gallery.alt3': 'Illustration einer Werkstatt für handgebaute Carruleddhi', 'gallery.alt4': 'Illustration des Publikums an der Strecke', 'gallery.alt5': 'Illustration der Feier im Ziel',
       'gallery.caption1': 'Spannung vor dem Start', 'gallery.caption2': 'Schwerkraft, Kurven und Meer', 'gallery.caption3': 'Jeder Wagen beginnt in der Werkstatt', 'gallery.caption4': 'Ein ganzer Ort feuert an', 'gallery.caption5': 'Das Ziel wird zum Fest', 'gallery.ctaTitle': 'Die nächste Szene könnte dir gehören.', 'gallery.ctaBody': 'Bestätige deine Teilnahme oder melde deinen Carruleddhi an.',
-      'quick.label': 'Schnellaktionen', 'quick.attend': 'Ich bin dabei', 'quick.attended': 'Teilnahme bestätigt', 'quick.signup': 'Anmelden', 'preview.title': 'Lokale Vorschau', 'preview.text': 'Du siehst den in diesem Browser gespeicherten Entwurf.', 'preview.back': 'Zurück zum Adminbereich'
+      'quick.label': 'Schnellaktionen', 'quick.attend': 'Ich bin dabei', 'quick.attended': 'Teilnahme bestätigt', 'quick.signup': 'Anmelden', 'quick.vote': 'Jetzt abstimmen', 'quick.winners': 'Gewinner', 'quick.remind': 'Erinnere mich', 'preview.title': 'Lokale Vorschau', 'preview.text': 'Du siehst den in diesem Browser gespeicherten Entwurf.', 'preview.back': 'Zurück zum Adminbereich'
     },
     es: {
       'nav.gallery': 'Galería', 'route.imageAlt': 'La bajada de via Giuseppe Verdi hacia la playa de Rena Bianca', 'route.figureNote': 'Fotografía de la bajada. La línea del recorrido es indicativa y se ajusta desde el panel.', 'route.cta': 'Inscríbete y afronta la bajada',
-      'gallery.kicker': 'Dentro del día', 'gallery.title': 'Hecho a mano. Vivido juntos.', 'gallery.intro': 'Cinco escenas muestran la energía de la salida, el descenso y la fiesta final. Estas ilustraciones locales se pueden sustituir por fotos auténticas.', 'gallery.note': 'Vistas ilustrativas: ninguna imagen se presenta como fotografía del evento.',
+      'gallery.kicker': 'Dentro del día', 'gallery.title': 'Hecho a mano. Vivido juntos.', 'gallery.intro': 'Las escenas del día muestran la energía de la salida, el descenso y la fiesta final. Estas ilustraciones locales se pueden sustituir por fotos auténticas.', 'gallery.note': 'Vistas ilustrativas: ninguna imagen se presenta como fotografía del evento.', 'gallery.photoAlt': 'Fotografía de la jornada del Carruleddhi Show',
       'gallery.alt1': 'Ilustración de los carruleddhi en la salida', 'gallery.alt2': 'Ilustración de un carruleddhi bajando a toda velocidad', 'gallery.alt3': 'Ilustración de la construcción artesanal de un carruleddhi', 'gallery.alt4': 'Ilustración del público animando junto al recorrido', 'gallery.alt5': 'Ilustración de la celebración en la meta',
       'gallery.caption1': 'La tensión antes de salir', 'gallery.caption2': 'Gravedad, curvas y mar', 'gallery.caption3': 'Cada carro nace en el taller', 'gallery.caption4': 'Todo un pueblo anima', 'gallery.caption5': 'La meta se convierte en fiesta', 'gallery.ctaTitle': 'La próxima escena puede ser tuya.', 'gallery.ctaBody': 'Confirma tu asistencia o inscribe tu carruleddhi.',
-      'quick.label': 'Acciones rápidas', 'quick.attend': 'Estaré allí', 'quick.attended': 'Asistencia confirmada', 'quick.signup': 'Inscríbete', 'preview.title': 'Vista previa local', 'preview.text': 'Estás viendo el borrador guardado en este navegador.', 'preview.back': 'Volver al panel'
+      'quick.label': 'Acciones rápidas', 'quick.attend': 'Estaré allí', 'quick.attended': 'Asistencia confirmada', 'quick.signup': 'Inscríbete', 'quick.vote': 'Vota ahora', 'quick.winners': 'Ganadores', 'quick.remind': 'Avísame', 'preview.title': 'Vista previa local', 'preview.text': 'Estás viendo el borrador guardado en este navegador.', 'preview.back': 'Volver al panel'
     },
     fr: {
       'nav.gallery': 'Galerie', 'route.imageAlt': 'La descente de la via Giuseppe Verdi vers la plage de Rena Bianca', 'route.figureNote': 'Photographie de la descente. La ligne du parcours est indicative et se règle dans le panneau admin.', 'route.cta': 'Inscrivez-vous et lancez-vous',
-      'gallery.kicker': 'Au cœur de la journée', 'gallery.title': 'Construit à la main. Vécu ensemble.', 'gallery.intro': 'Cinq scènes racontent l’énergie du départ, de la descente et de la fête finale. Ces illustrations locales pourront être remplacées par de vraies photos.', 'gallery.note': 'Aperçus illustratifs — aucune image n’est présentée comme photo de l’événement.',
+      'gallery.kicker': 'Au cœur de la journée', 'gallery.title': 'Construit à la main. Vécu ensemble.', 'gallery.intro': 'Les scènes de la journée racontent l’énergie du départ, de la descente et de la fête finale. Ces illustrations locales pourront être remplacées par de vraies photos.', 'gallery.note': 'Aperçus illustratifs — aucune image n’est présentée comme photo de l’événement.', 'gallery.photoAlt': 'Photographie de la journée du Carruleddhi Show',
       'gallery.alt1': 'Illustration des carruleddhi sur la ligne de départ', 'gallery.alt2': 'Illustration d’un carruleddhi lancé dans la descente', 'gallery.alt3': 'Illustration de la fabrication artisanale d’un carruleddhi', 'gallery.alt4': 'Illustration du public le long du parcours', 'gallery.alt5': 'Illustration de la fête à l’arrivée',
       'gallery.caption1': 'La tension avant le départ', 'gallery.caption2': 'Gravité, virages et mer', 'gallery.caption3': 'Chaque chariot naît à l’atelier', 'gallery.caption4': 'Tout un village encourage', 'gallery.caption5': 'L’arrivée devient une fête', 'gallery.ctaTitle': 'La prochaine scène peut être la vôtre.', 'gallery.ctaBody': 'Confirmez votre présence ou inscrivez votre carruleddhi.',
-      'quick.label': 'Actions rapides', 'quick.attend': 'Je serai là', 'quick.attended': 'Présence confirmée', 'quick.signup': "S'inscrire", 'preview.title': 'Aperçu local', 'preview.text': 'Vous voyez le brouillon enregistré dans ce navigateur.', 'preview.back': 'Retour au panneau'
+      'quick.label': 'Actions rapides', 'quick.attend': 'Je serai là', 'quick.attended': 'Présence confirmée', 'quick.signup': "S'inscrire", 'quick.vote': 'Voter', 'quick.winners': 'Gagnants', 'quick.remind': 'Préviens-moi', 'preview.title': 'Aperçu local', 'preview.text': 'Vous voyez le brouillon enregistré dans ce navigateur.', 'preview.back': 'Retour au panneau'
     }
   };
 

@@ -5291,7 +5291,33 @@ const SETTINGS_DEFAULTS = {
 
 const SETTINGS_FLAGS = ['siteLocked', 'showGallery', 'showWall', 'showPrizes', 'showCounters'];
 const MAX_SPONSORS = 30;
-const GALLERY_SIZE = 5;
+
+/**
+ * SUFIT GALERII: DWANAŚCIE KADRÓW. NIE PIĘĆ, NIE BEZ OGRANICZENIA.
+ * ============================================================================
+ * DLACZEGO NIE PIĘĆ (czyli jaki błąd naprawia ta zmiana)
+ *   Do tej pory galeria miała DOKŁADNIE pięć miejsc i `cleanSettings` odrzucał każdą inną
+ *   długość kodem `SETTINGS_GALLERY_SIZE`. To znaczyło, że w panelu nie było jak dodać
+ *   szóstego zdjęcia ani usunąć jednego z pięciu — zgłoszone przez właściciela jako „nie ma
+ *   plusa żeby dodać kolejne zdjęcie". Pięć było liczbą wpisaną w KOD, a nie decyzją
+ *   organizatora o tym, ile zdjęć ma jego galeria.
+ *
+ * DLACZEGO NIE „ILE KTO CHCE"
+ *   Każdy kadr to jedna karta karuzeli 3D i jeden PODPISANY adres z prywatnego bucketa.
+ *   Adresy podpisuje `withSignedGallery` przy KAŻDYM odczycie ustawień, czyli przy każdym
+ *   wejściu gościa na stronę: pięćdziesiąt zdjęć to pięćdziesiąt wywołań `signPhoto` na
+ *   jedno wejście i pięćdziesiąt dużych plików do pobrania. Karuzela też przestaje wtedy
+ *   być galerią — przy pięćdziesięciu kadrach kropki pod nią zamieniają się w linijkę
+ *   kresek, a przewinięcie do zdjęcia numer czterdzieści zajmuje kilkadziesiąt gestów.
+ *
+ * DLACZEGO DWANAŚCIE
+ *   Tyle mieści się w siatce zapasowej bez dziur (siatka ma dwanaście kolumn, a wzór
+ *   szerokości kart domyka się co pięć kadrów), tyle da się przejrzeć kropkami w jednym
+ *   rzędzie i tyle podpisów mieści się w jednym żądaniu bez zauważalnej zwłoki.
+ *   Podniesienie sufitu to zmiana tej jednej liczby w trzech miejscach, które ją znają:
+ *   tutaj, w `assets/js/site-config.js` i w `src/admin/views/SettingsView.tsx`.
+ */
+const GALLERY_MAX = 12;
 
 /**
  * Validates a settings object from the panel.
@@ -5367,13 +5393,26 @@ function cleanSettings(input) {
     out.eventDate = date.toISOString();
   }
 
+  /* DOWOLNA DŁUGOŚĆ DO SUFITU, ALE KAŻDY WPIS SPRAWDZONY.
+     -------------------------------------------------------------------------
+     Zmiana wobec poprzedniej wersji: było `length !== GALLERY_SIZE`, czyli odmowa dla
+     każdej liczby zdjęć innej niż pięć. Teraz odmowa jest tylko dla liczby WIĘKSZEJ niż
+     sufit — pusta tablica jest poprawną odpowiedzią na „nie mam jeszcze zdjęć" i strona
+     publiczna umie ją obsłużyć, ukrywając całą sekcję.
+
+     Czego NIE poluzowano: sprawdzenia pojedynczego wpisu. Ten napis trafia wprost do
+     atrybutu `src` na stronie głównej, więc dozwolone są dokładnie dwa kształty — ścieżka
+     w prywatnym bucketcie (`galleries/…`, czyli plik wgrany przez ten sam panel) i ścieżka
+     do pliku z repozytorium (`/assets/images/….svg|webp|…`). Pusty wpis też odpada: kafelek
+     bez zdjęcia jest dziurą w siatce, a nie kadrem, i nie ma jak z panelu odróżnić „jeszcze
+     nie wgrałem" od „usunąłem", więc usuwanie skraca tablicę, a nie zostawia w niej pustkę. */
   if (input.galleryImages !== undefined) {
-    if (!Array.isArray(input.galleryImages) || input.galleryImages.length !== GALLERY_SIZE) {
-      return { error: 'SETTINGS_GALLERY_SIZE' };
-    }
+    if (!Array.isArray(input.galleryImages)) return { error: 'SETTINGS_GALLERY_SHAPE' };
+    if (input.galleryImages.length > GALLERY_MAX) return { error: 'SETTINGS_GALLERY_SIZE' };
     const images = input.galleryImages.map((raw) => String(raw || '').trim().slice(0, 260));
     const valid = images.every((path) => (
-      !path.includes('..')
+      path !== ''
+      && !path.includes('..')
       && (/^galleries\/[A-Za-z0-9._/-]+$/.test(path)
         || /^\/assets\/images\/[A-Za-z0-9._/-]+\.(?:svg|webp|avif|png|jpe?g)$/i.test(path))
     ));
@@ -5382,9 +5421,8 @@ function cleanSettings(input) {
   }
 
   if (input.galleryCaptions !== undefined) {
-    if (!Array.isArray(input.galleryCaptions) || input.galleryCaptions.length !== GALLERY_SIZE) {
-      return { error: 'SETTINGS_GALLERY_SIZE' };
-    }
+    if (!Array.isArray(input.galleryCaptions)) return { error: 'SETTINGS_GALLERY_SHAPE' };
+    if (input.galleryCaptions.length > GALLERY_MAX) return { error: 'SETTINGS_GALLERY_SIZE' };
     out.galleryCaptions = input.galleryCaptions.map((raw) => String(raw || '').trim().slice(0, 260));
   }
 
@@ -5404,7 +5442,12 @@ async function readSettings(env) {
     const rows = await response.json();
     const data = rows?.[0]?.data;
     if (!data || typeof data !== 'object') return { ...SETTINGS_DEFAULTS };
-    return { ...SETTINGS_DEFAULTS, ...data };
+    /* Wyrównanie na ODCZYCIE, nie tylko na zapisie. Wiersz mógł być napisany przez starszą
+       wersję tego pliku (pięć podpisów na sztywno) albo ręcznie w edytorze tabeli Supabase,
+       a wtedy liczba podpisów nie ma nic wspólnego z liczbą zdjęć. Każdy odbiorca ustawień
+       — strona publiczna, panel, middleware — dostaje więc tablice tej samej długości bez
+       względu na to, co leży w bazie. */
+    return alignGalleryCaptions({ ...SETTINGS_DEFAULTS, ...data });
   } catch (_) {
     return { ...SETTINGS_DEFAULTS };
   }
@@ -5426,6 +5469,38 @@ async function withSignedLogos(env, sponsors) {
     if (!sponsor.logo || sponsor.logo.startsWith('/')) return sponsor;
     return { ...sponsor, logo: await signPhoto(env, sponsor.logo) };
   }));
+}
+
+/**
+ * PODPISY ZAWSZE TEJ SAMEJ DŁUGOŚCI CO ZDJĘCIA — JEDNYM WARUNKIEM, PO SCALENIU.
+ * ============================================================================
+ * DLACZEGO NIE W `cleanSettings`
+ *   Panel wysyła ŁATKĘ: raz same `galleryImages` (po wgraniu pliku), raz same
+ *   `galleryCaptions` (po wpisaniu podpisu). `cleanSettings` widzi tylko to, co przyszło,
+ *   więc nie ma z czym równać długości. Miejsce, w którym znane są OBIE tablice, jest
+ *   jedno: obiekt po scaleniu łatki z zapisanym wierszem.
+ *
+ * JAKIE DWA BŁĘDY TO ZAPOBIEGA
+ *   1. Podpis bez zdjęcia. Ktoś ma pięć kadrów z podpisami, usuwa trzy — zostają dwa
+ *      zdjęcia i pięć podpisów. Trzy nadmiarowe podpisy zostają w bazie i po dodaniu
+ *      nowego zdjęcia wracają na ekran przypisane do CZEGOŚ INNEGO, bo indeks trzeci to
+ *      teraz inne zdjęcie. Podpis „Meta zmienia się w święto" pod zdjęciem startu.
+ *   2. Zdjęcie bez podpisu. Dodanie szóstego kadru przy pięciu podpisach daje tablicę
+ *      krótszą od zdjęć, a wtedy `galleryCaptions[5]` jest `undefined` — czyli każde
+ *      czytanie podpisów musi się zastanawiać, czy nie wypadło z zakresu. Dosypanie
+ *      pustego napisu kosztuje jeden wiersz i znosi całą tę klasę pytań.
+ *
+ * Robione na kopii, nie w miejscu: wołający scala łatkę i zapisuje wynik, więc mutowanie
+ * wejścia znaczyłoby, że kolejność wywołań decyduje o zapisanej treści.
+ */
+function alignGalleryCaptions(settings) {
+  const images = Array.isArray(settings.galleryImages) ? settings.galleryImages : [];
+  const captions = Array.isArray(settings.galleryCaptions) ? settings.galleryCaptions : [];
+  return {
+    ...settings,
+    galleryImages: images,
+    galleryCaptions: images.map((_image, index) => String(captions[index] || ''))
+  };
 }
 
 /** Gallery files uploaded in the panel share the private wall-media bucket. Local assets pass through. */
@@ -5589,7 +5664,10 @@ async function settingsAdmin(env, payload, cors) {
      saving different switches within a second of each other is not a scenario worth
      designing for here, and a read-modify-write is the shape the panel already sends. */
   const current = await readSettings(env);
-  const merged = { ...current, ...cleaned.value };
+  /* Wyrównanie podpisów do zdjęć robione TU, na scalonym obiekcie, a nie w `cleanSettings` —
+     pełne uzasadnienie nad `alignGalleryCaptions`. Krótko: łatka zna tylko jedną z dwóch
+     tablic, więc tylko tutaj jest z czym równać. */
+  const merged = alignGalleryCaptions({ ...current, ...cleaned.value });
 
   const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
     method: 'PATCH',

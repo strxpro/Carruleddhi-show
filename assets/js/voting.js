@@ -443,6 +443,15 @@ import {
        formularzu, wiec adresy trafiaja na jedna liste. */
     $$('[data-race-over]').forEach((element) => { element.hidden = !closed; });
 
+    /* „Zobacz zwycięzców" — w pasku i w doku, obok zaproszenia na przyszły rok.
+       ---------------------------------------------------------------------------
+       Warunek jest ostrzejszy niż sama faza: `closed` znaczy tylko tyle, że głosowanie się
+       zamknęło, a zamknąć można też przy zerze głosów. Przycisk obiecujący zwycięzców,
+       których nie ma, prowadziłby do sekcji z jednym zdaniem „nikt nie zagłosował" —
+       gorzej niż gdyby go tam w ogóle nie było. Ta sama reguła rządzi już przejściem na
+       cokół w hero (`[data-hero-vote-podium]`), więc oba znikają i wracają razem. */
+    $$('[data-race-podium]').forEach((element) => { element.hidden = !(closed && hasWinners); });
+
     paintSignupLock(voting, closed);
   }
 

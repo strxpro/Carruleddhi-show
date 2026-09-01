@@ -1,4 +1,4 @@
-import { DEFAULT_SITE_CONFIG, getPublicSiteConfig } from './site-config.js';
+import { DEFAULT_SITE_CONFIG, GALLERY_MAX, getPublicSiteConfig } from './site-config.js';
 import { DEMO_SPONSORS, demoComments, demoRating } from './demo-content.js';
 import { ROUTE_VIEWBOX, buildDashPathData, buildRoutePathData } from './route-path.js';
 import { flagSvg } from './flags.js';
@@ -190,6 +190,152 @@ import {
     script.textContent = JSON.stringify(data, null, 2);
   }
 
+  /* ==========================================================================
+     Galeria o dowolnej liczbie kadrów
+     ==========================================================================
+     Było: pięć `<figure>` wpisanych w index.html z `data-gallery-image="0".."4"` i pętla,
+     która podstawiała im adresy z konfiguracji. Znaczyło to, że liczba zdjęć na stronie
+     jest liczbą WPISANĄ W ZNACZNIK, a nie liczbą zdjęć w ustawieniach:
+       - cztery zdjęcia → piąty kafelek zostawał z ilustracją demonstracyjną z repozytorium
+         i gość widział obcy obrazek między prawdziwymi;
+       - osiem zdjęć → trzy ostatnie nie miały gdzie się pokazać;
+       - zero zdjęć → pięć ilustracji zamiast braku sekcji.
+     Teraz siatka jest budowana z tablicy i jej długość JEST liczbą zdjęć.
+     ======================================================================== */
+
+  /**
+   * Czy ten adres to jedna z pięciu ilustracji demonstracyjnych z repozytorium.
+   *
+   * PO CO PO ADRESIE, A NIE PO POZYCJI
+   *   Słownik ma `gallery.caption1..5` i `gallery.alt1..5` — przetłumaczone na sześć języków
+   *   opisy KONKRETNYCH pięciu ilustracji, które jadą w repozytorium („Napięcie tuż przed
+   *   startem", „Ilustracja carruleddhi na linii startu"). Wcześniejsza wersja brała je po
+   *   numerze kafelka, więc po podmianie pierwszego zdjęcia na prawdziwe zdjęcie z zawodów
+   *   pod nim nadal stało „Napięcie tuż przed startem", a czytnik ekranu ogłaszał
+   *   „Ilustracja carruleddhi na linii startu" o fotografii mety. Opis alternatywny, który
+   *   opisuje inny obrazek, jest gorszy niż ogólny.
+   *
+   *   Dopasowanie po adresie znaczy: te napisy działają dokładnie dla tych plików, dla
+   *   których zostały napisane, a każde wgrane zdjęcie dostaje podpis organizatora albo nic.
+   */
+  function galleryDemoIndex(source) {
+    return DEFAULT_SITE_CONFIG.media.galleryImages.indexOf(source);
+  }
+
+  /**
+   * Podpisy pod kadrami, dokładnie tyle, ile jest zdjęć.
+   *
+   * Pierwszeństwo ma podpis z panelu. Puste pole to świadomy brak podpisu — kafelek pokazuje
+   * wtedy sam numer, a nie zmyślony napis. Wyjątkiem są ilustracje demonstracyjne, dla
+   * których podpis jest w słowniku (patrz `galleryDemoIndex`).
+   */
+  function galleryCaptionList() {
+    const captions = Array.isArray(config.media.galleryCaptions) ? config.media.galleryCaptions : [];
+    return config.media.galleryImages.map((image, index) => {
+      const own = String(captions[index] || '').trim();
+      if (own) return own;
+      const demo = galleryDemoIndex(image);
+      return demo >= 0 ? text(`gallery.caption${demo + 1}`) : '';
+    });
+  }
+
+  /**
+   * Szerokości kart w siatce zapasowej, tak żeby każdy RZĄD był pełny.
+   *
+   * Siatka ma dwanaście kolumn (patrz `.gallery__grid` w main.css), a wzór 8+4 | 6+6 | 12
+   * domyka się co pięć kart. Ostatnia karta dostaje resztę rzędu, bo inaczej przy liczbie
+   * zdjęć niepodzielnej przez wzór ostatni rząd kończyłby się pustym miejscem szerokości
+   * jednej karty — a puste miejsce w siatce zdjęć czyta się jak brakujące zdjęcie.
+   * Zmierzone: przy trzech zdjęciach było 8+4, potem 6 i cztery kolumny dziury.
+   */
+  const GALLERY_SPAN_PATTERN = [8, 4, 6, 6, 12];
+  const GALLERY_SPAN_CLASS = { 8: 'gallery-card--hero', 4: 'gallery-card--portrait', 12: 'gallery-card--wide' };
+
+  function gallerySpanClasses(count) {
+    const classes = [];
+    let used = 0;
+    for (let index = 0; index < count; index += 1) {
+      let span = GALLERY_SPAN_PATTERN[index % GALLERY_SPAN_PATTERN.length];
+      if (index === count - 1 && used + span < 12) span = 12 - used;
+      used = (used + span) % 12;
+      classes.push(GALLERY_SPAN_CLASS[span] || '');
+    }
+    return classes;
+  }
+
+  /**
+   * Buduje siatkę zapasową i decyduje, czy sekcja galerii ma w ogóle istnieć.
+   *
+   * ZERO ZDJĘĆ TO BRAK SEKCJI, NIE PUSTA SIATKA
+   *   Sekcja galerii ma nagłówek, wstęp i zastrzeżenie o ilustracjach. Bez zdjęć zostaje
+   *   z tego pół ekranu tekstu o zdjęciach, których nie ma, i przewijanie przez panel,
+   *   który nic nie pokazuje. Ukrywany jest cały `[data-feature="gallery"]` razem z
+   *   odsyłaczem w menu — dokładnie tak, jak przy wyłączonym przełączniku „Galeria zdjęć".
+   *
+   * KAFELKI DOSTAJĄ `is-visible` OD RAZU
+   *   `setupReveal` zakłada swojego obserwatora RAZ, na starcie, na elementach, które wtedy
+   *   istniały. Kafelek zbudowany później nie jest przez nikogo obserwowany, więc zostałby
+   *   na `opacity: 0` na zawsze — czyli siatka zdjęć niewidoczna, mimo że jest w DOM.
+   *   Tracimy animację wejścia dla tych kafelków; galeria, której nie widać, to nie
+   *   kompromis, który warto rozważać.
+   */
+  function renderGalleryGrid() {
+    const grid = $('[data-gallery-fallback]');
+    const section = document.getElementById('gallery');
+    const images = config.media.galleryImages;
+    const captions = galleryCaptionList();
+
+    /* Zero zdjęć: sekcja i odsyłacz w menu schodzą ze strony. Warunek jest tu, a nie w
+       pętli przełączników, bo to nie jest decyzja organizatora o sekcji — to brak treści. */
+    if (images.length === 0) {
+      if (section) section.hidden = true;
+      $$('[data-feature-link="gallery"]').forEach((element) => { element.hidden = true; });
+      $('[data-gallery3d]')?.setAttribute('hidden', '');
+      if (grid) grid.replaceChildren();
+      return;
+    }
+    if (section && config.features.gallery) section.hidden = false;
+
+    if (!grid) return;
+    const spans = gallerySpanClasses(images.length);
+    const cards = images.map((source, index) => {
+      const figure = document.createElement('figure');
+      /* `is-visible` razem z `reveal` — patrz komentarz nad tą funkcją. */
+      figure.className = ['gallery-card', spans[index], 'reveal', 'is-visible'].filter(Boolean).join(' ');
+
+      const media = document.createElement('div');
+      media.className = 'gallery-card__media';
+      const image = document.createElement('img');
+      image.src = source;
+      /* Opis dla czytnika ekranu, w trzech krokach: podpis od organizatora, potem opis
+         przypisany tej konkretnej ilustracji demonstracyjnej (`gallery.alt1..5`), a na
+         końcu jedno ogólne zdanie. Puste `alt` znaczyłoby „obrazek dekoracyjny", a zdjęcie
+         z wyścigu dekoracją nie jest. */
+      const demo = galleryDemoIndex(source);
+      image.alt = captions[index]
+        || (demo >= 0 ? text(`gallery.alt${demo + 1}`) : text('gallery.photoAlt'));
+      image.width = 1200;
+      image.height = 800;
+      /* Pierwsze dwa kadry mogą trafić na ekran od razu przy wejściu z odsyłacza
+         `#gallery`; resztę pobiera przeglądarka, kiedy uzna, że są blisko. */
+      image.loading = index < 2 ? 'eager' : 'lazy';
+      image.decoding = 'async';
+      media.appendChild(image);
+
+      const caption = document.createElement('figcaption');
+      const number = document.createElement('span');
+      number.textContent = String(index + 1).padStart(2, '0');
+      const label = document.createElement('strong');
+      /* `textContent`, nie `innerHTML`: podpis jest danymi z panelu, nie znacznikiem. */
+      label.textContent = captions[index] || '';
+      caption.append(number, label);
+
+      figure.append(media, caption);
+      return figure;
+    });
+    grid.replaceChildren(...cards);
+  }
+
   function applyPublicConfig() {
     /* NAJPIERW ZNACZNIKI W NAPISACH, POTEM NAPISY.
        ---------------------------------------------------------------------------
@@ -283,15 +429,17 @@ import {
     };
 
     setImage($('[data-route-image]'), config.media.routeImage);
-    $$('[data-gallery-image]').forEach((image) => {
-      const index = Number.parseInt(image.dataset.galleryImage, 10);
-      setImage(image, config.media.galleryImages[index]);
-    });
 
     Object.entries(config.features).forEach(([feature, enabled]) => {
       $$(`[data-feature="${feature}"]`).forEach((element) => { element.hidden = !enabled; });
       $$(`[data-feature-link="${feature}"]`).forEach((element) => { element.hidden = !enabled; });
     });
+
+    /* PO pętli przełączników sekcji, nie przed nią. Ta funkcja może ukryć całą sekcję
+       galerii (zero zdjęć), a pętla wyżej ustawia `hidden` z konfiguracji — odwrotna
+       kolejność znaczyłaby, że przełącznik „Galeria zdjęć: włączona" odsłania sekcję,
+       w której nie ma ani jednego kadru. */
+    renderGalleryGrid();
 
     if (config.preview && !$('[data-config-preview-banner]')) {
       const banner = document.createElement('div');
@@ -1211,7 +1359,25 @@ import {
       const ratio = clamp(y / max, 0, 1);
       const progress = $('[data-scroll-progress]');
       if (progress) progress.style.width = `${ratio * 100}%`;
-      if (currentProgress) currentProgress.textContent = `${String(Math.round(ratio * 100)).padStart(2, '0')}%`;
+      /* ILE ZOSTAŁO, CO PIĘĆ PROCENT — a nie ile przewinięto, co jeden.
+         ---------------------------------------------------------------------------
+         Dwie zmiany naraz, bo są tą samą zmianą. Licznik idący w dół odpowiada na pytanie,
+         które ktoś zadaje w połowie długiej strony — „ile jeszcze" — a nie na to, które już
+         sobie odpowiedział, patrząc gdzie jest.
+
+         Skok co pięć procent zamiast co jeden ma drugie dno: przy kroku jednoprocentowym
+         napis zmieniał się kilkadziesiąt razy na jedno przewinięcie ekranu, czyli migotał
+         w kącie oka przez cały czas czytania. Co pięć procent zmienia się dwadzieścia razy
+         na całą stronę i daje się przeczytać.
+
+         Zapis tylko przy faktycznej zmianie. `updateScroll` chodzi w każdej klatce
+         przewijania, a wpisanie tego samego napisu do `textContent` i tak unieważnia układ
+         — teraz dzieje się to dwadzieścia razy na stronę, nie kilkaset. */
+      if (currentProgress) {
+        const left = Math.round((100 - ratio * 100) / 5) * 5;
+        const label = `${String(left).padStart(2, '0')}%`;
+        if (currentProgress.textContent !== label) currentProgress.textContent = label;
+      }
 
       /**
        * Scrolling back up opens the header out again, the way it looks over the
@@ -3154,9 +3320,20 @@ import {
      * moment the hero scrolls away, which is the point at which it starts being useful
      * rather than redundant.
      */
+    /* Lista obejmuje WSZYSTKIE fazy, nie tylko tę przed startem.
+       Odkąd dok zmienia się z fazą wyścigu, „to samo, co na ekranie" znaczy co innego w
+       każdej z nich: w trakcie rywalem jest zaproszenie do głosowania w hero, po dekoracji
+       — przejście na cokół. Przeoczenie ich dawałoby dokładnie to masło maślane, które ten
+       kod miał usuwać: „Zagłosuj teraz" na dole ekranu, na którym „Zagłosuj" stoi już w
+       hero.
+
+       Ukryte elementy nie przecinają się z widokiem, więc obserwator sam pomija te, których
+       akurat nie ma — lista może być zbudowana raz, przed pierwszym odczytem fazy. */
     const rivals = [
       ...$$('a[href="#signup"]'),
-      ...$$('[data-open-reminder]')
+      ...$$('[data-open-reminder]'),
+      ...$$('[data-vote-cta]'),
+      ...$$('[data-race-podium], a[href="#podium"]')
     ].filter(Boolean).filter((element) => !dock.contains(element));
 
     const onScreen = new Set();
@@ -6267,43 +6444,113 @@ import {
    * Loaded lazily so a GSAP failure cannot take the rest of the page down, and so
    * the ~60 kB of GSAP is only fetched when the gallery is actually enabled.
    */
+  /* Karuzela jest budowana raz, ale liczba zdjęć może się zmienić PO jej zbudowaniu —
+     ustawienia z serwera przychodzą po całej inicjalizacji strony. Trzymamy więc uchwyt do
+     instancji i odcisk tego, z czego ją zbudowano; gdy odcisk się zmieni, stara instancja
+     jest rozbierana i stawiana od nowa. Bez rozbierania każde przestawienie zostawiłoby
+     drugą pętlę autoodtwarzania i podwójne nasłuchy na strzałkach — kliknięcie „dalej"
+     przeskakiwałoby o dwa kadry. */
+  let galleryModulePromise = null;
+  let galleryInstance = null;
+  let gallerySignature = '';
+  /* Czy budowa jest w locie. Moduł karuzeli wczytuje się z sieci, więc między decyzją
+     „buduj" i gotową karuzelą mija czas, w którym mogą przyjść ustawienia z panelu z inną
+     liczbą zdjęć. Bez tej flagi taka odpowiedź trafiała w `galleryInstance === null`, była
+     uznawana za „karuzeli jeszcze nie ma, nie ma czego przestawiać" — i budowa kończyła się
+     kadrami z konfiguracji wbudowanej, na zawsze. */
+  let galleryBuilding = false;
+
+  /**
+   * Stawia (albo przestawia) karuzelę na aktualnej zawartości `config.media`.
+   *
+   * Wołane z dwóch miejsc: leniwego wyzwalacza przy pierwszym zbliżeniu do sekcji oraz
+   * `applyServerSettings`, gdy ustawienia z panelu przyniosły INNĄ liczbę zdjęć niż ta,
+   * z której karuzela stoi. Drugie wywołanie jest tym, czego wcześniej nie było: kod
+   * podmieniał wtedy `src` w istniejących kartach, więc szóste zdjęcie nie miało gdzie się
+   * pokazać, a po usunięciu jednego zostawała karta z adresem zdjęcia, którego już nie ma.
+   *
+   * Odcisk obejmuje też podpisy, bo one też są treścią kart (etykieta dla czytnika ekranu
+   * i tekst pod zdjęciem). Zmiana samego podpisu bez przebudowy zostawiłaby stary napis.
+   */
+  function galleryContentSignature() {
+    return JSON.stringify([config.media.galleryImages, galleryCaptionList()]);
+  }
+
+  /** Rozbiera karuzelę i zapomina, z czego stała. Używane przy zerze zdjęć. */
+  function teardownGalleryCarousel() {
+    galleryInstance?.destroy?.();
+    galleryInstance = null;
+    gallerySignature = '';
+  }
+
+  function buildGalleryCarousel(section) {
+    const signature = galleryContentSignature();
+    if (signature === gallerySignature && (galleryInstance || galleryBuilding)) return;
+    gallerySignature = signature;
+    galleryBuilding = true;
+
+    section.dataset.g3dState = 'loading';
+    /* Moduł pobierany raz. `import()` sam pamięta wynik, ale trzymanie obietnicy tutaj
+       znaczy też, że dwa szybkie przestawienia nie wystawią dwóch żądań sieciowych. */
+    galleryModulePromise = galleryModulePromise || import('./gallery-3d.js');
+    galleryModulePromise
+      .then(({ setupGallery3D }) => {
+        galleryBuilding = false;
+        /* Zawartość czytana TERAZ, a nie w chwili wywołania. Między wywołaniem i tym
+           miejscem jest pobranie modułu z sieci, w którego trakcie mogły dojść ustawienia
+           z panelu — budowanie z wartości zapamiętanych wcześniej znaczyłoby karuzelę
+           z poprzedniej liczby zdjęć i odcisk, który kłamie. */
+        const images = config.media.galleryImages;
+        const captions = galleryCaptionList();
+        gallerySignature = galleryContentSignature();
+
+        /* Rozbiórka PRZED budową. `setupGallery3D` czyści zawartość pierścienia, ale nie
+           zdejmuje nasłuchów ze wspólnej scenki, strzałek i kropek — a te elementy żyją
+           w znaczniku i przetrwają każdą przebudowę. */
+        galleryInstance?.destroy?.();
+        galleryInstance = null;
+        section.dataset.g3dState = 'module-ready';
+        /* Karuzela mogła się wcześniej ukryć, bo zdjęć było mniej niż dwa. Odsłaniamy ją
+           przed próbą, żeby dodanie drugiego zdjęcia w panelu ją przywróciło. */
+        section.hidden = false;
+        const instance = setupGallery3D({ images, captions, reducedMotion });
+        galleryInstance = instance;
+        const grid = document.querySelector('[data-gallery-fallback]');
+        if (instance) {
+          grid?.setAttribute('hidden', '');
+          section.dataset.ready = '1';
+          section.dataset.g3dState = 'ready';
+        } else {
+          /* Odmowa (mniej niż dwa kadry — karuzela z jednym zdjęciem nie ma czego
+             przewijać). Siatka MUSI wtedy wrócić, inaczej jedno zdjęcie znika ze strony
+             razem z karuzelą, która się nie zbudowała. */
+          grid?.removeAttribute('hidden');
+          delete section.dataset.ready;
+          section.dataset.g3dState = 'declined';
+        }
+      })
+      .catch((error) => {
+        galleryBuilding = false;
+        console.warn('3D gallery unavailable, keeping the grid:', error);
+        section.dataset.g3dState = `failed: ${error?.message || error}`;
+        section.hidden = true;
+        document.querySelector('[data-gallery-fallback]')?.removeAttribute('hidden');
+      });
+  }
+
   function setupGalleryCarousel() {
     const section = $('[data-gallery3d]');
     if (!section) return;
     // Lifecycle marker: makes it obvious in DevTools whether this step ran,
     // whether the lazy chunk was requested, and whether it initialised.
     section.dataset.g3dState = 'init';
-    if (!config.features.gallery) {
+    if (!config.features.gallery || config.media.galleryImages.length === 0) {
       section.hidden = true;
-      section.dataset.g3dState = 'feature-off';
+      section.dataset.g3dState = config.features.gallery ? 'no-images' : 'feature-off';
       return;
     }
 
-    const captions = [1, 2, 3, 4, 5].map((number, idx) => config.media.galleryCaptions?.[idx] || text(`gallery.caption${number}`));
-    const start = () => {
-      section.dataset.g3dState = 'loading';
-      import('./gallery-3d.js')
-        .then(({ setupGallery3D }) => {
-          section.dataset.g3dState = 'module-ready';
-          const instance = setupGallery3D({
-            images: config.media.galleryImages,
-            captions,
-            reducedMotion
-          });
-          if (instance) {
-            document.querySelector('[data-gallery-fallback]')?.setAttribute('hidden', '');
-            section.dataset.ready = '1';
-            section.dataset.g3dState = 'ready';
-          } else {
-            section.dataset.g3dState = 'declined';
-          }
-        })
-        .catch((error) => {
-          console.warn('3D gallery unavailable, keeping the grid:', error);
-          section.dataset.g3dState = `failed: ${error?.message || error}`;
-          section.hidden = true;
-        });
-    };
+    const start = () => buildGalleryCarousel(section);
 
     /**
      * Deliberately three independent triggers. IntersectionObserver is the
@@ -6400,23 +6647,51 @@ import {
       config.eventLocation = settings.eventLocation.trim();
     }
 
-    if (Array.isArray(settings.galleryImages) && settings.galleryImages.length === 5) {
-      const usableImages = settings.galleryImages.map((image) => String(image || '').trim());
-      if (usableImages.every((image) => image.startsWith('/') || /^https:\/\//i.test(image))) {
-        config.media.galleryImages = usableImages;
-      }
-    }
+    /* GALERIA O DOWOLNEJ DŁUGOŚCI.
+       ---------------------------------------------------------------------------
+       Było: `settings.galleryImages.length === 5`. To był twardy warunek na liczbę zdjęć
+       i najgorszy rodzaj błędu — CICHY. Organizator dodawał szóste zdjęcie, panel je
+       zapisywał, worker oddawał sześć adresów, a ta linijka je porzucała i strona zostawała
+       przy pięciu ilustracjach z repozytorium. Nic nie mówiło, że odpowiedź serwera została
+       wyrzucona do kosza; galeria po prostu nie reagowała na zmiany w panelu.
 
-    if (Array.isArray(settings.galleryCaptions) && settings.galleryCaptions.length === 5) {
-      config.media.galleryCaptions = settings.galleryCaptions.map((caption) => String(caption || '').trim());
+       Teraz przyjmowana jest każda długość do sufitu. Sufit jest tu drugi raz (worker już go
+       pilnuje), bo ta funkcja przyjmuje odpowiedź z sieci, a nie z zaufanego źródła.
+
+       Sprawdzenie pojedynczego wpisu zostaje: to są adresy do wstawienia w `src`. Zmiana
+       jest jedna — z `every` na `filter`. `every` znaczyło „jeden zły adres unieważnia całą
+       galerię", czyli jedno zdjęcie usunięte z bucketa gasiło pozostałe jedenaście. */
+    if (Array.isArray(settings.galleryImages)) {
+      const usableImages = settings.galleryImages
+        .map((image) => String(image || '').trim())
+        .filter((image) => image.startsWith('/') || /^https:\/\//i.test(image))
+        .slice(0, GALLERY_MAX);
+      const captions = Array.isArray(settings.galleryCaptions) ? settings.galleryCaptions : [];
+      config.media.galleryImages = usableImages;
+      /* Podpisy przycinane do liczby zdjęć — ten sam warunek, co w workerze i w
+         site-config.js. Trzy miejsca, bo trzy niezależne wejścia tych danych; jedno
+         zdanie w każdym z nich jest tańsze niż jedno pytanie „czemu podpis jest pod
+         obcym zdjęciem". */
+      config.media.galleryCaptions = usableImages.map((_image, index) => String(captions[index] || '').trim());
     }
 
     payloadFor = null;
     applyPublicConfig();
-    $$('.g3d__card img').forEach((image, index) => {
-      const source = config.media.galleryImages[index];
-      if (source && image.getAttribute('src') !== source) image.src = source;
-    });
+    /* Karuzela przebudowywana, a nie łatana po adresach.
+       ---------------------------------------------------------------------------
+       Było: pętla po `.g3d__card img` podmieniająca `src`. Działało dokładnie dla pięciu
+       kadrów — przy sześciu szósta karta nie istniała, przy czterech zostawała piąta karta
+       ze starym zdjęciem. `buildGalleryCarousel` sam sprawdza, czy coś się zmieniło, więc
+       wywołanie przy niezmienionej galerii nic nie kosztuje. */
+    const carouselSection = $('[data-gallery3d]');
+    if (config.media.galleryImages.length === 0) {
+      /* Zero zdjęć po odpowiedzi serwera: karuzela musi ZNIKNĄĆ razem z sekcją, którą
+         `renderGalleryGrid` właśnie ukrył. Samo ukrycie zostawiłoby żywe odliczanie
+         autoodtwarzania i tweeny GSAP-a mielące niewidoczne karty do końca wizyty. */
+      teardownGalleryCarousel();
+    } else if (carouselSection && (galleryInstance || galleryBuilding)) {
+      buildGalleryCarousel(carouselSection);
+    }
 
     /* Sponsors. The panel stores a bucket path and the function hands back a signed URL,
        so what arrives here is ready to put in a src. `image` is the name the renderer

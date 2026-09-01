@@ -697,7 +697,10 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .story-number span { font-family: var(--font-meta); font-size: 20px; letter-spacing: .14em; text-transform: uppercase; }
 
 .stack-section { background: var(--cream); }
-.stack-intro { display: grid; grid-template-columns: 1fr .6fr; gap: 30px; align-items: end; margin-bottom: 54px; }
+/* Jedna kolumna, odkad pod tytulem nie ma juz zdania.
+   Druga kolumna (.6fr) trzymala akapit „Przewijaj — kazda karta pokazuje...". Zostawiona po
+   jego usunieciu scisnelaby tytul do 62% szerokosci sekcji i zostawila obok niego pustke. */
+.stack-intro { display: grid; grid-template-columns: minmax(0, 1fr); gap: 30px; align-items: end; margin-bottom: 54px; }
 .stack-intro p { margin: 0; color: var(--muted); }
 .card-stack { position: relative; }
 .stack-card {

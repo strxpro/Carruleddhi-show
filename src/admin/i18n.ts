@@ -270,8 +270,31 @@ export const pl = {
   'set.announcePendingResults': 'Najpierw w zakładce Głosowanie wyślij wynik osobom, które poprosiły o powiadomienie. Dopiero potem można bezpiecznie wyzerować sezon.',
   'set.announceVotingOpen': 'Najpierw zamknij bieżące głosowanie. Otwarty lub niezakończony wynik nie może trafić do archiwum.',
   'set.gallery': 'Zdjęcia galerii',
-  'set.galleryLead': 'Kliknij zdjęcie, aby je podmienić. Pięć kadrów aktualizuje galerię i karuzelę 3D.',
+  /* Bez liczby „pięć". Liczba kadrów jest teraz decyzją organizatora, więc napis mówi, co
+     zrobić, a nie ile ich ma być — poprzednia wersja obiecywała pięć miejsc i przy szóstym
+     zdjęciu wyglądała jak zakaz. */
+  'set.galleryLead': 'Kliknij kadr, aby podmienić zdjęcie. Kolejność kafelków jest kolejnością na stronie. Zmiany zapisują się same.',
   'set.galleryPhoto': 'Zdjęcie galerii',
+  'set.galleryAdd': 'Dodaj zdjęcie',
+  'set.galleryRemove': 'Usuń ten kadr',
+  /* Pytanie, nie ostrzeżenie ogólne: mówi, czego dotyczy i że plik zostaje w koszyku, więc
+     „usuń" nie brzmi jak „zniszcz na zawsze". */
+  'set.galleryRemoveConfirm': 'Usunąć ten kadr z galerii? Zniknie ze strony od razu.',
+  'set.galleryUp': 'Przesuń wcześniej',
+  'set.galleryDown': 'Przesuń później',
+  /* Sufit. Liczba w napisie jest jedna dla obu języków i pochodzi z GALLERY_MAX — patrz
+     komentarz przy tej stałej w SettingsView.tsx. */
+  'set.galleryFull': 'Osiągnięto maksimum kadrów. Usuń jeden, aby dodać inny.',
+  'set.galleryEmpty': 'Brak zdjęć — sekcja galerii jest ukryta na stronie. Dodaj pierwszy kadr, aby ją pokazać.',
+  'set.galleryCount': 'kadrów',
+  /* Trzy stany zapisu tej karty. Karta zapisuje się sama, więc to jest jedyny sposób, w jaki
+     człowiek dowiaduje się, że zmiana weszła — zgłoszenie „nie ma okienka zapisz" nie było
+     prośbą o guzik, tylko o pewność. */
+  'set.gallerySaving': 'Zapisywanie…',
+  'set.gallerySaved': 'Zapisano ✓',
+  'set.gallerySaveFailed': 'Nie udało się zapisać galerii. Spróbuj ponownie.',
+  'set.galleryPending': 'Niezapisane zmiany — zapiszą się za chwilę.',
+  'set.gallerySaveNow': 'Zapisz teraz',
   /* Podpis pod kadrem galerii. Pole jest opcjonalne, więc podpowiedź musi to mówić — puste
      pole bez podpowiedzi wygląda jak pole wymagane, którego ktoś zapomniał wypełnić. */
   'set.galleryCaptionPlaceholder': 'Podpis (opcjonalnie)',
@@ -790,8 +813,21 @@ export const it: Dict = {
   'set.announcePendingResults': 'Prima invia il risultato, dalla scheda Votazione, a chi ha richiesto la notifica. Solo dopo il reset della stagione è sicuro.',
   'set.announceVotingOpen': 'Prima chiudi la votazione corrente. Un risultato ancora aperto o incompleto non può essere archiviato.',
   'set.gallery': 'Foto della galleria',
-  'set.galleryLead': 'Tocca una foto per sostituirla. I cinque scatti aggiornano la galleria e il carosello 3D.',
+  'set.galleryLead': 'Tocca uno scatto per sostituire la foto. L’ordine dei riquadri è l’ordine sul sito. Le modifiche si salvano da sole.',
   'set.galleryPhoto': 'Foto della galleria',
+  'set.galleryAdd': 'Aggiungi foto',
+  'set.galleryRemove': 'Rimuovi questo scatto',
+  'set.galleryRemoveConfirm': 'Rimuovere questo scatto dalla galleria? Sparisce subito dal sito.',
+  'set.galleryUp': 'Sposta prima',
+  'set.galleryDown': 'Sposta dopo',
+  'set.galleryFull': 'Numero massimo di scatti raggiunto. Rimuovine uno per aggiungerne un altro.',
+  'set.galleryEmpty': 'Nessuna foto — la sezione galleria è nascosta sul sito. Aggiungi il primo scatto per mostrarla.',
+  'set.galleryCount': 'scatti',
+  'set.gallerySaving': 'Salvataggio…',
+  'set.gallerySaved': 'Salvato ✓',
+  'set.gallerySaveFailed': 'Salvataggio della galleria non riuscito. Riprova.',
+  'set.galleryPending': 'Modifiche non salvate — si salvano tra un istante.',
+  'set.gallerySaveNow': 'Salva ora',
   'set.galleryCaptionPlaceholder': 'Didascalia (facoltativa)',
 
   'set.sponsors': 'Sponsor',

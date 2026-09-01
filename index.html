@@ -118,7 +118,9 @@
       <div class="nav-current" data-nav-current aria-live="polite">
         <span class="nav-current__pulse" aria-hidden="true"></span>
         <span class="nav-current__copy">
-          <small class="nav-current__progress" data-nav-progress>00%</small>
+          <!-- 100%, bo licznik odlicza W DOL: mowi, ile strony zostalo. Nadpisywane przez
+               updateScroll() jeszcze zanim chip stanie sie widoczny — patrz app.js. -->
+          <small class="nav-current__progress" data-nav-progress>100%</small>
           <strong data-current-section>Carruleddhi</strong>
         </span>
       </div>
@@ -176,6 +178,13 @@
              wyścig, bo bywa przestawiony. -->
         <a class="btn btn--small nav-vote" href="votazione.html" data-vote-cta hidden>
           <span data-i18n="voting.cta">Vota il partecipante</span>
+        </a>
+        <!-- Po zamknieciu w pasku staje trzeci stan. Przycisk „zaglosuj" wlasnie zniknal
+             (glosowanie zamkniete), „bede tam" tez (`data-race-hide`) - i bez tego pasek
+             zostawalby z samym menu w chwili, ktora jest na tej stronie najciekawsza.
+             Prowadzi do cokolu na tej samej stronie, nie na podstrone: wyniki sa tutaj. -->
+        <a class="btn btn--small btn--yellow nav-podium" href="#podium" data-race-podium hidden>
+          <span data-i18n="voting.seeWinners">Guarda i vincitori</span>
         </a>
         <button class="btn btn--small nav-attend" type="button" data-open-reminder data-race-hide data-i18n="nav.attend">Ci sarò</button>
         <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Apri il menu">
@@ -719,9 +728,8 @@
         <div class="stack-intro reveal">
           <div>
             <span class="eyebrow" data-i18n="category.kicker">Mezzi ammessi</span>
-            <h2 class="section-title section-title--medium" id="categories-title" data-i18n="category.title" data-text-effect="rise">Le carte si sovrappongono. La sfida sale.</h2>
+            <h2 class="section-title section-title--medium" id="categories-title" data-i18n="category.title" data-text-effect="rise">Due categorie, una sola discesa.</h2>
           </div>
-          <p class="lead" data-i18n="category.intro">Scorri: ogni carta mostra ciò che serve per prendere parte alla discesa.</p>
         </div>
 
         <div class="card-stack" data-card-stack>
@@ -933,32 +941,25 @@
           </div>
           <div class="g3d__footer">
             <p class="g3d__caption" data-gallery3d-caption aria-live="polite"></p>
-            <div class="g3d__dots" data-gallery3d-dots role="tablist" aria-label="1-5"></div>
+            <!-- Etykietę listy kropek pisze gallery-3d.js z liczby kadrów. Stało tu
+                 `aria-label="1-5"` wpisane na stałe, czyli napis, który przy innej liczbie
+                 zdjęć kłamie czytnikowi ekranu. -->
+            <div class="g3d__dots" data-gallery3d-dots role="tablist"></div>
           </div>
         </div>
 
-        <div class="gallery__grid" data-gallery-fallback>
-          <figure class="gallery-card gallery-card--hero reveal">
-            <div class="gallery-card__media"><img data-gallery-image="0" src="/assets/images/gallery-start.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione dei carruleddhi sulla linea di partenza" data-i18n-alt="gallery.alt1"></div>
-            <figcaption><span>01</span><strong data-i18n="gallery.caption1">La tensione prima del via</strong></figcaption>
-          </figure>
-          <figure class="gallery-card gallery-card--portrait reveal" data-delay="1">
-            <div class="gallery-card__media"><img data-gallery-image="1" src="/assets/images/gallery-race.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione di un carruleddhu lanciato in discesa" data-i18n-alt="gallery.alt2"></div>
-            <figcaption><span>02</span><strong data-i18n="gallery.caption2">Gravità, curve e mare</strong></figcaption>
-          </figure>
-          <figure class="gallery-card reveal">
-            <div class="gallery-card__media"><img data-gallery-image="2" src="/assets/images/gallery-craft.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione della costruzione artigianale di un carruleddhu" data-i18n-alt="gallery.alt3"></div>
-            <figcaption><span>03</span><strong data-i18n="gallery.caption3">Ogni mezzo nasce in officina</strong></figcaption>
-          </figure>
-          <figure class="gallery-card reveal" data-delay="1">
-            <div class="gallery-card__media"><img data-gallery-image="3" src="/assets/images/gallery-crowd.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione del pubblico che tifa lungo il percorso" data-i18n-alt="gallery.alt4"></div>
-            <figcaption><span>04</span><strong data-i18n="gallery.caption4">Un paese intero fa il tifo</strong></figcaption>
-          </figure>
-          <figure class="gallery-card gallery-card--wide reveal">
-            <div class="gallery-card__media"><img data-gallery-image="4" src="/assets/images/gallery-finish.svg" width="1200" height="800" loading="lazy" decoding="async" alt="Illustrazione della festa sul traguardo" data-i18n-alt="gallery.alt5"></div>
-            <figcaption><span>05</span><strong data-i18n="gallery.caption5">Il traguardo diventa festa</strong></figcaption>
-          </figure>
-        </div>
+        <!-- SIATKA ZAPASOWA JEST BUDOWANA Z KODU, NIE WPISANA TUTAJ.
+             ====================================================================
+             Stało tu pięć `<figure>` z `data-gallery-image="0".."4"`, a app.js podstawiał im
+             adresy z ustawień. Liczba zdjęć na stronie była więc liczbą wpisaną w TEN plik:
+             przy czterech zdjęciach piąty kafelek zostawał z ilustracją demonstracyjną z
+             repozytorium (gość widział obcy obrazek), przy ośmiu trzy ostatnie nie miały gdzie
+             się pokazać, a przy zerze pokazywało się pięć ilustracji zamiast braku sekcji.
+
+             Buduje `renderGalleryGrid()` w app.js — z tablicy `config.media.galleryImages`,
+             więc długość tablicy JEST liczbą kafelków. Wywoływana także po każdej zmianie
+             języka, bo podpisy i opisy alternatywne idą ze słownika. -->
+        <div class="gallery__grid" data-gallery-fallback></div>
 
         <!-- Hidden, not deleted: it repeated the two buttons that already sit in
              the fixed dock at the bottom of every screen. The markup stays so the
@@ -1903,14 +1904,40 @@
     </section>
 
     <nav class="quick-actions" data-quick-actions aria-label="Azioni rapide" data-i18n-aria-label="quick.label" aria-expanded="true">
-      <button class="quick-action quick-action--attend" type="button" data-quick-attend data-feature-link="attendance" aria-pressed="false">
+      <!-- DOK ZMIENIA SIE Z FAZA WYSCIGU, BO INACZEJ KŁAMIE.
+           ===========================================================================
+           Stal tu przez caly rok ten sam komplet: „bede tam" i „zapisz sie". W chwili, gdy
+           wozki juz jada, oba zdania sa nieprawda - zapisy sa zamkniete, a byc trzeba juz
+           teraz, nie „bede". Po dekoracji sa nieprawda podwojnie.
+
+           Zadnej logiki nie ma tu w JavaScripcie doku: te same atrybuty, ktore chowaja i
+           odslaniaja przyciski w hero i w pasku (`data-race-hide`, `data-vote-cta`,
+           `data-race-podium`, `data-race-over`), rzadza i tym. Jedno miejsce decyduje o
+           fazie - paintPhase() w voting.js - wiec dok nie moze rozjechac sie z hero.
+
+           Ile ich stoi naraz: przed startem dwa, w trakcie jeden (glosowanie jest jedyna
+           rzecza do zrobienia), po zamknieciu dwa - zwyciezcy po lewej, przypomnienie po
+           prawej. -->
+      <button class="quick-action quick-action--attend" type="button" data-quick-attend data-feature-link="attendance" data-race-hide aria-pressed="false">
         <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
         <span data-attendance-quick-label data-i18n="quick.attend">Ci sarò</span>
       </button>
-      <a class="quick-action quick-action--signup" href="#signup" data-feature-link="registration">
+      <a class="quick-action quick-action--signup" href="#signup" data-feature-link="registration" data-race-hide>
         <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span>
         <span data-i18n="quick.signup">Iscriviti</span>
       </a>
+      <a class="quick-action quick-action--vote" href="votazione.html" data-vote-cta hidden>
+        <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
+        <span data-i18n="quick.vote">Vota ora</span>
+      </a>
+      <a class="quick-action quick-action--podium" href="#podium" data-race-podium hidden>
+        <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4.5A2.5 2.5 0 0 0 7 8.5M17 6h2.5A2.5 2.5 0 0 1 17 8.5"/><path d="M12 14v3M8.5 20h7"/></svg></span>
+        <span data-i18n="quick.winners">Vincitori</span>
+      </a>
+      <button class="quick-action quick-action--remind" type="button" data-open-reminder data-race-over hidden>
+        <span class="quick-action__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 6-2.5 7-2.5 7h17S18 14 18 8"/><path d="M10.3 19a2 2 0 0 0 3.4 0"/></svg></span>
+        <span data-i18n="quick.remind">Avvisami</span>
+      </button>
     </nav>
   </main>
 

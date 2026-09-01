@@ -27,10 +27,37 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
   if (!section || !stage || !ring) return null;
 
   const slides = images.filter(Boolean);
+  /**
+   * Mniej niż dwa kadry: karuzeli nie ma.
+   *
+   * Nie jest to awaria i nie jest to zero zdjęć — to jedno zdjęcie. Karuzela z jednym
+   * kadrem ma strzałki, które nic nie robią, jedną kropkę i autoodtwarzanie przewijające
+   * do tego samego zdjęcia; wygląda jak zepsuta. Zwracane `null` jest dla wołającego
+   * sygnałem „pokaż siatkę zapasową", a ta z jednym zdjęciem wygląda dokładnie jak jedno
+   * zdjęcie na całą szerokość — patrz `gallerySpanClasses` w app.js.
+   */
   if (slides.length < 2) {
     section.hidden = true;
     return null;
   }
+
+  /**
+   * Wszystkie nasłuchy tej instancji wiszą na jednym sygnale.
+   *
+   * PO CO: liczba zdjęć jest teraz zmienna, więc karuzelę można PRZEBUDOWAĆ w trakcie
+   * wizyty (ustawienia z panelu przychodzą po wczytaniu strony). Karty i kropki są
+   * budowane od nowa i stare po prostu znikają z DOM, ale nasłuchy na `stage`, na
+   * strzałkach, na `window` i na `document` siedzą na elementach ZE ZNACZNIKA, które
+   * przebudowę przeżywają. Bez zdejmowania druga instancja znaczyła: dwa nasłuchy na
+   * „dalej" (jedno kliknięcie, przeskok o dwa kadry), dwie pętle autoodtwarzania i stary
+   * `render()` piszący transformacje do kart, których już nie ma.
+   *
+   * `AbortController` zamiast listy `removeEventListener`: zdjęcie wszystkiego jednym
+   * wywołaniem nie da się rozjechać z dodawaniem, a lista dawała się — wystarczyło dopisać
+   * nasłuch i zapomnieć o wpisie w rozbiórce.
+   */
+  const teardown = new AbortController();
+  const { signal } = teardown;
 
   /* ----------------------------------------------------------------- build */
 
@@ -310,7 +337,7 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
       if (e.target.closest('[data-gallery-lightbox-close]')) {
         closeLightbox();
       }
-    });
+    }, { signal });
   }
 
   /* ----------------------------------------------------------- interaction */
@@ -326,7 +353,7 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
       }
       // Already centred: open the lightbox.
       openLightbox(index);
-    });
+    }, { signal });
   });
 
   stage.addEventListener('pointerdown', (event) => {
@@ -339,7 +366,7 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
     stage.setPointerCapture?.(event.pointerId);
     stage.classList.add('is-dragging');
     interrupt();
-  });
+  }, { signal });
 
   stage.addEventListener('pointermove', (event) => {
     if (!state.dragging || event.pointerId !== state.pointerId) return;
@@ -349,7 +376,7 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
     // tracks the finger instead of waiting for the next frame.
     state.offset = -dx / (stage.clientWidth * 0.38);
     render();
-  });
+  }, { signal });
 
   const endDrag = () => {
     if (!state.dragging) return;
@@ -365,18 +392,18 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
     }
     resetIdle();
   };
-  stage.addEventListener('pointerup', endDrag);
-  stage.addEventListener('pointercancel', endDrag);
-  stage.addEventListener('lostpointercapture', endDrag);
+  stage.addEventListener('pointerup', endDrag, { signal });
+  stage.addEventListener('pointercancel', endDrag, { signal });
+  stage.addEventListener('lostpointercapture', endDrag, { signal });
 
   stage.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowRight') { interrupt(); step(1); }
     if (event.key === 'ArrowLeft') { interrupt(); step(-1); }
     if (event.key === 'Escape') { hideCaption(); }
-  });
+  }, { signal });
 
-  document.querySelector('[data-gallery3d-prev]')?.addEventListener('click', () => { interrupt(); step(-1); });
-  document.querySelector('[data-gallery3d-next]')?.addEventListener('click', () => { interrupt(); step(1); });
+  document.querySelector('[data-gallery3d-prev]')?.addEventListener('click', () => { interrupt(); step(-1); }, { signal });
+  document.querySelector('[data-gallery3d-next]')?.addEventListener('click', () => { interrupt(); step(1); }, { signal });
 
   /* ---------------------------------------------------------------- dots */
 
@@ -392,9 +419,13 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
         hideCaption();
         state.offset += relative(index);
         goTo(index);
-      });
+      }, { signal });
       dotsHost.appendChild(dot);
     });
+    /* Etykieta listy kropek liczona z liczby kadrów. W znaczniku stało `aria-label="1-5"`
+       wpisane na stałe — po zmianie liczby zdjęć czytnik ekranu ogłaszałby „1-5" nad
+       dwunastoma kropkami. */
+    dotsHost.setAttribute('aria-label', `1-${count}`);
   }
 
   /* ------------------------------------------------------------- lifecycle */
@@ -403,21 +434,50 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
   startAutoplay();
   resetIdle();
 
+  let visibility = null;
   if ('IntersectionObserver' in window) {
-    const visibility = new IntersectionObserver((entries) => {
+    visibility = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) startAutoplay();
       else stopAutoplay();
     }, { threshold: 0.02 });
     visibility.observe(section);
   }
 
-  window.addEventListener('resize', render, { passive: true });
+  window.addEventListener('resize', render, { passive: true, signal });
+
+  /**
+   * Rozbiórka. Wołana przez app.js przed postawieniem karuzeli na innej liczbie zdjęć.
+   *
+   * Zdejmuje dokładnie to, czego przebudowa sama nie sprząta: nasłuchy na elementach ze
+   * znacznika (jednym `abort()`), oba zegary, obserwator widoczności, tweeny GSAP-a na
+   * obiekcie stanu i wyzwalacz przewijania animacji wejścia. Karty i kropki zostawia —
+   * `setupGallery3D` czyści je sam przez `replaceChildren()` przy budowie, więc czyszczenie
+   * ich także tutaj znaczyłoby dwa miejsca decydujące o tym samym.
+   */
+  function destroy() {
+    teardown.abort();
+    stopAutoplay();
+    window.clearTimeout(state.idleTimer);
+    window.clearTimeout(state.settleTimer);
+    visibility?.disconnect();
+    gsap.killTweensOf(state);
+    /* Karuzela mogła zostać rozebrana ze otwartą lupą — nasłuch Escape zniknął razem z
+       sygnałem, więc bez tego okno zostałoby na ekranie bez sposobu na zamknięcie. */
+    if (lightbox) lightbox.hidden = true;
+    document.removeEventListener('keydown', handleLightboxEsc);
+    introTimeline?.scrollTrigger?.kill();
+    introTimeline?.kill();
+  }
 
   /* ------------------------------------------------------ pin + expand */
 
+  /* Deklarowany przed gałęzią „bez animacji", żeby `destroy()` mógł go zamknąć bez
+     sprawdzania, którą drogą poszła budowa. */
+  let introTimeline = null;
+
   if (reducedMotion || !gsap || !ScrollTrigger) {
     section.classList.add('is-static');
-    return { render };
+    return { render, destroy };
   }
 
   gsap.registerPlugin(ScrollTrigger);
@@ -468,14 +528,14 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
    *
    * Only the entrance is animated, once, on its own clock.
    */
-  const intro = gsap.timeline({
+  introTimeline = gsap.timeline({
     scrollTrigger: { trigger: section, start: 'top 78%', once: true }
   });
-  intro
+  introTimeline
     .fromTo(heading, { y: 22, opacity: 0 }, { y: 0, opacity: 1, duration: 0.5, ease: 'power2.out' })
     .fromTo(frame, { y: 26, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'power2.out' }, 0.08);
 
-  window.addEventListener('load', () => ScrollTrigger.refresh());
+  window.addEventListener('load', () => ScrollTrigger.refresh(), { signal });
 
-  return { render, timeline: intro };
+  return { render, destroy, timeline: introTimeline };
 }

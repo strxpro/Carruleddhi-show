@@ -203,6 +203,54 @@ export function cleanRoutePath(value, fallback) {
   return points.length >= 2 ? points : fallback.map((point) => ({ ...point }));
 }
 
+/**
+ * SUFIT GALERII. Ta sama liczba co `GALLERY_MAX` w `worker/index.js` — pełne uzasadnienie
+ * dwunastki stoi tam. Tu jest po to, żeby wklejony ręcznie plik konfiguracji ani wersja
+ * robocza z panelu nie mogły wprowadzić na stronę pięćdziesięciu kadrów, których worker by
+ * nigdy nie przyjął. Dwa miejsca sprawdzające to samo, bo dwie drogi wejścia: przez zapis w
+ * panelu (worker) i przez `window.CARRULEDDHI_CONFIG` albo import JSON-a (ten plik).
+ */
+export const GALLERY_MAX = 12;
+
+/**
+ * Zdjęcia galerii z konfiguracji wbudowanej albo z wersji roboczej panelu.
+ *
+ * BRAK KLUCZA TO NIE TO SAMO CO PUSTA TABLICA — i to jest cały sens tej funkcji.
+ *   Poprzednia wersja robiła `DEFAULT.galleryImages.map((fallback, index) => cleanAsset(source[index], fallback))`,
+ *   czyli WYMUSZAŁA pięć pozycji i podstawiała pod brakujące zdjęcia demonstracyjne. Przy
+ *   konfiguracji bez galerii wychodziło pięć ilustracji, przy dwunastu zdjęciach wychodziło
+ *   pięć pierwszych, a przy jednym — jedno prawdziwe i cztery z repozytorium. Żadna z tych
+ *   trzech odpowiedzi nie jest tym, co ktoś ustawił.
+ *
+ *   Teraz: brak klucza (albo coś, co nie jest tablicą) to „nie mam nic do powiedzenia" i
+ *   zostają wartości wbudowane. Tablica — nawet pusta — to decyzja i jest respektowana.
+ *   Puste zdjęcie w środku tablicy odpada, bo kafelek bez obrazka jest dziurą w siatce.
+ */
+function cleanGalleryImages(value) {
+  if (!Array.isArray(value)) return DEFAULT_SITE_CONFIG.media.galleryImages.slice();
+  const images = [];
+  for (const entry of value) {
+    if (images.length >= GALLERY_MAX) break;
+    if (!isSafeAssetPath(entry)) continue;
+    const path = entry.trim().replace(/\\/g, '/');
+    images.push(path.startsWith('/') ? path : `/${path}`);
+  }
+  return images;
+}
+
+/**
+ * Podpisy, zawsze tyle samo co zdjęć.
+ *
+ * Ten sam warunek co `alignGalleryCaptions` w workerze i z tego samego powodu: podpis bez
+ * zdjęcia wraca później pod obce zdjęcie, a zdjęcie bez podpisu każe każdemu czytającemu
+ * pilnować zakresu tablicy. Długość bierze się ze zdjęć, nie z podpisów — zdjęcia są tym,
+ * co widać.
+ */
+function cleanGalleryCaptions(value, imageCount) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from({ length: imageCount }, (_unused, index) => cleanText(source[index], '', 260));
+}
+
 export const SPONSOR_MAX = 20;
 
 /**
@@ -268,8 +316,11 @@ export function normalizeSiteConfig(input = {}) {
   const media = isRecord(source.media) ? source.media : {};
   const features = isRecord(source.features) ? source.features : {};
   const endpoints = isRecord(source.endpoints) ? source.endpoints : {};
-  const gallerySource = Array.isArray(media.galleryImages) ? media.galleryImages : [];
-  const galleryCaptionsSource = Array.isArray(media.galleryCaptions) ? media.galleryCaptions : [];
+  /* Tablica przekazywana dalej TAKA, JAKA PRZYSZŁA — bez zamiany braku na `[]`. Podmiana
+     nieobecnego klucza na pustą tablicę zabijała różnicę między „nie podano galerii" (wtedy
+     zostają wartości wbudowane) i „galeria jest pusta" (wtedy sekcji nie ma na stronie).
+     Rozróżnienie robi `cleanGalleryImages`. */
+  const galleryImages = cleanGalleryImages(media.galleryImages);
 
   return {
     eventName: cleanText(source.eventName, DEFAULT_SITE_CONFIG.eventName, 80),
@@ -292,8 +343,8 @@ export function normalizeSiteConfig(input = {}) {
     },
     media: {
       routeImage: cleanAsset(media.routeImage, DEFAULT_SITE_CONFIG.media.routeImage),
-      galleryImages: DEFAULT_SITE_CONFIG.media.galleryImages.map((fallback, index) => cleanAsset(gallerySource[index], fallback)),
-      galleryCaptions: DEFAULT_SITE_CONFIG.media.galleryCaptions.map((fallback, index) => cleanText(galleryCaptionsSource[index], fallback, 260))
+      galleryImages,
+      galleryCaptions: cleanGalleryCaptions(media.galleryCaptions, galleryImages.length)
     },
     sponsors: cleanSponsors(source.sponsors),
     features: Object.fromEntries(featureNames.map((name) => [name, typeof features[name] === 'boolean' ? features[name] : DEFAULT_SITE_CONFIG.features[name]])),
