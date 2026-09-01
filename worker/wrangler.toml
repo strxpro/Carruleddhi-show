@@ -2,6 +2,22 @@ name = "carruleddhi-intake"
 main = "index.js"
 compatibility_date = "2026-08-01"
 
+# BEZ PUBLICZNEGO ADRESU. To nie jest ozdoba, to zabezpieczenie.
+# ---------------------------------------------------------------------------
+# Ten Worker robi dzis jedna rzecz: zegar przypomnien (patrz [triggers] nizej). Strona i API
+# stoja na Vercelu — api/intake.js uruchamia ten sam plik, a vercel.json przekierowuje tam
+# /api/carruleddhi/*.
+#
+# Bez tej linii `wrangler deploy` proponuje rejestracje subdomeny workers.dev i konczy sie
+# bledem, gdy odmowisz. A zgoda bylaby GORSZA niz blad: ponizej stoi [assets] z katalogiem
+# ../dist, wiec pod adresem carruleddhi-intake.<cos>.workers.dev opublikowalaby sie DRUGA,
+# publiczna kopia calej strony — razem z admin.html i czternastoma PDF-ami. Druga wersja w
+# wyszukiwarce, druga furtka do panelu i formularze odpowiadajace bledem, bo ten Worker nie
+# ma sekretow aplikacji.
+#
+# `false` znaczy: wdroz kod i zegar, nie wystawiaj niczego na swiat.
+workers_dev = false
+
 # Serve the built site and let the Worker answer only /api/carruleddhi/*.
 [assets]
 directory = "../dist"
@@ -26,12 +42,24 @@ crons = ["0 * * * *"]
 # Comma separated. Leave empty during local development.
 ALLOWED_ORIGINS = ""
 
+# Dokad zegar puka. Zwykla zmienna, nie sekret — to publiczny adres strony.
+SITE_URL = "https://www.carruleddhishow.com"
+
 # Optional throttling store. Create it once, then paste the id here:
 #   npx wrangler kv namespace create RATE_LIMIT
 # [[kv_namespaces]]
 # binding = "RATE_LIMIT"
 # id = "<kv-namespace-id>"
 
+# JEDYNY SEKRET POTRZEBNY DO ZEGARA PRZYPOMNIEN:
+#   npx wrangler secret put ROSTER_KEY
+# Ta sama wartosc co w Vercelu. Zegar nie czyta bazy sam — puka do zywego endpointu na
+# Vercelu, gdzie sa dane i reszta sekretow. Dlatego NIE trzeba tu wpisywac
+# SUPABASE_SERVICE_KEY ani WALL_SALT; zwlaszcza tej drugiej, bo dwie rozne sole znacza
+# odsylacze z maili, ktore przestaja przechodzic walidacje bez zadnego bledu w logach.
+#
+# Pozostale sekrety nizej sa potrzebne TYLKO wtedy, gdy kiedys przeniesiesz tu cala strone.
+#
 # Secrets are never written here. Set them with:
 #   npx wrangler secret put MAKE_WEBHOOK_URL       # required for the forms
 #   npx wrangler secret put ROSTER_KEY             # admin participant list

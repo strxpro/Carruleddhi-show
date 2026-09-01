@@ -6799,13 +6799,46 @@ export default {
    * byłaby jednak dokładnie tym, co właśnie kosztowało tydzień przypomnień.
    */
   async scheduled(event, env, ctx) {
+    /* Zegar WOLA STRONE, a nie liczy sam.
+       ---------------------------------------------------------------------------
+       Pierwsza wersja tego zegara wywolywala `remindersDue(env, ...)` wprost, w tym samym
+       procesie. Bylo to bledne zalozenie: aplikacja stoi na VERCELU (api/intake.js to
+       przejsciowka uruchamiajaca ten sam plik, a vercel.json przekierowuje tam
+       /api/carruleddhi/*). Ten Worker jest osobnym wdrozeniem tego samego kodu — bez trasy,
+       bez bazy, bez sekretow. Wywolanie w procesie znaczyloby wiec czytanie z Supabase,
+       ktorego ten Worker nie zna, i cicha awaria co godzine.
+
+       Dlatego robimy dokladnie to, co robil GitHub Actions: jeden uwierzytelniony POST na
+       zywy endpoint. Cala praca dzieje sie tam, gdzie sa dane i sekrety.
+
+       KOSZT TEJ DECYZJI, POWIEDZIANY WPROST
+       Worker potrzebuje jednego sekretu (ROSTER_KEY), a nie czterech. Nie duplikujemy tu
+       SUPABASE_SERVICE_KEY ani WALL_SALT — a zwlaszcza WALL_SALT, ktory MUSI byc identyczny
+       z Vercelem: dwie rozne sole znacza, ze odsylacz z maila przestaje przechodzic
+       walidacje, bez ani jednego bledu w logach. Jeden sekret w dwoch miejscach to jedno
+       miejsce, w ktorym moga sie rozjechac; cztery to cztery. */
     ctx.waitUntil((async () => {
+      const site = (env.SITE_URL || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
+      if (!env.ROSTER_KEY) {
+        console.error('cron: brak ROSTER_KEY, przypomnienia nie zostaly wyslane');
+        return;
+      }
       try {
-        const response = await remindersDue(env, { deliver: true }, {});
-        const body = await response.clone().json().catch(() => null);
-        console.log('reminders-due', response.status, JSON.stringify(body));
+        const response = await fetch(`${site}/api/carruleddhi/reminders-due`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            [ROSTER_HEADER]: env.ROSTER_KEY
+          },
+          body: JSON.stringify({ deliver: true })
+        });
+        const body = await response.text();
+        /* Status ORAZ tresc. 200 z pustym wynikiem to normalny dzien przez wiekszosc roku,
+           ale 200 z bledem w ciele juz nie — a bez wypisania tresci jedno od drugiego nie
+           da sie odroznic w logu. */
+        console.log('cron reminders-due:', response.status, body.slice(0, 400));
       } catch (problem) {
-        console.error('reminders-due nie wykonalo sie:', problem && problem.message);
+        console.error('cron reminders-due nie doszlo:', problem && problem.message);
       }
     })());
   },
