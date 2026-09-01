@@ -381,6 +381,9 @@ import {
     if (stage) stage.hidden = !(closed && hasWinners);
     const emptyNote = $('[data-podium-empty]');
     if (emptyNote) emptyNote.hidden = !(closed && !hasWinners);
+    /* Klasa dla CSS: pusta sekcja zwija sie do wysokosci tresci zamiast zostawac
+       pelnoekranowym panelem z biała pustka pod jednym zdaniem. */
+    if (podium) podium.classList.toggle('is-empty', closed && !hasWinners);
 
     // Zaproszenie do głosowania — w nagłówku i w hero. Prowadzi na podstronę.
     $$('[data-vote-cta]').forEach((cta) => { cta.hidden = !voting; });
@@ -393,7 +396,14 @@ import {
        dotyczyć. Zostaje jedno zdanie: zagłosuj.
 
        `hidden`, więc wypadają też z kolejności tabulacji i z czytnika ekranu. */
-    $$('[data-race-hide]').forEach((element) => { element.hidden = voting; });
+    /* Schodza takze PO zamknieciu, nie tylko w trakcie. Wczesniej wracaly razem z koncem
+       glosowania i hero zapraszalo „Zapisz sie do wyscigu" do formularza, ktory piec sekcji
+       nizej mowil juz „ta edycja sie skonczyla" i mial zablokowane pola. Dwa sprzeczne
+       zdania na jednej stronie, w tej samej chwili. */
+    $$('[data-race-hide]').forEach((element) => { element.hidden = voting || closed; });
+    /* Na ich miejsce wchodzi jedno zaproszenie na przyszly rok — to samo okno, co przy
+       formularzu, wiec adresy trafiaja na jedna liste. */
+    $$('[data-race-over]').forEach((element) => { element.hidden = !closed; });
 
     paintSignupLock(voting, closed);
   }

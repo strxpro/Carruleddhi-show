@@ -2360,3 +2360,31 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   }
   .vote-head { box-shadow: 6px 6px 0 rgb(154 217 255 / .3); }
 }
+
+/* ===========================================================================
+   Zamkniete glosowanie bez ani jednego glosu — sekcja ma sie ZWINAC
+   ===========================================================================
+   Kazda sekcja-panel dostaje `min-height: var(--screen-h)` (patrz
+   `#main > section.section-card[data-panel='flow']` w experience.css), zeby przewijanie
+   skakalo ekran po ekranie. Przy pustym cokole zostawal z tego naglowek, jedno zdanie i
+   POL EKRANU BIALEJ PUSTKI — zglosone jako „brzydko widac".
+
+   Selektor jest celowo dluzszy niz tamten: `#main` plus trzy klasy plus atrybut przebija
+   `#main` plus dwie klasy plus atrybut. Krotszy zapis przegralby i regula wygladalaby na
+   dzialajaca, dopoki ktos nie zmierzy wysokosci.
+
+   `min-height: auto` tylko w tym jednym stanie — z wynikami sekcja nadal jest pelnoekranowym
+   panelem, bo cokol ma co pokazac. */
+#main > section.section-card.podium.is-empty[data-panel] {
+  min-height: auto;
+  padding-bottom: clamp(48px, 7vw, 84px);
+}
+#main > section.section-card.podium.is-empty[data-panel] .podium__actions,
+#main > section.section-card.podium.is-empty[data-panel] .podium__field { display: none; }
+
+.podium__empty {
+  margin: 6px 0 0;
+  max-width: 62ch;
+  font-size: clamp(15px, 1.6vw, 17px);
+  line-height: 1.55;
+}
