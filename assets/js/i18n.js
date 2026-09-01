@@ -1,9 +1,29 @@
 (() => {
   'use strict';
 
+  /* ===========================================================================
+     ROK I DATA W SŁOWNIKU: %YEAR%, %DATE%, %EVENT%, %PLACE%
+     ===========================================================================
+     Napisy niżej NIE zawierają roku ani daty wpisanej wprost, i to jest naprawa zgłoszenia
+     „po ogłoszeniu nowej edycji strona nadal pokazuje stary rok i datę".
+
+     Odczyt ustawień podmienia wszystko, co nosi `data-config-*` w znaczniku, ale nie ma
+     dostępu do wnętrza napisów ze słownika. Rok siedział w czterech kluczach razy sześć
+     języków — dwadzieścia cztery miejsca, które ktoś musiałby poprawić ręcznie raz w roku,
+     i dwadzieścia cztery okazje do przeoczenia. Skutek jest cichy: nic się nie psuje, strona
+     po prostu podaje nieprawdziwą datę.
+
+     Znaczniki podstawia `fillCopyTokens` w site-bridge.js — na obu drogach napisu na ekran
+     (`makeText` i `translateDom`) i na obu stronach (index.html, votazione.html). Wartości
+     wchodzą tam z `config.eventDate`, czyli z jednego źródła.
+
+     %DATE%, A NIE „17 %MONTH% %YEAR%": dzień i miesiąc też były wpisane na sztywno, a
+     `Intl.DateTimeFormat` daje poprawną formę w każdym z sześciu języków („17 ottobre 2026",
+     „17 października 2026", „17. Oktober 2026", „17 de octubre de 2026") z tej samej jednej
+     daty. Trzy tokeny zamiast jednego znaczyłyby trzy szanse na rozjazd. */
   const it = {
-    'meta.title': 'Carruleddhi Show 2026 — Santa Teresa Gallura',
-    'meta.description': 'La corsa di carretti artigianali più spettacolare della Sardegna. 17 ottobre 2026, Santa Teresa Gallura.',
+    'meta.title': '%EVENT% — %PLACE%',
+    'meta.description': 'La corsa di carretti artigianali più spettacolare della Sardegna. %DATE%, %PLACE%.',
     'a11y.skip': 'Vai al contenuto',
     'a11y.menu': 'Apri il menu',
     'a11y.close': 'Chiudi',
@@ -16,7 +36,7 @@
     'nav.contact': 'Contatti',
     'nav.signup': 'Iscriviti',
     'nav.attend': 'Ci sarò',
-    'hero.kicker': '17 ottobre 2026 · Santa Teresa Gallura',
+    'hero.kicker': '%DATE% · %PLACE%',
     'hero.tagline': 'Nessun motore. Solo la discesa.',
     'hero.signup': 'Iscriviti alla gara',
     'hero.attend': 'Ci sarò',
@@ -75,7 +95,7 @@
     'route.map': 'Apri in Google Maps',
     'route.start': 'Partenza · Rena Bianca',
     'route.finish': 'Arrivo · paese',
-    'schedule.kicker': '17 ottobre 2026',
+    'schedule.kicker': '%DATE%',
     'schedule.title': 'Un giorno. Tutto da ricordare.',
     'schedule.item1': 'Presentazione dei carruleddhi in piazza',
     'schedule.item2': 'Partenza ufficiale della gara',
@@ -90,7 +110,12 @@
     'prizes.rank': 'Premio',
     'prize.1': 'Più veloce Classic',
     'prize.2': 'Più veloce ART',
-    'prize.3': 'Carruleddhi Show 2026',
+    /* ROK ZDJĘTY Z NAZWY KATEGORII — patrz komentarz przy `podiumResultsExtras` na końcu pliku.
+       Stało tu „Carruleddhi Show 2026". Nazwa kategorii nie jest datą: ta sama nagroda wraca
+       w każdej edycji, a wpisany rok znaczy, że 18 października 2026 dwanaście nazw staje się
+       nieprawdą — i to w miejscu, w którym od teraz stoją także wyniki i archiwum poprzednich
+       roczników. Rok mówi wybrany rocznik obok, jeden raz, zamiast dwunastu tłumaczeń. */
+    'prize.3': 'Carruleddhi Show',
     'prize.4': 'Carruleddhu più grande',
     'prize.5': 'Carruleddhu più simpatico',
     'prize.6': 'Esibizione Show',
@@ -210,11 +235,11 @@
   };
 
   const pl = {
-    'meta.title': 'Carruleddhi Show 2026 — Santa Teresa Gallura',
-    'meta.description': 'Najbardziej widowiskowy wyścig ręcznie budowanych pojazdów na Sardynii. 17 października 2026.',
+    'meta.title': '%EVENT% — %PLACE%',
+    'meta.description': 'Najbardziej widowiskowy wyścig ręcznie budowanych pojazdów na Sardynii. %DATE%.',
     'a11y.skip': 'Przejdź do treści', 'a11y.menu': 'Otwórz menu', 'a11y.close': 'Zamknij',
     'nav.race': 'Wyścig', 'nav.categories': 'Kategorie', 'nav.route': 'Trasa', 'nav.program': 'Program', 'nav.prizes': 'Nagrody', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Zapisz się', 'nav.attend': 'Będę tam',
-    'hero.kicker': '17 października 2026 · Santa Teresa Gallura', 'hero.tagline': 'Bez silnika. Tylko w dół.', 'hero.signup': 'Zapisz się do wyścigu', 'hero.attend': 'Będę tam', 'hero.pilots': 'zapisanych zawodników', 'hero.people': 'osób będzie na miejscu', 'hero.scroll': 'Poznaj wyścig',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Bez silnika. Tylko w dół.', 'hero.signup': 'Zapisz się do wyścigu', 'hero.attend': 'Będę tam', 'hero.pilots': 'zapisanych zawodników', 'hero.people': 'osób będzie na miejscu', 'hero.scroll': 'Poznaj wyścig',
     'count.days': 'dni', 'count.hours': 'godzin', 'count.minutes': 'minut', 'count.seconds': 'sekund',
     'count.daysShort': 'd', 'count.hoursShort': 'g', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Zbuduj · Wejdź · Zjedź · Hamuj · Uśmiechnij się',
@@ -226,9 +251,10 @@
     'category.art.kicker': 'Kategoria B · Kreatywność', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Dowolny materiał, od czterech do dziesięciu kół i dowolne hamulce. Jedna twórcza zasada: pojazd musi być wykonany ręcznie.', 'category.art.tag1': '4–10 kół', 'category.art.tag2': 'Dowolne materiały', 'category.art.tag3': 'Efekt wow',
     'category.safety.kicker': 'Przed startem', 'category.safety.title': 'Bezpieczeństwo zawsze.', 'category.safety.body': 'Atestowany kask jest obowiązkowy. Pojazd przechodzi kontrolę przed startem. Osoby niepełnoletnie startują wyłącznie za zgodą rodzica lub opiekuna.', 'category.safety.tag1': 'Kask', 'category.safety.tag2': 'Kontrola techniczna', 'category.safety.tag3': 'Zgoda',
     'route.kicker': 'Trasa', 'route.title': 'W dół, prosto ku morzu.', 'route.body': 'Start na zjeździe Rena Bianca, wzdłuż via Giuseppe Verdi. Prezentacja na placu, wejście pieszo pod górę, a potem wszyscy w dół — z błękitem morza przed sobą.', 'route.distance': 'około 250 m', 'route.distanceLabel': 'zjazdu', 'route.road': 'Via Giuseppe Verdi', 'route.roadLabel': 'Santa Teresa Gallura', 'route.map': 'Otwórz w Google Maps', 'route.start': 'Start · Rena Bianca', 'route.finish': 'Meta · miasteczko',
-    'schedule.kicker': '17 października 2026', 'schedule.title': 'Jeden dzień. Mnóstwo wspomnień.', 'schedule.item1': 'Prezentacja carruleddhi na placu', 'schedule.item2': 'Oficjalny start wyścigu', 'schedule.item3time': 'Wieczór', 'schedule.item3': 'Wręczenie nagród i finałowa zabawa', 'schedule.note': 'Kanapka i napój dla każdego uczestnika.',
+    'schedule.kicker': '%DATE%', 'schedule.title': 'Jeden dzień. Mnóstwo wspomnień.', 'schedule.item1': 'Prezentacja carruleddhi na placu', 'schedule.item2': 'Oficjalny start wyścigu', 'schedule.item3time': 'Wieczór', 'schedule.item3': 'Wręczenie nagród i finałowa zabawa', 'schedule.note': 'Kanapka i napój dla każdego uczestnika.',
     'prizes.kicker': 'Kategorie i nagrody', 'prizes.title': 'Dwanaście sposobów na zwycięstwo.', 'prizes.body': 'Przeciągnij lub kliknij talię. Nie musisz być najszybszy, aby przejść do legendy.', 'prizes.drag': 'Przeciągnij kartę', 'prizes.next': 'Następna karta', 'prizes.rank': 'Nagroda',
-    'prize.1': 'Najszybszy Classic', 'prize.2': 'Najszybszy ART', 'prize.3': 'Carruleddhi Show 2026', 'prize.4': 'Największy Carruleddhu', 'prize.5': 'Najzabawniejszy Carruleddhu', 'prize.6': 'Pokaz specjalny', 'prize.7': 'Show Classic', 'prize.8': 'Najmłodszy kierowca', 'prize.9': 'Najstarszy kierowca', 'prize.10': 'Najbardziej technologiczny', 'prize.11': 'Najwolniejszy', 'prize.12': 'Najbardziej Shardana',
+    /* Bez rocznika w nazwie — powód przy `prize.3` we włoskim słowniku wyżej. */
+    'prize.1': 'Najszybszy Classic', 'prize.2': 'Najszybszy ART', 'prize.3': 'Carruleddhi Show', 'prize.4': 'Największy Carruleddhu', 'prize.5': 'Najzabawniejszy Carruleddhu', 'prize.6': 'Pokaz specjalny', 'prize.7': 'Show Classic', 'prize.8': 'Najmłodszy kierowca', 'prize.9': 'Najstarszy kierowca', 'prize.10': 'Najbardziej technologiczny', 'prize.11': 'Najwolniejszy', 'prize.12': 'Najbardziej Shardana',
     'attendance.kicker': 'Trybuny ożywają', 'attendance.title': 'Naciśnij wielki przycisk. Podbij licznik.', 'attendance.label': 'osób powiedziało „będę tam”', 'attendance.press': 'BĘDĘ TAM!', 'attendance.done': 'JESTEŚ Z NAMI!', 'attendance.hint': 'Jedno kliknięcie na osobę. Do czasu podłączenia bazy wybór zapisujemy tylko w tej przeglądarce.', 'attendance.reminder': 'Chcesz też przypomnienie?',
     'signup.kicker': 'Bezpłatne zapisy', 'signup.title': 'Trzy kroki. I jesteś w wyścigu.', 'signup.intro': 'Nowy, prosty i czytelny formularz. Numer startowy pojawi się od razu po wysłaniu.', 'signup.sidebar': 'Twój wyścig zaczyna się tutaj.',
     'step.1': 'Twoje dane', 'step.1sub': 'Kto prowadzi', 'step.2': 'Carruleddhu', 'step.2sub': 'Czym wystartujesz', 'step.3': 'Potwierdzenie', 'step.3sub': 'Zasady i wysyłka',
@@ -248,7 +274,7 @@
   const en = {
     'a11y.skip': 'Skip to content', 'a11y.menu': 'Open menu', 'a11y.close': 'Close',
     'nav.race': 'The race', 'nav.categories': 'Categories', 'nav.route': 'Route', 'nav.program': 'Schedule', 'nav.prizes': 'Prizes', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': 'Sign up', 'nav.attend': "I'll be there",
-    'hero.kicker': '17 October 2026 · Santa Teresa Gallura', 'hero.tagline': 'No engine. Just downhill.', 'hero.signup': 'Enter the race', 'hero.attend': "I'll be there", 'hero.pilots': 'registered riders', 'hero.people': 'people are coming', 'hero.scroll': 'Discover the race',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'No engine. Just downhill.', 'hero.signup': 'Enter the race', 'hero.attend': "I'll be there", 'hero.pilots': 'registered riders', 'hero.people': 'people are coming', 'hero.scroll': 'Discover the race',
     'count.days': 'days', 'count.hours': 'hours', 'count.minutes': 'minutes', 'count.seconds': 'seconds',
     'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Build · Climb · Race · Brake · Smile',
@@ -258,9 +284,10 @@
     'category.art.kicker': 'Category B · Creativity', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Any material, four to ten wheels and any type of brake. One creative rule: it must be handmade.', 'category.art.tag1': '4–10 wheels', 'category.art.tag2': 'Any materials', 'category.art.tag3': 'Wow factor',
     'category.safety.kicker': 'Before the start', 'category.safety.title': 'Safety, always.', 'category.safety.body': 'An approved helmet is mandatory. Every cart is checked before the start. Minors need a waiver signed by a parent or guardian.', 'category.safety.tag1': 'Helmet', 'category.safety.tag2': 'Safety check', 'category.safety.tag3': 'Waiver',
     'route.kicker': 'The route', 'route.title': 'Down towards the sea.', 'route.body': 'Start on the Rena Bianca descent along Via Giuseppe Verdi. Presentation in the square, walk uphill, then everyone races down with the blue sea ahead.', 'route.distance': 'about 250 m', 'route.distanceLabel': 'of descent', 'route.road': 'Via Giuseppe Verdi', 'route.roadLabel': 'Santa Teresa Gallura', 'route.map': 'Open Google Maps', 'route.start': 'Start · Rena Bianca', 'route.finish': 'Finish · town',
-    'schedule.kicker': '17 October 2026', 'schedule.title': 'One day. Every moment counts.', 'schedule.item1': 'Carruleddhi presentation in the square', 'schedule.item2': 'Official race start', 'schedule.item3time': 'Evening', 'schedule.item3': 'Awards and final celebration', 'schedule.note': 'A sandwich and drink for every participant.',
+    'schedule.kicker': '%DATE%', 'schedule.title': 'One day. Every moment counts.', 'schedule.item1': 'Carruleddhi presentation in the square', 'schedule.item2': 'Official race start', 'schedule.item3time': 'Evening', 'schedule.item3': 'Awards and final celebration', 'schedule.note': 'A sandwich and drink for every participant.',
     'prizes.kicker': 'Categories and prizes', 'prizes.title': 'Twelve ways to win.', 'prizes.body': "Drag or click the deck. You don't need to be the fastest to become a legend.", 'prizes.drag': 'Drag the card', 'prizes.next': 'Next card', 'prizes.rank': 'Prize',
-    'prize.1': 'Fastest Classic', 'prize.2': 'Fastest ART', 'prize.3': 'Carruleddhi Show 2026', 'prize.4': 'Largest Carruleddhu', 'prize.5': 'Funniest Carruleddhu', 'prize.6': 'Show Performance', 'prize.7': 'Show Classic', 'prize.8': 'Youngest rider', 'prize.9': 'Oldest rider', 'prize.10': 'Most technological', 'prize.11': 'Slowest', 'prize.12': 'Most Shardana person',
+    /* Bez rocznika w nazwie — powód przy `prize.3` we włoskim słowniku wyżej. */
+    'prize.1': 'Fastest Classic', 'prize.2': 'Fastest ART', 'prize.3': 'Carruleddhi Show', 'prize.4': 'Largest Carruleddhu', 'prize.5': 'Funniest Carruleddhu', 'prize.6': 'Show Performance', 'prize.7': 'Show Classic', 'prize.8': 'Youngest rider', 'prize.9': 'Oldest rider', 'prize.10': 'Most technological', 'prize.11': 'Slowest', 'prize.12': 'Most Shardana person',
     'attendance.kicker': 'The crowd comes alive', 'attendance.title': 'Hit the big button. Make the number rise.', 'attendance.label': 'people said “I’ll be there”', 'attendance.press': "I'LL BE THERE!", 'attendance.done': "YOU'RE IN!", 'attendance.hint': 'One click per person. Until a database is connected, your choice is stored only in this browser.', 'attendance.reminder': 'Want a reminder too?',
     'signup.kicker': 'Free registration', 'signup.title': 'Three steps. Then you race.', 'signup.intro': 'A new, simple and readable form. Your race number appears immediately after submission.', 'signup.sidebar': 'Your race starts here.',
     'step.1': 'Your details', 'step.1sub': 'Who will drive', 'step.2': 'The cart', 'step.2sub': 'How you will race', 'step.3': 'Confirmation', 'step.3sub': 'Rules and submit',
@@ -280,7 +307,7 @@
   const de = {
     'a11y.skip': 'Zum Inhalt', 'a11y.menu': 'Menü öffnen', 'a11y.close': 'Schließen',
     'nav.race': 'Das Rennen', 'nav.categories': 'Kategorien', 'nav.route': 'Strecke', 'nav.program': 'Programm', 'nav.prizes': 'Preise', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Anmelden', 'nav.attend': 'Ich bin dabei',
-    'hero.kicker': '17. Oktober 2026 · Santa Teresa Gallura', 'hero.tagline': 'Kein Motor. Nur bergab.', 'hero.signup': 'Zum Rennen anmelden', 'hero.attend': 'Ich bin dabei', 'hero.pilots': 'angemeldete Fahrer', 'hero.people': 'Personen kommen', 'hero.scroll': 'Rennen entdecken',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Kein Motor. Nur bergab.', 'hero.signup': 'Zum Rennen anmelden', 'hero.attend': 'Ich bin dabei', 'hero.pilots': 'angemeldete Fahrer', 'hero.people': 'Personen kommen', 'hero.scroll': 'Rennen entdecken',
     'count.days': 'Tage', 'count.hours': 'Stunden', 'count.minutes': 'Minuten', 'count.seconds': 'Sekunden',
     /* „Std/Min/Sek" byłoby poprawniejsze, ale to trzy razy szerzej niż jest miejsca w pasku;
        h/min/s to jednostki SI i po niemiecku czyta się je bez zastanowienia. */
@@ -292,7 +319,7 @@
     'category.art.kicker': 'Kategorie B · Kreativität', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Beliebiges Material, vier bis zehn Räder und jede Art von Bremse. Eine Regel: handgefertigt.', 'category.art.tag1': '4–10 Räder', 'category.art.tag2': 'Freie Materialien', 'category.art.tag3': 'Wow-Effekt',
     'category.safety.kicker': 'Vor dem Start', 'category.safety.title': 'Sicherheit, immer.', 'category.safety.body': 'Ein zugelassener Helm ist Pflicht. Jeder Wagen wird vor dem Start geprüft. Minderjährige brauchen die Einwilligung eines Elternteils.', 'category.safety.tag1': 'Helm', 'category.safety.tag2': 'Technikcheck', 'category.safety.tag3': 'Einwilligung',
     'route.kicker': 'Die Strecke', 'route.title': 'Hinunter zum Meer.', 'route.body': 'Start an der Abfahrt Rena Bianca entlang der Via Giuseppe Verdi. Präsentation auf dem Platz, zu Fuß hinauf und dann mit Blick aufs blaue Meer hinunter.', 'route.distance': 'ca. 250 m', 'route.distanceLabel': 'Abfahrt', 'route.road': 'Via Giuseppe Verdi', 'route.roadLabel': 'Santa Teresa Gallura', 'route.map': 'In Google Maps öffnen', 'route.start': 'Start · Rena Bianca', 'route.finish': 'Ziel · Ort',
-    'schedule.kicker': '17. Oktober 2026', 'schedule.title': 'Ein Tag. Unvergesslich.', 'schedule.item1': 'Präsentation der Carruleddhi auf dem Platz', 'schedule.item2': 'Offizieller Rennstart', 'schedule.item3time': 'Abends', 'schedule.item3': 'Siegerehrung und Abschlussfest', 'schedule.note': 'Sandwich und Getränk für alle Teilnehmenden.',
+    'schedule.kicker': '%DATE%', 'schedule.title': 'Ein Tag. Unvergesslich.', 'schedule.item1': 'Präsentation der Carruleddhi auf dem Platz', 'schedule.item2': 'Offizieller Rennstart', 'schedule.item3time': 'Abends', 'schedule.item3': 'Siegerehrung und Abschlussfest', 'schedule.note': 'Sandwich und Getränk für alle Teilnehmenden.',
     'prizes.kicker': 'Kategorien und Preise', 'prizes.title': 'Zwölf Arten zu gewinnen.', 'prizes.body': 'Ziehe oder klicke den Stapel. Man muss nicht der Schnellste sein, um Legende zu werden.', 'prizes.drag': 'Karte ziehen', 'prizes.next': 'Nächste Karte', 'prizes.rank': 'Preis',
     'attendance.kicker': 'Die Tribüne erwacht', 'attendance.title': 'Drück den großen Knopf. Lass den Zähler steigen.', 'attendance.label': 'Personen sagen „Ich bin dabei“', 'attendance.press': 'ICH BIN DABEI!', 'attendance.done': 'DU BIST DABEI!', 'attendance.hint': 'Ein Klick pro Person. Bis zur Datenbank-Verbindung wird die Wahl nur in diesem Browser gespeichert.', 'attendance.reminder': 'Möchtest du eine Erinnerung?',
     'signup.kicker': 'Kostenlose Anmeldung', 'signup.title': 'Drei Schritte. Dann fährst du.', 'signup.intro': 'Ein neues, einfaches Formular. Deine Startnummer erscheint direkt nach dem Absenden.', 'signup.sidebar': 'Dein Rennen beginnt hier.',
@@ -311,7 +338,7 @@
   const es = {
     'a11y.skip': 'Ir al contenido', 'a11y.menu': 'Abrir menú', 'a11y.close': 'Cerrar',
     'nav.race': 'La carrera', 'nav.categories': 'Categorías', 'nav.route': 'Recorrido', 'nav.program': 'Programa', 'nav.prizes': 'Premios', 'nav.faq': 'FAQ', 'nav.contact': 'Contacto', 'nav.signup': 'Inscríbete', 'nav.attend': 'Estaré allí',
-    'hero.kicker': '17 de octubre de 2026 · Santa Teresa Gallura', 'hero.tagline': 'Sin motor. Solo cuesta abajo.', 'hero.signup': 'Inscríbete en la carrera', 'hero.attend': 'Estaré allí', 'hero.pilots': 'pilotos inscritos', 'hero.people': 'personas asistirán', 'hero.scroll': 'Descubre la carrera',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Sin motor. Solo cuesta abajo.', 'hero.signup': 'Inscríbete en la carrera', 'hero.attend': 'Estaré allí', 'hero.pilots': 'pilotos inscritos', 'hero.people': 'personas asistirán', 'hero.scroll': 'Descubre la carrera',
     'count.days': 'días', 'count.hours': 'horas', 'count.minutes': 'minutos', 'count.seconds': 'segundos',
     'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Construye · Sube · Baja · Frena · Sonríe',
@@ -321,7 +348,7 @@
     'category.art.kicker': 'Categoría B · Creatividad', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Cualquier material, de cuatro a diez ruedas y cualquier freno. Una regla: debe estar hecho a mano.', 'category.art.tag1': '4–10 ruedas', 'category.art.tag2': 'Materiales libres', 'category.art.tag3': 'Efecto wow',
     'category.safety.kicker': 'Antes de salir', 'category.safety.title': 'Seguridad, siempre.', 'category.safety.body': 'Casco homologado obligatorio. El carro se revisa antes de la salida. Los menores necesitan autorización firmada.', 'category.safety.tag1': 'Casco', 'category.safety.tag2': 'Revisión técnica', 'category.safety.tag3': 'Autorización',
     'route.kicker': 'El recorrido', 'route.title': 'Bajando hacia el mar.', 'route.body': 'Salida en la bajada de Rena Bianca por Via Giuseppe Verdi. Presentación en la plaza, subida a pie y después todos cuesta abajo con el mar azul delante.', 'route.distance': 'unos 250 m', 'route.distanceLabel': 'de bajada', 'route.road': 'Via Giuseppe Verdi', 'route.roadLabel': 'Santa Teresa Gallura', 'route.map': 'Abrir en Google Maps', 'route.start': 'Salida · Rena Bianca', 'route.finish': 'Meta · pueblo',
-    'schedule.kicker': '17 de octubre de 2026', 'schedule.title': 'Un día. Todo para recordar.', 'schedule.item1': 'Presentación de los carruleddhi en la plaza', 'schedule.item2': 'Salida oficial de la carrera', 'schedule.item3time': 'Tarde', 'schedule.item3': 'Premios y fiesta final', 'schedule.note': 'Bocadillo y bebida para cada participante.',
+    'schedule.kicker': '%DATE%', 'schedule.title': 'Un día. Todo para recordar.', 'schedule.item1': 'Presentación de los carruleddhi en la plaza', 'schedule.item2': 'Salida oficial de la carrera', 'schedule.item3time': 'Tarde', 'schedule.item3': 'Premios y fiesta final', 'schedule.note': 'Bocadillo y bebida para cada participante.',
     'prizes.kicker': 'Categorías y premios', 'prizes.title': 'Doce formas de ganar.', 'prizes.body': 'Arrastra o pulsa la baraja. No hace falta ser el más rápido para ser leyenda.', 'prizes.drag': 'Arrastra la carta', 'prizes.next': 'Siguiente carta', 'prizes.rank': 'Premio',
     'attendance.kicker': 'La grada cobra vida', 'attendance.title': 'Pulsa el gran botón. Haz subir el contador.', 'attendance.label': 'personas dijeron “estaré allí”', 'attendance.press': '¡ESTARÉ ALLÍ!', 'attendance.done': '¡ESTÁS DENTRO!', 'attendance.hint': 'Un clic por persona. Hasta conectar la base de datos, se guarda solo en este navegador.', 'attendance.reminder': '¿Quieres un recordatorio?',
     'signup.kicker': 'Inscripción gratuita', 'signup.title': 'Tres pasos. Y a correr.', 'signup.intro': 'Un formulario nuevo, sencillo y claro. Tu dorsal aparece al enviarlo.', 'signup.sidebar': 'Tu carrera empieza aquí.',
@@ -340,7 +367,7 @@
   const fr = {
     'a11y.skip': 'Aller au contenu', 'a11y.menu': 'Ouvrir le menu', 'a11y.close': 'Fermer',
     'nav.race': 'La course', 'nav.categories': 'Catégories', 'nav.route': 'Parcours', 'nav.program': 'Programme', 'nav.prizes': 'Prix', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': "S'inscrire", 'nav.attend': 'Je serai là',
-    'hero.kicker': '17 octobre 2026 · Santa Teresa Gallura', 'hero.tagline': 'Aucun moteur. Seulement la descente.', 'hero.signup': "S'inscrire à la course", 'hero.attend': 'Je serai là', 'hero.pilots': 'pilotes inscrits', 'hero.people': 'personnes seront là', 'hero.scroll': 'Découvrir la course',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Aucun moteur. Seulement la descente.', 'hero.signup': "S'inscrire à la course", 'hero.attend': 'Je serai là', 'hero.pilots': 'pilotes inscrits', 'hero.people': 'personnes seront là', 'hero.scroll': 'Découvrir la course',
     'count.days': 'jours', 'count.hours': 'heures', 'count.minutes': 'minutes', 'count.seconds': 'secondes',
     /* „j" dla dnia, nie „d" — po francusku dzień to `jour`. Ta jedna litera jest powodem,
        dla którego skróty są kluczami i18n, a nie obcięciem pełnej nazwy w JavaScripcie. */
@@ -352,7 +379,7 @@
     'category.art.kicker': 'Catégorie B · Créativité', 'category.art.title': 'Carruleddhi ART', 'category.art.body': 'Tout matériau, quatre à dix roues et tout type de frein. Une règle : fabrication artisanale.', 'category.art.tag1': '4–10 roues', 'category.art.tag2': 'Matériaux libres', 'category.art.tag3': 'Effet wow',
     'category.safety.kicker': 'Avant le départ', 'category.safety.title': 'La sécurité, toujours.', 'category.safety.body': 'Casque homologué obligatoire. Chaque chariot est contrôlé avant le départ. Les mineurs ont besoin d’une autorisation signée.', 'category.safety.tag1': 'Casque', 'category.safety.tag2': 'Contrôle technique', 'category.safety.tag3': 'Autorisation',
     'route.kicker': 'Le parcours', 'route.title': 'Vers la mer.', 'route.body': 'Départ dans la descente de Rena Bianca, via Giuseppe Verdi. Présentation sur la place, montée à pied, puis tous en descente face à la mer bleue.', 'route.distance': 'environ 250 m', 'route.distanceLabel': 'de descente', 'route.road': 'Via Giuseppe Verdi', 'route.roadLabel': 'Santa Teresa Gallura', 'route.map': 'Ouvrir Google Maps', 'route.start': 'Départ · Rena Bianca', 'route.finish': 'Arrivée · village',
-    'schedule.kicker': '17 octobre 2026', 'schedule.title': 'Une journée. Inoubliable.', 'schedule.item1': 'Présentation des carruleddhi sur la place', 'schedule.item2': 'Départ officiel de la course', 'schedule.item3time': 'Soir', 'schedule.item3': 'Remise des prix et fête finale', 'schedule.note': 'Sandwich et boisson pour chaque participant.',
+    'schedule.kicker': '%DATE%', 'schedule.title': 'Une journée. Inoubliable.', 'schedule.item1': 'Présentation des carruleddhi sur la place', 'schedule.item2': 'Départ officiel de la course', 'schedule.item3time': 'Soir', 'schedule.item3': 'Remise des prix et fête finale', 'schedule.note': 'Sandwich et boisson pour chaque participant.',
     'prizes.kicker': 'Catégories et prix', 'prizes.title': 'Douze façons de gagner.', 'prizes.body': "Faites glisser ou cliquez sur le paquet. Pas besoin d'être le plus rapide pour devenir une légende.", 'prizes.drag': 'Faites glisser', 'prizes.next': 'Carte suivante', 'prizes.rank': 'Prix',
     'attendance.kicker': "La tribune s'anime", 'attendance.title': 'Appuyez sur le gros bouton. Faites monter le compteur.', 'attendance.label': 'personnes ont dit « je serai là »', 'attendance.press': 'JE SERAI LÀ !', 'attendance.done': 'VOUS EN ÊTES !', 'attendance.hint': 'Un clic par personne. Avant la connexion de la base, le choix reste dans ce navigateur.', 'attendance.reminder': 'Un rappel aussi ?',
     'signup.kicker': 'Inscription gratuite', 'signup.title': 'Trois étapes. Puis la course.', 'signup.intro': 'Un formulaire simple et lisible. Votre numéro apparaît dès l’envoi.', 'signup.sidebar': 'Votre course commence ici.',
@@ -2311,6 +2338,211 @@
     }
   };
 
+  /* ===========================================================================
+     WYNIKI NA STRONIE GŁÓWNEJ: DWANAŚCIE NAGRÓD JURY I ARCHIWUM ROCZNIKÓW
+     ===========================================================================
+     DZIURA, KTÓRA BYŁA PRAWDZIWA
+       `prize.1`…`prize.12` istniały wyłącznie dla `it`, `pl` i `en`. Dla `de`, `es` i `fr`
+       `withFallback` podstawiał pod nie włoski — a to znaczy, że brak tłumaczenia wyglądał
+       dokładnie jak tłumaczenie i nikt nie miał jak tego zgłosić. Dopóki te nazwy stały tylko
+       na talii kart w sekcji nagród, kosztowało to jedną kartę po włosku. Od chwili, w której
+       stoją przy nazwiskach zwycięzców, kosztowałoby dwanaście wierszy wyniku w trzech
+       językach. Dlatego są tu wszystkie sześć.
+
+     ROK W `prize.3` — ROZSTRZYGNIĘTE PRZEZ USUNIĘCIE, NIE PRZEZ TOKEN
+       Włoskie, polskie i angielskie `prize.3` brzmiało „Carruleddhi Show 2026". Rok w nazwie
+       kategorii jest nieprawdą od 18 października 2026, a od teraz ta nazwa pojawia się także
+       przy wynikach archiwalnych roczników — czyli obok rocznika 2025 stałaby kategoria
+       „Show 2026". Dwie sprzeczne liczby w jednym wierszu.
+
+       Token `{year}` był drugą możliwością i został odrzucony świadomie: `prize.3` jest
+       wpisany w znacznik sekcji nagród przez `data-i18n`, a podstawianie napisów robi
+       `translateDom` w `app.js`, który nie zna żadnych tokenów. Wstawienie `{year}` znaczyłoby
+       więc albo widoczne na ekranie „Carruleddhi Show {year}", albo zmianę w `app.js` i w
+       sekcji nagród — dwóch plikach, których to zadanie nie dotyka. A rok i tak jest na
+       ekranie: mówi go nagłówek edycji i wybrany rocznik w archiwum, jeden raz, zamiast być
+       przepisywanym do sześciu tłumaczeń raz w roku.
+
+     UWAGA na `tools/check-i18n.mjs`: rodzina `voting.` jest pilnowana pod kątem „to nie jest
+     po cichu włoski", więc każdy napis dłuższy niż 11 znaków musi być tu naprawdę
+     przetłumaczony, a nie skopiowany. */
+  const podiumResultsExtras = {
+    it: {
+      'voting.publicAward': 'Premio del Pubblico',
+      'voting.publicAwardNote': 'È l’unico premio deciso dal pubblico. Gli altri dodici li assegnano la giuria e il cronometro.',
+      'voting.awardsTitle': 'I dodici premi della giuria',
+      'voting.awardsLead': 'Una categoria per riga. Dove il vincitore manca, il premio non è ancora stato annunciato.',
+      'voting.awardPending': 'Vincitore non ancora annunciato',
+      'voting.awardResult': 'Risultato',
+      'voting.archiveKicker': 'Albo d’oro',
+      'voting.archiveTitle': 'Le edizioni precedenti.',
+      'voting.archiveLead': 'Ogni anno resta qui: il podio del pubblico, i premi della giuria e quanti eravamo.',
+      'voting.archiveOpen': 'Guarda i risultati precedenti',
+      'voting.archiveClose': 'Chiudi l’archivio',
+      'voting.archivePick': 'Scegli l’anno',
+      'voting.archivePickNone': '— scegli —',
+      'voting.archiveLoading': 'Apro quell’anno…',
+      'voting.archiveFailed': 'Non è stato possibile aprire quell’anno. Riprova.',
+      'voting.archiveWeWere': 'Quell’anno eravamo',
+      'voting.archiveAttendees': 'persone sulla discesa',
+      'voting.archiveOnlyRiders': 'Quante persone c’erano quel giorno non è stato registrato. Quello che sappiamo:',
+      'voting.archiveRiders': 'carruleddhi iscritti',
+      'voting.archivePodium': 'Il podio del pubblico',
+      'voting.archiveNoAwards': 'I premi della giuria non sono stati salvati in questa edizione.'
+    },
+    pl: {
+      'voting.publicAward': 'Nagroda Publiczności',
+      'voting.publicAwardNote': 'To jedyna nagroda, którą przyznała publiczność. Pozostałych dwunastu rozstrzyga jury i stoper.',
+      'voting.awardsTitle': 'Dwanaście nagród jury',
+      'voting.awardsLead': 'Jedna kategoria w wierszu. Gdzie nie ma zwycięzcy, tam wynik nie został jeszcze ogłoszony.',
+      'voting.awardPending': 'Zwycięzca jeszcze nieogłoszony',
+      'voting.awardResult': 'Wynik',
+      'voting.archiveKicker': 'Złota księga',
+      'voting.archiveTitle': 'Wcześniejsze edycje.',
+      'voting.archiveLead': 'Każdy rocznik zostaje tutaj: podium publiczności, nagrody jury i ilu nas było.',
+      'voting.archiveOpen': 'Zobacz wcześniejsze wyniki',
+      'voting.archiveClose': 'Zamknij archiwum',
+      'voting.archivePick': 'Wybierz rocznik',
+      'voting.archivePickNone': '— wybierz —',
+      'voting.archiveLoading': 'Otwieram ten rocznik…',
+      'voting.archiveFailed': 'Nie udało się otworzyć tego rocznika. Spróbuj jeszcze raz.',
+      'voting.archiveWeWere': 'Było nas wtedy',
+      'voting.archiveAttendees': 'osób na zjeździe',
+      'voting.archiveOnlyRiders': 'Liczby widowni z tamtego dnia nikt nie zapisał. To, co wiemy:',
+      'voting.archiveRiders': 'zapisanych carruleddhi',
+      'voting.archivePodium': 'Podium publiczności',
+      'voting.archiveNoAwards': 'Nagrody jury nie zostały zapisane w tym roczniku.'
+    },
+    en: {
+      'voting.publicAward': 'Audience Award',
+      'voting.publicAwardNote': 'This is the one award the audience decided. The other twelve are settled by the jury and the stopwatch.',
+      'voting.awardsTitle': 'The twelve jury awards',
+      'voting.awardsLead': 'One category per row. Where the winner is missing, the award has not been announced yet.',
+      'voting.awardPending': 'Winner not announced yet',
+      'voting.awardResult': 'Result',
+      'voting.archiveKicker': 'Roll of honour',
+      'voting.archiveTitle': 'The earlier editions.',
+      'voting.archiveLead': 'Every year stays here: the audience podium, the jury awards and how many of us there were.',
+      'voting.archiveOpen': 'See the earlier results',
+      'voting.archiveClose': 'Close the archive',
+      'voting.archivePick': 'Choose the year',
+      'voting.archivePickNone': '— choose —',
+      'voting.archiveLoading': 'Opening that year…',
+      'voting.archiveFailed': 'That year could not be opened. Try again.',
+      'voting.archiveWeWere': 'That year we were',
+      'voting.archiveAttendees': 'people on the descent',
+      'voting.archiveOnlyRiders': 'Nobody recorded how many people were there that day. What we do know:',
+      'voting.archiveRiders': 'carruleddhi entered',
+      'voting.archivePodium': 'The audience podium',
+      'voting.archiveNoAwards': 'The jury awards were not stored for this edition.'
+    },
+    de: {
+      'prize.1': 'Schnellster Classic',
+      'prize.2': 'Schnellster ART',
+      'prize.3': 'Carruleddhi Show',
+      'prize.4': 'Größter Carruleddhu',
+      'prize.5': 'Sympathischster Carruleddhu',
+      'prize.6': 'Show-Auftritt',
+      'prize.7': 'Show Classic',
+      'prize.8': 'Jüngster Fahrer',
+      'prize.9': 'Ältester Fahrer',
+      'prize.10': 'Technischster Wagen',
+      'prize.11': 'Langsamster',
+      'prize.12': 'Shardanischste Person',
+      'voting.publicAward': 'Publikumspreis',
+      'voting.publicAwardNote': 'Das ist der einzige Preis, den das Publikum entschieden hat. Die anderen zwölf vergeben Jury und Stoppuhr.',
+      'voting.awardsTitle': 'Die zwölf Jury-Preise',
+      'voting.awardsLead': 'Eine Kategorie pro Zeile. Wo der Gewinner fehlt, ist der Preis noch nicht verkündet.',
+      'voting.awardPending': 'Gewinner noch nicht verkündet',
+      'voting.awardResult': 'Ergebnis',
+      'voting.archiveKicker': 'Ehrentafel',
+      'voting.archiveTitle': 'Die früheren Ausgaben.',
+      'voting.archiveLead': 'Jedes Jahr bleibt hier: Publikumspodium, Jury-Preise und wie viele wir waren.',
+      'voting.archiveOpen': 'Frühere Ergebnisse ansehen',
+      'voting.archiveClose': 'Archiv schließen',
+      'voting.archivePick': 'Jahr auswählen',
+      'voting.archivePickNone': '— wählen —',
+      'voting.archiveLoading': 'Öffne dieses Jahr…',
+      'voting.archiveFailed': 'Dieses Jahr konnte nicht geöffnet werden. Versuch es erneut.',
+      'voting.archiveWeWere': 'In dem Jahr waren wir',
+      'voting.archiveAttendees': 'Menschen an der Abfahrt',
+      'voting.archiveOnlyRiders': 'Wie viele Leute an dem Tag da waren, hat niemand notiert. Was wir wissen:',
+      'voting.archiveRiders': 'gemeldete Carruleddhi',
+      'voting.archivePodium': 'Das Publikumspodium',
+      'voting.archiveNoAwards': 'Die Jury-Preise wurden für diese Ausgabe nicht gespeichert.'
+    },
+    es: {
+      'prize.1': 'El Classic más rápido',
+      'prize.2': 'El ART más rápido',
+      'prize.3': 'Carruleddhi Show',
+      'prize.4': 'Carruleddhu más grande',
+      'prize.5': 'Carruleddhu más simpático',
+      'prize.6': 'Actuación Show',
+      'prize.7': 'Show Classic',
+      'prize.8': 'Piloto más joven',
+      'prize.9': 'Piloto más veterano',
+      'prize.10': 'El más tecnológico',
+      'prize.11': 'El más lento',
+      'prize.12': 'Persona más Shardana',
+      'voting.publicAward': 'Premio del Público',
+      'voting.publicAwardNote': 'Es el único premio que decidió el público. Los otros doce los reparten el jurado y el cronómetro.',
+      'voting.awardsTitle': 'Los doce premios del jurado',
+      'voting.awardsLead': 'Una categoría por fila. Donde falta el ganador, el premio aún no se ha anunciado.',
+      'voting.awardPending': 'Ganador aún sin anunciar',
+      'voting.awardResult': 'Resultado',
+      'voting.archiveKicker': 'Cuadro de honor',
+      'voting.archiveTitle': 'Las ediciones anteriores.',
+      'voting.archiveLead': 'Cada año se queda aquí: el podio del público, los premios del jurado y cuántos éramos.',
+      'voting.archiveOpen': 'Ver los resultados anteriores',
+      'voting.archiveClose': 'Cerrar el archivo',
+      'voting.archivePick': 'Elige el año',
+      'voting.archivePickNone': '— elige —',
+      'voting.archiveLoading': 'Abriendo ese año…',
+      'voting.archiveFailed': 'No se ha podido abrir ese año. Inténtalo otra vez.',
+      'voting.archiveWeWere': 'Ese año fuimos',
+      'voting.archiveAttendees': 'personas en la bajada',
+      'voting.archiveOnlyRiders': 'Nadie apuntó cuánta gente hubo ese día. Lo que sí sabemos:',
+      'voting.archiveRiders': 'carruleddhi inscritos',
+      'voting.archivePodium': 'El podio del público',
+      'voting.archiveNoAwards': 'Los premios del jurado no se guardaron en esta edición.'
+    },
+    fr: {
+      'prize.1': 'Classic le plus rapide',
+      'prize.2': 'ART le plus rapide',
+      'prize.3': 'Carruleddhi Show',
+      'prize.4': 'Carruleddhu le plus grand',
+      'prize.5': 'Carruleddhu le plus drôle',
+      'prize.6': 'Prestation Show',
+      'prize.7': 'Show Classic',
+      'prize.8': 'Pilote le plus jeune',
+      'prize.9': 'Pilote le plus âgé',
+      'prize.10': 'Le plus technologique',
+      'prize.11': 'Le plus lent',
+      'prize.12': 'Personne la plus Shardana',
+      'voting.publicAward': 'Prix du Public',
+      'voting.publicAwardNote': 'C’est le seul prix décidé par le public. Les douze autres sont attribués par le jury et le chronomètre.',
+      'voting.awardsTitle': 'Les douze prix du jury',
+      'voting.awardsLead': 'Une catégorie par ligne. Là où le gagnant manque, le prix n’a pas encore été annoncé.',
+      'voting.awardPending': 'Gagnant pas encore annoncé',
+      'voting.awardResult': 'Résultat',
+      'voting.archiveKicker': 'Palmarès',
+      'voting.archiveTitle': 'Les éditions précédentes.',
+      'voting.archiveLead': 'Chaque année reste ici : le podium du public, les prix du jury et combien nous étions.',
+      'voting.archiveOpen': 'Voir les résultats précédents',
+      'voting.archiveClose': 'Fermer les archives',
+      'voting.archivePick': 'Choisissez l’année',
+      'voting.archivePickNone': '— choisir —',
+      'voting.archiveLoading': 'Ouverture de cette année…',
+      'voting.archiveFailed': 'Impossible d’ouvrir cette année. Réessayez.',
+      'voting.archiveWeWere': 'Cette année-là nous étions',
+      'voting.archiveAttendees': 'personnes sur la descente',
+      'voting.archiveOnlyRiders': 'Personne n’a noté combien de gens étaient là ce jour-là. Ce que nous savons :',
+      'voting.archiveRiders': 'carruleddhi inscrits',
+      'voting.archivePodium': 'Le podium du public',
+      'voting.archiveNoAwards': 'Les prix du jury n’ont pas été enregistrés pour cette édition.'
+    }
+  };
+
   Object.keys(interactionExtras).forEach((locale) => Object.assign(extras[locale], interactionExtras[locale]));
   Object.keys(consentExtras).forEach((locale) => Object.assign(extras[locale], consentExtras[locale]));
   Object.keys(miscExtras).forEach((locale) => Object.assign(extras[locale], miscExtras[locale]));
@@ -2322,6 +2554,7 @@
   Object.keys(chatConsentExtras).forEach((locale) => Object.assign(extras[locale], chatConsentExtras[locale]));
   Object.keys(chatSponsorFormExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorFormExtras[locale]));
   Object.keys(chatHandoverExtras).forEach((locale) => Object.assign(extras[locale], chatHandoverExtras[locale]));
+  Object.keys(podiumResultsExtras).forEach((locale) => Object.assign(extras[locale], podiumResultsExtras[locale]));
 
   Object.assign(it, extras.it);
   Object.assign(pl, extras.pl);

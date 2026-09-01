@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import {
-  announceEdition,
-  ApiError,
   fetchSettings,
   saveSettings,
   uploadGalleryImage,
@@ -27,6 +25,7 @@ import {
   type Sponsor
 } from '../api';
 import { PurgePanel } from './PurgePanel';
+import { EditionWizard } from './EditionWizard';
 
 /**
  * Settings, and the two things that used to need a developer.
@@ -206,19 +205,41 @@ export function SettingsView({
   const [settings, setSettings] = useState<SiteSettings>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+
+  /**
+   * Stan zapisu KARTY WYDARZENIA, osobny od `status` wyżej.
+   * ==========================================================================
+   * JAKI BŁĄD TO ZAPOBIEGA
+   *   `status` obsługuje wszystko inne na tym ekranie: kłódkę całej strony, cztery
+   *   przełączniki sekcji i listę sponsorów. Karta wydarzenia korzystała z tego samego stanu,
+   *   więc przełączenie „Galeria zdjęć" — zapis niemający z terminem nic wspólnego —
+   *   przestawiało `status` na 'saving', a guzik zapisu daty stawał się w tej chwili
+   *   wyłączonym „Zapisywanie…". Przy zerwanym łączu `push` kończy się na 'failed' i już z
+   *   niego nie wraca; przy zawieszonym żądaniu 'saving' zostaje na zawsze — i wtedy guzik
+   *   „Zapisz wydarzenie" jest wyłączony do końca życia karty, mimo że nikt nie próbował
+   *   zapisać wydarzenia. Zgłoszone jako „nie mogę kliknąć zapisz daty".
+   *
+   *   Dwa stany, bo to są dwa niezależne zapisy do dwóch różnych zestawów pól. Jeden stan na
+   *   oba znaczył, że powodzenie jednego opisuje drugi.
+   */
+  const [eventStatus, setEventStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+
+  /**
+   * Czy pierwszy odczyt ustawień się nie udał.
+   *
+   * Bez tego nieudany `fetchSettings` kończył się ekranem, który wygląda na wypełniony:
+   * w polach stoją wartości z `EMPTY`, czyli z KODU, a nie z bazy. `eventDirty` wychodzi
+   * wtedy fałszywe (wersja robocza równa się „zapisanej"), więc guzik zapisu jest wyłączony
+   * z podpisem „wszystko jest już zapisane" — panel twierdzi coś, czego nie sprawdził, i to
+   * o polu, którego zapis nadpisałby prawdziwy termin zawodów datą z kodu.
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
   const [galleryBusy, setGalleryBusy] = useState<Set<number>>(new Set());
-  const [announcement, setAnnouncement] = useState<
-    'idle' | 'queued' | 'already' | 'pendingResults' | 'votingOpen' | 'failed'
-  >('idle');
-  const [editionResult, setEditionResult] = useState<{
-    rolledOver?: boolean;
-    archivedEditionKey?: string;
-    activeEditionKey?: string;
-    participantCount?: number;
-    voteCount?: number;
-  } | null>(null);
+  /* Czy kreator nowej edycji jest otwarty. Ogłaszanie wyprowadzone z tej karty do osobnego
+     ekranu — patrz komentarz przy guziku, który go otwiera. */
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [eventDraft, setEventDraft] = useState({
     eventName: EMPTY.eventName,
     eventDate: toLocalInput(EMPTY.eventDate),
@@ -252,15 +273,42 @@ export function SettingsView({
           eventDate: toLocalInput(response.settings.eventDate),
           eventLocation: response.settings.eventLocation
         });
+        setLoadFailed(false);
         setLoaded(true);
       })
       .catch(() => {
-        if (alive) setLoaded(true);
+        if (!alive) return;
+        /* Zapamiętane, a nie przemilczane — patrz `loadFailed`. Ekran rysuje się dalej, bo
+           kłódka strony i przełączniki sekcji nadal działają na zapis; blokuje się tylko to,
+           czego nie wolno zapisać w niewiedzy. */
+        setLoadFailed(true);
+        setLoaded(true);
       });
     return () => {
       alive = false;
     };
   }, [apiKey]);
+
+  /**
+   * Przyjmuje świeże ustawienia z serwera i przepisuje nimi WSZYSTKIE kopie na tym ekranie.
+   *
+   * Kopii jest cztery: `settings`, `savedSponsors`, `eventDraft` i `galleryImagesRef`. Kreator
+   * zapisuje te same pola, co ta karta, więc bez jednego miejsca, które je wszystkie odświeża,
+   * po wyjściu z kreatora karta wydarzenia pokazywałaby starą datę i uznawałaby się za
+   * „brudną" — a wtedy autozapis wysłałby poprzedni termin z powrotem i cofnął to, co kreator
+   * właśnie ustawił.
+   */
+  const absorbSettings = useCallback((next: SiteSettings) => {
+    setSettings(next);
+    setSavedSponsors(next.sponsors);
+    galleryImagesRef.current = next.galleryImages;
+    setEventDraft({
+      eventName: next.eventName,
+      eventDate: toLocalInput(next.eventDate),
+      eventLocation: next.eventLocation
+    });
+    setLoadFailed(false);
+  }, []);
 
   const push = useCallback(
     async (patch: Partial<SiteSettings>) => {
@@ -396,26 +444,6 @@ export function SettingsView({
     }
   };
 
-  const announce = async () => {
-    if (!window.confirm(t('set.announceConfirm'))) return;
-    setAnnouncement('idle');
-    setEditionResult(null);
-    try {
-      const result = await announceEdition(apiKey);
-      setSettings((current) => ({ ...current, announcementEventDate: result.eventDate }));
-      setEditionResult(result.edition || null);
-      setAnnouncement(result.queued ? 'queued' : 'already');
-    } catch (problem) {
-      if (problem instanceof ApiError && problem.code === 'VOTING_RESULT_NOTIFICATIONS_PENDING') {
-        setAnnouncement('pendingResults');
-      } else if (problem instanceof ApiError && problem.code === 'VOTING_EDITION_NOT_CLOSED') {
-        setAnnouncement('votingOpen');
-      } else {
-        setAnnouncement('failed');
-      }
-    }
-  };
-
   const draftDate = new Date(eventDraft.eventDate);
   const draftIso = Number.isNaN(draftDate.getTime()) ? '' : draftDate.toISOString();
   const savedDate = new Date(settings.eventDate);
@@ -441,12 +469,11 @@ export function SettingsView({
   const eventSignature = `${eventDraft.eventName.trim()}|${draftIso}|${eventDraft.eventLocation.trim()}`;
 
   const saveEvent = useCallback(async () => {
-    if (!eventReady || !eventYearSane) {
-      setStatus('failed');
+    if (!eventReady || !eventYearSane || loadFailed) {
+      setEventStatus('failed');
       return;
     }
-    setStatus('saving');
-    setAnnouncement('idle');
+    setEventStatus('saving');
     try {
       const response = await saveSettings(apiKey, {
         eventName: eventDraft.eventName.trim(),
@@ -465,11 +492,11 @@ export function SettingsView({
         eventLocation: response.settings.eventLocation
       });
       setEventAutosaveFailedFor(null);
-      setStatus('saved');
-      window.setTimeout(() => setStatus('idle'), 2200);
+      setEventStatus('saved');
+      window.setTimeout(() => setEventStatus('idle'), 2200);
     } catch (_) {
       setEventAutosaveFailedFor(eventSignature);
-      setStatus('failed');
+      setEventStatus('failed');
     }
   }, [
     apiKey,
@@ -478,7 +505,8 @@ export function SettingsView({
     eventDraft.eventName,
     eventReady,
     eventSignature,
-    eventYearSane
+    eventYearSane,
+    loadFailed
   ]);
 
   /**
@@ -493,22 +521,28 @@ export function SettingsView({
    *                     albo miejsce to i tak odmowa po stronie Workera.
    *   `eventYearSane` — rok w drodze do „2027" przechodzi przez „0002"; zapis takiej daty
    *                     zatrzymuje licznik na stronie głównej.
-   * Do tego `status !== 'saving'`: gdy zapis jest w locie, nie planujemy drugiego. Po jego
-   * końcu `status` się zmienia, efekt liczy się od nowa i jeśli w międzyczasie ktoś dopisał
-   * literę, autozapis planuje się ponownie.
+   * Do tego `eventStatus !== 'saving'`: gdy zapis jest w locie, nie planujemy drugiego. Po
+   * jego końcu `eventStatus` się zmienia, efekt liczy się od nowa i jeśli w międzyczasie ktoś
+   * dopisał literę, autozapis planuje się ponownie. Świadomie WŁASNY stan karty, a nie wspólny
+   * `status`: na wspólnym przełącznik sekcji wstrzymywał autozapis terminu, a zawieszony zapis
+   * przełącznika wstrzymywał go na zawsze.
+   *
+   * `!loadFailed`, bo bez udanego odczytu w polach stoją wartości z kodu — autozapis wysłałby
+   * je jako termin zawodów, zanim ktokolwiek cokolwiek napisał.
    *
    * I ostatni warunek, najmniej oczywisty: ta sama wersja robocza nie jest wysyłana drugi raz
-   * po nieudanym zapisie. Bez tego przy zerwanym łączu robi się pętla — `status` idzie
+   * po nieudanym zapisie. Bez tego przy zerwanym łączu robi się pętla — `eventStatus` idzie
    * 'failed' → 'saving' → 'failed', każda zmiana przelicza efekt, efekt planuje kolejną próbę
    * i panel dobija Workera co sekundę, dopóki ekran jest otwarty. Zmiana któregokolwiek pola
    * daje nowy odcisk i próba rusza od nowa; kto chce ponowić bez zmiany, ma guzik, który
    * pozostaje aktywny właśnie na ten wypadek.
    */
   const eventAutosavePending = loaded
+    && !loadFailed
     && eventDirty
     && eventReady
     && eventYearSane
-    && status !== 'saving'
+    && eventStatus !== 'saving'
     && eventAutosaveFailedFor !== eventSignature;
 
   useEffect(() => {
@@ -526,22 +560,29 @@ export function SettingsView({
 
   /* Guzik zapisu: wyłączony tylko wtedy, gdy naprawdę nie ma czego zapisać albo zapis trwa —
      i wtedy z podpisem, który mówi, co jest nie tak. Wcześniej jedynym sygnałem była
-     przezroczystość, a wyblakły przycisk czyta się jak brak przycisku. */
-  const eventSaveDisabled = status === 'saving' || !eventDirty || !eventReady || !eventYearSane;
-  const eventSaveLabel = status === 'saving'
+     przezroczystość, a wyblakły przycisk czyta się jak brak przycisku.
+
+     Kolejność w podpisie idzie od najcięższego powodu: nieudany odczyt bije wszystko, bo przy
+     nim nie wiemy nawet, z czym porównujemy. Bez tego pierwszeństwa panel mówił „wszystko jest
+     już zapisane" o polach, których nigdy nie przeczytał. */
+  const eventSaveDisabled =
+    eventStatus === 'saving' || loadFailed || !eventDirty || !eventReady || !eventYearSane;
+  const eventSaveLabel = eventStatus === 'saving'
     ? t('set.eventSaving')
-    : status === 'saved' && !eventDirty
+    : eventStatus === 'saved' && !eventDirty
       ? t('set.eventSaved')
       : t('set.eventSave');
-  const eventSaveHint = status === 'saving' || status === 'saved'
+  const eventSaveHint = eventStatus === 'saving' || eventStatus === 'saved'
     ? ''
-    : !eventReady
-      ? t('set.eventSaveIncomplete')
-      : !eventYearSane
-        ? t('set.eventSaveBadYear')
-        : !eventDirty
-          ? t('set.eventSaveNothing')
-          : '';
+    : loadFailed
+      ? t('set.eventSaveUnread')
+      : !eventReady
+        ? t('set.eventSaveIncomplete')
+        : !eventYearSane
+          ? t('set.eventSaveBadYear')
+          : !eventDirty
+            ? t('set.eventSaveNothing')
+            : '';
 
   if (!loaded) {
     /* The heading and lead are real, not placeholders — they are the same two lines whether
@@ -657,6 +698,15 @@ export function SettingsView({
           </div>
         </div>
 
+        {/* Nieudany odczyt powiedziany wprost, na samej górze karty. Wcześniej przemilczany:
+            pola pokazywały wartości z kodu, a podpis pod guzikiem twierdził, że wszystko jest
+            już zapisane — czyli panel opisywał stan bazy, którego nie znał. */}
+        {loadFailed ? (
+          <p className="mt-3 rounded-xl border border-coral/30 bg-coral/10 px-3 py-2 text-[12px] leading-relaxed text-coral">
+            {t('set.loadFailed')}
+          </p>
+        ) : null}
+
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1.5 sm:col-span-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">{t('set.eventName')}</span>
@@ -707,17 +757,20 @@ export function SettingsView({
           >
             {eventSaveLabel}
           </button>
+          {/* OGŁOSZENIE PRZENIESIONE DO KREATORA.
+              Stał tu jeden guzik „Ogłoś i rozpocznij nową edycję", który po jednym pytaniu
+              „czy na pewno" archiwizował rocznik, kasował głosy i uczestników oraz uzbrajał
+              wysyłkę listów — na podstawie trzech pól obok, z których widać było tylko datę.
+              Nowa edycja to nie jedno pole, więc jest teraz kreatorem: pięć kroków, każdy
+              zapisywany osobno, i liczby tego, co zniknie, pokazane PRZED potwierdzeniem.
+              Ta karta zostaje do samej poprawki terminu, bez ogłaszania. */}
           <button
             type="button"
-            /* Warunek zostaje odwrotny: ogłaszać można tylko termin, który jest już w bazie.
-               Autozapis sam gasi `eventDirty` po sekundzie, więc ten guzik odblokowuje się
-               bez klikania czegokolwiek — wcześniej wymagał wciśnięcia zapisu. */
-            disabled={!eventReady || eventDirty || status === 'saving'}
-            onClick={() => void announce()}
-            className="inline-flex items-center gap-2 rounded-full bg-coral px-4 py-2 text-xs font-bold text-white hover:bg-white hover:text-navy-950 disabled:opacity-40"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full bg-coral px-4 py-2 text-xs font-bold text-white hover:bg-white hover:text-navy-950"
           >
             <Megaphone className="size-3.5" />
-            {t('set.announce')}
+            {t('wiz.open')}
           </button>
           {/* Wzajemnie się wykluczają: gdy autozapis odlicza, guzik jest aktywny i podpowiedzi
               nie ma; gdy guzik jest wyłączony, nie ma czego odliczać. */}
@@ -725,33 +778,40 @@ export function SettingsView({
             <span role="status" className="text-[12px] text-yellow">{t('set.eventAutosavePending')}</span>
           ) : null}
           {eventSaveHint ? <span className="text-[12px] text-white/50">{eventSaveHint}</span> : null}
-          {status === 'saved' ? <span className="text-[12px] text-emerald-300">{t('set.saved')}</span> : null}
-          {status === 'failed' ? <span className="text-[12px] text-coral">{t('set.saveFailed')}</span> : null}
+          {eventStatus === 'saved' ? (
+            <span className="text-[12px] text-emerald-300">{t('set.saved')}</span>
+          ) : null}
+          {eventStatus === 'failed' ? (
+            <span className="text-[12px] text-coral">{t('set.saveFailed')}</span>
+          ) : null}
         </div>
 
-        {editionResult?.rolledOver ? (
-          <p className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/10 px-3 py-2 text-[12px] leading-relaxed text-blue-100">
-            {t('set.editionArchived')} {editionResult.archivedEditionKey || '—'} ({editionResult.participantCount || 0}{' '}
-            {t('set.participantsCount')}, {editionResult.voteCount || 0} {t('set.votesCount')}).{' '}
-            {t('set.editionActive')}: {editionResult.activeEditionKey || '—'}.
-          </p>
-        ) : null}
-        {announcement === 'queued' ? (
-          <p className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[12px] text-emerald-200">{t('set.announceQueued')}</p>
-        ) : null}
-        {announcement === 'already' || alreadyAnnounced ? (
+        <p className="mt-2.5 text-[12px] leading-relaxed text-white/45">{t('wiz.openLead')}</p>
+
+        {/* Ślad ogłoszenia zostaje w karcie, choć samo ogłaszanie już nie: to jest odpowiedź na
+            pytanie „czy ta edycja była już ogłaszana", zadawane przy patrzeniu na termin, a nie
+            przy zakładaniu nowej edycji. Reszta komunikatów — kolejka wysyłki, zarchiwizowany
+            rocznik, odmowy — przeniosła się do kreatora, bo tam zapadają decyzje, których
+            dotyczą. */}
+        {alreadyAnnounced ? (
           <p className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] text-white/60">{t('set.alreadyAnnounced')}</p>
         ) : null}
-        {announcement === 'pendingResults' ? (
-          <p className="mt-3 rounded-xl border border-yellow/30 bg-yellow/10 px-3 py-2 text-[12px] text-yellow">{t('set.announcePendingResults')}</p>
-        ) : null}
-        {announcement === 'votingOpen' ? (
-          <p className="mt-3 rounded-xl border border-yellow/30 bg-yellow/10 px-3 py-2 text-[12px] text-yellow">{t('set.announceVotingOpen')}</p>
-        ) : null}
-        {announcement === 'failed' ? (
-          <p className="mt-3 rounded-xl border border-coral/30 bg-coral/10 px-3 py-2 text-[12px] text-coral">{t('set.saveFailed')}</p>
-        ) : null}
       </section>
+
+      {/* Kreator pod kartą, a nie w okienku na wierzchu.
+          Pięć kroków z polami, listą kadrów i podsumowaniem nie mieści się w okienku na
+          telefonie, a okienko z własnym przewijaniem w środku przewijanej strony to dwa
+          przewijania na jednym ekranie — na dotyku nie da się przewidzieć, które z nich
+          złapie palec. */}
+      {wizardOpen ? (
+        <EditionWizard
+          t={t}
+          apiKey={apiKey}
+          settings={settings}
+          onSettings={absorbSettings}
+          onClose={() => setWizardOpen(false)}
+        />
+      ) : null}
 
       {/* ---------------------------------------------------------- gallery */}
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">
@@ -815,7 +875,7 @@ export function SettingsView({
                 const newCaptions = [...(settings.galleryCaptions || ['', '', '', '', ''])];
                 newCaptions[index] = e.target.value;
                 setSettings({ ...settings, galleryCaptions: newCaptions });
-                
+
                 window.clearTimeout(captionsTimerRef.current);
                 captionsTimerRef.current = window.setTimeout(async () => {
                   try {

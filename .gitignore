@@ -23,3 +23,9 @@ public/__probe.html
 # wgrania powstaje z generatora i ma tam zastępnik, więc ten plik jest tylko lokalną kopią
 # zapasową i nie ma po co wchodzić do publicznego repozytorium.
 make/blueprint-live-backup-*.json
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example

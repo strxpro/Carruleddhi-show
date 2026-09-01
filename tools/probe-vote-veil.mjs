@@ -42,15 +42,23 @@ check(p.rest.pickHidden === true, 'suwak schowany');
 check(p.rest.buttonsUnderPhoto === 0, `zero przyciskow POD zdjeciem (${p.rest.buttonsUnderPhoto})`);
 check(p.rest.hasHit, 'przezroczysty cel dotkniecia na zdjeciu');
 
-console.log('\n--- dotkniecie: jedno zaproszenie na srodku zdjecia');
+/* JEDNO DOTKNIECIE, NIE DWA.
+   ---------------------------------------------------------------------------
+   Stalo tu „suwak jeszcze schowany" i „cel dotykowy zaproszenia", czyli opis stanu
+   POSREDNIEGO: pierwsze dotkniecie tylko odslanialo pigulke „Zaglosuj", a suwak wymagal
+   drugiego. To byla usterka „klikam w zaglosuj i nic sie nie robi" — na myszy najechanie
+   odslania pigulke darmo, a pod palcem nie ma czym oddzielic przygotowania od nacisniecia.
+   Pigulka jest teraz mierzona w SPOCZYNKU (ma juz wtedy swoje pudelko, tylko nakladka jest
+   niewidoczna), a dotkniecie ma od razu rozwinac suwak. Patrz probe-voting-mobile.mjs. */
+console.log('\n--- jedno dotkniecie: suwak od razu');
 check(p.armed.cardArmed, 'kafelek oznaczony jako odslony');
 check(p.armed.veilOpacity === 1, `nakladka widoczna (krycie ${p.armed.veilOpacity})`);
 check(p.armed.veilEvents === 'auto', 'nakladka lapie wskaznik');
-check(p.armed.hitHidden === true, 'cel dotkniecia schodzi z drogi, zeby nastepne dotkniecie trafilo w przycisk');
+check(p.armed.hitHidden === true, 'przezroczysta warstwa schodzi z drogi suwakowi');
 check(Boolean(p.armed.ctaLabel), `zaproszenie ma napis: „${p.armed.ctaLabel}"`);
-check(p.armed.ctaHeight >= 44, `cel dotykowy zaproszenia: ${p.armed.ctaHeight} px`);
-check(p.armed.ctaInsidePhoto, 'zaproszenie stoi NA zdjeciu, nie pod nim');
-check(p.armed.pickHidden === true, 'suwak jeszcze schowany');
+check(p.rest.ctaHeight >= 44, `cel dotykowy zaproszenia (w spoczynku): ${p.rest.ctaHeight} px`);
+check(p.rest.ctaInsidePhoto, 'zaproszenie stoi NA zdjeciu, nie pod nim');
+check(p.armed.pickHidden === false, 'JEDNO dotkniecie rozwija suwak, bez drugiego');
 
 console.log('\n--- klik: przycisk przeistacza sie w suwak');
 check(p.picking.cardPicking, 'kafelek w trybie wyboru oceny');
@@ -73,7 +81,10 @@ check(p.single.secondArmed === true, 'dotkniecie drugiego kafelka odslania go');
 check(p.single.firstStillPicking === false && p.single.firstStillArmed === false,
   'pierwszy kafelek sklada sie sam');
 check(p.single.armedCount === 1, `dokladnie jeden odslony (${p.single.armedCount})`);
-check(p.single.pickingCount === 0, `zaden nie zostal z otwartym suwakiem (${p.single.pickingCount})`);
+/* Jeden otwarty suwak, nie zero: odkad jedno dotkniecie rozwija oceny od razu, dotkniecie
+   DRUGIEGO kafelka sklada pierwszy i otwiera drugi. Pytanie brzmi „czy dokladnie jeden",
+   bo dwa naraz to pytanie „ktory wlasnie wysylam", zadane w chwili wysylania. */
+check(p.single.pickingCount === 1, `dokladnie jeden z otwartym suwakiem (${p.single.pickingCount})`);
 
 console.log('\n--- wysylka otwiera okno z adresem');
 check(p.dialog.open, 'okno otwarte dopiero po nacisnieciu wysylki');

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  Award,
   BarChart3,
   // `Bell` is still here as the sidebar icon for the reminders tab. The bell in the header
   // and its `BellRing` variant moved into NotificationBell together with the dropdown.
@@ -35,6 +36,7 @@ import { Gate } from './Gate';
 import { Dashboard } from './views/Dashboard';
 import { Registrations } from './views/Registrations';
 import { Voting } from './views/Voting';
+import { Prizes } from './views/Prizes';
 import { Stats } from './views/Stats';
 import { Season } from './views/Season';
 import { Chat } from './views/Chat';
@@ -56,6 +58,7 @@ type TabId =
   | 'season'
   | 'registrations'
   | 'voting'
+  | 'awards'
   | 'chat'
   | 'wall'
   | 'reminders'
@@ -189,6 +192,10 @@ export default function App() {
              screen itself is where that is read. A number here would be votes arriving,
              which is not something anyone needs to act on one at a time. */
           { id: 'voting', title: t('nav.voting'), icon: Trophy },
+          /* Nagrody jury, obok głosowania i osobno od niego. Bez plakietki: „nowe od
+             ostatniego razu" nie istnieje dla listy, którą wypełnia się samemu. Osobna
+             zakładka, a nie sekcja w „Głosowaniu" — uzasadnienie w nagłówku Prizes.tsx. */
+          { id: 'awards', title: t('nav.awards'), icon: Award },
           {
             id: 'audience',
             title: t('nav.audience'),
@@ -354,6 +361,7 @@ export default function App() {
           {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
           {tab === 'season' ? <Season t={t} apiKey={key} /> : null}
           {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
+          {tab === 'awards' ? <Prizes t={t} apiKey={key} /> : null}
           {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'reminders' ? (

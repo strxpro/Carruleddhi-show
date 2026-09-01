@@ -656,6 +656,69 @@
   .nav-clock__label { font-size: 7.5px; letter-spacing: .04em; }
 }
 
+/* ===========================================================================
+   ŚRODEK PASKA: JEDNO MIEJSCE, JEDEN LOKATOR, REZERWA ZE ZMIERZONEJ SZEROKOŚCI
+   ===========================================================================
+
+   TRZY RZECZY CHCĄ STAĆ NA ŚRODKU, WSZYSTKIE NA `left: 50%`
+     `.nav-current`        chip z nazwą sekcji i procentem przewinięcia
+     `.nav-clock`          zadokowane odliczanie do wydarzenia (strona główna)
+     `.nav-clock--vote`    zadokowany zegar głosowania (votazione.html, voting.css)
+
+   PIERWSZEŃSTWO — ROZSTRZYGNIĘTE, NIE PRZYPADKOWE
+     1. ZEGAR GŁOSOWANIA. Dotyczy czynności z terminem: „ile mam czasu, żeby zagłosować".
+        Kto tego nie wie, traci głos — a to jedyna rzecz, po którą ktoś tego dnia wchodzi.
+     2. ODLICZANIE DO WYDARZENIA. Jedna liczba, po którą ludzie wracają na górę strony.
+        Ustępuje zegarowi, bo „ile dni do zjazdu" można sprawdzić za minutę, a „ile minut do
+        końca głosowania" nie.
+     3. CHIP Z NAZWĄ SEKCJI. Tylko informuje, gdzie jesteś, i tę samą odpowiedź daje treść pod
+        paskiem. Ustępuje obu.
+     WYJĄTEK: PRZY OTWARTYM MENU WYGRYWA CHIP. Wtedy nie czyta się strony, tylko wybiera, GDZIE
+     iść — a wybór z listy dziesięciu pozycji potrzebuje odpowiedzi „gdzie jestem teraz".
+
+     Dwie rzeczy nigdy nie stoją tam naraz i nie jest to kwestia zaufania: pilnują tego reguły
+     `[data-clock-docked]` wyżej i niżej, a sonda tools/probe-podium-prizes.mjs liczy w każdym
+     stanie paska `centreCount` — jedna albo zero, nigdy dwie.
+
+   REZERWA JEST POMIAREM, NIE LICZBĄ WPISANĄ W ARKUSZ
+     Stało tu `min(260px, calc(100% - 300px))`, gdzie 300 to dwa razy szerokość marki. Prawa
+     strona paska nie ma jednak stałej szerokości: na czas głosowania dochodzi w niej przycisk
+     „Zagłosuj", a każdy napis jest w sześciu językach innej długości.
+
+     ZMIERZONE sondą, 1440x900, niemiecki, faza `voting`:
+       pasek zwinięty              chip × `.nav-actions` = 42 px nachodzenia
+       pasek zwinięty odsłonięty   chip × „Zagłosuj"     = 11 px, chip × `.nav-actions` = 71 px
+     W fazach `scheduled` i `closed` zera — bo wtedy tego przycisku w pasku nie ma. Zgłoszone
+     jako „pasek zasłania treść, gdy dochodzą przyciski głosowania".
+
+     `--nav-side` liczy `syncNavCentreReserve` w site-bridge.js z NAMALOWANEGO napisu marki i z
+     lewej krawędzi rzędu przycisków, po każdej zmianie okna, zawartości paska i języka. Tam
+     stoi też powód, dla którego to pomiar, a nie zgaszenie chipu na czas głosowania.
+
+   `max(0px, …)` NA KOŃCU
+     Gdy po obu stronach nie zostaje nic, chip ma zniknąć, a nie dostać ujemną szerokość
+     (którą przeglądarka czyta jako brak ograniczenia — czyli dokładnie odwrotnie niż trzeba).
+     Zero razem z `overflow: hidden`, które chip ma w stanie zwiniętym, znaczy „nie ma go". */
+.site-header { --nav-side: 150px; }
+.site-header .nav-current,
+.site-header.is-compact .nav-current,
+.site-header.is-compact.is-menu-open .nav-current,
+.site-header .nav-clock {
+  max-width: max(0px, min(260px, calc(100% - 2 * var(--nav-side))));
+}
+
+/* Na telefonie chip ma dodatkowy, ciaśniejszy sufit: w pasku są już marka, flaga i „Menu", a
+   nazwa sekcji jest tam i tak ukryta (`[data-current-section] { display: none }` wyżej), więc
+   zostaje kropka z procentem. Zmierzona rezerwa nadal obowiązuje — bierzemy MNIEJSZĄ z dwóch,
+   bo obie są ograniczeniami, a nie propozycjami. */
+@media (max-width: 760px) {
+  .site-header .nav-current,
+  .site-header.is-compact .nav-current,
+  .site-header.is-compact.is-menu-open .nav-current {
+    max-width: max(0px, min(78px, calc(100% - 2 * var(--nav-side))));
+  }
+}
+
 /* Flag language listbox. */
 .language-picker {
   position: relative;

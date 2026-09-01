@@ -23,8 +23,95 @@
  *   wcześniej niż atrybut w `<html>` — dwa napisy obok siebie byłyby w dwóch językach.
  */
 
+import { DEFAULT_SITE_CONFIG } from './site-config.js';
+
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+/* ------------------------------------------------------- rok i data wewnątrz napisów */
+
+/**
+ * ROK I DATA W SŁOWNIKU SĄ WZORCEM, NIE LICZBĄ.
+ * ===========================================================================
+ *
+ * JAKI BŁĄD TO NAPRAWIA
+ *   Po ogłoszeniu nowej edycji w panelu strona nadal pokazywała stary rok i starą datę.
+ *   Odczyt ustawień działał (`applyServerSettings` w app.js, `loadEventConfig` w
+ *   voting-boot.js) i poprawnie podmieniał wszystko, co nosi `data-config-*` — ale rok siedział
+ *   także w napisach ze słownika, których żaden odczyt nie rusza:
+ *     `meta.title`      „Carruleddhi Show 2026 — Santa Teresa Gallura"
+ *     `meta.description` „…17 ottobre 2026, Santa Teresa Gallura."
+ *     `hero.kicker`      „17 ottobre 2026 · Santa Teresa Gallura"
+ *     `schedule.kicker`  „17 ottobre 2026"
+ *   Sześć języków razy cztery klucze to dwadzieścia cztery miejsca do ręcznej poprawki raz w
+ *   roku — czyli dwadzieścia cztery miejsca, w których ktoś kiedyś zapomni. A skutek jest
+ *   cichy: strona wygląda na sprawną i po prostu kłamie o dacie.
+ *
+ * DLACZEGO WZORZEC, A NIE PODMIANA LICZBY
+ *   Podmiana liczby w słowniku to ta sama praca za rok. Wzorzec sprawia, że data ma JEDNO
+ *   źródło (`config.eventDate` po odczycie ustawień) i żadnej kopii — bo napis ze słownika
+ *   przestaje być datą, a staje się zdaniem z miejscem na datę.
+ *
+ * DLACZEGO PODSTAWIENIE SIEDZI TUTAJ, A NIE W app.js
+ *   Przez ten plik przechodzą OBIE drogi napisu na ekran: `makeText` (napisy budowane w
+ *   JavaScripcie) i `translateDom` (napisy w znacznikach), i to zarówno na stronie głównej,
+ *   jak i na `votazione.html`. Podstawienie zrobione w app.js pomijałoby podstronę, a zrobione
+ *   w i18n.js nie miałoby dostępu do konfiguracji.
+ *
+ * ZNACZNIKI
+ *   %YEAR%   rok edycji, np. „2026"
+ *   %DATE%   data edycji zapisana po ludzku w bieżącym języku, np. „17 ottobre 2026",
+ *            „17 października 2026", „17. Oktober 2026"
+ *   %EVENT%  nazwa edycji z panelu, np. „Carruleddhi Show 2026"
+ *   %PLACE%  miejsce, np. „Santa Teresa Gallura"
+ *
+ * WARTOŚCI POCZĄTKOWE TO ZAPAS, A NIE ŹRÓDŁO PRAWDY
+ *   Brane z `DEFAULT_SITE_CONFIG`, czyli z tej samej wartości awaryjnej, która stoi w
+ *   znacznikach. Obowiązują wyłącznie do chwili, w której odczyt ustawień odpowie — a gdy nie
+ *   odpowie nigdy (zimna funkcja, brak sieci), strona pokazuje wbudowaną edycję zamiast dziury
+ *   w zdaniu.
+ */
+const TOKEN_PATTERN = /%(YEAR|DATE|EVENT|PLACE)%/g;
+
+function fallbackTokens() {
+  const date = new Date(DEFAULT_SITE_CONFIG.eventDate);
+  return {
+    YEAR: Number.isNaN(date.getTime()) ? '' : String(date.getFullYear()),
+    /* Wbudowana etykieta zawiera już miejsce („17 ottobre 2026 · Santa Teresa Gallura"), a
+       %DATE% ma być samą datą — dlatego ucinane na separatorze, a nie brane w całości. */
+    DATE: DEFAULT_SITE_CONFIG.dateLabel.split(' · ')[0],
+    EVENT: DEFAULT_SITE_CONFIG.eventName,
+    PLACE: DEFAULT_SITE_CONFIG.eventLocation
+  };
+}
+
+let copyTokens = fallbackTokens();
+
+/**
+ * Nowe wartości znaczników, po odczycie ustawień albo po zmianie języka.
+ *
+ * Puste i niepodane pola są POMIJANE, nie zerowane: odpowiedź serwera bez `eventLocation` nie
+ * ma prawa zamienić „Santa Teresa Gallura" w pustkę w środku zdania.
+ */
+export function setCopyTokens(next = {}) {
+  Object.entries(next).forEach(([name, value]) => {
+    const clean = typeof value === 'string' ? value.trim() : '';
+    if (clean) copyTokens[name] = clean;
+  });
+  return { ...copyTokens };
+}
+
+/**
+ * Podstawienie znaczników w jednym napisie.
+ *
+ * Szybkie wyjście przez `includes('%')`: przez tę funkcję przechodzi KAŻDY napis ze słownika
+ * przy każdym przełączeniu języka (ponad dwa tysiące wywołań), a znaczniki ma cztery z nich.
+ * Uruchamianie wyrażenia regularnego na pozostałych dwóch tysiącach to praca bez skutku.
+ */
+export function fillCopyTokens(value) {
+  if (typeof value !== 'string' || !value.includes('%')) return value;
+  return value.replace(TOKEN_PATTERN, (whole, name) => copyTokens[name] ?? whole);
+}
 
 /* ------------------------------------------------------------------------------ słownik */
 
@@ -37,7 +124,7 @@ export function makeText(getLang) {
   return function text(key) {
     const all = window.CARRULEDDHI_I18N || {};
     const dict = all[getLang()] || all.it || {};
-    return dict[key] || (all.it || {})[key] || key;
+    return fillCopyTokens(dict[key] || (all.it || {})[key] || key);
   };
 }
 
@@ -53,7 +140,10 @@ export function translateDom(dict, { setText } = {}) {
 
   $$('[data-i18n]').forEach((element) => {
     const key = element.dataset.i18n;
-    if (typeof dict[key] === 'string') write(element, dict[key]);
+    /* `fillCopyTokens` na każdym napisie, nie tylko na tych z datą: lista kluczy z rokiem
+       zmieniałaby się przy każdej poprawce tekstu, a napis bez znacznika wraca z tej funkcji
+       nietknięty i za darmo — patrz szybkie wyjście na `includes('%')`. */
+    if (typeof dict[key] === 'string') write(element, fillCopyTokens(dict[key]));
   });
 
   const translatedAttributes = [
@@ -65,7 +155,7 @@ export function translateDom(dict, { setText } = {}) {
   translatedAttributes.forEach(([dataAttribute, attribute]) => {
     $$(`[${dataAttribute}]`).forEach((element) => {
       const key = element.getAttribute(dataAttribute);
-      if (typeof dict[key] === 'string') element.setAttribute(attribute, dict[key]);
+      if (typeof dict[key] === 'string') element.setAttribute(attribute, fillCopyTokens(dict[key]));
     });
   });
 }
@@ -186,6 +276,111 @@ export function measureScreenHeight() {
 
 /** Ostatnio zmierzona wysokość ekranu, bez ponownego pomiaru. */
 export const screenHeight = () => screenHeightPx;
+
+/* ------------------------------------------------------- rezerwa na środku paska */
+
+/**
+ * ILE MIEJSCA NA ŚRODKU PASKA JEST NAPRAWDĘ WOLNE.
+ * ===========================================================================
+ *
+ * NA CZYM STOI CAŁY PROBLEM
+ *   Trzy rzeczy mogą stanąć na środku paska nawigacji i wszystkie trzy są pozycjonowane
+ *   bezwzględnie na `left: 50%`: chip z nazwą sekcji, zadokowane odliczanie i — od tej zmiany
+ *   — zadokowany zegar głosowania. Środek jest wtedy środkiem PASKA, nie środkiem tego, co
+ *   zostało między sąsiadami, i to jest dobra decyzja (powód w całości przy `.nav-current`
+ *   w experience.css). Ma jednak skutek: element na środku NIE WIE, ile miejsca zostało.
+ *
+ * CO ZMIERZONO
+ *   Rezerwa była wpisana na sztywno: `max-width: min(260px, calc(100% - 300px))`, gdzie 300 to
+ *   dwa razy szerokość marki. Prawa strona paska nie ma jednak stałej szerokości — rośnie o
+ *   przycisk „Zagłosuj", który pojawia się w niej na czas głosowania, i o długość napisu w
+ *   danym języku.
+ *
+ *   Sonda tools/probe-podium-prizes.mjs, 1440x900, język niemiecki, faza `voting`:
+ *     pasek zwinięty            chip × .nav-actions  = 42 px nachodzenia
+ *     pasek zwinięty odsłonięty chip × „Zagłosuj"    = 11 px, chip × .nav-actions = 71 px
+ *   W fazach `scheduled` i `closed` zera — bo wtedy tego przycisku w pasku nie ma. Czyli
+ *   dokładnie to, co zgłoszono: „przy dochodzących przyciskach głosowania pasek zasłania".
+ *
+ * DLACZEGO POMIAR, A NIE WYŁĄCZENIE CHIPU NA CZAS GŁOSOWANIA
+ *   Zgaszenie chipu w fazie `voting` naprawiłoby te dwa pomiary i nic więcej. Ta sama rezerwa
+ *   jest zła przy każdym dłuższym napisie w pasku — po niemiecku, francusku, przy dłuższej
+ *   nazwie sekcji, przy następnym przycisku, który tam kiedyś stanie. Liczba wzięta z POMIARU
+ *   jest odpowiedzią na wszystkie te przypadki naraz i nie wymaga pamiętania o niej przy
+ *   następnej zmianie w pasku.
+ *
+ * PIERWSZEŃSTWO NA ŚRODKU — ROZSTRZYGNIĘTE ŚWIADOMIE, OPISANE W experience.css
+ *   1. zegar głosowania      czynność z terminem: „ile mam czasu, żeby zagłosować"
+ *   2. zadokowane odliczanie jedna liczba, po którą ktoś wraca na górę strony
+ *   3. chip z nazwą sekcji   tylko informuje, gdzie jesteś
+ *   Przy otwartym menu wygrywa chip: wtedy wybiera się, GDZIE iść. Dwie rzeczy nigdy nie stoją
+ *   tam naraz — pilnują tego reguły `[data-clock-docked]`, a sonda liczy `centreCount`.
+ *
+ * NAMALOWANY NAPIS MARKI, NIE JEJ PUDEŁKO
+ *   W stanie zwiniętym `.brand` ma `flex: 1`, więc jej prostokąt ciągnie się przez pół paska,
+ *   choć napis „Carruleddhi" zajmuje w nim około stu pikseli. Rezerwa liczona z pudełka
+ *   wyszłaby dwa razy za duża i skasowałaby chip na ekranach, na których jest na niego miejsce.
+ *
+ * BEZ NASŁUCHU PRZEWIJANIA I BEZ PĘTLI
+ *   Woła to `ResizeObserver` na pasku i na rzędzie przycisków — czyli po układzie, nie w jego
+ *   środku. Zapis zmienia `max-width` elementu pozycjonowanego BEZWZGLĘDNIE, więc nie zmienia
+ *   rozmiaru paska i nie budzi obserwatora jeszcze raz. Dodatkowo zapis następuje tylko wtedy,
+ *   gdy liczba się zmieniła.
+ */
+let lastNavReserve = -1;
+
+function paintedWidth(element) {
+  if (!element) return 0;
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+  if (!rects.length) return 0;
+  return Math.max(...rects.map((rect) => rect.right)) - Math.min(...rects.map((rect) => rect.left));
+}
+
+export function syncNavCentreReserve() {
+  const header = $('.site-header');
+  const shell = $('.nav-shell', header || document);
+  const actions = $('.nav-actions', header || document);
+  if (!header || !shell) return;
+
+  const shellBox = shell.getBoundingClientRect();
+  const brand = $('.brand', header);
+  const brandBox = brand?.getBoundingClientRect();
+  const brandText = paintedWidth($('.brand__name', header)) || 0;
+  const brandDate = paintedWidth($('.brand__date', header)) || 0;
+  /* Odstęp marki od krawędzi paska plus szerokość jej NAPISU (dłuższego z dwóch wierszy). */
+  const leftUsed = (brandBox ? brandBox.left - shellBox.left : 0) + Math.max(brandText, brandDate);
+  const rightUsed = actions ? shellBox.right - actions.getBoundingClientRect().left : 0;
+
+  /* Czternaście pikseli oddechu z każdej strony: „nie nachodzi" i „dotyka" wyglądają na
+     ekranie tak samo źle, a `pointer-events: none` na chipie ratuje tylko kliknięcia. */
+  const reserve = Math.max(0, Math.round(Math.max(leftUsed, rightUsed))) + 14;
+  if (reserve === lastNavReserve) return;
+  lastNavReserve = reserve;
+  header.style.setProperty('--nav-side', `${reserve}px`);
+}
+
+/**
+ * Podłączenie pomiaru. Wołane raz, ze strony głównej i z podstrony głosowania.
+ *
+ * Trzy źródła zmian, bo pasek zmienia szerokość na trzy różne sposoby: okno (`resize`),
+ * zawartość (`ResizeObserver` — zwinięcie w pigułkę, dojście przycisku „Zagłosuj") i język
+ * (`carruleddhi:language` — ten sam przycisk po niemiecku jest o połowę szerszy).
+ */
+export function watchNavCentreReserve() {
+  syncNavCentreReserve();
+  window.addEventListener('resize', syncNavCentreReserve, { passive: true });
+  window.addEventListener('load', syncNavCentreReserve);
+  window.addEventListener('carruleddhi:language', syncNavCentreReserve);
+  if (typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(syncNavCentreReserve);
+    ['.nav-shell', '.nav-actions', '.brand'].forEach((selector) => {
+      const element = $(selector);
+      if (element) observer.observe(element);
+    });
+  }
+}
 
 /* -------------------------------------------------------------------------------- sieć */
 

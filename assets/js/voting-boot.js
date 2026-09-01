@@ -23,7 +23,9 @@
  */
 import './i18n.js';
 import { getPublicSiteConfig } from './site-config.js';
-import { installBridge, measureScreenHeight, postJSON, translateDom } from './site-bridge.js';
+import {
+  installBridge, measureScreenHeight, postJSON, setCopyTokens, translateDom, watchNavCentreReserve
+} from './site-bridge.js';
 /* Flagi jako SVG: Windows nie ma kolorowych glifów flag i w ich miejsce pokazuje dwie litery.
    Ten sam moduł co na stronie głównej, więc flaga jest ta sama, a nie podobna. */
 import { flagSvg } from './flags.js';
@@ -77,18 +79,23 @@ function eventYear() {
   return Number.isNaN(date.getTime()) ? String(new Date().getFullYear()) : String(date.getFullYear());
 }
 
-function eventDateLabel() {
+/** Sama data po ludzku, w bieżącym języku. Bez miejsca — to dokłada `eventDateLabel`. */
+function eventDate() {
   const date = new Date(config.eventDate);
-  if (Number.isNaN(date.getTime())) return config.eventLocation || '';
-  let formatted;
+  if (Number.isNaN(date.getTime())) return String(config.eventDate || '').slice(0, 10);
   try {
-    formatted = new Intl.DateTimeFormat(lang, {
+    return new Intl.DateTimeFormat(lang, {
       day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome'
     }).format(date);
   } catch (_) {
-    formatted = config.eventDate.slice(0, 10);
+    return config.eventDate.slice(0, 10);
   }
-  return [formatted, config.eventLocation].filter(Boolean).join(' · ');
+}
+
+function eventDateLabel() {
+  const date = new Date(config.eventDate);
+  if (Number.isNaN(date.getTime())) return config.eventLocation || '';
+  return [eventDate(), config.eventLocation].filter(Boolean).join(' · ');
 }
 
 function applyEventConfig() {
@@ -102,6 +109,9 @@ function applyEventConfig() {
   });
   document.querySelectorAll('[data-config-date-label]').forEach((element) => {
     element.textContent = eventDateLabel();
+  });
+  document.querySelectorAll('[data-config-event-date]').forEach((element) => {
+    element.textContent = eventDate();
   });
   document.querySelectorAll('[data-config-event-year]').forEach((element) => {
     element.textContent = eventYear();
@@ -131,6 +141,16 @@ function applyLanguage(next, persist = true) {
   lang = available.includes(next) ? next : 'it';
   const all = window.CARRULEDDHI_I18N || {};
   const dict = all[lang] || all.it || {};
+
+  /* Znaczniki `%YEAR%`/`%DATE%`/`%EVENT%`/`%PLACE%` PRZED przelotem po napisach: podstawia je
+     site-bridge.js w `translateDom` i `makeText`, a wartości bierze stąd. Ustawione po
+     `translateDom` dałyby na ekranie surowy wzorzec do najbliższej zmiany języka. */
+  setCopyTokens({
+    YEAR: eventYear(),
+    DATE: eventDate(),
+    EVENT: config.eventName,
+    PLACE: config.eventLocation
+  });
 
   translateDom(dict);
   document.documentElement.lang = lang;
@@ -396,32 +416,82 @@ function setupMenu() {
 setupMenu();
 
 /* ===========================================================================
-   Licznik parkuje POD nagłówkiem, nie za nim
+   ZEGAR GŁOSOWANIA WJEŻDŻA W PASEK — TEN SAM WZORZEC CO `setupNavClock` W app.js
    ===========================================================================
-   `.site-header` jest `position: fixed` z `z-index: 900`, a licznik `sticky top: 0` z
-   `z-index: 60`. Przy przewijaniu licznik dojeżdżał więc do samej góry i chował się pod
-   paskiem — na telefonie znikał prawie w całości, czyli jedyna liczba, która w tych
-   kilkudziesięciu minutach jest pilna, była niewidoczna.
 
-   Wysokość paska liczona w JS, a nie wpisana w CSS: pasek zmienia wysokość razem z
-   szerokością ekranu, długością nazwy i tym, czy zawija się w dwie linie. Każda liczba
-   wpisana na sztywno byłaby poprawna dla jednego telefonu i zła dla następnego.
+   CO BYŁO I DLACZEGO TO BYŁO ZŁE
+     Zegar był `position: sticky` z `top: var(--vote-header-bottom)`, czyli DRUGĄ BELKĄ
+     zaparkowaną pod paskiem nawigacji. Dwie belki jedna nad drugą zabierały na telefonie
+     60 + 48 px razem z odstępem — około ćwierci ekranu — i to przez cały czas głosowania,
+     czyli dokładnie wtedy, gdy człowiek przewija listę kilkudziesięciu wozów. Zgłoszone
+     wprost: „zegar ma być na stronie, nie przyklejony; przy przewijaniu ma wchodzić w pasek".
+
+   JAK TO DZIAŁA TERAZ
+     Zegar stoi w treści, pod zdaniem nagłówka. Jego kopia (`.nav-clock--vote`) siedzi w pasku,
+     wygaszona, i pojawia się w chwili, gdy nagłówek dostanie `[data-clock-docked]`.
+
+   ANI JEDNEGO NASŁUCHU PRZEWIJANIA
+     Pasek jest `position: fixed`, więc wszystko, co w nim stoi, jest „przyklejone" darmo.
+     O tym, KIEDY kopia się pojawia, decyduje obserwator przecięć — tak samo jak przy
+     odliczaniu na stronie głównej. Wersja na `scroll` musiałaby wołać `getBoundingClientRect()`
+     przy każdym zdarzeniu, czyli wymuszać przeliczanie układu w trakcie przewijania listy,
+     która i tak doczytuje kolejne kafelki.
+
+   `rootMargin` UJEMNY OD GÓRY
+     Pasek zasłania górne kilkadziesiąt pikseli ekranu. Bez tej poprawki zegar w treści „jest
+     jeszcze widoczny" w chwili, gdy w rzeczywistości leży pod paskiem — kopia wjeżdżałaby
+     z opóźnieniem, przez które czasu nie ma nigdzie.
+
+   WARUNEK `top < 0`
+     Sam brak przecięcia nie mówi, którą stroną ekranu zegar wyszedł. Bez tego kopia
+     dokowałaby się także wtedy, gdy zegar w treści jest PONIŻEJ widoku — czyli nigdy nie
+     zniknęłaby po powrocie na górę strony.
+
+   BEZ DRUGIEGO UKŁADU DLA PRZYPIĘTYCH PANELI
+     `setupNavClock` na stronie głównej ma DWA obserwatory, bo tam hero jest `position: sticky`
+     i geometrycznie nie wychodzi z ekranu — przykrywa je następny panel. Ta podstrona ma
+     jeden zwykły przepływ treści: zegar wyjeżdża górą i tyle. Kopiowanie tam drugiego
+     obserwatora byłoby przepisywaniem rozwiązania problemu, którego tu nie ma.
 */
-function syncHeaderOffset() {
+function setupVoteClock() {
   const header = document.querySelector('.site-header');
-  if (!header) return;
-  const bottom = Math.round(header.getBoundingClientRect().bottom);
-  /* `bottom`, nie `height`: pasek stoi 16 px od góry, więc sama wysokość zostawiłaby
-     licznik schowany dokładnie o ten odstęp. */
-  document.documentElement.style.setProperty('--vote-header-bottom', `${Math.max(bottom, 0)}px`);
+  const inPage = document.querySelector('.vote-timer[data-vote-timer]');
+  const docked = document.querySelector('[data-vote-timer-dock]');
+  if (!header || !docked) return;
+
+  /* Ograniczony ruch: kopia się pojawia, ale nie wjeżdża. Ta sama klasa i ten sam powód co
+     przy `.nav-clock` na stronie głównej — pytanie „czy wolno animować" ma jedną odpowiedź. */
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    docked.classList.add('nav-clock--still');
+  }
+
+  if (!inPage || !('IntersectionObserver' in window)) {
+    /* Bez zegara w treści albo bez obserwatora nie ma czym rozstrzygnąć, kiedy kopia ma się
+       pokazać. Kopia stojąca w pasku ZAWSZE znaczyłaby ten sam czas dwa razy na jednym
+       ekranie, u samej góry strony. Więc jej wtedy nie ma. */
+    header.removeAttribute('data-clock-docked');
+    return;
+  }
+
+  /* Wysokość paska liczona z paska, nie wpisana w kod: zmienia się razem z szerokością ekranu
+     i z tym, czy zawartość się zawinie. Każda liczba wpisana na sztywno byłaby poprawna dla
+     jednego telefonu i zła dla następnego. */
+  const barLine = () => Math.round(header.getBoundingClientRect().bottom) + 8;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      /* `!inPage.hidden` w warunku: przed pierwszym odczytem stanu zegar w treści jest ukryty,
+         a ukryty element nie przecina niczego — bez tego pytania kopia dokowałaby się już
+         u góry strony, zanim cokolwiek wiadomo o fazie. */
+      const above = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+      header.toggleAttribute('data-clock-docked', above && !inPage.hidden);
+    });
+  }, { root: null, rootMargin: `-${barLine()}px 0px 0px 0px`, threshold: 0 });
+  observer.observe(inPage);
 }
 
-syncHeaderOffset();
-window.addEventListener('resize', syncHeaderOffset, { passive: true });
-window.addEventListener('load', syncHeaderOffset);
-/* Pasek zmienia wysokość także bez zmiany okna — po przełączeniu języka albo gdy nazwa
-   sekcji się zawinie. ResizeObserver łapie to, czego `resize` nie widzi. */
-if (typeof ResizeObserver === 'function') {
-  const header = document.querySelector('.site-header');
-  if (header) new ResizeObserver(syncHeaderOffset).observe(header);
-}
+setupVoteClock();
+/* Rezerwa na środku paska z pomiaru — ta sama funkcja co na stronie głównej. Tutaj mierzy
+   miejsce dla zadokowanego zegara głosowania: pasek ma po prawej flagę, „Wróć na stronę" i
+   „Menu", a napis na przycisku powrotu jest w każdym języku innej długości. */
+watchNavCentreReserve();

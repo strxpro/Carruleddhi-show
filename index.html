@@ -20,6 +20,16 @@
        z innym domyślnym zachowaniem nie mogła tego zrobić. Wpisane jawnie, bo skutek
        jest cichy: nic się nie psuje, strona jest tylko w innym miejscu niż była. -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual">
+  <!-- ROK I DATA W CZTERECH NAPISACH PONIŻEJ TO ZAPAS, NIE ŹRÓDŁO PRAWDY.
+       ==========================================================================
+       Prawdziwa data edycji przychodzi z panelu i mieszka w `config.eventDate`; tytuł karty,
+       opis dla wyszukiwarki i oba opisy `og:` przepisuje `applyPublicConfig` w app.js po
+       odczycie ustawień, ze słownika i18n z podstawionymi `%EVENT%`, `%DATE%` i `%PLACE%`.
+
+       Wartości wpisane tutaj obowiązują wyłącznie w tej jednej sytuacji, w której nie ma nic
+       innego: JavaScript nie wystartował albo końcówka ustawień nie odpowiedziała. Wtedy
+       lepiej pokazać wbudowaną edycję niż wzorzec albo pustkę. NIE POPRAWIAJ ICH RĘCZNIE PRZY
+       nowej edycji — poprawka w panelu wystarcza dla wszystkiego, co ktoś zobaczy. -->
   <title>Carruleddhi Show 2026 — Santa Teresa Gallura</title>
   <meta name="description" content="La corsa di carretti artigianali più spettacolare della Sardegna. 17 ottobre 2026, Santa Teresa Gallura.">
   <meta name="theme-color" content="#071a3d">
@@ -37,6 +47,11 @@
   <link rel="preload" href="/assets/fonts/bungee-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/assets/fonts/baloo2-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/site.css">
+  <!-- Dane strukturalne. `name`, `startDate` i `endDate` PODMIENIA `applyStructuredData` w
+       app.js po odczycie ustawień — przez `textContent` tego skryptu, nie przez wstrzykiwanie
+       HTML-a, bo to są dane, a nie znacznik. Wpisane niżej wartości są zapasem na wypadek braku
+       odpowiedzi; to jedyny napis na tej stronie, którego nikt nie widzi na ekranie, więc bez
+       tej podmiany zeszłoroczny termin siedziałby tu latami i nikt by tego nie zgłosił. -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -246,8 +261,13 @@
             <span class="hero__kicker-dot" aria-hidden="true"></span>
             <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
           </div>
+          <!-- Rok w tytule strony przepisuje `applyPublicConfig` (app.js) z `config.eventDate`,
+               tym samym atrybutem, którym robi to podstrona głosowania. Wpisane „2026" jest
+               zapasem na wypadek braku odpowiedzi z ustawień — nie źródłem prawdy.
+               Zgłoszone jako „po ogłoszeniu nowej edycji strona nadal pokazuje stary rok": ten
+               napis jest największy na całej stronie i był wpisany ręcznie. -->
           <h1 class="hero__title reveal" id="hero-title" data-delay="1">
-            CARRULEDDHI<br><span class="accent">SHOW</span> <span class="hero__year" data-text-jitter>2026</span>
+            CARRULEDDHI<br><span class="accent">SHOW</span> <span class="hero__year" data-text-jitter data-config-event-year>2026</span>
           </h1>
           <p class="hero__tagline reveal" data-delay="2" data-i18n="hero.tagline" data-config-tagline>Nessun motore. Solo la discesa.</p>
           <div class="hero__actions reveal" data-delay="3">
@@ -367,6 +387,27 @@
           Il voto è chiuso, ma non è arrivato nessun voto: non c’è un podio da mostrare.
         </p>
 
+        <!-- NAGRODA PUBLICZNOŚCI NA SAMEJ GÓRZE I WIDOCZNIE INNA OD POZOSTAŁYCH.
+             ==================================================================
+             Tuż niżej stoi dwanaście nagród jury. Wszystkie trzynaście to „nagrody
+             Carruleddhi Show", ale jedna z nich została przyznana przez ludzi stojących na
+             zboczu, a dwanaście przez jury i stoper. Bez tego rozróżnienia cokół czyta się
+             jako pierwszy z trzynastu równorzędnych wyników — a to jest jedyna nagroda, o
+             której ta strona w ogóle zbierała głosy.
+
+             Wstążka, nie sam nagłówek: nagłówek sekcji mówi „Podium", czyli KSZTAŁT, a nie
+             CZYJ jest ten wynik. Ukrywana razem z cokołem, bo bez zwycięzców nie ma czego
+             podpisywać. -->
+        <div class="podium__crown" data-podium-crown hidden>
+          <p class="podium__crown-badge">
+            <span class="podium__crown-star" aria-hidden="true">★</span>
+            <span data-i18n="voting.publicAward">Premio del Pubblico</span>
+          </p>
+          <p class="podium__crown-note" data-i18n="voting.publicAwardNote">
+            È l’unico premio deciso dal pubblico. Gli altri dodici li assegnano la giuria e il cronometro.
+          </p>
+        </div>
+
         <!-- ZDJĘCIA STOJĄ NA COKOLE, NIE OBOK NIEGO.
              ==================================================================
              Był tu rysunek SVG z trzema słupkami i cyframi 2/1/3, a karty zwycięzców leżały
@@ -467,6 +508,103 @@
             <button class="btn btn--outline btn--small" type="button" data-podium-field-more hidden>
               <span data-podium-field-more-label data-i18n="voting.loadMore">Mostra altri</span>
             </button>
+          </div>
+        </div>
+
+        <!-- DWANAŚCIE NAGRÓD JURY ZE ZWYCIĘZCAMI.
+             ==================================================================
+             Do tej zmiany ta strona po zamknięciu głosowania pokazywała JEDNĄ nagrodę —
+             publiczności — i ani jednego zwycięzcy z dwunastu pozostałych. Sekcja nagród
+             wyżej wymienia dwanaście kategorii, wieczorem są w nich rozdane statuetki, a na
+             stronie nie było po nich śladu: kto chciał wiedzieć, kto wygrał „najszybszy
+             Classic", nie miał gdzie zajrzeć.
+
+             DWA STANY, KTÓRE MUSZĄ SIĘ RÓŻNIĆ NA PIERWSZY RZUT OKA
+               Kategoria BEZ przypisanego zwycięzcy nie znika z listy. Znikająca kategoria
+               znaczy „tej nagrody nie ma", a prawda jest inna: nagroda jest, wynik nie został
+               jeszcze ogłoszony. Dlatego wiersz zostaje, dostaje przerywaną obwódkę i zdanie
+               o tym wprost — patrz `data-award-state` w voting.js i reguły `.award-card` w
+               voting.css.
+
+             Kolejność jest kolejnością nagród (01–12), nie kolejnością ogłaszania: numer
+             nagrody jest tym, po czym ludzie o nią pytają. -->
+        <section class="podium__awards" data-podium-awards hidden aria-labelledby="podium-awards-title">
+          <h3 class="podium__awards-title" id="podium-awards-title" data-i18n="voting.awardsTitle">
+            I dodici premi della giuria
+          </h3>
+          <p class="podium__awards-lead" data-i18n="voting.awardsLead">
+            Una categoria per riga. Dove il vincitore manca, il premio non è ancora stato annunciato.
+          </p>
+          <ol class="award-list" data-podium-awards-list></ol>
+        </section>
+      </div>
+    </section>
+
+
+    <!-- ==================================================================
+         Archiwum roczników — „Zobacz wcześniejsze wyniki"
+         ==================================================================
+         Po opublikowaniu nowego sezonu poprzedni wynik przestaje być bieżącym wynikiem, ale
+         nie przestaje istnieć: ludzie wracają sprawdzić, kto wygrał rok temu, a ich zdjęcia
+         i punkty leżą w bazie (`voting_editions`, migracja 0030). Bez tej sekcji jedyną drogą
+         do nich był ręcznie dopisany `?edition=2025` na podstronie głosowania.
+
+         Roczniki przychodzą w `editions` z tej samej końcówki, którą strona i tak już odpytuje
+         (`readVotingEditions` w Workerze), a wejście w rocznik to `action: 'state'` z polem
+         `edition`. Ani jednego nowego adresu: ta droga działa na podstronie od migracji 0030,
+         patrz `paintEditions` i `state.requestedEdition` w assets/js/voting-page.js.
+
+         SEKCJA JEST UKRYTA, DOPÓKI NIE MA CZEGO POKAZAĆ. Przed pierwszą archiwizacją lista
+         roczników zawiera wyłącznie ten trwający — a przycisk „zobacz wcześniejsze wyniki"
+         prowadzący do pustego wyboru jest gorszy niż brak przycisku. -->
+    <section class="section section-card archive" id="archive" aria-labelledby="archive-title" data-archive hidden>
+      <div class="container">
+        <header class="section-head">
+          <span class="eyebrow" data-i18n="voting.archiveKicker">Albo d’oro</span>
+          <h2 id="archive-title" data-i18n="voting.archiveTitle" data-text-effect="jump">Le edizioni precedenti.</h2>
+          <p class="section-lead" data-i18n="voting.archiveLead">
+            Ogni anno resta qui: il podio del pubblico, i premi della giuria e quanti eravamo.
+          </p>
+        </header>
+
+        <!-- Przycisk, a nie od razu rozwinięta lista: bieżący wynik jest treścią tej strony,
+             a poprzednie roczniki są odpowiedzią na pytanie, które zadaje się świadomie. -->
+        <button class="btn btn--yellow archive__open" type="button"
+                data-archive-open aria-expanded="false" aria-controls="archive-panel">
+          <span data-archive-open-label data-i18n="voting.archiveOpen">Guarda i risultati precedenti</span>
+          <span aria-hidden="true">↓</span>
+        </button>
+
+        <div class="archive__panel" id="archive-panel" data-archive-panel hidden>
+          <p class="archive__pick">
+            <label class="archive__label" for="archive-edition" data-i18n="voting.archivePick">Scegli l’anno</label>
+            <select class="archive__select" id="archive-edition" data-archive-edition></select>
+          </p>
+
+          <!-- Scena rocznika. Konfetti jest wstawiane TUTAJ, a nie nad cokołem bieżącej
+               edycji: `podium-confetti` z voting.css jest pozycjonowane bezwzględnie względem
+               najbliższego rodzica z `position: relative`, więc host musi być tym pudełkiem,
+               do którego wynik właśnie wjechał. -->
+          <div class="archive__stage" data-archive-stage>
+            <p class="archive__summary" data-archive-summary hidden>
+              <span class="archive__summary-lead" data-archive-summary-lead></span>
+              <b class="archive__summary-count" data-archive-summary-count></b>
+              <span class="archive__summary-label" data-archive-summary-label></span>
+            </p>
+            <p class="archive__meta" data-archive-meta hidden></p>
+
+            <h3 class="archive__subtitle" data-archive-podium-title hidden data-i18n="voting.archivePodium">
+              Il podio del pubblico
+            </h3>
+            <ol class="archive__podium" data-archive-podium></ol>
+
+            <h3 class="archive__subtitle" data-archive-awards-title hidden data-i18n="voting.awardsTitle">
+              I dodici premi della giuria
+            </h3>
+            <ol class="award-list award-list--compact" data-archive-awards></ol>
+            <p class="archive__note" data-archive-note hidden data-i18n="voting.archiveNoAwards">
+              I premi della giuria non sono stati salvati in questa edizione.
+            </p>
           </div>
         </div>
       </div>
@@ -745,11 +883,18 @@
 
     <section class="section section-card schedule" id="schedule" aria-labelledby="schedule-title">
       <div class="container">
-        <span class="eyebrow reveal" data-i18n="schedule.kicker">17 ottobre 2026</span>
+        <!-- Data programu z konfiguracji, dwa razy dla dwóch różnych odbiorców.
+             `data-i18n="schedule.kicker"` daje napis „%DATE%" ze słownika, podstawiony przy
+             tłumaczeniu, a `data-config-event-date` przepisuje go jeszcze raz po odczycie
+             ustawień — pierwsze działa bez sieci, drugie po odpowiedzi serwera. `datetime` w
+             wierszach dostaje dzień z konfiguracji, a godzinę zachowuje: godzina jest treścią
+             wiersza, dzień jest datą edycji. Bez tego zeszłoroczny dzień zostawał w danych,
+             których nie widzi nikt na ekranie, więc nikt by go nie zgłosił. -->
+        <span class="eyebrow reveal" data-i18n="schedule.kicker" data-config-event-date>17 ottobre 2026</span>
         <h2 class="section-title reveal" id="schedule-title" data-i18n="schedule.title" data-text-effect="rise">Un giorno. Tutto da ricordare.</h2>
         <div class="schedule-list">
-          <div class="schedule-row reveal"><time datetime="2026-10-17T12:00">12.00</time><span data-i18n="schedule.item1">Presentazione dei carruleddhi in piazza</span></div>
-          <div class="schedule-row reveal"><time datetime="2026-10-17T14:30">14.30</time><span data-i18n="schedule.item2">Partenza ufficiale della gara</span></div>
+          <div class="schedule-row reveal"><time datetime="2026-10-17T12:00" data-config-schedule-time="12:00">12.00</time><span data-i18n="schedule.item1">Presentazione dei carruleddhi in piazza</span></div>
+          <div class="schedule-row reveal"><time datetime="2026-10-17T14:30" data-config-schedule-time="14:30">14.30</time><span data-i18n="schedule.item2">Partenza ufficiale della gara</span></div>
           <div class="schedule-row reveal"><time data-i18n="schedule.item3time">Sera</time><span data-i18n="schedule.item3">Premiazione e festa finale</span></div>
         </div>
         <p class="lead reveal" data-i18n="schedule.note">Panino e bevanda offerti a ogni partecipante.</p>
@@ -864,7 +1009,10 @@
           <article class="prize-card" data-prize-card>
             <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 03</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
             <div class="prize-card__art"><svg viewBox="0 0 480 320" aria-hidden="true"><use href="/assets/images/prizes.svg#prize-03"></use></svg></div>
-            <div class="prize-card__bottom"><div class="prize-card__number">03</div><h3 data-i18n="prize.3">Carruleddhi Show 2026</h3></div>
+            <!-- Bez rocznika w nazwie kategorii: ta sama nagroda wraca w każdej edycji, a przy
+                 wynikach archiwalnych stałaby obok rocznika 2025 nazwa „Show 2026". Powód w
+                 całości przy `prize.3` w assets/js/i18n.js. -->
+            <div class="prize-card__bottom"><div class="prize-card__number">03</div><h3 data-i18n="prize.3">Carruleddhi Show</h3></div>
           </article>
           <article class="prize-card" data-prize-card>
             <div class="prize-card__top"><span class="prize-card__rank"><span data-i18n="prizes.rank">Premio</span> 04</span><span class="prize-card__drag" aria-hidden="true">•••</span></div>
@@ -1772,7 +1920,8 @@
         <!-- footer__brandwrap is a container query context, so the brand can size itself
              against this column instead of being measured by JavaScript. See main.css. -->
         <div class="footer__brandwrap">
-          <div class="footer__brand">CARRULEDDHI<br><span>SHOW 2026</span></div>
+          <!-- Rok ze konfiguracji, tym samym atrybutem co w hero i w stopce podstrony. -->
+          <div class="footer__brand">CARRULEDDHI<br><span>SHOW <span data-config-event-year>2026</span></span></div>
           <p class="footer__copy" data-i18n="footer.copy">Una discesa, un paese, una storia costruita a mano.</p>
         </div>
         <div class="footer__group">
@@ -1928,6 +2077,22 @@
     <span class="toast__text" data-toast-text></span>
   </div>
 
+  <!-- WBUDOWANA KONFIGURACJA — ZAPAS NA CZAS PRZED ODPOWIEDZIĄ, NIE ŹRÓDŁO PRAWDY.
+       ==========================================================================
+       `eventName`, `eventDate` i `dateLabel` niżej rysują pierwszy ekran w tej jednej chwili,
+       w której nie ma jeszcze nic innego: strona jest wczytana, a końcówka ustawień
+       (`applyServerSettings` w app.js) jeszcze nie odpowiedziała — albo nie odpowie wcale, bo
+       funkcja jest zimna, sieć padła, a Supabase ma złą minutę. Wtedy strona pokazuje
+       wbudowaną edycję i jest w całości używalna.
+
+       Po odpowiedzi te trzy wartości są NADPISYWANE tym, co organizator wpisał w panelu, i
+       stamtąd rozchodzą się na wszystko: rok w tytule (`data-config-event-year`), datę w
+       kickerach (`data-config-date-label`, `data-config-event-date`), tytuł karty i dane
+       strukturalne, znaczniki `%YEAR%`/`%DATE%` w słowniku i cel licznika.
+
+       NIE POPRAWIAJ TEGO PRZY NOWEJ EDYCJI. Poprawka tutaj wymaga `npm run build` i wdrożenia,
+       a zmiana w panelu działa od razu i dla wszystkich. Jeśli te liczby zaczynają być stare,
+       to znaczy, że są w porządku: są zapasem, a zapas ma być stary. -->
   <script>
     window.CARRULEDDHI_CONFIG = {
       eventName: 'Carruleddhi Show 2026',

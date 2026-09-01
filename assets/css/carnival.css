@@ -552,9 +552,23 @@
      rozwinieciu jest miejsce, wiec wraca tez nazwa sekcji. */
   /* Chip i flaga sa widoczne takze bez najezdzania, wiec hover nie ma juz czego
      przywracac — zostaje mu poszerzenie paska na "Bede tam". */
+  /* REZERWA Z POMIARU, NIE STAŁE 260 px.
+     ---------------------------------------------------------------------------
+     Stało tu `max-width: 260px`. Reguła ma wyższą wagę niż `.site-header.is-compact
+     .nav-current` w experience.css, więc w stanie z fokusem albo pod kursorem CASOWAŁA
+     zmierzoną rezerwę `--nav-side` i chip znowu wjeżdżał na przyciski.
+
+     ZMIERZONE sondą tools/probe-podium-prizes.mjs na 1440x900 w fazie `voting`, przy fokusie
+     zostawionym w pasku po zamknięciu menu: chip nachodził na `.nav-actions` o 42 px, a na
+     przycisk „Zagłosuj" o 11 px. Pasek miał wtedy 720 px szerokości (stan rozwinięty), a nie
+     560 — bo ta sama reguła rozwija pasek.
+
+     To NIE jest stan sztuczny: fokus zostaje w pasku po każdym zamknięciu menu z klawiatury, a
+     kursor bywa nad paskiem cały czas na komputerze. Ta sama formuła co w experience.css —
+     jedno ograniczenie, wszędzie takie samo. */
   .site-header.is-compact:hover .nav-current,
   .site-header.is-compact:focus-within .nav-current {
-    max-width: 260px;
+    max-width: max(0px, min(260px, calc(100% - 2 * var(--nav-side))));
   }
   .site-header.is-compact:hover .menu-toggle,
   .site-header.is-compact:focus-within .menu-toggle {

@@ -3,6 +3,7 @@ import {
   Eraser, Hourglass, ImagePlus, ListPlus, Play, RefreshCw, RotateCcw, Square, Trash2, Trophy
 } from 'lucide-react';
 import { cn, formatMoment } from '@/lib/utils';
+import { ActionButton } from './ActionButton';
 import { DateTimeField } from './DateTimeField';
 import type { TranslateKey } from '../i18n';
 import {
@@ -146,6 +147,21 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
   const knownIds = useRef<Set<string> | null>(null);
   const freshTimer = useRef(0);
 
+  /**
+   * Czy ktoś tknął pola czasu od ostatniego zapisu.
+   *
+   * JAKI BŁĄD TO ZAPOBIEGA
+   *   Odczyt co piętnaście sekund wołał `absorb`, a `absorb` bezwarunkowo przepisywał pole
+   *   „Start wyścigu" wartością z serwera. Wpisanie nowego terminu przez własny wybierak daty
+   *   trwa dłużej niż piętnaście sekund — trzeba przewinąć miesiąc, trafić w dzień, ustawić
+   *   godzinę i minutę — więc w połowie tej czynności pole cofało się do starej wartości.
+   *   Widziane od strony organizatora: „wpisuję datę, ona się cofa i nie da się jej zapisać".
+   *
+   *   `useRef`, a nie stan: to nie jest nic, co ma rysować ekran, a jako stan przeliczałoby
+   *   efekt odpytywania przy każdym uderzeniu w klawiaturę i restartowało odliczanie.
+   */
+  const timeTouched = useRef(false);
+
   const absorb = useCallback((next: VotingState) => {
     const incoming = new Set(next.participants.map((row) => row.id));
     if (knownIds.current) {
@@ -159,8 +175,13 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
     knownIds.current = incoming;
 
     setState(next);
-    setStartAt(toLocalInput(next.raceStartsAt));
-    setDuration(next.durationMinutes || 30);
+    /* Pola czasu przepisywane z serwera tylko wtedy, gdy nikt ich nie tknął — patrz
+       `timeTouched`. Sam `state` przepisywany zawsze, bo faza, liczby i lista uczestników
+       nie są niczyją wersją roboczą. */
+    if (!timeTouched.current) {
+      setStartAt(toLocalInput(next.raceStartsAt));
+      setDuration(next.durationMinutes || 30);
+    }
   }, []);
 
   useEffect(() => () => window.clearTimeout(freshTimer.current), []);
@@ -291,6 +312,64 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
   const chip =
     'rounded-full px-4 py-2 text-xs font-extrabold transition-colors disabled:opacity-45 disabled:cursor-not-allowed';
 
+  /* ---------------------------------------------------------------- czas: co wolno kliknąć
+
+     TERMIN STARTU PRZELICZONY RAZ, W JEDNYM MIEJSCU.
+     `new Date('')` daje Invalid Date, a `.toISOString()` na Invalid Date RZUCA RangeError.
+     Wołane wprost w `onClick` — jak było — kończyło się komunikatem „Invalid time value"
+     wyświetlonym organizatorowi jako powód nieudanego zapisu terminu. Tu wychodzi pusty napis,
+     a pusty napis jest warunkiem wyłączenia przycisku z czytelnym zdaniem obok. */
+  const parsedStart = startAt ? new Date(startAt) : null;
+  const startIso =
+    parsedStart && !Number.isNaN(parsedStart.getTime()) ? parsedStart.toISOString() : '';
+
+  /* Powody wyłączenia, po jednym na przycisk. Puste znaczy „klikalny".
+
+     KTÓRE WARUNKI ZOSTAŁY ZWĘŻONE I DLACZEGO
+       „Zapisz termin" straciło warunek `status === 'closed'`. Był za szeroki: `scheduleVoting`
+       w Workerze zapisuje `status: 'scheduled'`, czyli sam zdejmuje ręczne zamknięcie. Warunek
+       gasił więc przycisk dokładnie w stanie, w którym jest najbardziej potrzebny — po
+       zamknięciu próbnego głosowania, gdy trzeba wpisać prawdziwy termin zawodów — i nie było
+       innej drogi niż „Wróć do odliczania", które bierze datę z Ustawień, a nie z tego pola.
+
+       „Zamknij teraz" i „Przywróć harmonogram" swoje warunki zachowują, bo one mają treść:
+       zamykać nie ma czego, gdy deklaracja już stoi, a przywracać nie ma czego, gdy nikt nic
+       ręcznie nie zamknął. Zmienia się tylko to, że teraz mówią o tym wprost, zamiast blaknąć.
+
+       Wszędzie `status`, a nie `phase`. To dwie różne rzeczy: `status` to DEKLARACJA
+       organizatora zapisana w bazie, `phase` liczy Worker z zegara i wychodzi mu `closed`
+       także wtedy, gdy nikt niczego nie zamknął, tylko minęło okno `voting_ends_at`. Warunki
+       na `phase` gasiły przyciski po upływie okna, czyli w chwili, w której organizator sięga
+       po nie najczęściej. Jedyny wyjątek jest niżej, przy listach do zwycięzców: tam Worker
+       sam odmawia przed czasem (`VOTING_STILL_OPEN`), więc panel pyta o to samo, co serwer. */
+  const whyBusy = busy ? t('vote.whyBusy') : '';
+  const whyBadStart = startIso ? '' : t('vote.whyBadStart');
+  const reasonSaveSchedule = whyBusy || whyBadStart;
+  const reasonRestore =
+    whyBusy || whyBadStart || (state?.status === 'closed' ? '' : t('vote.whyNoManualClose'));
+  /* Puste pole jest tu POPRAWNE: schodzi na datę wydarzenia z Ustawień. Niepełna data w polu
+     poprawna nie jest, bo wtedy jest co brać i nie da się tego przeliczyć. */
+  const reasonCountdown = whyBusy || (startAt && !startIso ? t('vote.whyBadStart') : '');
+  const reasonOpenNow = whyBusy;
+  const reasonCloseNow = whyBusy || (state?.status === 'closed' ? t('vote.whyAlreadyClosed') : '');
+  const reasonClearVotes = whyBusy || ((state?.totalVotes ?? 0) === 0 ? t('vote.whyNoVotes') : '');
+  const reasonMailWinners = whyBusy || (state?.phase === 'closed' ? '' : t('vote.whyNotClosedYet'));
+
+  /**
+   * Zapisuje termin z pola i zdejmuje znacznik „tknięte".
+   *
+   * Znacznik zdejmowany PRZED wywołaniem, żeby świeży stan z odpowiedzi mógł przepisać pole
+   * — po udanym zapisie wartość z serwera jest tą właściwą. Przy nieudanym wraca, bo wpisany
+   * termin musi zostać na ekranie do ponowienia; bez tego pierwsze odpytanie po zerwanym
+   * łączu wyczyściłoby to, co ktoś właśnie wpisał.
+   */
+  const commitSchedule = (message: string) => {
+    timeTouched.current = false;
+    void run(() => scheduleVoting(apiKey, startIso, duration), message).then((ok) => {
+      if (!ok) timeTouched.current = true;
+    });
+  };
+
   /* Klasyfikacja i trzy liczby nad nią.
      ---------------------------------------------------------------------------
      Liczone tu, a nie na serwerze: serwer i tak odsyła każdemu uczestnikowi jego średnią i
@@ -374,7 +453,13 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             <span className="text-[11px] uppercase tracking-wider text-white/45">{t('vote.raceStart')}</span>
             <DateTimeField
               value={startAt}
-              onChange={setStartAt}
+              /* Znacznik „tknięte" stawiany tu, a nie w `useEffect` po zmianie `startAt`:
+                 efekt nie odróżniłby zmiany wpisanej ręcznie od tej, którą właśnie wstawił
+                 odczyt z serwera, więc pierwszy odczyt zablokowałby odświeżanie na zawsze. */
+              onChange={(next) => {
+                timeTouched.current = true;
+                setStartAt(next);
+              }}
               locale={t('locale.intl')}
               className={field}
               labels={{
@@ -395,7 +480,10 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               min={1}
               max={1440}
               value={duration}
-              onChange={(event) => setDuration(Number(event.target.value))}
+              onChange={(event) => {
+                timeTouched.current = true;
+                setDuration(Number(event.target.value));
+              }}
               className={field}
             />
           </label>
@@ -407,101 +495,76 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-2.5">
-          <button
-            type="button"
-            disabled={busy || !startAt || state?.status === 'closed'}
-            onClick={() =>
-              void run(
-                () => scheduleVoting(apiKey, new Date(startAt).toISOString(), duration),
-                t('vote.saved')
-              )
-            }
-            className={cn(chip, 'bg-yellow text-navy-950 hover:bg-white')}
-          >
-            {t('vote.saveSchedule')}
-          </button>
-          <button
-            type="button"
-            disabled={busy || !startAt || state?.status !== 'closed'}
-            onClick={() => {
+        {/* `items-start`, nie `items-center`: pod przyciskiem stoi teraz zdanie z powodem,
+            więc kafelki mają różną wysokość i wyrównanie do środka rozjeżdżałoby rząd. */}
+        <div className="mt-5 flex flex-wrap items-start gap-2.5">
+          <ActionButton
+            label={t('vote.saveSchedule')}
+            reason={reasonSaveSchedule}
+            tone="bg-yellow text-navy-950 hover:bg-white"
+            onPress={() => commitSchedule(t('vote.saved'))}
+          />
+          <ActionButton
+            label={t('vote.restoreSchedule')}
+            reason={reasonRestore}
+            tone="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25"
+            icon={<RotateCcw size={13} />}
+            onPress={() => {
               if (!window.confirm(t('vote.restoreConfirm'))) return;
-              void run(
-                () => scheduleVoting(apiKey, new Date(startAt).toISOString(), duration),
-                t('vote.restored')
-              );
+              commitSchedule(t('vote.restored'));
             }}
-            className={cn(chip, 'inline-flex items-center gap-2 bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25')}
-          >
-            <RotateCcw size={13} /> {t('vote.restoreSchedule')}
-          </button>
-          {/* Jedno kliknięcie po testach: zdejmuje ręczne zamknięcie i przepisuje start z daty
-              wydarzenia zapisanej w Ustawieniach, więc licznik w hero znowu odlicza do tego
-              samego terminu, który widzi publiczność. Godzina bierze się z tamtego pola, nie
-              stąd — dwa miejsca na jedną godzinę to pierwsze miejsce na rozjazd. */}
+          />
           {/* WRÓĆ DO ODLICZANIA.
               Bierze godzinę z pola „Start wyścigu" obok, więc dokładną datę ustawia się w tym
               samym miejscu, w którym się ją widzi. Puste pole schodzi na datę wydarzenia z
               Ustawień — wtedy nie ma czego brać stąd, a odliczanie i tak ma się zgadzać z tym,
               co widzi publiczność. Jedno i drugie zdejmuje ręczne zamknięcie, więc licznik na
-              stronie głównej wraca od razu. */}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              if (startAt) {
-                void run(
-                  () => scheduleVoting(apiKey, new Date(startAt).toISOString(), duration),
-                  t('vote.countdownDone')
-                );
+              stronie głównej wraca od razu.
+
+              Wyłączany TYLKO na czas żądania i na niepełną datę w polu. Puste pole nie jest
+              powodem: ma wtedy własną, poprawną drogę przez datę z Ustawień. */}
+          <ActionButton
+            label={t('vote.showCountdown')}
+            reason={reasonCountdown}
+            tone="bg-blue-400/15 text-blue-100 hover:bg-blue-400/25"
+            icon={<Hourglass size={13} />}
+            onPress={() => {
+              if (startIso) {
+                commitSchedule(t('vote.countdownDone'));
                 return;
               }
               void run(() => showCountdown(apiKey), t('vote.countdownDone'));
             }}
-            className={cn(chip, 'inline-flex items-center gap-2 bg-blue-400/15 text-blue-100 hover:bg-blue-400/25')}
-          >
-            <Hourglass size={13} /> {t('vote.showCountdown')}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void run(() => openVoting(apiKey, duration))}
-            className={cn(chip, 'inline-flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500')}
-          >
-            <Play size={13} /> {t('vote.openNow')}
-          </button>
-          <button
-            type="button"
-            /* `status`, NIE `phase` — i to jest cała naprawa martwego przycisku.
-               ---------------------------------------------------------------------------
-               To są dwie różne rzeczy i panel sam to gdzie indziej rozróżnia (patrz napis
-               `vote.manualClosed` wyżej). `status` to DEKLARACJA organizatora, zapisana w
-               bazie. `phase` liczy votingPhase() w Workerze i wychodzi mu `closed` także
-               wtedy, gdy nikt niczego nie zamknął, tylko minęła godzina z `voting_ends_at`.
+          />
+          <ActionButton
+            label={t('vote.openNow')}
+            reason={reasonOpenNow}
+            tone="bg-blue-600 text-white hover:bg-blue-500"
+            icon={<Play size={13} />}
+            onPress={() => void run(() => openVoting(apiKey, duration))}
+          />
+          {/* ZAMKNIJ TERAZ.
+              Warunek stoi na `status`, NIE na `phase`, i to jest jedna z dwóch rzeczy, które
+              trzymają ten przycisk żywym. `status` to DEKLARACJA organizatora zapisana w
+              bazie; `phase` liczy votingPhase() w Workerze i wychodzi mu `closed` także
+              wtedy, gdy nikt niczego nie zamknął, tylko minęło okno `voting_ends_at`. Warunek
+              na `phase` gasił przycisk dokładnie w chwili, w której sięga się po niego
+              najczęściej: po upływie okna strona pokazuje już podium, a panel nie pozwala
+              tego zapisać, bo jedyny przycisk, który to robi, jest wyłączony.
 
-               Warunek na `phase` gasił więc przycisk dokładnie w chwili, w której sięga się
-               po niego najczęściej: głosowanie otwarte przyciskiem „Otwórz teraz" dostaje
-               okno na `durationMinutes`, po jego upływie `phase` robi się `closed`, a
-               `status` zostaje `voting`. Strona pokazuje już podium, panel pokazuje
-               „zamknięte" — i nie da się tego zapisać, bo jedyny przycisk, który to robi,
-               jest wyłączony. Zgłoszone jako „klikam i nic się nie dzieje, nie chce się
-               kliknąć": przycisk był po prostu `disabled`.
-
-               Naciśnięcie ma sens zawsze, dopóki deklaracji nie ma: przed startem znaczy
-               „odwołujemy głosowanie", w trakcie „kończymy wcześniej", a po upływie okna
-               „potwierdzamy to, co i tak pokazuje zegar" — i dopiero to wpisuje
-               `status: 'closed'`, które wygrywa z zegarem przy każdym następnym odczycie.
-               Bez treści jest tylko jeden przypadek: gdy deklaracja już stoi. */
-            disabled={busy || state?.status === 'closed'}
-            onClick={() => {
+              Druga rzecz to zdanie obok. Gdy deklaracja już stoi, zamykać naprawdę nie ma
+              czego — ale wtedy trzeba powiedzieć, że głosowanie JEST zamknięte i czym się je
+              odwraca, a nie zostawić wyblakły guzik, który czyta się jak awarię panelu. */}
+          <ActionButton
+            label={t('vote.closeNow')}
+            reason={reasonCloseNow}
+            tone="bg-white/10 text-white hover:bg-white/20"
+            icon={<Square size={13} />}
+            onPress={() => {
               // Zamknięcia nie da się cofnąć zegarem, więc pytanie jest tu na miejscu.
               if (window.confirm(t('vote.closeConfirm'))) void run(() => closeVoting(apiKey));
             }}
-            className={cn(chip, 'inline-flex items-center gap-2 bg-white/10 text-white hover:bg-white/20')}
-          >
-            <Square size={13} /> {t('vote.closeNow')}
-          </button>
-          {!startAt ? <p className="self-center text-xs text-white/40">{t('vote.needStart')}</p> : null}
+          />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-white/40">{t('vote.countdownHint')}</p>
       </section>
@@ -520,22 +583,26 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             <h2 className="font-extrabold text-white">{t('vote.results')}</h2>
             <p className="mt-1 max-w-lg text-xs leading-relaxed text-white/45">{t('vote.resultsLead')}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy || (state?.totalVotes ?? 0) === 0}
-              onClick={() => {
+          {/* Te dwa też z powodem obok, z tego samego powodu co rząd wyżej: „Wyślij podium"
+              jest wyłączony przez cały dzień zawodów i bez zdania obok wygląda na zepsuty
+              dokładnie wtedy, gdy ktoś pierwszy raz go szuka. */}
+          <div className="flex flex-wrap items-start gap-2">
+            <ActionButton
+              label={t('vote.clearVotes')}
+              reason={reasonClearVotes}
+              tone="border border-coral/40 text-coral hover:bg-coral hover:text-white"
+              icon={<Eraser size={13} />}
+              onPress={() => {
                 if (!window.confirm(t('vote.clearConfirm'))) return;
                 void run(() => clearVoting(apiKey), t('vote.cleared'));
               }}
-              className={cn(chip, 'inline-flex items-center gap-2 border border-coral/40 text-coral hover:bg-coral hover:text-white')}
-            >
-              <Eraser size={13} /> {t('vote.clearVotes')}
-            </button>
-            <button
-              type="button"
-              disabled={busy || state?.phase !== 'closed'}
-              onClick={() => {
+            />
+            <ActionButton
+              label={t('vote.winnersSend')}
+              reason={reasonMailWinners}
+              tone="bg-yellow text-navy-950 hover:bg-white"
+              icon={<Trophy size={13} />}
+              onPress={() => {
                 if (!window.confirm(t('vote.winnersConfirm'))) return;
                 void (async () => {
                   setBusy(true);
@@ -549,10 +616,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                   }
                 })();
               }}
-              className={cn(chip, 'inline-flex items-center gap-2 bg-yellow text-navy-950 hover:bg-white')}
-            >
-              <Trophy size={13} /> {t('vote.winnersSend')}
-            </button>
+            />
           </div>
         </div>
 

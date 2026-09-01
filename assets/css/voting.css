@@ -131,17 +131,53 @@
   padding: 0;
   list-style: none;
 }
-/* MALEJĄCE ROZMIARY ZDJĘĆ: pierwsze największe, drugie średnie, trzecie mniejsze.
-   Kolejność czyta się bez czytania cyfr — ta sama zasada trzyma potem pozostałą stawkę
-   w siatce niżej, tylko jeszcze mniejszą. */
+/* ZWYCIĘZCA NAJSZERSZY, DWA BOCZNE RÓWNE — I TA RÓWNOŚĆ JEST POMIAREM, NIE GUSTEM.
+   ---------------------------------------------------------------------------
+   Stało tu 38% / 31% / 26%, czyli trzy różne szerokości, „bo kolejność czyta się bez czytania
+   cyfr". Pierwsza część tej myśli jest słuszna i zostaje: karta zwycięzcy jest wyraźnie
+   największa. Druga miała skutek, którego nikt nie zamierzył — rząd jest wyśrodkowany jako
+   CAŁOŚĆ (`justify-content: center`), więc gdy karta po lewej jest szersza od tej po prawej,
+   środkowa przesuwa się w prawo o połowę różnicy.
+
+   ZMIERZONE 1440×900: zwycięzca stał 33 px od środka cokołu. Dokładnie (409 − 343) / 2.
+   Trzydzieści trzy piksele na rzędzie szerokim na 1400 to nie jest dużo, ale to jest cokół —
+   kształt, którego cała treść polega na tym, że najwyższy stopień stoi POŚRODKU.
+
+   Miejsca drugie i trzecie mają teraz tę samą szerokość, a różnicę między nimi niosą wysokość
+   stopnia, kolor medalu, plakietka z cyfrą i strona, na której stoją — czyli cztery rzeczy,
+   które i tak już to mówiły. Rozróżnienie „zwycięzca kontra reszta" zostaje w rozmiarze,
+   bo ono jest tym, po co ktoś na ten cokół patrzy.
+
+   Symetrii nie da się załatwić siatką o trzech kolumnach: przy jednym zwycięzcy zostawiała
+   dwie puste — patrz komentarz przy `.podium__steps` wyżej. */
 .podium-card[data-podium-place='1'] { flex: 0 1 38%; }
-.podium-card[data-podium-place='2'] { flex: 0 1 31%; }
-.podium-card[data-podium-place='3'] { flex: 0 1 26%; }
+.podium-card[data-podium-place='2'] { flex: 0 1 29%; }
+.podium-card[data-podium-place='3'] { flex: 0 1 29%; }
 /* Kolejność w znaczniku niesie wynik dla czytnika ekranu; `order` ustawia obraz tak, jak
    stoi prawdziwe podium — zwycięzca w środku. */
 .podium-card[data-podium-place='1'] { order: 2; }
 .podium-card[data-podium-place='2'] { order: 1; }
 .podium-card[data-podium-place='3'] { order: 3; }
+
+/* KOLOR KARNAWAŁOWY OSOBNO OD KOLORU MEDALU — I TO JEST CAŁA ZASADA TEJ PRZEBUDOWY.
+   ---------------------------------------------------------------------------
+   Prośba brzmiała „bardziej kolorowo, inny wygląd". Najprostszym sposobem byłoby pomalowanie
+   stopni na żółto, różowo i fioletowo — i to jest dokładnie ten sposób, który KASUJE
+   informację: złoto, srebro i brąz nie są dekoracją, tylko drugim (po wysokości) nośnikiem
+   miejsca, i każdy odczytuje je bez podpisu.
+
+   Dlatego są tu dwie niezależne palety:
+     `--medal`  złoto / srebro / brąz. Zostaje na plakietce miejsca i w tle stopnia. Znaczy.
+     `--tone`   żółty / różowy / fiołkowy z palety strony. Świeci pod kartą, obrysowuje
+                zdjęcie i barwi paski na stopniu. Nie znaczy nic i właśnie dlatego wolno mu
+                być głośnym.
+
+   Jedna zmienna na kartę zamiast trzech selektorów na każdą ozdobę: gdy trzeba zmienić odcień,
+   zmienia się go raz, a nie w pięciu miejscach, które po pierwszej poprawce przestają się
+   zgadzać. */
+.podium-card[data-podium-place='1'] { --tone: #ffc928; --tone-soft: rgb(255 201 40 / .5); --medal: #e9a11b; }
+.podium-card[data-podium-place='2'] { --tone: #ff83ae; --tone-soft: rgb(255 131 174 / .45); --medal: #cfd8e5; }
+.podium-card[data-podium-place='3'] { --tone: #8d76ff; --tone-soft: rgb(141 118 255 / .45); --medal: #c07440; }
 
 .podium-card {
   display: grid;
@@ -239,6 +275,42 @@
   --step-h: clamp(34px, 5vw, 66px);
   background: linear-gradient(180deg, #f0b08a, #c07440);
 }
+
+/* Ukośne paski na stopniu, w kolorze karnawałowym tej kolumny.
+   ---------------------------------------------------------------------------
+   Osobną warstwą (`::before`), nie drugim gradientem w `background`: tło stopnia niesie medal
+   i musi dać się zmienić bez ruszania pasków. Paski są RZADKIE i półprzejrzyste, bo mają
+   dołożyć święta, a nie zamienić stopnia w tkaninę — przy gęstszym kroku na zdjęciu ekranu
+   pojawia się mora. */
+.podium-card__block::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    128deg,
+    var(--tone-soft) 0 10px,
+    rgb(255 255 255 / 0) 10px 26px
+  );
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+/* Poświata pod kartą, w barwie kolumny. Leży POD stopniem i pod zdjęciem (`z-index: -1` na
+   `__top::after` robi to samo z cieniem), więc nie dotyka ani fotografii, ani czytelności
+   napisów na niej — a cokół przestaje być trzema szarymi klockami na białym tle. */
+.podium-card::after {
+  content: '';
+  grid-area: 1 / 1 / 3 / 2;
+  z-index: -1;
+  align-self: end;
+  height: 62%;
+  margin: 0 -6%;
+  border-radius: 50%;
+  background: radial-gradient(60% 50% at 50% 60%, var(--tone-soft), rgb(255 255 255 / 0) 70%);
+  filter: blur(6px);
+  pointer-events: none;
+}
 /* Cyfra w bloku: duża, ale wtopiona. Ma potwierdzać miejsce, nie konkurować ze zdjęciem
    nad sobą — kolejność i tak jest już powiedziana wysokością. */
 .podium-card__block b {
@@ -249,10 +321,15 @@
 
 /* Kreska, na której stoją bloki. Jeden element, bo to jedna linia — trzy dolne krawędzie
    bloków nie tworzą jej same, gdy stawka ma mniej niż trzy wozy. */
+/* Grubsza i kolorowa, nie szara kreska włosowa. Ta linia jest jedyną rzeczą, która na
+   szerokim ekranie łączy trzy kolumny w JEDEN cokół — szara na 3 px robiła to tak cicho, że
+   trzy stopnie czytały się jako trzy osobne klocki. Tęcza trzyma stronę w tej samej palecie
+   co konfetti i zdrapka. */
 .podium__ground {
-  height: 3px;
+  height: 6px;
   border-radius: 999px;
-  background: rgb(18 35 61 / .22);
+  background: linear-gradient(90deg, #ffc928, #ff83ae 34%, #8d76ff 68%, #37c9a5);
+  box-shadow: 0 10px 24px -14px rgb(7 26 61 / .5);
 }
 
 /* ---------------------------------------------------- wejście: bloki, potem karty */
@@ -302,8 +379,13 @@
   border-radius: clamp(16px, 1.6vw, 24px);
   background: var(--navy-900);
   /* Cień własny karty, na jej płaszczyźnie — jedzie razem ze zdjęciem przy unoszeniu i daje
-     mu grubość. Cień NA COKOLE jest osobny, na `__top::after` wyżej. */
-  box-shadow: 0 26px 48px -28px rgb(7 26 61 / .75);
+     mu grubość. Cień NA COKOLE jest osobny, na `__top::after` wyżej.
+     Obrys w barwie kolumny wpisany w ten sam `box-shadow`, a nie jako `border`: obwódka
+     zabrałaby zdjęciu dwa piksele z każdej strony i przy `object-fit: cover` przycięłaby kadr.
+     `inset` leży w środku i nic nie przesuwa. */
+  box-shadow:
+    0 26px 48px -28px rgb(7 26 61 / .75),
+    inset 0 0 0 3px var(--tone, var(--yellow));
 }
 .podium-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .podium-card__photo > span[aria-hidden] { display: grid; width: 100%; height: 100%; place-items: center; color: rgb(18 35 61 / .18); font: 900 40px/1 var(--font-meta); }
@@ -417,45 +499,95 @@
    `.podium__field-photo`, `.podium__field-scrim`, `.podium__field-place`, `.podium__field-body`
    i `.podium__field-tie` usunięto razem ze znacznikiem, który je nosił. */
 
-/* Na telefonie trzy kolumny cokołu robią trzy nieczytelne kolumny: zdjęcie w kolumnie o
-   szerokości 100 px to znaczek. Cokół schodzi wtedy do listy w kolejności wyniku, a blok
-   zamienia się w wąski pasek koloru z lewej — zostaje po nim złoto, srebro i brąz, czyli
-   informacja, a nie dekoracja, której nie ma gdzie pokazać. */
+/* ===========================================================================
+   COKÓŁ NA TELEFONIE: TRZY RÓWNE PANELE, KAŻDY NA WŁASNYM STOPNIU
+   ===========================================================================
+   CO BYŁO I DLACZEGO ZOSTAŁO ZGŁOSZONE JAKO NIERÓWNE
+     Kolumna dostawała tu siatkę `10px minmax(0, 1fr)`: stopień zamieniał się w pasek koloru
+     szeroki na dziesięć pikseli z LEWEJ strony zdjęcia, a cała podłoga cokołu znikała
+     (`display: none`). Wychodziły z tego trzy panele, przed którymi stoją trzy cienkie
+     kreski — i to jest dokładnie ten kształt, który czyta się jako niedokończony: pasek jest
+     za wąski, żeby być stopniem, i za szeroki, żeby być obwódką. Zdjęcia zaczynały się
+     dziesięć pikseli plus odstęp od lewej krawędzi sekcji, a nagłówek i tabela pod nimi od
+     zera, więc lewa krawędź strony łamała się trzy razy.
+
+   CO JEST TERAZ
+     Stopień wraca pod kartę, na pełną szerokość panelu, i dalej ma trzy różne wysokości —
+     czyli podium zostaje podium także na telefonie, tylko ustawione w pionie. Wszystkie trzy
+     panele mają tę samą szerokość i tę samą lewą krawędź co reszta sekcji, więc nie ma czego
+     wyrównywać: `align-items: stretch` na kolumnie i ani jednej wartości w pikselach, która
+     mogłaby się rozjechać z resztą układu.
+
+     Kolejność: `order: 0` na wszystkich trzech, więc obraz idzie za znacznikiem — 1, 2, 3 od
+     góry. Znacznika NIE odwracamy: on niesie wynik dla czytnika ekranu, a `order` w CSS
+     ustawia obraz (na szerokim ekranie zwycięzca w środku, tu na górze). Na wąskim ekranie
+     „zwycięzca w środku" nie ma nawet sensu — środek kolumny to drugie miejsce.
+
+     Cyfra w stopniu ZOSTAJE (wcześniej `display: none`, bo w pasku 10 px nie było jej gdzie
+     postawić). Na pełnej szerokości mieści się i mówi miejsce bez czytania podpisu. */
 @media (max-width: 700px) {
-  .podium__steps { flex-direction: column; align-items: stretch; gap: 10px; }
+  .podium__steps {
+    flex-direction: column;
+    align-items: stretch;
+    gap: clamp(12px, 3.4vw, 18px);
+    /* Perspektywa bez pochylonych kart nie ma czego robić, a na wąskim ekranie liczy się
+       każdy piksel szerokości: punkt zbiegu potrafi przesunąć kartę o kilka. */
+    perspective: none;
+  }
   .podium-card[data-podium-place='1'],
   .podium-card[data-podium-place='2'],
   .podium-card[data-podium-place='3'] { order: 0; flex: none; }
+
+  /* Dwa wiersze, jedna kolumna, zero wartości w pikselach: zdjęcie, pod nim stopień na pełną
+     szerokość. Bez `grid-template-columns` w ogóle — poprzednia wersja musiała jawnie
+     przypisywać komórki (`grid-area`), bo w znaczniku karta stoi PRZED stopniem, a w dwóch
+     wierszach ta kolejność jest już właściwa. */
   .podium-card {
-    grid-template-rows: auto;
-    grid-template-columns: 10px minmax(0, 1fr);
-    align-items: stretch;
+    grid-template-rows: auto min-content;
+    align-content: stretch;
   }
-  /* JAWNE PRZYPISANIE DO KOMÓREK, BO KOLEJNOŚĆ W ZNACZNIKU JEST ODWROTNA.
-     ---------------------------------------------------------------------------
-     Kolumna ma tu dwa pola — pasek koloru 10 px i resztę — a w znaczniku najpierw stoi karta,
-     potem blok. Bez tych dwóch linijek siatka układa je po kolei: KARTA ląduje w pasku
-     szerokim na dziesięć pikseli, a blok dostaje całą resztę. Na telefonie znaczyło to trzy
-     kolorowe belki i ani jednego zdjęcia — pierwsza trójka wyniku znikała z ekranu zupełnie,
-     zostawiając złoto, srebro i brąz bez nikogo na nich. */
-  .podium-card__block {
-    grid-area: 1 / 1;
-    height: auto;
-    border: 0;
-    border-radius: 999px;
-  }
-  .podium-card__top { grid-area: 1 / 2; }
-  .podium-card__block b { display: none; }
-  /* Na telefonie cokół jest paskiem z lewej, a nie stopniem pod kartą: nie ma nad czym
-     lewitować, więc odchylenie, odstęp i cień na stopniu schodzą razem z nim. Zostaje samo
-     zdjęcie z napisami — czyli ta część, która na wąskim ekranie działa najlepiej. */
+
+  /* Na telefonie karta nie lewituje: nie ma miejsca na odstęp i cień pod nią, a pochylenie na
+     wąskim ekranie zjada szerokość zdjęcia. Zostaje samo zdjęcie z napisami. */
   .podium-card__top { --lean: none; margin-bottom: 0; }
   .podium-card__top::after { display: none; }
+
+  /* Stopień: pełna szerokość, trzy wysokości, cyfra w środku. Zaokrąglony tylko u dołu, więc
+     razem ze zdjęciem nad sobą tworzy jeden panel, a nie dwa sąsiadujące prostokąty. */
+  .podium-card__block {
+    border: 0;
+    border-radius: 0 0 clamp(14px, 3.4vw, 20px) clamp(14px, 3.4vw, 20px);
+  }
+  /* `.podium__steps` z przodu, żeby podnieść specyficzność — i to nie jest ozdoba selektora.
+     ---------------------------------------------------------------------------
+     Dalej w tym pliku stoi `@media (min-height: 640px)`, które ustawia te same trzy zmienne na
+     wysokości dla szerokiego ekranu. Telefon ma 844 px (i 740 px) wysokości, więc TAMTO
+     zapytanie też jest prawdziwe, a ponieważ leży niżej w pliku, przy równej specyficzności
+     wygrywa. ZMIERZONE: stopnie na 390×844 wychodziły 56/38/26 px zamiast 34/26/20 — czyli
+     kolumna dostawała wysokości policzone dla cokołu w rzędzie. Jedna klasa więcej rozstrzyga
+     to regułą, a nie kolejnością wierszy, której nikt nie widzi. */
+  .podium__steps .podium-card[data-podium-place='1'] .podium-card__block { --step-h: 34px; }
+  .podium__steps .podium-card[data-podium-place='2'] .podium-card__block { --step-h: 26px; }
+  .podium__steps .podium-card[data-podium-place='3'] .podium-card__block { --step-h: 20px; }
+  .podium-card__block b { font-size: 16px; }
+
+  /* Zdjęcie płaskie, bo w pionowej liście trzy kadry 4/5 to trzy ekrany przewijania. Górne
+     narożniki zaokrąglone, dolne wyprostowane — panel domyka stopień pod spodem. */
   .podium-card[data-podium-place='1'] .podium-card__photo,
   .podium-card[data-podium-place='2'] .podium-card__photo,
-  .podium-card[data-podium-place='3'] .podium-card__photo { aspect-ratio: 16 / 10; }
-  .podium__steps { perspective: none; }
-  .podium__ground { display: none; }
+  .podium-card[data-podium-place='3'] .podium-card__photo {
+    aspect-ratio: 16 / 10;
+    border-radius: clamp(14px, 3.4vw, 20px) clamp(14px, 3.4vw, 20px) 0 0;
+  }
+
+  /* Poświata schodzi: na telefonie panele stoją jeden pod drugim, a rozmyta plama pod każdym
+     z nich wchodziłaby na panel niżej i wyglądałaby jak zabrudzone tło. */
+  .podium-card::after { display: none; }
+
+  /* Podłoga zostaje, w przeciwieństwie do poprzedniej wersji. Trzy panele bez niej kończą się
+     w powietrzu, a to ona mówi, że stoją NA czymś — i przy okazji domyka kolumnę tą samą
+     tęczą, którą cokół ma na szerokim ekranie. */
+  .podium__ground { margin-top: clamp(10px, 2.6vw, 14px); }
 }
 
 /* Kto prosi o mniej ruchu, dostaje gotowy cokół: te same bloki, te same kolory, zero
@@ -1947,27 +2079,39 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   .podium__steps[data-podium-count='2'] .podium-card[data-podium-place='2'] { flex: 0 1 38%; }
 }
 
-/* ============================================================ zegar na samej górze */
-/* W miejscu paska postępu przewijania. `sticky`, więc jedzie z przewijaniem: kto zszedł
-   w połowę listy wózków, nadal widzi, ile ma czasu, bez wracania na górę. Tęczowy pas pod
-   spodem trzyma stronę w cukierkowej palecie i jednocześnie oddziela zegar od nagłówka. */
+/* ============================================================ zegar głosowania
+   ===========================================================================
+   ZWYKŁY ELEMENT TREŚCI, A NIE DRUGA BELKA POD PASKIEM.
+
+   BYŁO: `position: sticky; top: var(--vote-header-bottom)`, czyli pas przyklejony pod paskiem
+   nawigacji. Dwie belki jedna nad drugą zabierały na telefonie około ćwierci ekranu przez cały
+   czas głosowania — a pod nimi jest lista kilkudziesięciu wozów, po którą ktoś tu przyszedł.
+   Zgłoszone wprost: „zegar ma być na stronie, nie przyklejony".
+
+   JEST: pudełko w nagłówku sekcji, pod zdaniem, które mówi, o co w tym głosowaniu chodzi.
+   A przy przewijaniu w dół jego kopia wjeżdża W PASEK (`.nav-clock--vote` niżej), więc czas
+   nadal jest pod ręką bez wracania na górę — tylko bez drugiego pasa na ekranie.
+
+   `--vote-header-bottom` nie jest już nikomu potrzebne i nie jest ustawiane: pudełko stoi
+   w przepływie, a odstęp od paska daje `padding-top` na `.vote-main`. */
 .vote-timer {
-  position: sticky;
-  /* Pod paskiem, nie za nim. Wartosc ustawia syncHeaderOffset() w voting-boot.js, bo
-     wysokosc paska zalezy od szerokosci ekranu i od tego, czy nazwa sie zawija. Zapasowe
-     `0px` znaczy zachowanie sprzed tej zmiany, gdyby skrypt nie wystartowal. */
-  top: var(--vote-header-bottom, 0px);
-  z-index: 60;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: center;
   gap: 6px 12px;
-  padding: 9px 14px 11px;
-  border-bottom: 3px solid var(--navy-950);
+  /* Odstęp od zdania nad nim i od wyboru rocznika pod nim. Zegar jest osobną informacją,
+     nie dopiskiem do akapitu. */
+  margin: clamp(16px, 2.6vw, 26px) 0 0;
+  padding: 11px 16px 13px;
+  /* Obwódka i zaokrąglenie, bo to już nie pas przez całą szerokość ekranu, tylko pudełko
+     w treści — bez ramki tęczowe tło rozlewałoby się w akapit. */
+  border: 3px solid var(--navy-950);
+  border-radius: clamp(14px, 1.8vw, 20px);
   background: linear-gradient(100deg, #ffd75e, #ff83ae 42%, #8d76ff 82%);
   color: var(--navy-950);
   text-align: center;
+  box-shadow: 5px 5px 0 rgb(7 26 61 / .18);
 }
 .vote-timer[hidden] { display: none; }
 .vote-timer__label {
@@ -2000,8 +2144,62 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
     50% { transform: scale(1.45); }
   }
 }
-/* Nagłówek zjeżdża o wysokość paska, żeby zegar nie kładł się na tytule. */
+/* Treść zjeżdża o wysokość paska, bo pasek jest `position: fixed` i inaczej przykryłby tytuł. */
 .vote-page .vote-main { padding-top: clamp(74px, calc(var(--screen-h, 100svh) * 0.11), 118px); }
+
+/* ------------------------------------------------- kopia zegara zadokowana w pasku
+   ===========================================================================
+   Kształt, pozycja i wygaszanie przychodzą z `.nav-clock` w experience.css — ten sam element
+   co odliczanie zadokowane na stronie głównej, więc ta sama pozycja bezwzględnie na środku
+   paska, ta sama rezerwa na marce i przyciskach i to samo `[data-clock-docked]`. Tutaj są
+   tylko dwie różnice, które z tego wynikają.
+
+   PIERWSZA: PODPIS JEST ZDANIEM, NIE LITERĄ.
+     Odliczanie w pasku ma cztery jednostki po jednej literze („g", „o", „m", „s"). Zegar
+     głosowania ma podpis „Pozostało" / „Zeit übrig" / „Temps restant" i jedną liczbę. Podpis
+     dostaje więc mniejszy krój i nie wolno mu się zawinąć: zawinięty rozpycha pasek w wysokość.
+
+   DRUGA: NIE POKAZUJE SIĘ, DOPÓKI NIE MA ODCZYTU.
+     Zegar w treści ma na to `hidden`, ale kopia w pasku nie może go używać — jej widocznością
+     rządzi `opacity`/`visibility` z `[data-clock-docked]`, a `hidden` wygrałoby z tym na zawsze
+     (patrz komentarz w `paintTimer` w voting-page.js). Zamiast tego voting-page.js dopina
+     `[data-vote-timer-ready]` po pierwszym odczycie stanu, a ta reguła trzyma kopię schowaną,
+     dopóki go nie ma. Trzy selektory zamiast `!important`: wyższa waga niż reguła w
+     experience.css, więc rozstrzyga bez zaklęcia i bez zależności od kolejności arkuszy. */
+/* Rezerwa z pomiaru, ta sama co dla chipu i odliczania — patrz `--nav-side` w experience.css.
+   Bez tego zegar wyśrodkowany bezwzględnie nie wie, że po prawej stoją flaga, „Wróć na stronę"
+   i „Menu", a napis na przycisku powrotu jest w każdym języku innej długości. */
+.site-header .nav-clock--vote {
+  gap: 8px;
+  max-width: max(0px, min(260px, calc(100% - 2 * var(--nav-side))));
+}
+.nav-clock--vote .nav-clock__label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 8.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nav-clock--vote .nav-clock__number { font-size: 15px; }
+.site-header[data-clock-docked] .nav-clock--vote:not([data-vote-timer-ready]) {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Na wąskim pasku zostaje sama liczba.
+   ---------------------------------------------------------------------------
+   Zmierzone na 390 px: pasek zwinięty ma około 322 px, marka kończy się na ~162 px, a flaga
+   z „Menu" zaczyna na ~247 px — na środek zostaje niecałe 85 px. „Pozostało 12:34" ma tam
+   ponad 120 px i wchodziłoby zarówno na markę, jak i na przyciski.
+
+   Zdjęty jest PODPIS, nie liczba, i to nie jest utrata informacji: pełne zdanie stoi w
+   zegarze w treści strony, kilka przewinięć wyżej, a w pasku pytanie jest jedno — „ile
+   jeszcze". Kolor i bicie kropki niosą fazę bez słowa. */
+@media (max-width: 470px) {
+  .nav-clock--vote { display: flex; }
+  .nav-clock--vote .nav-clock__label { display: none; }
+  .nav-clock--vote .nav-clock__number { font-size: 16px; }
+}
 
 /* ============================================================ szkielet zdjęcia */
 /* Do tej pory na miejscu wczytywanego zdjęcia stał ciemny prostokąt — nieodróżnialny od
@@ -2069,6 +2267,22 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 .vote-card.is-armed .vote-veil { opacity: 1; pointer-events: auto; }
 
+/* Przygaszone tło nakładki jest czynne, więc musi to POKAZYWAĆ.
+   ---------------------------------------------------------------------------
+   Nakładka kryje całe zdjęcie i przy odsłonięciu łapie wskaźnik, a jej tło nie robiło nic:
+   ZMIERZONE sondą probe-voting-mobile.mjs na 390×844, 20 z 25 punktów zdjęcia zwracało
+   `div.vote-veil` i dotknięcie przepadało bez śladu. Obsługa jest teraz w `voteOverlay()`
+   (tło zamknięte otwiera rząd ocen, otwarte składa kafelek), a tutaj zostaje jedyna rzecz,
+   której nie da się powiedzieć z JavaScriptu: że pod kursorem to jest cel, a nie dekoracja.
+
+   `-webkit-tap-highlight-color`, bo bez tego dotknięcie tła zapala na pół sekundy szary
+   prostokąt na CAŁYM zdjęciu — wygląda jak błąd rysowania, nie jak reakcja na dotknięcie. */
+.vote-card.is-armed .vote-veil { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* W trakcie wybierania kursor wraca do zwykłego nad tłem: tam kliknięcie SKŁADA kafelek, więc
+   „palec wskazujący" nad suwakiem obiecywałby coś innego, niż się stanie. */
+.vote-card.is-picking .vote-veil { cursor: default; }
+.vote-card.is-picking .vote-veil__pick { cursor: auto; }
+
 .vote-veil__cta {
   min-height: 48px;
   padding: 0 22px;
@@ -2114,7 +2328,12 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 .vote-veil__actions { display: grid; gap: 5px; }
 .vote-veil__send { width: 100%; justify-content: center; min-height: 46px; }
 .vote-veil__cancel {
-  min-height: 34px;
+  /* 44 px, nie 34: to jedyna droga wyjścia z wybierania oceny i musi być celem dotykowym na
+     KAŻDEJ szerokości. Okrągły krzyżyk 44×44 dokłada blok `max-width: 700px`, ale tablet ma
+     768 px i dostawał tam podkreślony napis 230×34 — dziesięć pikseli pod zalecanym minimum,
+     ZMIERZONE sondą probe-voting-mobile.mjs na 768×1024. Wygląd zostaje ten sam, rośnie tylko
+     pole, w które da się trafić; na myszy dziesięć pikseli więcej nikomu nie przeszkadza. */
+  min-height: 44px;
   border: 0;
   background: none;
   color: var(--muted);
@@ -2514,4 +2733,357 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   max-width: 62ch;
   font-size: clamp(15px, 1.6vw, 17px);
   line-height: 1.55;
+}
+
+/* ===========================================================================
+   WSTĄŻKA NAGRODY PUBLICZNOŚCI
+   ===========================================================================
+   Nad cokołem stoi teraz jedno zdanie o tym, CZYJ jest ten wynik — bo pod cokołem stoi
+   dwanaście nagród jury i bez tego rozróżnienia trzynaście wyników czyta się jak jedna lista.
+   Wstążka, nie nagłówek: nagłówek sekcji mówi „Podium", czyli kształt; ten pasek mówi, kto
+   ten wynik przyznał. Kolory te same co konfetti, bo to ta sama chwila. */
+.podium__crown {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: clamp(14px, 2.4vw, 22px) 0 0;
+  text-align: center;
+}
+.podium__crown[hidden] { display: none; }
+.podium__crown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 9px 20px;
+  border: 3px solid var(--navy-950);
+  border-radius: 999px;
+  background: linear-gradient(100deg, #ffc928, #ff83ae 52%, #8d76ff);
+  box-shadow: 5px 5px 0 rgb(7 26 61 / .2);
+  color: var(--navy-950);
+  font: 900 clamp(12px, 1.5vw, 15px)/1 var(--font-meta);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.podium__crown-star { font-size: 1.2em; line-height: 1; }
+.podium__crown-note {
+  margin: 0;
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: clamp(13px, 1.4vw, 15px);
+  line-height: 1.5;
+}
+
+/* ===========================================================================
+   DWANAŚCIE NAGRÓD JURY
+   ===========================================================================
+   Siatka, nie tabela: w wierszu tabeli nie ma gdzie postawić zdjęcia zwycięzcy w rozmiarze,
+   w którym cokolwiek na nim widać, a każda z tych dwunastu nagród ma jednego zwycięzcę, nie
+   kolumnę liczb do porównania. `auto-fill` z minimum 250 px daje cztery karty na monitorze,
+   dwie na tablecie i jedną na telefonie bez ani jednego zapytania o szerokość. */
+.podium__awards { margin: clamp(30px, 4.5vw, 54px) 0 0; }
+.podium__awards[hidden] { display: none; }
+.podium__awards-title {
+  margin: 0;
+  font: 400 clamp(20px, 2.6vw, 30px)/1.12 var(--font-display);
+  letter-spacing: -.01em;
+}
+.podium__awards-lead {
+  margin: 6px 0 clamp(14px, 2vw, 20px);
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: clamp(13px, 1.4vw, 15px);
+  line-height: 1.5;
+}
+.award-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: clamp(10px, 1.6vw, 16px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ROZSTRZYGNIĘTA I NIEROZSTRZYGNIĘTA MUSZĄ SIĘ RÓŻNIĆ Z DRUGIEGO KOŃCA POKOJU.
+   ---------------------------------------------------------------------------
+   To są dwa różne zdania: „wygrał ten wóz" i „wyniku jeszcze nie ogłoszono". Gdyby różniły
+   się tylko treścią w środku karty, ktoś przewijający listę wieczorem, w trakcie ogłaszania,
+   musiałby przeczytać dwanaście kart, żeby się dowiedzieć, które już wiadomo. Dlatego różnica
+   jest w obwódce (ciągła / przerywana), w tle (białe / przygaszone) i w kolorze — czyli w
+   trzech rzeczach widocznych bez czytania. */
+.award-card {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: clamp(12px, 1.5vw, 16px);
+  border: 3px solid var(--navy-950);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 6px 6px 0 rgb(255 201 40 / .45);
+}
+.award-card[data-award-state='pending'] {
+  border-style: dashed;
+  border-color: rgb(7 26 61 / .34);
+  background: rgb(154 217 255 / .1);
+  box-shadow: none;
+}
+/* Cztery kolory po kolei, żeby siatka dwunastu kart nie była dwunastoma tymi samymi kartami.
+   Tylko na rozstrzygniętych: nierozstrzygnięta ma być cicha i tym się różni. */
+.award-card[data-award-state='won']:nth-child(4n + 2) { box-shadow: 6px 6px 0 rgb(255 131 174 / .45); }
+.award-card[data-award-state='won']:nth-child(4n + 3) { box-shadow: 6px 6px 0 rgb(141 118 255 / .4); }
+.award-card[data-award-state='won']:nth-child(4n + 4) { box-shadow: 6px 6px 0 rgb(55 201 165 / .4); }
+
+.award-card__head { display: flex; align-items: baseline; gap: 9px; }
+.award-card__rank {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--navy-950);
+  color: var(--yellow);
+  font: 900 11px/1 var(--font-meta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .06em;
+}
+.award-card[data-award-state='pending'] .award-card__rank {
+  background: rgb(7 26 61 / .12);
+  color: rgb(7 26 61 / .55);
+}
+.award-card__title {
+  margin: 0;
+  font: 400 clamp(15px, 1.6vw, 18px)/1.15 var(--font-display);
+  letter-spacing: -.01em;
+  overflow-wrap: anywhere;
+}
+
+/* Zdanie o nieogłoszonym wyniku. Kursywa i przygaszony kolor: to jest stan, nie nazwa. */
+.award-card__pending {
+  margin: 0;
+  color: rgb(7 26 61 / .58);
+  font: italic 600 13px/1.4 var(--font-body);
+}
+
+.award-card__who { display: flex; align-items: center; gap: 10px; }
+.award-card__photo {
+  flex: none;
+  width: 62px;
+  height: 50px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--navy-900);
+}
+.award-card__identity { display: grid; gap: 2px; min-width: 0; }
+.award-card__start {
+  color: var(--muted);
+  font: 900 10px/1 var(--font-meta);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .1em;
+}
+.award-card__identity strong {
+  font: 400 clamp(14px, 1.5vw, 17px)/1.15 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.award-card__rider {
+  color: var(--muted);
+  font: 800 10px/1.25 var(--font-meta);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+/* Wynik kategorii (czas, wymiar, wiek) — to, co jury zapisało w `note`. Osobny pasek, bo to
+   jest LICZBA, po którą się tu przyszło, a nie kolejna linijka podpisu. */
+.award-card__result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding-top: 8px;
+  border-top: 2px solid rgb(7 26 61 / .1);
+}
+.award-card__result span {
+  color: var(--muted);
+  font: 800 9.5px/1 var(--font-meta);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.award-card__result b {
+  font: 900 clamp(14px, 1.6vw, 18px)/1 var(--font-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===========================================================================
+   ARCHIWUM ROCZNIKÓW
+   ===========================================================================
+   Sekcja pojawia się dopiero, gdy jakiś rocznik został zarchiwizowany — patrz
+   `archivedEditions()` w voting.js. Panel jest zwijany, bo bieżący wynik jest treścią strony,
+   a poprzednie lata odpowiedzią na pytanie zadane świadomie. */
+.archive[hidden] { display: none; }
+.archive__open { margin-top: clamp(14px, 2.2vw, 22px); }
+.archive__panel {
+  display: grid;
+  gap: clamp(14px, 2.2vw, 22px);
+  margin-top: clamp(16px, 2.4vw, 24px);
+}
+.archive__panel[hidden] { display: none; }
+
+.archive__pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.archive__label {
+  color: var(--muted);
+  font: 800 10.5px/1.4 var(--font-meta);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+/* Wysokość 48 px, bo to jedyny cel dotykowy w tej sekcji, a zalecane minimum to 44.
+   Rodzime pole wyboru, nie własna lista: na telefonie natywne koło wyboru jest wygodniejsze
+   niż cokolwiek, co da się zrobić z `div`-ów, i działa z czytnikiem ekranu bez ani jednej
+   linijki JavaScriptu. */
+.archive__select {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 3px solid var(--navy-950);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: 800 14px/1.2 var(--font-meta);
+}
+.archive__select:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+/* Scena rocznika. `position: relative`, i to nie jest kosmetyka: `.podium-confetti` jest
+   pozycjonowane bezwzględnie względem najbliższego pozycjonowanego rodzica, więc bez tej
+   jednej linijki konfetti spadałoby nad zupełnie innym miejscem strony. */
+.archive__stage {
+  position: relative;
+  display: grid;
+  gap: clamp(10px, 1.8vw, 16px);
+  overflow: hidden;
+}
+
+/* „Było nas wtedy 1240 osób na zjeździe" — jedno zdanie, trzy elementy, bo liczba ma być
+   duża, a zdanie wokół niej normalne. */
+.archive__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: clamp(12px, 2vw, 18px) clamp(14px, 2.2vw, 22px);
+  border: 3px solid var(--navy-950);
+  border-radius: 22px;
+  background: linear-gradient(120deg, rgb(255 201 40 / .22), rgb(255 131 174 / .18) 55%, rgb(141 118 255 / .2));
+  box-shadow: 6px 6px 0 rgb(7 26 61 / .16);
+}
+.archive__summary[hidden] { display: none; }
+.archive__summary-lead {
+  color: var(--ink);
+  font: 400 clamp(15px, 1.9vw, 21px)/1.2 var(--font-display);
+}
+.archive__summary-count {
+  font: 900 clamp(30px, 5vw, 52px)/1 var(--font-meta);
+  font-variant-numeric: tabular-nums;
+}
+.archive__summary-label {
+  color: var(--muted);
+  font: 800 clamp(10px, 1.1vw, 12px)/1.3 var(--font-meta);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.archive__meta {
+  margin: 0;
+  color: var(--muted);
+  font: 800 11px/1.4 var(--font-meta);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.archive__meta[hidden] { display: none; }
+.archive__subtitle {
+  margin: clamp(4px, 1vw, 8px) 0 0;
+  font: 400 clamp(17px, 2.1vw, 23px)/1.15 var(--font-display);
+}
+.archive__subtitle[hidden] { display: none; }
+.archive__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(13px, 1.4vw, 15px);
+  line-height: 1.5;
+}
+.archive__note[hidden] { display: none; }
+
+/* Trójka nagrody publiczności z tamtego roku: trzy wiersze, nie cokół. Cokół jest kształtem
+   dla wyniku świeżego — tu jest zapis, a zapis czyta się listą. */
+.archive__podium {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.archive-row {
+  display: grid;
+  grid-template-columns: auto 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 3px solid var(--navy-950);
+  border-radius: 18px;
+  background: #fff;
+}
+.archive-row[data-archive-place='1'] { box-shadow: 5px 5px 0 rgb(255 201 40 / .55); }
+.archive-row[data-archive-place='2'] { box-shadow: 5px 5px 0 rgb(255 131 174 / .45); }
+.archive-row[data-archive-place='3'] { box-shadow: 5px 5px 0 rgb(141 118 255 / .4); }
+.archive-row__place {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--navy-950);
+  color: var(--yellow);
+  font: 900 15px/1 var(--font-meta);
+}
+.archive-row__photo {
+  width: 64px;
+  height: 46px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--navy-900);
+}
+.archive-row__who { display: grid; gap: 2px; min-width: 0; }
+.archive-row__who strong { font: 400 clamp(14px, 1.5vw, 17px)/1.15 var(--font-display); overflow-wrap: anywhere; }
+.archive-row__who small { color: var(--muted); font: 800 10px/1.2 var(--font-meta); letter-spacing: .08em; }
+.archive-row__score { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.archive-row__score b { font: 900 clamp(16px, 1.8vw, 22px)/1 var(--font-meta); font-variant-numeric: tabular-nums; }
+.archive-row__score small { color: var(--muted); font: 800 9px/1.2 var(--font-meta); letter-spacing: .06em; text-transform: uppercase; }
+
+/* Karty nagród w archiwum są ciaśniejsze: to zapis sprzed roku, a nie wynik ogłaszany na
+   oczach — nie musi zajmować tyle miejsca co bieżący. */
+.award-list--compact { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.award-list--compact .award-card { padding: 11px 12px; border-width: 2px; border-radius: 16px; box-shadow: none; }
+.award-list--compact .award-card[data-award-state='won'] { box-shadow: 4px 4px 0 rgb(7 26 61 / .12); }
+.award-list--compact .award-card__photo { width: 52px; height: 42px; }
+
+@media (max-width: 700px) {
+  /* Jedna kolumna i mniejsze zdjęcie: przy dwóch kolumnach na 360 px nazwa kategorii zawijała
+     się na cztery wiersze i karta „najzabawniejszy Carruleddhu" była wyższa niż zdjęcie w niej. */
+  .award-list, .award-list--compact { grid-template-columns: minmax(0, 1fr); }
+  .archive-row { grid-template-columns: auto 52px minmax(0, 1fr); }
+  .archive-row__photo { width: 52px; height: 40px; }
+  /* Punkty schodzą pod nazwę, na całą szerokość wiersza: w czterech kolumnach na 360 px
+     zostawało na nie osiemnaście pikseli i liczba się łamała. */
+  .archive-row__score {
+    grid-column: 2 / -1;
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+/* Kto prosi o mniej ruchu, dostaje wynik bez konfetti — samo podsumowanie. Zgoda jest
+   sprawdzana także w JavaScripcie (patrz `confetti()` w voting.js), więc elementy w ogóle nie
+   powstają; ta reguła jest zabezpieczeniem dla wszystkiego, co mogłoby je dołożyć inaczej. */
+@media (prefers-reduced-motion: reduce) {
+  .archive__stage .podium-confetti { display: none; }
 }

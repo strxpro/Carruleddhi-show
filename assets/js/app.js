@@ -11,7 +11,8 @@ import { flagSvg } from './flags.js';
    nazw znaczących to samo w jednym pliku. */
 import {
   makeText, makePayload, measureScreenHeight, postJSON,
-  screenHeight as frozenScreenHeight, showToast, translateDom
+  screenHeight as frozenScreenHeight, setCopyTokens, showToast, translateDom,
+  watchNavCentreReserve
 } from './site-bridge.js';
 
 (() => {
@@ -117,26 +118,117 @@ import {
     return parts ? `${parts[3]} · ${parts[2]} · ${parts[1]}` : config.dateLabel;
   }
 
-  function formatEventDateLabel(value, location) {
+  /**
+   * Sama data po ludzku, bez miejsca: „17 ottobre 2026", „17 października 2026".
+   *
+   * Wyciągnięte z `formatEventDateLabel`, bo te dwa napisy stoją w różnych miejscach: kicker w
+   * hero chce datę Z miejscem, a kicker programu i znacznik %DATE% chcą samej daty. Jedna
+   * funkcja z parametrem „czy dokładać miejsce" znaczyłaby, że każde wywołanie trzeba czytać
+   * razem z tym parametrem, żeby wiedzieć, co wyjdzie.
+   */
+  function formatEventDate(value) {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return config.dateLabel;
-    let formatted;
+    if (Number.isNaN(date.getTime())) return DEFAULT_SITE_CONFIG.dateLabel.split(' · ')[0];
     try {
-      formatted = new Intl.DateTimeFormat(state.lang || 'it', {
+      return new Intl.DateTimeFormat(state.lang || 'it', {
         day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome'
       }).format(date);
     } catch (_) {
-      formatted = formatHeaderDate(value).replaceAll(' · ', '/');
+      return formatHeaderDate(value).replaceAll(' · ', '/');
     }
-    return [formatted, location].filter(Boolean).join(' · ');
+  }
+
+  function formatEventDateLabel(value, location) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return config.dateLabel;
+    return [formatEventDate(value), location].filter(Boolean).join(' · ');
+  }
+
+  /** Rok edycji z `config.eventDate`. Zapas na bieżący rok, żeby nigdy nie wyszło „NaN". */
+  function eventYear() {
+    const date = new Date(config.eventDate);
+    return String(Number.isNaN(date.getTime()) ? new Date().getFullYear() : date.getFullYear());
+  }
+
+  /**
+   * DANE STRUKTURALNE (JSON-LD) PO ODCZYCIE USTAWIEŃ.
+   * ===========================================================================
+   * `startDate` i `endDate` w `<script type="application/ld+json">` były wpisane na sztywno.
+   * To jest napis, którego nie widzi nikt na ekranie — i właśnie dlatego przeżyłby każdą
+   * przeprowadzkę edycji bez poprawki, a wyszukiwarka i podglądy odsyłaczy pokazywałyby
+   * zeszłoroczny termin jako fakt o wydarzeniu.
+   *
+   * PODMIANA PRZEZ `textContent`, NIE PRZEZ WSTAWIANIE HTML-a.
+   *   Zawartość tego znacznika nie jest znacznikiem, tylko danymi. `innerHTML` przepuszczałby
+   *   `<` i `>` z nazwy edycji wpisanej w panelu jako składnię — a `JSON.stringify` i
+   *   `textContent` razem nie mają na to żadnej drogi.
+   *
+   * GODZINY 12:00–22:00 ZOSTAJĄ RAMĄ DNIA, NIE GODZINĄ STARTU.
+   *   `config.eventDate` to chwila startu wyścigu (14:30) i tym karmi się licznik.
+   *   `startDate` w danych strukturalnych opisuje CAŁE wydarzenie, które zaczyna się
+   *   prezentacją wozów w południe i kończy zabawą wieczorem — tak stoi w sekcji programu.
+   *   Brany jest więc sam DZIEŃ z konfiguracji, a godziny i strefa zostają.
+   */
+  function applyStructuredData() {
+    const script = $('script[type="application/ld+json"]');
+    if (!script) return;
+    const parts = String(config.eventDate || '').match(/^(\d{4}-\d{2}-\d{2})T[\d:.]+(Z|[+-]\d{2}:\d{2})?/);
+    if (!parts) return;
+    const day = parts[1];
+    const zone = parts[2] === 'Z' ? 'Z' : (parts[2] || '+02:00');
+    let data;
+    try {
+      data = JSON.parse(script.textContent);
+    } catch (_) {
+      /* Zepsuty JSON w znaczniku to błąd do naprawienia w index.html, nie w czasie działania —
+         nadpisanie go tutaj ukryłoby literówkę, którą powinien złapać przegląd pliku. */
+      return;
+    }
+    data.name = config.eventName;
+    data.startDate = `${day}T12:00:00${zone}`;
+    data.endDate = `${day}T22:00:00${zone}`;
+    script.textContent = JSON.stringify(data, null, 2);
   }
 
   function applyPublicConfig() {
+    /* NAJPIERW ZNACZNIKI W NAPISACH, POTEM NAPISY.
+       ---------------------------------------------------------------------------
+       `%YEAR%`, `%DATE%`, `%EVENT%` i `%PLACE%` w słowniku podstawia site-bridge.js, a wartości
+       bierze stąd. Ustawiane przed każdym odczytem ze słownika w tej funkcji — inaczej pierwszy
+       `text('meta.title')` po odpowiedzi serwera złożyłby tytuł ze starą datą. */
+    setCopyTokens({
+      YEAR: eventYear(),
+      DATE: formatEventDate(config.eventDate),
+      EVENT: config.eventName,
+      PLACE: config.eventLocation
+    });
     $$('[data-config-event-name]').forEach((element) => { element.textContent = config.eventName; });
     $$('[data-header-date]').forEach((element) => { element.textContent = formatHeaderDate(config.eventDate); });
     $$('[data-config-date-label]').forEach((element) => {
       element.textContent = formatEventDateLabel(config.eventDate, config.eventLocation);
     });
+    /* ROK I DATA Z JEDNEGO ŹRÓDŁA, TAKŻE W TYCH MIEJSCACH, KTÓRE NIE SĄ ZDANIEM.
+       ---------------------------------------------------------------------------
+       `hero__year` w tytule strony, rok w stopce i data w kickerze programu były wpisane w
+       znacznik i nie ruszał ich żaden odczyt. Ten sam atrybut i ta sama nazwa co na podstronie
+       głosowania (`applyEventConfig` w voting-boot.js) — dwie różne nazwy dla tego samego
+       znaczyłyby, że poprawka na jednej stronie nie działa na drugiej. */
+    $$('[data-config-event-year]').forEach((element) => { element.textContent = eventYear(); });
+    $$('[data-config-event-date]').forEach((element) => {
+      element.textContent = formatEventDate(config.eventDate);
+    });
+    $$('[data-config-event-location]').forEach((element) => {
+      element.textContent = config.eventLocation || '';
+    });
+    /* `<time datetime="…">` w programie. Nie widzi tego nikt na ekranie — czyta to czytnik
+       ekranu i wyszukiwarka — więc zeszłoroczna data siedziałaby tam do końca świata. Godzina
+       zostaje w znaczniku, bo to ona jest treścią wiersza; z konfiguracji bierzemy sam dzień. */
+    const eventDay = String(config.eventDate || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(eventDay)) {
+      $$('[data-config-schedule-time]').forEach((element) => {
+        element.setAttribute('datetime', `${eventDay}T${element.dataset.configScheduleTime}`);
+      });
+    }
     const configurableText = [
       ['[data-config-tagline]', config.tagline, DEFAULT_SITE_CONFIG.tagline],
       ['[data-config-route-distance]', config.route.distance, DEFAULT_SITE_CONFIG.route.distance],
@@ -146,7 +238,29 @@ import {
       if (value === defaultValue) return;
       $$(selector).forEach((element) => { element.textContent = value; });
     });
-    if (config.eventName !== DEFAULT_SITE_CONFIG.eventName) document.title = config.eventName;
+    /* TYTUŁ KARTY I OPISY DO UDOSTĘPNIENIA — Z TEJ SAMEJ DATY CO RESZTA STRONY.
+       ---------------------------------------------------------------------------
+       Było: `document.title = config.eventName` i tylko wtedy, gdy nazwa różni się od
+       wbudowanej. Po ogłoszeniu nowej edycji tytuł karty gubił miejsce („Carruleddhi Show 2027"
+       zamiast „… — Santa Teresa Gallura"), a gdy nazwa się nie zmieniła, zostawał tytuł z
+       zeszłorocznym rokiem wpisany w `<title>` w pliku.
+
+       Teraz idzie ze słownika, ze znacznikami podstawionymi wyżej — więc tytuł, opis dla
+       wyszukiwarki i opis dla podglądu odsyłacza mówią jedną datę, w języku, w którym ktoś
+       właśnie czyta stronę. `applyLanguage` woła tę funkcję po każdym przełączeniu języka. */
+    document.title = text('meta.title');
+    const description = $('meta[name="description"]');
+    if (description) description.content = text('meta.description');
+    const ogTitle = $('meta[property="og:title"]');
+    if (ogTitle) ogTitle.content = config.eventName;
+    const ogDescription = $('meta[property="og:description"]');
+    if (ogDescription) {
+      /* Hasło, potem data i miejsce — ten sam kształt, który stał w znaczniku. Nie ten sam
+         napis co `meta.description`: tam jest zdanie dla wyszukiwarki, tu jednolinijkowy podpis
+         pod obrazkiem w komunikatorze. */
+      ogDescription.content = `${config.tagline} ${formatEventDate(config.eventDate)} — ${config.eventLocation}`;
+    }
+    applyStructuredData();
 
     $$('[data-contact-email]').forEach((link) => {
       link.textContent = config.contact.email;
@@ -603,9 +717,10 @@ import {
     flipVisible = null;
 
     document.documentElement.lang = lang;
-    document.title = dict['meta.title'] || config.eventName;
-    const description = $('meta[name="description"]');
-    if (description && dict['meta.description']) description.content = dict['meta.description'];
+    /* Tytuł karty i `meta[name=description]` ustawia teraz `applyPublicConfig` na końcu tej
+       funkcji, bo oba napisy zawierają znaczniki `%DATE%`/`%EVENT%`/`%PLACE%` i muszą być
+       złożone PO podstawieniu. Wpisywanie tu surowego `dict['meta.title']` dawało tytuł karty
+       „%EVENT% — %PLACE%" — czyli wzorzec zamiast nazwy. */
 
     const metadata = languageMeta[lang] || languageMeta.it;
     const languageTrigger = $('[data-language-trigger]');
@@ -9385,6 +9500,11 @@ import {
       /* Po `countdown`, bo dokowanie ma sens tylko wtedy, gdy liczby w kopii są już
          przepisane — inaczej pierwsza zadokowana klatka pokazałaby „00" z HTML-a. */
       ['navClock', setupNavClock],
+      /* Rezerwa na środku paska liczona z pomiaru, a nie wpisana. Po `navClock`, bo mierzy
+         też miejsce dla zadokowanego licznika — powód w całości przy `syncNavCentreReserve`
+         w site-bridge.js. Naprawia zmierzone 42 i 71 px nachodzenia chipu na przyciski w
+         fazie głosowania. */
+      ['navCentreReserve', watchNavCentreReserve],
       ['footerGlow', setupFooterGlow],
       ['headingFit', setupHeadingFit],
       ['wall', setupWall],

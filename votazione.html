@@ -17,21 +17,10 @@
   <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
   <div class="noise" aria-hidden="true"></div>
 
-  <!-- ZEGAR NA SAMEJ GÓRZE, W MIEJSCE PASKA POSTĘPU.
-       ==========================================================================
-       Stała tu cienka kreska pokazująca, ile strony zostało do przewinięcia — informacja,
-       której w trakcie głosowania nikt nie potrzebuje, zajmująca najbardziej widoczny pas
-       ekranu. Teraz jest tam jedyna liczba, która w tych kilkudziesięciu minutach jest pilna:
-       ile czasu zostało do zamknięcia głosowania. Przed startem odlicza do startu, po
-       zamknięciu mówi, że już zamknięte.
-
-       `position: sticky`, więc jedzie z przewijaniem: kto zszedł w połowę listy wózków, nadal
-       widzi, ile ma czasu, bez wracania na górę. -->
-  <div class="vote-timer" data-vote-timer hidden aria-live="polite">
-    <span class="vote-timer__pulse" aria-hidden="true"></span>
-    <span class="vote-timer__label" data-vote-timer-label></span>
-    <strong class="vote-timer__time" data-vote-timer-time></strong>
-  </div>
+  <!-- Zegar głosowania stoi TERAZ W TREŚCI STRONY, pod nagłówkiem sekcji — patrz
+       `[data-vote-timer]` w `.vote-head` niżej. Przy przewijaniu w dół wjeżdża W PASEK
+       nawigacji, dokładnie tym samym mechanizmem, którym odliczanie z hero wjeżdża tam na
+       stronie głównej: `[data-clock-docked]` na nagłówku plus `.nav-clock` w pasku. -->
 
   <!-- Nagłówek: ten sam pasek co na stronie głównej, z tym samym przełącznikiem języka.
        ==========================================================================
@@ -54,6 +43,28 @@
            telefonie ściskały flagę z przyciskiem powrotu. Pasek postępu na górze ekranu
            zostaje, bo nie zabiera miejsca. Obsługa `[data-nav-progress]` w voting-boot.js jest
            warunkowa, więc brak tego elementu niczego nie psuje. -->
+
+      <!-- ZEGAR GŁOSOWANIA ZADOKOWANY W PASKU.
+           ==========================================================================
+           Ten sam mechanizm co odliczanie do wydarzenia na stronie głównej: `.nav-clock`
+           pozycjonowany bezwzględnie na środku paska, wygaszony do chwili, gdy nagłówek
+           dostanie `[data-clock-docked]`. O tym, kiedy go dostaje, decyduje `setupVoteClock`
+           w voting-boot.js — obserwator przecięć na zegarze stojącym w treści strony, bez ani
+           jednego nasłuchu przewijania.
+
+           DLACZEGO NIE `position: sticky` NA ZEGARZE W TREŚCI, JAK BYŁO
+             Przyklejony pas jechał pod paskiem jako DRUGA belka. Na telefonie dwie belki
+             jedna nad drugą zabierały 60 + 48 px, czyli ćwierć ekranu, przez cały czas
+             głosowania — a lista wozów, po którą ktoś tu przyszedł, dostawała resztę. Teraz
+             belka jest jedna: zegar wchodzi do niej, zamiast pod nią stawać.
+
+           `aria-hidden="true"` i `[data-vote-timer]` bez `aria-live`: to KOPIA napisu, który
+           ma już swoje `aria-live` w treści strony. Bez tego czytnik ekranu czytałby ten sam
+           czas dwa razy, w tym raz jako strumień zmian co sekundę. -->
+      <div class="nav-clock nav-clock--vote" data-vote-timer data-vote-timer-dock aria-hidden="true">
+        <span class="nav-clock__label" data-vote-timer-label></span>
+        <strong class="nav-clock__number" data-vote-timer-time></strong>
+      </div>
 
       <div class="nav-actions">
         <div class="language-picker" data-language-picker>
@@ -121,6 +132,23 @@
         <span class="eyebrow" data-vote-kicker data-i18n="voting.pageKicker">Voto del pubblico</span>
         <h1 data-i18n="voting.pageTitle">Premio del pubblico.</h1>
         <p class="lead" data-vote-lead data-i18n="voting.pageLead">Un premio, assegnato da chi guarda. Tocca “Vota”, dai da 3 a 10 punti e lascia la mail.</p>
+
+        <!-- ZEGAR GŁOSOWANIA: ZWYKŁY ELEMENT TREŚCI.
+             ==========================================================================
+             Stał wcześniej nad nagłówkiem jako `position: sticky` — czyli druga belka pod
+             paskiem nawigacji, zabierająca razem z nim ćwierć ekranu telefonu przez cały czas
+             głosowania. Zgłoszone jako „zegar ma być na stronie, nie przyklejony".
+
+             Teraz jest tam, gdzie jest jego treść: pod zdaniem, które mówi, o co w tym
+             głosowaniu chodzi. A przy przewijaniu w dół, gdy schodzi z ekranu, jego kopia
+             wjeżdża W PASEK — patrz `.nav-clock--vote` w nagłówku i `setupVoteClock` w
+             voting-boot.js. Ta sama zasada co na stronie głównej: jedna liczba, dwa miejsca,
+             nigdy oba naraz. -->
+        <div class="vote-timer" data-vote-timer hidden aria-live="polite">
+          <span class="vote-timer__pulse" aria-hidden="true"></span>
+          <span class="vote-timer__label" data-vote-timer-label></span>
+          <strong class="vote-timer__time" data-vote-timer-time></strong>
+        </div>
 
         <!-- Plakietka z regułą zdjęta.
              Powtarzała to, co i tak stoi w akapicie nad nią i w oknie oceny, a zajmowała

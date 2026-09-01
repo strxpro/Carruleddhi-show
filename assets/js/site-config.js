@@ -1,6 +1,23 @@
 export const ADMIN_STORAGE_KEY = 'carruleddhi.adminDraft.v1';
 export const SITE_CONFIG_VERSION = 1;
 
+/**
+ * WARTOŚCI WBUDOWANE — ZAPAS, NIE ŹRÓDŁO PRAWDY.
+ * ===========================================================================
+ *
+ * `eventName`, `eventDate`, `eventLocation` i `dateLabel` niżej opisują edycję tylko do chwili,
+ * w której odpowie końcówka ustawień: `applyServerSettings` (app.js) i `loadEventConfig`
+ * (voting-boot.js) nadpisują je tym, co organizator wpisał w panelu. Stamtąd rok i data
+ * rozchodzą się na wszystko — `data-config-event-year`, `data-config-event-date`, tytuł karty,
+ * dane strukturalne i znaczniki `%YEAR%`/`%DATE%` w słowniku (patrz `fillCopyTokens` w
+ * site-bridge.js).
+ *
+ * Dlatego stara data w tym pliku NIE JEST BŁĘDEM: to wartość na wypadek, gdy nie ma nic innego
+ * — brak sieci, zimna funkcja, wyłączony JavaScript. Poprawianie jej przy każdej nowej edycji
+ * to praca raz w roku, wymagająca `npm run build` i wdrożenia, żeby osiągnąć to, co panel robi
+ * od razu. Zgłoszenie „po ogłoszeniu nowej edycji strona nadal pokazuje stary rok" nie brało
+ * się stąd, tylko z miejsc, których żaden odczyt nie ruszał; te miejsca są już podpięte.
+ */
 export const DEFAULT_SITE_CONFIG = Object.freeze({
   eventName: 'Carruleddhi Show 2026',
   eventDate: '2026-10-17T14:30:00+02:00',

@@ -301,7 +301,14 @@ const FIELD_WHITELIST = {
   voting: ['action', 'participantId', 'name', 'email', 'deviceId', 'score', 'editToken', 'edition', 'notifyResults'],
   'voting-admin': [
     'action', 'id', 'registrationId', 'category', 'startNumber', 'firstName', 'lastName',
-    'projectName', 'imagePath', 'active', 'raceStartsAt', 'durationMinutes', 'status', 'photo'
+    'projectName', 'imagePath', 'active', 'raceStartsAt', 'durationMinutes', 'status', 'photo',
+    /* Werdykt jury: akcje `prizes` (odczyt) i `prize-set` (zapis jednej nagrody). Bez tych
+       czterech pól sanitizePayload wyrzuca je po cichu, handler widzi puste napisy i odmawia
+       tak, jakby organizator przysłał śmieci — a puste `participantId` razem z pustym
+       `winnerLabel` znaczy tutaj „wyczyść tę nagrodę", więc różnica między „nie przysłano" i
+       „przysłano pustkę" jest treścią, nie szczegółem. `participantId` jest pod tą samą nazwą
+       co w publicznym `voting`, bo znaczy to samo: kogo wskazano. */
+    'prizeKey', 'participantId', 'winnerLabel', 'note'
   ]
 };
 
@@ -3112,17 +3119,32 @@ async function deliverOutbox(env, messages, meta, cors) {
 
       /* Edition announcements are marked only after Make accepted this exact letter.
          A failed webhook therefore remains pending for the next hourly run instead of
-         disappearing from the queue before it was actually handed over. */
+         disappearing from the queue before it was actually handed over.
+
+         WIĘCEJ NIŻ JEDEN WIERSZ NA LIST, I DLACZEGO
+         Jeden człowiek może być na obu listach — `reminder_subscribers` i
+         `newsletter_subscribers` — a list dostaje jeden. Znacznik idempotencji siedzi w
+         wierszu, więc oznaczyć trzeba OBA: pominięcie drugiego znaczy, że za godzinę druga
+         lista zakolejkuje tej samej osobie to samo ogłoszenie. Nieudane oznaczenie
+         któregokolwiek jest liczone jako niepowodzenie całego listu, bo tylko wtedy
+         następny przebieg ma szansę doprowadzić stan do końca. */
       if (receipt?.kind === 'edition-announcement') {
-        const markUrl = new URL(`${env.SUPABASE_URL}/rest/v1/newsletter_subscribers`);
-        markUrl.searchParams.set('id', `eq.${receipt.subscriberId}`);
-        const marked = await fetch(markUrl, {
-          method: 'PATCH',
-          headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-          body: JSON.stringify({ last_announcement_event: receipt.eventKey })
-        });
-        if (!marked.ok) {
-          failures.push(`${message.to}: announcement mark HTTP ${marked.status}`);
+        let markFailure = '';
+        for (const target of receipt.targets || []) {
+          const markUrl = new URL(`${env.SUPABASE_URL}/rest/v1/${target.table}`);
+          markUrl.searchParams.set('id', `eq.${target.id}`);
+          const marked = await fetch(markUrl, {
+            method: 'PATCH',
+            headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+            body: JSON.stringify({ last_announcement_event: receipt.eventKey })
+          }).catch(() => null);
+          if (!marked?.ok) {
+            markFailure = `${target.table} mark HTTP ${marked ? marked.status : 'network'}`;
+            break;
+          }
+        }
+        if (markFailure) {
+          failures.push(`${message.to}: announcement ${markFailure}`);
           continue;
         }
       } else if (receipt?.kind === 'voting-result') {
@@ -3251,36 +3273,124 @@ function editionAnnouncementHtml(row, settings) {
   return `<!doctype html><html lang="${locale}"><body style="margin:0;background:#eef5ff;font-family:Segoe UI,Arial,sans-serif;color:#071a3d"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#fff;border-radius:24px;overflow:hidden"><tr><td style="padding:24px 30px;background:linear-gradient(100deg,#ffca28,#ff6f9f,#8f71ff);font-size:20px;font-weight:900">${escapeHtml(settings.eventName)}</td></tr><tr><td style="padding:34px 30px"><p style="margin:0 0 10px;font-size:15px">${escapeHtml(copy.hello)}${firstName ? ` ${escapeHtml(firstName)}` : ''},</p><h1 style="margin:0 0 24px;font-size:28px;line-height:1.15">${escapeHtml(copy.lead)}</h1><div style="padding:18px;border:2px solid #071a3d;border-radius:16px;background:#fff8cf"><b>${escapeHtml(copy.date)}:</b> ${escapeHtml(when)}<br><b>${escapeHtml(copy.place)}:</b> ${escapeHtml(settings.eventLocation)}</div><p style="margin:24px 0"><a href="${escapeHtml(site)}" style="display:inline-block;padding:13px 22px;border-radius:999px;background:#071a3d;color:#fff;text-decoration:none;font-weight:800">${escapeHtml(copy.cta)} →</a></p><p style="margin:28px 0 0;color:#65718b;font-size:12px;line-height:1.6">${escapeHtml(copy.footer)}<br><a href="${escapeHtml(unsubscribeUrl(row.unsubscribe_token))}" style="color:#65718b">${escapeHtml(copy.unsub)}</a></p></td></tr></table></td></tr></table></body></html>`;
 }
 
+/* ============================================================================
+   OGŁOSZENIE NOWEJ EDYCJI IDZIE DO OBU LIST
+   ============================================================================
+   BŁĄD, KTÓRY TO NAPRAWIA
+     Ta funkcja czytała WYŁĄCZNIE `newsletter_subscribers`. Do tamtej tabeli wchodzi się
+     jedną drogą: rejestracja zawodnika z zaznaczonym `newsConsent` (patrz storeIntake).
+     Tymczasem przycisk „Avvisami l'anno prossimo" / „Będę tam" wysyła `type: 'reminder'`
+     i ląduje w `reminder_subscribers` — w tabeli, której ogłoszenie NIGDY nie czytało.
+
+     Czyli ludzie, którzy WPROST poprosili „powiadom mnie za rok", byli jedynymi, którzy
+     ogłoszenia o nowym roczniku nie dostawali. Dostawali je za to zawodnicy, którzy przy
+     zapisie odhaczyli newsletter — czyli grupa, która o to prosiła mniej wyraźnie.
+
+   JEDNA OSOBA, JEDEN LIST
+     Rejestracja zapisuje ten sam adres do OBU tabel (newsletter przy zgodzie, przypomnienia
+     zawsze), więc naiwne złączenie wysłałoby części ludzi dwa identyczne listy. Adresy są
+     więc odsiewane po `lower(email)`: pierwszy trafiony wiersz układa list, a znacznik
+     idempotencji zakłada się na WSZYSTKICH wierszach tej osoby — inaczej druga lista
+     wysłałaby jej to samo za godzinę.
+
+   SUFIT OBOWIĄZUJE NA SUMĘ
+     `NEWSLETTER_BATCH` liczy LISTY, nie wiersze w tabeli. Limit narzucony każdej liście
+     osobno znaczyłby dwieście listów w jednym przebiegu crona, czyli dwa razy więcej, niż
+     ten sufit miał przepuszczać. Dlatego każda lista czytana jest z zapasem, a przycięcie
+     następuje PO odsianiu duplikatów.
+
+   ZGODA I STATUS SPRAWDZONE W KAŻDEJ TABELI OSOBNO
+     Odczytane z migracji, nie założone. `reminder_subscribers` (0002): `consent_at
+     timestamptz not null` — czyli zgoda jest warunkiem powstania wiersza, nie kolumną do
+     odhaczenia — plus `status text not null check (status in ('active','unsubscribed'))`.
+     `newsletter_subscribers` (0002): `source` i ten sam `status` z tą samą dwuwartościową
+     listą. W żadnej z nich nie ma osobnej kolumny „zgoda cofnięta"; jedynym sygnałem
+     wycofania jest `status = 'unsubscribed'`, ustawiany przez unsubConfirm(). Dlatego filtr
+     `status = eq.active` jest nałożony na KAŻDĄ listę osobno i to on odsiewa wypisanych —
+     jedno wspólne zapytanie nie miałoby czego odsiać.
+
+   ODSYŁACZ „NIE CHCĘ WIĘCEJ" DZIAŁA DLA OBU
+     Sprawdzone, nie założone: `unsubscribe_token` istnieje w obu tabelach (0002 dla
+     przypomnień, 0009 dla newslettera), a `findSubscriptions()` po żetonie z listu
+     odnajduje wiersz, potem po ujawnionym adresie dobiera drugą listę i `unsubConfirm()`
+     przestawia oba wiersze. Żeton z listu wysłanego do osoby, która jest tylko na liście
+     przypomnień, wypisuje ją poprawnie. List z martwym odsyłaczem wypisania byłby gorszy
+     niż brak listu — więc to musiało być potwierdzone przed dołożeniem drugiej listy.
+   ========================================================================== */
+const ANNOUNCEMENT_LISTS = [
+  /* Newsletter pierwszy, bo jego wiersz niesie imię i nazwisko z formularza zgłoszenia,
+     a wiersz przypomnienia — to, co ktoś wpisał w jednopolowym okienku. Przy duplikacie
+     wygrywa lepsze dane, a nie kolejność alfabetyczna nazw tabel. */
+  { name: 'newsletter', table: 'newsletter_subscribers' },
+  { name: 'reminders', table: 'reminder_subscribers' }
+];
+
 async function pendingEditionAnnouncements(env, settings, dryRun) {
   const eventKey = String(settings.announcementEventDate || '');
   if (!eventKey || eventKey !== settings.eventDate) return { messages: [] };
 
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/newsletter_subscribers`);
-  url.searchParams.set('select', 'id,name,email,locale,unsubscribe_token');
-  url.searchParams.set('status', 'eq.active');
-  url.searchParams.set('or', `(last_announcement_event.is.null,last_announcement_event.neq.${eventKey})`);
-  url.searchParams.set('order', 'created_at.asc');
-  url.searchParams.set('limit', String(NEWSLETTER_BATCH));
-  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
-  if (!response?.ok) return { messages: [], note: 'edition announcement read failed' };
-  const rows = await response.json().catch(() => []);
-  if (!Array.isArray(rows) || rows.length === 0) return { messages: [] };
+  const notes = [];
+  /* Klucz to `lower(email)`, wartość to list plus WSZYSTKIE wiersze tej osoby do oznaczenia. */
+  const people = new Map();
 
-  const messages = rows.map((row) => {
-    const locale = localeOf(row.locale);
+  for (const list of ANNOUNCEMENT_LISTS) {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/${list.table}`);
+    url.searchParams.set('select', 'id,name,email,locale,unsubscribe_token');
+    url.searchParams.set('status', 'eq.active');
+    /* `last_announcement_event is null` musi być wypisane osobno: w SQL `NULL <> '…'` nie
+       jest prawdą, więc samo `neq` pominęłoby po cichu każdego, do kogo nigdy nie pisano —
+       czyli wszystkich przy pierwszym przebiegu. Ta sama pułapka co przy `last_reminder`. */
+    url.searchParams.set('or', `(last_announcement_event.is.null,last_announcement_event.neq.${eventKey})`);
+    url.searchParams.set('order', 'created_at.asc');
+    /* Z zapasem, nie do sufitu: część tych wierszy zniknie przy odsiewaniu duplikatów, a
+       przycięcie do `NEWSLETTER_BATCH` idzie na gotową listę osób. Dwukrotność sufitu
+       wystarcza, bo więcej niż dwie listy tu nie ma. */
+    url.searchParams.set('limit', String(NEWSLETTER_BATCH * 2));
+
+    const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+    if (!response?.ok) {
+      /* Brak kolumny na jednej z list (migracja 0034 nie poszła) nie ma zatrzymywać drugiej.
+         Jedna lista obsłużona jest lepsza niż zero i jest odnotowana w odpowiedzi. */
+      notes.push(`${list.name} announcement read failed`);
+      continue;
+    }
+    const rows = await response.json().catch(() => []);
+    if (!Array.isArray(rows)) continue;
+
+    for (const row of rows) {
+      const email = String(row.email || '').trim().toLowerCase();
+      if (!email) continue;
+      const existing = people.get(email);
+      if (existing) {
+        // Ta sama osoba na drugiej liście: list zostaje jeden, znaczniki dwa.
+        existing.targets.push({ table: list.table, id: row.id });
+        continue;
+      }
+      people.set(email, { email, row, targets: [{ table: list.table, id: row.id }] });
+    }
+  }
+
+  const note = notes.length ? notes.join('; ') : undefined;
+  if (people.size === 0) return { messages: [], ...(note ? { note } : {}) };
+
+  const messages = [...people.values()].slice(0, NEWSLETTER_BATCH).map((person) => {
+    const locale = localeOf(person.row.locale);
     return {
-      to: String(row.email || '').trim().toLowerCase(),
+      to: person.email,
       subject: (EDITION_COPY[locale] || EDITION_COPY.it).subject,
-      html: editionAnnouncementHtml(row, settings),
+      html: editionAnnouncementHtml(person.row, settings),
       receipt: {
         kind: 'edition-announcement',
-        subscriberId: row.id,
+        /* Wiersze do oznaczenia, po jednym na listę. Znacznik zakłada deliverOutbox i robi
+           to dopiero PO przyjęciu listu przez Make — nieudany webhook zostawia adres w
+           kolejce na następną godzinę. `dryRun` nie oznacza niczego z tego samego powodu. */
+        targets: dryRun ? [] : person.targets,
         eventKey
       }
     };
   });
 
-  return { messages };
+  return { messages, ...(note ? { note } : {}) };
 }
 
 /* ============================================================================
@@ -5296,10 +5406,44 @@ async function withSignedGallery(env, images) {
   )));
 }
 
+/**
+ * Rok wydarzenia, cztery cyfry, w strefie Europe/Rome.
+ *
+ * PO CO TO WYCHODZI Z SERWERA, A NIE JEST SKŁADANE W PRZEGLĄDARCE
+ *   Strona miała rok wpisany w kilku miejscach na stałe, a w pozostałych wycinała go z
+ *   `eventDate` po swojemu. Rocznik jest kluczem archiwum (`voting_editions.edition_key`,
+ *   migracja 0030) i tam liczy go Postgres — `to_char(… at time zone 'Europe/Rome', 'YYYY')`.
+ *   Dwa różne miejsca liczące ten sam rok to gwarancja rozjazdu przy imprezie 31 grudnia
+ *   wieczorem: przeglądarka w Warszawie i baza w Rzymie odpowiadają wtedy inaczej.
+ *
+ * DLACZEGO STREFA JEST STAŁA
+ *   Wydarzenie odbywa się w Santa Teresa Gallura, więc jego rok jest rokiem tamtego zegara,
+ *   a nie zegara gościa. `Intl` ze `timeZone: 'Europe/Rome'` daje dokładnie to, co `to_char`
+ *   w migracji 0030 — jedna reguła, dwie implementacje mówiące to samo.
+ *
+ * `en-CA` w locale to nie przypadek i nie ma nic wspólnego z językiem: to gwarancja cyfr
+ * arabskich. `Intl` z locale gościa mógłby oddać rok w innym systemie liczbowym albo w innej
+ * erze kalendarzowej, a to jest liczba do porównania z kluczem w bazie, nie napis do czytania.
+ */
+function eventYearLabel(value) {
+  const at = new Date(String(value || ''));
+  if (Number.isNaN(at.getTime())) return '';
+  const year = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome',
+    year: 'numeric'
+  }).format(at);
+  return /^\d{4}$/.test(year) ? year : '';
+}
+
 async function settingsShape(env, settings) {
   const { announcementEventDate: _announcementEventDate, ...publicSettings } = settings;
   return {
     ...publicSettings,
+    /* Pole pochodne, policzone raz tutaj. NIE MA tu `eventDateLabel` — patrz raport i
+       komentarz nad eventYearLabel(): dzień i miesiąc słownie zależą od języka GOŚCIA, a ta
+       odpowiedź jest jedna dla wszystkich i nie wie, kto ją czyta. Rok od języka nie zależy,
+       więc jego miejsce jest tutaj. */
+    eventYear: eventYearLabel(settings.eventDate),
     sponsors: await withSignedLogos(env, settings.sponsors),
     galleryImages: await withSignedGallery(env, settings.galleryImages)
   };
@@ -6527,6 +6671,113 @@ const VOTE_MAX = 10;
  *   czego sprawdzać, bo nie ma czego wybierać.
  */
 const PUBLIC_AWARD = 'public-choice';
+
+/**
+ * Dwanaście nagród jury i ani jednej więcej.
+ *
+ * KLUCZ, NIE NAZWA. Nazwy nagród są tłumaczone na sześć języków i zmieniają się co rok —
+ * nagroda 03 ma rocznik wprost w nazwie. Nazwa jako identyfikator znaczyłaby sześć różnych
+ * identyfikatorów jednego werdyktu i zerwane powiązanie z archiwum po każdej zmianie roku.
+ * Baza trzyma `prize-N`, a napis dla człowieka składa strona ze swojego słownika.
+ *
+ * `public-choice` NIE JEST NA TEJ LIŚCIE I NIE WOLNO JEJ TU DOPISAĆ. Nagroda Publiczności
+ * wynika z głosów: liczy ją widok `voting_ranking`, a `voting_editions.results` ją mrozi przy
+ * archiwizacji. Gdyby dała się wpisać do `prize_winners`, ta sama nagroda miałaby dwa
+ * źródła — a dwa źródła jednej nagrody to dwa różne podia, które kiedyś się rozjadą i nikt
+ * nie odpowie, które jest prawdziwe.
+ *
+ * Ta stała jest kopią więzu CHECK z migracji 0034 i to jest zamierzone: baza odmawia
+ * niezależnie od Workera, a Worker odmawia komunikatem, z którego panel potrafi zrobić
+ * zdanie. Rozjazd między nimi łapie `tools/check-migrations.mjs`.
+ */
+const PRIZE_KEYS = Array.from({ length: 12 }, (_, index) => `prize-${index + 1}`);
+const PRIZE_KEY_SET = new Set(PRIZE_KEYS);
+
+/** Jedno pole nagrody w odpowiedzi publicznej. Puste miejsce jest pełnoprawną odpowiedzią. */
+function emptyPrize(prizeKey) {
+  return { prizeKey, startNumber: 0, projectName: '', riderName: '', note: '' };
+}
+
+/**
+ * Dwanaście pozycji, zawsze w kolejności `prize-1` … `prize-12`.
+ *
+ * NAGRODA BEZ ZWYCIĘZCY NIE JEST POMIJANA. Strona pokazuje dwanaście kategorii, z których
+ * część jeszcze czeka na werdykt — gdyby odpowiedź niosła tylko rozstrzygnięte, layout
+ * musiałby zgadywać, których brakuje, a numeracja na ekranie rozjechałaby się z numeracją
+ * w regulaminie. Dlatego brak zwycięzcy to pozycja z pustymi polami, nie brak pozycji.
+ *
+ * Kolejność liczona z `PRIZE_KEYS`, nie z tego, co przyszło z bazy: sortowanie tekstowe
+ * ustawia `prize-10` przed `prize-2`, a numeracja nagród jest liczbowa.
+ */
+function prizeListShape(entries) {
+  const byKey = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const prizeKey = String(entry?.prizeKey || '');
+    if (!PRIZE_KEY_SET.has(prizeKey) || byKey.has(prizeKey)) continue;
+    byKey.set(prizeKey, {
+      prizeKey,
+      startNumber: Number(entry.startNumber) || 0,
+      projectName: String(entry.projectName || ''),
+      riderName: String(entry.riderName || ''),
+      note: String(entry.note || '')
+    });
+  }
+  return PRIZE_KEYS.map((prizeKey) => byKey.get(prizeKey) || emptyPrize(prizeKey));
+}
+
+/**
+ * Werdykt bieżącego rocznika, złożony z żywych wierszy.
+ *
+ * Dwa zapytania, nie osadzenie PostgREST-owe (`participants(...)`). Osadzenie działa dopóki
+ * relacja nazywa się tak, jak PostgREST zgadł, a to jest zależność od cudzego zgadywania w
+ * miejscu, którego nie da się tu przetestować bez bazy. Dwa odczyty po identyfikatorach są
+ * przewidywalne i kosztują jedno żądanie więcej raz na wejście na stronę.
+ *
+ * `winnerLabel` wygrywa nad imieniem z listy startowej: gdy organizator wpisał napis ręcznie,
+ * zrobił to po to, żeby był widoczny — a nie żeby przegrał z tym, co i tak było w bazie.
+ */
+async function readPrizeWinners(env, editionId) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(editionId || ''))) return [];
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/prize_winners`);
+  url.searchParams.set('select', 'prize_key,participant_id,winner_label,note');
+  url.searchParams.set('edition_id', `eq.${editionId}`);
+  url.searchParams.set('limit', '24');
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  /* Brak tabeli (migracja 0034 nie poszła) nie ma wywracać całej strony głosowania: wtedy
+     wraca dwanaście pustych miejsc, czyli dokładnie to, co widzi się przed werdyktem. */
+  if (!response?.ok) return [];
+  const rows = await response.json().catch(() => []);
+  if (!Array.isArray(rows) || !rows.length) return [];
+
+  const ids = [...new Set(rows.map((row) => row.participant_id).filter(Boolean))];
+  const people = new Map();
+  if (ids.length) {
+    const peopleUrl = new URL(`${env.SUPABASE_URL}/rest/v1/participants`);
+    peopleUrl.searchParams.set('select', 'id,start_number,project_name,first_name,last_name');
+    peopleUrl.searchParams.set('id', `in.(${ids.join(',')})`);
+    const peopleResponse = await fetch(peopleUrl, { headers: supabaseHeaders(env) }).catch(() => null);
+    if (peopleResponse?.ok) {
+      for (const row of await peopleResponse.json().catch(() => [])) people.set(row.id, row);
+    }
+  }
+
+  return rows.map((row) => {
+    const person = people.get(row.participant_id) || null;
+    const fromRoster = person
+      ? `${person.first_name || ''} ${person.last_name || ''}`.trim()
+      : '';
+    return {
+      prizeKey: String(row.prize_key || ''),
+      participantId: row.participant_id || null,
+      winnerLabel: String(row.winner_label || ''),
+      startNumber: person ? Number(person.start_number) || 0 : 0,
+      projectName: person ? String(person.project_name || '') : '',
+      riderName: String(row.winner_label || '').trim() || fromRoster,
+      note: String(row.note || '')
+    };
+  });
+}
+
 const PARTICIPANT_COLUMNS =
   'id,registration_id,category,start_number,first_name,last_name,project_name,image_path,active';
 
@@ -6728,11 +6979,24 @@ async function readVotingEditions(env) {
 async function readVotingArchive(env, editionKey) {
   if (!/^\d{4}$/.test(String(editionKey || ''))) return null;
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_editions`);
-  url.searchParams.set('select', 'id,edition_key,event_name,event_date,event_location,status,results');
+  /* `prizes` czytane razem z `results`: werdykt archiwalny mieszka w kolumnie edycji, bo w
+     `prize_winners` po rolloverze nie ma już z czego go odtworzyć — uczestnicy są skasowani,
+     a `participant_id` wyzerowane przez `on delete set null`. Patrz migracja 0034. */
+  const columns = 'id,edition_key,event_name,event_date,event_location,status,results';
+  url.searchParams.set('select', `${columns},prizes`);
   url.searchParams.set('edition_key', `eq.${editionKey}`);
   url.searchParams.set('status', 'eq.archived');
   url.searchParams.set('limit', '1');
-  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  let response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  /* WDROŻENIE NIE JEST ATOMOWE. Worker i migracje jadą osobno, więc między jednym i drugim
+     istnieje okno, w którym `prizes` jeszcze nie ma w bazie. PostgREST odrzuca WTEDY CAŁY
+     odczyt (nieznana kolumna to 400 na całe zapytanie), czyli archiwum poprzednich lat
+     zniknęłoby ze strony do czasu puszczenia migracji. Drugie podejście bez tej kolumny
+     kosztuje jedno żądanie w tym jednym oknie i nic poza nim. */
+  if (!response?.ok) {
+    url.searchParams.set('select', columns);
+    response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  }
   if (!response?.ok) return null;
   const row = (await response.json().catch(() => []))?.[0];
   if (!row || !Array.isArray(row.results)) return null;
@@ -6795,6 +7059,9 @@ async function votingState(env, payload, cors) {
         categories: [...new Set(shaped.map((row) => row.category))],
         participants: shaped,
         podium,
+        /* Werdykt dwunastu nagród z migawki rocznika. Ten sam kształt, co dla edycji
+           trwającej — strona ma jeden kod na oba przypadki. */
+        prizes: prizeListShape(archive.row.prizes),
         myVotes: []
       }, 200, cors);
     }
@@ -6820,6 +7087,11 @@ async function votingState(env, payload, cors) {
       .slice(0, 3)
     : [];
   const mine = await readDeviceVotes(env, String(payload.deviceId || '').trim().toLowerCase());
+  /* Werdykt nagród bieżącego rocznika. Bez bramki na fazę: wpisuje go organizator w panelu i
+     robi to po ogłoszeniu wyników na placu, więc „jest w bazie" znaczy „jest już ogłoszony".
+     Bramka po fazie zamiast tego chowałaby werdykt po ogłoszeniu nowego terminu, a właśnie
+     wtedy ludzie wchodzą sprawdzić, kto wygrał w poprzednim roku. */
+  const prizes = activeEdition ? await readPrizeWinners(env, activeEdition.id) : [];
 
   return json({
     ok: true,
@@ -6835,6 +7107,10 @@ async function votingState(env, payload, cors) {
     categories: [...new Set(shaped.map((row) => row.category))],
     participants: shaped,
     podium,
+    /* Zawsze dwanaście pozycji, `prize-1` … `prize-12`, nagroda bez zwycięzcy z pustymi
+       polami — patrz prizeListShape(). Nagrody Publiczności tu NIE MA: ona jest w `podium`,
+       policzona z głosów, i nie wolno jej mieszać z werdyktem jury. */
+    prizes: prizeListShape(prizes),
     myVotes: mine
       .filter((row) => row.category === PUBLIC_AWARD)
       .map((row) => {
@@ -7717,9 +7993,156 @@ async function votingAdminWinners(env, cors) {
   }, 200, cors);
 }
 
+/* ============================================================================
+   WERDYKT DWUNASTU NAGRÓD — odczyt i zapis dla panelu
+   ============================================================================
+   Dwie akcje i ani jednej więcej: `prizes` czyta dwanaście miejsc, `prize-set` zapisuje
+   jedno. Nie ma osobnego „prize-clear", bo czyszczenie to ten sam gest z pustymi polami —
+   dwie akcje robiące to samo różnią się tylko tym, którą z nich panel zapomni obsłużyć.
+
+   ROCZNIK NIE PRZYCHODZI Z ŻĄDANIA. Bierze się z wiersza `voting_editions` o statusie
+   `active`, tak samo jak przy uczestnikach: gdyby przychodził, panel mógłby dopisać werdykt
+   do archiwum sprzed trzech lat, a archiwum jest niezmienne z założenia (patrz 0030).
+
+   NAGRODY PUBLICZNOŚCI TU NIE MA. Ona wynika z głosów — liczy ją widok `voting_ranking` i
+   pokazuje `podium`. Dwa źródła jednej nagrody to dwa różne podia i pytanie „które jest
+   prawdziwe", na które nikt nie umie odpowiedzieć.
+   ========================================================================== */
+
+/* Napis wpisany ręcznie to nazwa zespołu, szkoły albo grupy kibiców — nie akapit. Odrzucane,
+   nie przycinane: przycięta nazwa wygląda jak literówka organizatora, a nie jak limit. */
+const PRIZE_LABEL_LIMIT = 160;
+/* Wynik, czas albo uwaga jury. Zdanie, nie protokół. */
+const PRIZE_NOTE_LIMIT = 500;
+
+/** Rocznik, do którego wolno pisać: ten jeden aktywny, nigdy z żądania. */
+async function activeVotingEdition(env) {
+  const editions = await readVotingEditions(env);
+  return editions.find((edition) => edition.status === 'active') || null;
+}
+
+async function votingAdminPrizes(env, cors) {
+  const edition = await activeVotingEdition(env);
+  if (!edition) return json({ ok: false, code: 'VOTING_NO_EDITION' }, 409, cors);
+
+  const rows = await readPrizeWinners(env, edition.id);
+  const byKey = new Map(rows.map((row) => [row.prizeKey, row]));
+
+  /* Dwanaście pozycji, zawsze, w kolejności liczbowej. Panel dostaje więcej pól niż strona:
+     `participantId` do podświetlenia wiersza na liście startowej i `winnerLabel` do pokazania
+     w polu tekstowym — bez nich formularz musiałby zgadywać, skąd wzięła się nazwa, którą
+     widzi. Strona tych dwóch pól nie potrzebuje i nie dostaje ich w `voting`. */
+  return json({
+    ok: true,
+    editionId: edition.id,
+    editionKey: edition.key,
+    prizeKeys: PRIZE_KEYS,
+    prizes: PRIZE_KEYS.map((prizeKey) => {
+      const row = byKey.get(prizeKey);
+      if (!row) {
+        return {
+          prizeKey, participantId: '', winnerLabel: '',
+          startNumber: 0, projectName: '', riderName: '', note: ''
+        };
+      }
+      return {
+        prizeKey,
+        participantId: row.participantId || '',
+        winnerLabel: row.winnerLabel,
+        startNumber: row.startNumber,
+        projectName: row.projectName,
+        riderName: row.riderName,
+        note: row.note
+      };
+    })
+  }, 200, cors);
+}
+
+/**
+ * Zapis jednej nagrody.
+ *
+ * PUSTE `participantId` I PUSTE `winnerLabel` ZNACZY „WYCZYŚĆ TĘ NAGRODĘ". Wiersz jest wtedy
+ * usuwany, a nie zostawiany z samą notatką: nagroda z notatką bez zwycięzcy to pozycja, która
+ * na stronie wygląda jak rozstrzygnięta i nie jest. `note` bez wskazanego zwycięzcy nie ma po
+ * czym wisieć.
+ *
+ * UPSERT po `(edition_id, prize_key)`, nie „sprawdź i wstaw": dwa kliknięcia w panelu w tej
+ * samej sekundzie zrobiłyby z tego dwa wiersze na jedną nagrodę, gdyby rozstrzygał to odczyt
+ * przed zapisem. Rozstrzyga nazwany więz unikalny z migracji 0034, czyli baza.
+ */
+async function votingAdminPrizeSet(env, payload, cors) {
+  const prizeKey = String(payload.prizeKey || '').trim().toLowerCase();
+  if (!PRIZE_KEY_SET.has(prizeKey)) return json({ ok: false, code: 'VOTING_BAD_PRIZE_KEY' }, 422, cors);
+
+  const edition = await activeVotingEdition(env);
+  if (!edition) return json({ ok: false, code: 'VOTING_NO_EDITION' }, 409, cors);
+
+  const participantId = String(payload.participantId || '').trim();
+  const winnerLabel = trimmed(payload.winnerLabel, '');
+  const note = trimmed(payload.note, '');
+  if (winnerLabel.length > PRIZE_LABEL_LIMIT) {
+    return json({ ok: false, code: 'VOTING_BAD_WINNER_LABEL', limit: PRIZE_LABEL_LIMIT }, 422, cors);
+  }
+  if (note.length > PRIZE_NOTE_LIMIT) {
+    return json({ ok: false, code: 'VOTING_BAD_PRIZE_NOTE', limit: PRIZE_NOTE_LIMIT }, 422, cors);
+  }
+
+  const target = `${env.SUPABASE_URL}/rest/v1/prize_winners`;
+
+  if (!participantId && !winnerLabel) {
+    const removed = await fetch(
+      `${target}?edition_id=eq.${edition.id}&prize_key=eq.${prizeKey}`,
+      { method: 'DELETE', headers: supabaseHeaders(env, { Prefer: 'return=minimal' }) }
+    ).catch(() => null);
+    if (!removed?.ok) return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
+    return votingAdminPrizes(env, cors);
+  }
+
+  /* Wskazany uczestnik musi istnieć. Klucz obcy odmówiłby i tak, ale komunikatem 23503, z
+     którego panel nie zrobi zdania — a organizator wpisujący werdykt w dniu zawodów ma
+     usłyszeć „nie ma takiego uczestnika", nie numer błędu Postgresa.
+     `active` nie jest tu wymagane: wyłączony uczestnik to pojazd, który nie wystartował w
+     głosowaniu publiczności, a nagrodę jury dostać może (np. za samą konstrukcję). */
+  if (participantId) {
+    if (!/^[0-9a-f-]{36}$/i.test(participantId)) {
+      return json({ ok: false, code: 'VOTING_NO_PARTICIPANT' }, 422, cors);
+    }
+    const participant = await findParticipant(env, participantId);
+    if (!participant) return json({ ok: false, code: 'VOTING_NO_PARTICIPANT' }, 404, cors);
+  }
+
+  const stored = await fetch(`${target}?on_conflict=edition_id,prize_key`, {
+    method: 'POST',
+    headers: supabaseHeaders(env, {
+      Prefer: 'resolution=merge-duplicates,return=minimal'
+    }),
+    body: JSON.stringify({
+      edition_id: edition.id,
+      prize_key: prizeKey,
+      participant_id: participantId || null,
+      winner_label: winnerLabel || null,
+      note: note || null,
+      /* Ustawiane tutaj, bo w bazie nie ma triggera — patrz komentarz przy kolumnie w 0034. */
+      updated_at: new Date().toISOString()
+    })
+  }).catch(() => null);
+  if (!stored?.ok) {
+    return json({
+      ok: false, code: 'VOTING_STORE_FAILED',
+      detail: stored ? (await stored.text().catch(() => '')).slice(0, 400) : null
+    }, 502, cors);
+  }
+
+  /* Cała dwunastka w odpowiedzi, nie sam zapisany wiersz: panel odświeża jeden stan i nie
+     musi sam zgadywać, jak zapis zmienił resztę listy. */
+  return votingAdminPrizes(env, cors);
+}
+
 async function votingAdmin(env, payload, cors) {
   const action = String(payload.action || 'state').toLowerCase();
   if (action === 'state') return votingAdminState(env, cors);
+  if (action === 'prizes') return votingAdminPrizes(env, cors);
+  if (action === 'prize-set') return votingAdminPrizeSet(env, payload, cors);
   if (action === 'photo') {
     /* Ten sam dekoder i ten sam wzorzec co logo sponsora: najpierw wgranie, które oddaje
        ścieżkę, potem osobny zapis uczestnika wskazującego na nią. Nieudane wgranie zostawia

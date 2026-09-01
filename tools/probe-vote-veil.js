@@ -47,7 +47,16 @@ async (document, window) => {
     veilEvents: veil ? getComputedStyle(veil).pointerEvents : null,
     pickHidden: pick ? pick.hidden : null,
     // Żaden przycisk oceny nie stoi POD zdjęciem — o to szła cała zmiana.
-    buttonsUnderPhoto: $$('.vote-card__body button', card).length
+    buttonsUnderPhoto: $$('.vote-card__body button', card).length,
+    /* Pigułka „Zagłosuj" mierzona TU, w spoczynku: nakładka jest niewidoczna (`opacity: 0`),
+       ale przycisk ma już swoje pudełko, więc wysokość i położenie są prawdziwe. Po dotknięciu
+       pigułka ustępuje miejsca suwakowi (`display: none`) i wtedy jej pudełko jest zerowe —
+       mierzenie jej po dotknięciu zwracało 0 px i wyglądało na zapadnięty przycisk. */
+    ctaHeight: cta ? Math.round(box(cta).height) : null,
+    ctaInsidePhoto: cta && card
+      ? box(cta).top >= box($('.vote-card__photo', card)).top - 1
+        && box(cta).bottom <= box($('.vote-card__photo', card)).bottom + 1
+      : false
   };
 
   /* --- dotknięcie: nakładka odsłonięta, jedno zaproszenie na środku -------- */

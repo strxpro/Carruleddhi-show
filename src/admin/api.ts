@@ -463,6 +463,75 @@ export const mailWinners = (key: string) =>
     { action: 'winners' }
   );
 
+/* ------------------------------------------------ dwanaście nagród jury
+
+   DLACZEGO OSOBNA PARA WYWOŁAŃ, A NIE POLE W `state`
+     `voting-admin` z `{ action: 'state' }` oddaje ŻYWE tabele głosowania: fazę, uczestników
+     i sumę głosów. Nagrody jury to inna decyzja i inny moment — zapada po zawodach, przy
+     stoliku, i zmienia się pojedynczo. Dopisanie dwunastu przypisań do odpowiedzi `state`
+     znaczyłoby, że odpytywanie co piętnaście sekund w trakcie głosowania ciągnie także je,
+     a każde przypisanie nagrody wymagałoby przeliczenia całej klasyfikacji.
+
+   KONTRAKT
+     odczyt: `{ action: 'prizes' }`  → dwanaście pozycji, także te bez zwycięzcy (puste pola);
+     zapis:  `{ action: 'prize-set', prizeKey, participantId?, winnerLabel?, note? }`,
+             gdzie puste `participantId` RAZEM z pustym `winnerLabel` znaczy „wyczyść".
+
+   Końcówka jest pisana równolegle w Workerze, więc `prizes` jest tu `unknown`, a nie
+   `PrizeAssignment[]`. To nie jest ostrożność na wyrost: gdyby typ obiecywał tablicę,
+   pierwsze wdrożenie panelu przed Workerem skończyłoby się `undefined.map(...)` i białym
+   ekranem w dniu wręczania nagród. Kształt sprawdza `normalisePrizes` w `lib/awards.ts` i
+   dopiero on oddaje dane albo `null` znaczące „nie udało się odczytać". */
+
+/** Jedna z dwunastu nagród. Pozycja bez zwycięzcy ma puste napisy i `startNumber` równe 0. */
+export interface PrizeAssignment {
+  /** `prize-1` … `prize-12`. Ten sam klucz, który przyjmuje `prize-set`. */
+  prizeKey: string;
+  /** Identyfikator uczestnika z listy startowej albo pusto, gdy zwycięzca wpisany z ręki. */
+  participantId: string;
+  /** Nazwa zwycięzcy wpisana z ręki albo pusto, gdy wybrany z listy startowej. */
+  winnerLabel: string;
+  /** Wynik albo uwaga jury. Zawsze wolna, także przy zwycięzcy z listy. */
+  note: string;
+  startNumber: number;
+  projectName: string;
+  riderName: string;
+}
+
+/** Surowa odpowiedź odczytu. `prizes` nieznanego kształtu — patrz komentarz nad sekcją. */
+export interface PrizeListResponse {
+  ok: true;
+  prizes?: unknown;
+}
+
+export const fetchPrizes = (key: string) =>
+  call<PrizeListResponse>('voting-admin', key, { action: 'prizes' });
+
+/**
+ * Co wolno zmienić w jednej nagrodzie. Każde pole osobno opcjonalne, bo komentarz da się
+ * poprawić bez ruszania zwycięzcy — a wysłanie przy tym pustego `participantId` byłoby
+ * wyczyszczeniem przypisania, którego nikt nie prosił.
+ */
+export interface PrizeChange {
+  participantId?: string;
+  winnerLabel?: string;
+  note?: string;
+}
+
+export const setPrize = (key: string, prizeKey: string, change: PrizeChange) =>
+  call<{ ok: true }>('voting-admin', key, { action: 'prize-set', prizeKey, ...change });
+
+/**
+ * Zdjęcie nagrody.
+ *
+ * Wysyła oba pola zwycięzcy pustymi JAWNIE, a nie pomija ich: pominięte pole znaczy w tym
+ * kontrakcie „nie zmieniaj", więc `setPrize(key, prizeKey, {})` nie wyczyściłoby niczego.
+ * Osobna funkcja zamiast komentarza przy wywołaniu, bo to jedyne miejsce, w którym ta
+ * różnica ma znaczenie, i jedyne, w którym da się ją przeoczyć.
+ */
+export const clearPrize = (key: string, prizeKey: string) =>
+  setPrize(key, prizeKey, { participantId: '', winnerLabel: '', note: '' });
+
 /* ------------------------------------------------- roczniki i podsumowanie
 
    DLACZEGO TO SIĘGA DO DWÓCH KOŃCÓWEK, A NIE DO JEDNEJ

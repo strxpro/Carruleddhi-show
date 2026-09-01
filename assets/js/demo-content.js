@@ -260,10 +260,107 @@ export function demoParticipants(withScores) {
  * średniej. Kształt inny niż prawdziwy dawałby przegląd projektu, który wygląda dobrze i nie
  * odpowiada niczemu.
  */
-export function demoVotingState(phase = 'scheduled') {
+/**
+ * Dwunastu zwycięzców kategorii jury — z trzema kategoriami PUSTYMI z rozmysłu.
+ * ===========================================================================
+ *
+ * Puste są 07, 10 i 12. Nie dlatego, że brakuje danych: bez nich nie da się zobaczyć drugiego
+ * z dwóch stanów wiersza, a to on jest tu treścią. Kategoria bez zwycięzcy NIE ZNIKA — dostaje
+ * przerywaną obwódkę i zdanie „jeszcze nie ogłoszono". Znikająca kategoria mówiłaby „tej
+ * nagrody nie ma", a strona główna obiecuje dwanaście.
+ *
+ * KSZTAŁT `prizes`, NIE `awards`, I TO JEST CELOWE
+ *   Publiczny odczyt niesie to pole pod dwiema nazwami, zależnie od tego, jak stara jest
+ *   wdrożona funkcja (powód w całości przy `normalizeAwards` w voting-core.js). Demo podaje tę
+ *   nazwę, której strona NIE używa u siebie wewnętrznie — więc każde uruchomienie z `?demo=1`
+ *   sprawdza po drodze, że tłumaczenie jednego kształtu na drugi naprawdę działa. Demo
+ *   podające wygodny kształt potwierdzałoby tylko samo siebie.
+ *
+ * `note` to wynik kategorii: czas przejazdu, wymiar, wiek. Trzy różne rodzaje z rozmysłu —
+ * kolumna z wynikiem musi zmieścić i „31.44 s", i „2,10 m", i „9 lat".
+ */
+const DEMO_PRIZES = [
+  { prizeKey: 'prize-1', startNumber: 7, projectName: 'Rena Bianca', riderName: 'Salvatore Mannu', note: '31.44 s' },
+  { prizeKey: 'prize-2', startNumber: 102, projectName: 'Luna di Capo Testa', riderName: 'Valentina Sechi', note: '33.02 s' },
+  { prizeKey: 'prize-3', startNumber: 41, projectName: 'Tonno Volante', riderName: 'Marta Cossu', note: '' },
+  { prizeKey: 'prize-4', startNumber: 12, projectName: 'Bomboniera', riderName: 'Giulia Deiana', note: '2,10 m' },
+  { prizeKey: 'prize-5', startNumber: 128, projectName: 'Barca a Rotelle', riderName: 'Giulia Demuru', note: '' },
+  { prizeKey: 'prize-6', startNumber: 113, projectName: 'Ginepro Blu', riderName: 'Sara Demuru', note: '' },
+  { prizeKey: 'prize-8', startNumber: 121, projectName: 'Punta Falcone', riderName: 'Salvatore Pinna', note: '9 lat' },
+  { prizeKey: 'prize-9', startNumber: 108, projectName: 'Maestrale', riderName: 'Giovanni Addis', note: '71 lat' },
+  { prizeKey: 'prize-11', startNumber: 55, projectName: 'Lentissimo', riderName: 'Antonio Serra', note: '1:12.90' }
+];
+
+/**
+ * Roczniki: bieżący i dwa zarchiwizowane, różniące się TYM, CO O NICH WIEMY.
+ *
+ * 2025 ma `attendeeCount`, więc podsumowanie mówi „Było nas wtedy 1840 osób na zjeździe".
+ * 2024 nie ma go wcale — i to jest przypadek, dla którego ten wiersz tu stoi: rocznik bez
+ * zapisanej liczby widowni NIE MOŻE pokazać zera. Zero znaczy „nikt nie przyszedł", a prawda
+ * jest inna: nikt nie policzył. Wtedy zdanie zmienia się razem z liczbą i mówi, ile było
+ * zapisanych wozów, bo to jedyna liczba, którą naprawdę mamy.
+ */
+const DEMO_EDITIONS = [
+  { key: '2026', name: 'Carruleddhi Show 2026', date: '2026-10-17', location: 'Santa Teresa Gallura', status: 'open', participantCount: 8, voteCount: 0 },
+  { key: '2025', name: 'Carruleddhi Show 2025', date: '2025-10-18', location: 'Santa Teresa Gallura', status: 'archived', participantCount: 22, voteCount: 1640, attendeeCount: 1840 },
+  { key: '2024', name: 'Carruleddhi Show 2024', date: '2024-10-19', location: 'Santa Teresa Gallura', status: 'archived', participantCount: 17, voteCount: 980 }
+];
+
+/**
+ * ODPOWIEDŹ BEZ POLA `prizes` — czyli „wdrożony Worker jest starszy od strony".
+ * ===========================================================================
+ *
+ * Statyczne pliki i funkcja Workera idą na produkcję OSOBNO, więc przez kilka minut po każdym
+ * wypchnięciu strona rozmawia z wersją, która o dwunastu nagrodach jeszcze nie wie. Wymaganie
+ * jest wtedy jasne: cała lista ma się po prostu nie pokazać, bez ani jednego błędu w konsoli.
+ *
+ * DLACZEGO PARAMETR W ADRESIE, A NIE „TO SIĘ NIE STANIE"
+ *   To jest jedyny stan tej sekcji, którego nie da się zobaczyć ani wywołać z ekranu — a
+ *   jednocześnie jedyny, w którym poprawka bywa cicha: brak pola i pole puste dawały do tej
+ *   pory ten sam wynik na ekranie. Bez tego przełącznika ani człowiek, ani sonda nie miały jak
+ *   sprawdzić, że rozróżnienie naprawdę działa; sprawdzało się je czytaniem kodu, który się
+ *   właśnie zmienia.
+ *
+ *   Dostępne wyłącznie razem z `?demo=1`, czyli tam, gdzie i tak nic nie jest prawdziwe.
+ */
+function noPrizeField() {
+  return new URLSearchParams(window.location.search).get('noPrizes') === '1';
+}
+
+export function demoVotingState(phase = 'scheduled', edition = '') {
   const closed = phase === 'closed';
   const participants = demoParticipants(closed);
   const now = Date.now();
+
+  /* WEJŚCIE W ROCZNIK ARCHIWALNY. Odpowiedź ma inny kształt niż bieżąca edycja i tak samo
+     zachowuje się prawdziwy Worker: podium i stawka są ZAPISANE, więc przychodzą niezależnie od
+     fazy, a `isArchive` mówi stronie, że patrzy na zapis, nie na wynik na żywo.
+
+     Rocznik 2024 dostaje `prizes: []` — nagrody jury nie zostały wtedy zapisane. To nie to samo
+     co brak zwycięzcy w jednej kategorii: tam nic nie ma, więc dwanaście wierszy „jeszcze nie
+     ogłoszono" byłoby nieprawdą o wyniku, który dawno ogłoszono. Strona pokazuje wtedy jedno
+     zdanie — i bez tego wiersza w demo nie dałoby się tego zobaczyć. */
+  const archived = DEMO_EDITIONS.find((row) => row.key === edition && row.status === 'archived');
+  if (archived) {
+    const scored = demoParticipants(true);
+    return {
+      ok: true,
+      demo: true,
+      phase: 'closed',
+      isArchive: true,
+      selectedEdition: archived,
+      editions: DEMO_EDITIONS,
+      participants: scored,
+      podium: [...scored]
+        .sort((a, b) =>
+          b.totalScore - a.totalScore ||
+          b.voteCount - a.voteCount ||
+          b.averageScore - a.averageScore)
+        .slice(0, 3),
+      ...(noPrizeField() ? {} : { prizes: archived.key === '2024' ? [] : DEMO_PRIZES }),
+      myVotes: []
+    };
+  }
 
   return {
     ok: true,
@@ -287,6 +384,15 @@ export function demoVotingState(phase = 'scheduled') {
           b.averageScore - a.averageScore)
         .slice(0, 3)
       : [],
+    /* Zwycięzcy kategorii jury wychodzą razem z podium — dopiero po zamknięciu. Przed nim
+       lista dwunastu nagród nie ma się pokazać wcale, bo nie ma czego ogłaszać.
+
+       `?demo=1&noPrizes=1` OMIJA TO POLE CAŁKOWICIE — patrz `noPrizeField` wyżej. */
+    ...(noPrizeField() ? {} : { prizes: closed ? DEMO_PRIZES : [] }),
+    /* Lista roczników jest niezależna od fazy: poprzednie edycje są zamknięte także wtedy, gdy
+       bieżące głosowanie dopiero czeka na start. */
+    editions: DEMO_EDITIONS,
+    selectedEdition: DEMO_EDITIONS[0],
     // Nikt nie zagłosował z tej przeglądarki, więc kafelki są klikalne i da się oddać głos.
     myVotes: []
   };

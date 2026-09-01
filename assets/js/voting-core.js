@@ -157,7 +157,10 @@ export function remaining(milliseconds) {
  * przez cały rok poza dniem wyścigu.
  */
 export async function readState(demoPhase = 'scheduled', edition = '') {
-  if (demoMode) return demoVotingState(demoPhase);
+  /* Rocznik podawany też do demo. Bez tego wejście w rocznik archiwalny w trybie demo
+     oddawało bieżącą edycję i sekcja archiwum pokazywała ten sam wynik pod każdym rokiem —
+     czyli wyglądała na sprawną i nie dawała się sprawdzić. */
+  if (demoMode) return demoVotingState(demoPhase, edition);
 
   const bridge = api();
   const endpoint = config()?.endpoints?.voting;
@@ -408,6 +411,75 @@ export function tieNotes(rows) {
     start = end + 1;
   }
   return notes;
+}
+
+/* ===========================================================================
+   ZWYCIĘZCY DWUNASTU NAGRÓD: DWIE NAZWY TEGO SAMEGO POLA
+   ===========================================================================
+   Publiczny odczyt `voting` niesie zwycięzców kategorii jury. Pole ma jednak dwa kształty,
+   bo powstawało w dwóch miejscach naraz:
+
+     `awards: [{ awardKey, startNumber, firstName, lastName, projectName, photo, note }]`
+     `prizes: [{ prizeKey, startNumber, projectName, riderName, note }]`
+
+   To nie jest niezdecydowanie, tylko rzeczywistość wdrożenia: statyczne pliki i funkcja
+   Workera idą na produkcję osobno, a przez tę szczelinę strona chwilami rozmawia z WERSJĄ
+   STARSZĄ NIŻ ONA SAMA. Strona, która zna jedną nazwę, w tej szczelinie nie pokazuje
+   dwunastu nagród wcale — i nie umie o tym powiedzieć, bo z jej punktu widzenia pola po
+   prostu nie ma.
+
+   Dlatego jedna funkcja sprowadza oba kształty do jednego, tego, którego używa rysowanie.
+   Rozpoznanie po zawartości, nie po wersji: nie ma czego pytać o wersję.
+
+   NIEZNANY KSZTAŁT ZNACZY „NIC NIE PRZYSZŁO", nie wyjątek. `Array.isArray` zamiast `|| []`:
+   gdyby serwer oddał obiekt albo napis, `|| []` przepuściłoby to dalej i dopiero `.find()`
+   przy rysowaniu przewróciłoby całą sekcję wyników. A brak tego pola jest stanem NORMALNYM:
+   dwanaście kategorii stoi wtedy bez zwycięzców, dokładnie tak jak przed ogłoszeniem, i w
+   konsoli nie ma ani jednego błędu.
+
+   @param {object} result odpowiedź końcówki `voting`
+   @returns {Array} zwycięzcy w jednym kształcie, z `awardKey`
+*/
+export function normalizeAwards(result) {
+  const source = [
+    Array.isArray(result?.awards) ? result.awards : null,
+    Array.isArray(result?.prizes) ? result.prizes : null
+  ].find(Boolean);
+
+  /* `null` ZNACZY „TEGO POLA NIE BYŁO", A TO JEST INNA ODPOWIEDŹ NIŻ PUSTA TABLICA.
+     ---------------------------------------------------------------------------
+     Pusta tablica znaczy „serwer wie o dwunastu kategoriach i żadna nie ma jeszcze zwycięzcy" —
+     wtedy lista stoi, a każdy wiersz mówi „jeszcze nie ogłoszono". Brak pola znaczy coś
+     zupełnie innego: „ta wersja funkcji nie umie o tym powiedzieć". Dwanaście wierszy
+     „jeszcze nie ogłoszono" byłoby wtedy nieprawdą o wyniku, który wieczorem ogłoszono na
+     scenie — i nieprawdą, której nikt nie umiałby wytłumaczyć, bo strona wygląda na sprawną.
+
+     Dlatego przy braku pola cała lista się NIE POKAZUJE, bez ani jednego błędu w konsoli.
+     Odróżnienie tych dwóch przypadków wymaga trzeciej wartości; `[]` dla obu skasowałoby je. */
+  if (!source) return null;
+
+  return source
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const key = String(row.awardKey || row.prizeKey || '').trim();
+      if (!/^prize-\d{1,2}$/.test(key)) return null;
+      /* `riderName` przychodzi jako jeden napis, `firstName`/`lastName` jako dwa. Rysowanie
+         chce dwóch, więc jednoczłonowa forma jest dzielona na pierwszej spacji — a nie
+         wpisywana w całości do imienia, bo wtedy wiersz brzmiałby „Salvatore Mannu" w polu
+         opisanym jako imię i przy pierwszej zmianie układu wyszłoby to na ekran. */
+      const rider = String(row.riderName || '').trim();
+      const [first, ...rest] = rider ? rider.split(/\s+/) : [];
+      return {
+        awardKey: key,
+        startNumber: row.startNumber ?? '',
+        firstName: row.firstName ?? (first || ''),
+        lastName: row.lastName ?? rest.join(' '),
+        projectName: row.projectName || '',
+        photo: row.photo || '',
+        note: row.note || ''
+      };
+    })
+    .filter(Boolean);
 }
 
 export function votesLabel(count) {

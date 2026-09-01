@@ -19,6 +19,12 @@
  *   adresem. Ocena zostaje przy pojeździe, a okno pojawia się raz — na to, co naprawdę wymaga
  *   pisania.
  *
+ *   JEDNO NACIŚNIĘCIE, TAKŻE PALCEM. Pod palcem przycisku „Zagłosuj" nie widać, dopóki ktoś nie
+ *   dotknie kafelka, bo `:hover` na telefonie nie istnieje — ale przezroczysta warstwa na całym
+ *   zdjęciu JEST tym przyciskiem i nosi jego nazwę. Dotknięcie zdjęcia rozwija więc rząd ocen od
+ *   razu, bez pośredniego dotknięcia „na odsłonięcie". To pośrednie dotknięcie było usterką
+ *   „klikam w zagłosuj i nic się nie robi" — patrz `hit.addEventListener` w `voteOverlay()`.
+ *
  * DOCZYTYWANIE PORCJAMI
  *   Kafelki wchodzą po dwanaście. Przy stu uczestnikach pierwsze wejście nie zaczyna się od stu
  *   podpisanych adresów zdjęć naraz. `loading="lazy"` samo nie wystarcza: leniwy obrazek nadal
@@ -453,40 +459,69 @@ import {
   }
 
   /**
-   * Zegar w pasku na samej górze strony.
+   * Zegar głosowania — DWA WIDOKI, JEDEN ODCZYT.
+   * ===========================================================================
    *
    * Trzy stany, bo trzy różne pytania: przed startem „ile do startu", w trakcie „ile mam czasu
    * na głos", po zamknięciu „koniec". Tyka co sekundę tylko wtedy, gdy jest co pokazywać —
    * przy zamkniętym głosowaniu licznik sekundowy nie ma czego odliczać, więc go nie ma.
+   *
+   * DLACZEGO `$$`, A NIE `$`
+   *   Od przeniesienia zegara w treść strony jest go DWA: ten w `.vote-head` i jego kopia
+   *   zadokowana w pasku (`.nav-clock--vote`). Malowanie tylko pierwszego znalezionego dawało
+   *   pasek z pustym środkiem po przewinięciu — a to jest dokładnie ta chwila, w której zegar
+   *   jest jedyną liczbą, po którą ktoś patrzy w pasek. Jedna pętla zamiast drugiej funkcji:
+   *   dwa widoki karmione dwoma kawałkami kodu rozjeżdżają się przy pierwszej poprawce.
+   *
+   *   O TYM, KTÓRY Z DWÓCH JEST WIDOCZNY, nie decyduje ta funkcja, tylko `setupVoteClock`
+   *   w voting-boot.js przez `[data-clock-docked]` na nagłówku. Tutaj oba dostają ten sam
+   *   napis, także wtedy, gdy jeden z nich jest właśnie wygaszony — inaczej ten, który
+   *   wjeżdża, wjeżdżałby ze starą liczbą i poprawiałby ją dopiero przy następnym tyknięciu.
    */
   function paintTimer() {
-    const box = $('[data-vote-timer]');
-    if (!box) return;
-    const label = $('[data-vote-timer-label]', box);
-    const time = $('[data-vote-timer-time]', box);
-    if (!state.loaded) {
-      box.hidden = true;
-      return;
+    const boxes = $$('[data-vote-timer]');
+    if (!boxes.length) return;
+
+    /* Napis liczony RAZ, nie w pętli: `remaining()` na dwóch kopiach mogłoby trafić w dwie
+       różne sekundy, gdyby pętla wypadła na granicy tyknięcia. */
+    let label = '';
+    let time = '';
+    if (state.loaded) {
+      if (state.phase === 'closed') {
+        label = text('voting.resultsKicker');
+        time = text('voting.closed');
+      } else {
+        const target = state.phase === 'voting' ? stamp(state.votingEndsAt) : stamp(state.raceStartsAt);
+        const left = target ? target - Date.now() : 0;
+        if (!target || left <= 0) {
+          label = text('voting.pageKicker');
+          time = text(state.phase === 'voting' ? 'voting.openNoLimit' : 'voting.notOpenYet');
+        } else {
+          label = text(state.phase === 'voting' ? 'voting.timeLeft' : 'voting.startsIn');
+          time = remaining(left);
+        }
+      }
     }
 
-    box.hidden = false;
-    box.dataset.phase = state.phase;
-
-    if (state.phase === 'closed') {
-      if (label) label.textContent = text('voting.resultsKicker');
-      if (time) time.textContent = text('voting.closed');
-      return;
-    }
-
-    const target = state.phase === 'voting' ? stamp(state.votingEndsAt) : stamp(state.raceStartsAt);
-    const left = target ? target - Date.now() : 0;
-    if (!target || left <= 0) {
-      if (label) label.textContent = text('voting.pageKicker');
-      if (time) time.textContent = text(state.phase === 'voting' ? 'voting.openNoLimit' : 'voting.notOpenYet');
-      return;
-    }
-    if (label) label.textContent = text(state.phase === 'voting' ? 'voting.timeLeft' : 'voting.startsIn');
-    if (time) time.textContent = remaining(left);
+    boxes.forEach((box) => {
+      /* KOPIA W PASKU NIE UŻYWA `hidden`.
+         Jej widocznością rządzi `[data-clock-docked]` przez `opacity`/`visibility` — patrz
+         `.nav-clock` w experience.css. `hidden` postawione tutaj wygrywałoby z tamtym i zegar
+         nie pojawiłby się w pasku nigdy; a `hidden = false` przed pierwszym odczytem
+         pokazywałby w pasku puste miejsce. Dlatego kopia dostaje `data-vote-timer-ready`,
+         a arkusz trzyma ją schowaną, dopóki go nie ma. */
+      if (box.hasAttribute('data-vote-timer-dock')) {
+        box.toggleAttribute('data-vote-timer-ready', state.loaded);
+      } else {
+        box.hidden = !state.loaded;
+      }
+      if (!state.loaded) return;
+      box.dataset.phase = state.phase;
+      const labelSlot = $('[data-vote-timer-label]', box);
+      const timeSlot = $('[data-vote-timer-time]', box);
+      if (labelSlot) labelSlot.textContent = label;
+      if (timeSlot) timeSlot.textContent = time;
+    });
   }
 
   /**
@@ -1164,10 +1199,14 @@ import {
    * Teraz kafelek jest czysty: samo zdjęcie z podpisem. Zaproszenie pojawia się DOPIERO wtedy,
    * gdy ktoś wykaże zainteresowanie tym konkretnym wozem:
    *
-   *   MYSZ — najechanie przygasza zdjęcie i wynosi na jego środek jeden przycisk;
-   *   PALEC — dotknięcie robi to samo, bo `:hover` na telefonie nie istnieje;
-   *   KLIK  — przycisk PRZEISTACZA SIĘ w suwak z oceną i przyciskiem wysyłki, w miejscu,
-   *           w którym stał, więc wzrok nie musi nigdzie skakać.
+   *   MYSZ — najechanie przygasza zdjęcie i wynosi na jego środek jeden przycisk, a KLIK w ten
+   *           przycisk PRZEISTACZA GO w suwak z oceną i przyciskiem wysyłki, w miejscu, w którym
+   *           stał, więc wzrok nie musi nigdzie skakać;
+   *   PALEC — JEDNO dotknięcie zdjęcia daje od razu ten sam suwak. Nie „to samo, co najechanie":
+   *           to samo, co KLIK. `:hover` na telefonie nie istnieje, więc nie ma czym oddzielić
+   *           „przygotowania" od „naciśnięcia" — a dotknięcie, które tylko odsłania przycisk
+   *           pod własnym kciukiem, wygląda z ekranu jak strona, która nie zareagowała.
+   *           Patrz `hit.addEventListener` na dole tej funkcji.
    *
    * DLACZEGO SUWAK, A NIE OSIEM PRZYCISKÓW
    *   Osiem sąsiadujących celów na szerokości pół telefonu to osiem okazji do trafienia w
@@ -1287,9 +1326,15 @@ import {
     picker.append(label, track, scale, actions);
     veil.append(cta, picker);
 
-    /* Przezroczysty przycisk na całym zdjęciu. Na telefonie to on odsłania nakładkę — bez
-       niego nie byłoby jak jej wywołać, bo `:hover` nie istnieje. Na myszy jest niewidoczny
-       i nieużywany: CSS zdejmuje go, gdy kursor wejdzie na kafelek. */
+    /* Przezroczysty przycisk na całym zdjęciu — i to ON JEST przyciskiem „Zagłosuj" pod palcem.
+       ---------------------------------------------------------------------------
+       Na myszy jest niewidoczny i nieużywany: CSS zdejmuje go, gdy kursor wejdzie na kafelek,
+       więc klik zawsze trafia wprost w pigułkę na środku zdjęcia. Pod palcem `:hover` nie
+       istnieje, więc pigułki nie ma na ekranie, dopóki ktoś nie dotknie kafelka — i dlatego to
+       ten przycisk niesie nazwę „Zagłosuj na uczestnika — <wóz>" dla czytnika ekranu.
+
+       Nazwa zobowiązuje: naciśnięcie musi zrobić to, co robi „Zagłosuj", a nie tylko pokazać
+       drugi przycisk o tej samej nazwie. Patrz `hit.addEventListener` niżej. */
     const hit = document.createElement('button');
     hit.type = 'button';
     hit.className = 'vote-card__hit';
@@ -1316,32 +1361,74 @@ import {
       if (state.open && state.open.id === row.id) state.open = null;
     };
 
-    const arm = () => {
-      closeOthers();
-      const node = card();
-      if (node) node.classList.add('is-armed');
-      // Przycisk dotknięcia schodzi z drogi, żeby następne dotknięcie trafiło w „Zagłosuj".
-      hit.hidden = true;
-      /* Zapisane w stanie, nie tylko w klasie: przerysowanie siatki (doczytana porcja, odczyt z
-         serwera) buduje kafelki od nowa i klasa by przepadła — patrz `state.open`. */
-      state.open = { id: row.id, picking: false, score: Number(slider.value) };
-      cta.focus({ preventScroll: true });
-    };
-
     const toPick = () => {
       closeOthers();
       const node = card();
       if (node) node.classList.add('is-armed', 'is-picking');
+      /* Przezroczysta warstwa schodzi z drogi, żeby następne dotknięcie trafiło w suwak i
+         w przycisk wysyłki, a nie znowu w nią. */
       hit.hidden = true;
       picker.hidden = false;
       cta.setAttribute('aria-expanded', 'true');
+      /* Zapisane w stanie, nie tylko w klasach: przerysowanie siatki (doczytana porcja, odczyt z
+         serwera) buduje kafelki od nowa i klasy by przepadły — patrz `state.open`. */
       state.open = { id: row.id, picking: true, score: Number(slider.value) };
       slider.focus({ preventScroll: true });
     };
 
-    hit.addEventListener('click', arm);
+    /**
+     * JEDNO DOTKNIĘCIE KAFELKA ROBI TO, CO JEDNO KLIKNIĘCIE MYSZĄ.
+     * ===========================================================================
+     *
+     * TU BYŁA USTERKA „KLIKAM W ZAGŁOSUJ I NIC SIĘ NIE ROBI".
+     *   Stało tu `hit.addEventListener('click', arm)`, gdzie `arm()` tylko odsłaniał nakładkę
+     *   i chował przezroczystą warstwę, żeby DRUGIE dotknięcie mogło trafić w „Zagłosuj".
+     *   Czyli pierwsze dotknięcie było zużywane na pokazanie tego, co mysz dostaje darmo, samym
+     *   najechaniem — i nie posuwało głosowania o ani jeden krok.
+     *
+     * ZMIERZONE sondą tools/probe-voting-mobile.mjs, ta sama strona, to samo jedno dotknięcie:
+     *
+     *     1440×900 (wskaźnik z hoverem)   is-picking=true   → rząd ocen rozwinięty
+     *     768×1024 (wskaźnik z hoverem)   is-picking=true   → rząd ocen rozwinięty
+     *     390×844  (hover: none)          is-picking=false  → suwaka NIE MA W KADRZE
+     *
+     *   Na telefonie z ekranu wyglądało to dokładnie jak w zgłoszeniu: zdjęcie przygasa, a
+     *   pigułka „Zagłosuj" wyrasta DOKŁADNIE POD KCIUKIEM, który ją zasłania. Nic się nie
+     *   otwiera, więc naturalną reakcją jest dotknąć jeszcze raz — a przy pigułce 159×44 w
+     *   kadrze 173×173 (ZMIERZONE: 20 z 25 punktów zdjęcia zjadała nakładka i nie robiły NIC)
+     *   drugie dotknięcie najczęściej trafiało w przygaszone tło. Stąd „nie da się zagłosować".
+     *
+     * DLACZEGO TO NIE ZMIENIA NICZEGO NA MYSZY
+     *   Kursor nigdy nie klika w tę warstwę: `.vote-card:hover .vote-card__hit { display: none }`
+     *   zdejmuje ją, gdy kursor wejdzie na kafelek. Mysz klika wprost w pigułkę, tak jak
+     *   wcześniej, i tak samo dostaje rząd ocen. Znika WYŁĄCZNIE dodatkowe dotknięcie, którego
+     *   nie było w opisie przepływu na początku tego pliku.
+     */
+    hit.addEventListener('click', toPick);
     cta.addEventListener('click', toPick);
     cancel.addEventListener('click', () => { disarm(); hit.focus({ preventScroll: true }); });
+
+    /**
+     * PRZYGASZONE TŁO NIE JEST MARTWĄ STREFĄ.
+     * ===========================================================================
+     * Nakładka kryje CAŁE zdjęcie i przy odsłonięciu łapie wskaźnik (`pointer-events: auto`),
+     * a jej tło nie miało żadnej obsługi. Każde dotknięcie obok pigułki albo obok rzędu ocen
+     * przepadało bez śladu — na kafelku, który wyglądał jak wielki przycisk. ZMIERZONE przed
+     * naprawą: 20 z 25 punktów zdjęcia zwracało `div.vote-veil` i nie robiło nic.
+     *
+     * Teraz tło jest przełącznikiem tego samego, co robi dotknięcie zdjęcia: zamknięte otwiera
+     * rząd ocen, otwarte składa kafelek. To ta sama zasada, którą ma dotknięcie POZA kafelkiem
+     * (nasłuch na dokumencie w `start()`), tylko rozciągnięta na przygaszone tło, bo z punktu
+     * widzenia palca to jest to samo miejsce: „nie w kontrolkę".
+     *
+     * `event.target !== veil` przepuszcza dalej trafienia w przyciski i suwak w środku — one
+     * mają własną obsługę i nie wolno ich dublować.
+     */
+    veil.addEventListener('click', (event) => {
+      if (event.target !== veil) return;
+      if (picker.hidden) toPick();
+      else disarm();
+    });
 
     /* Escape wychodzi z wyboru, nie z całej strony — a wychodzi krok po kroku: z suwaka do
        przycisku, z przycisku do czystego kafelka. */
@@ -1352,6 +1439,12 @@ import {
         picker.hidden = true;
         card()?.classList.remove('is-picking');
         cta.setAttribute('aria-expanded', 'false');
+        /* Stan idzie za drzewem, nie zostaje w nim tylko klasa.
+           Bez tej linijki `state.open.picking` zostawało prawdą po zwinięciu suwaka klawiszem
+           Escape — a `restoreOpen()` przy najbliższym przerysowaniu siatki (odczyt z serwera
+           chodzi co pół minuty) rozwijał go z powrotem. Czyli suwak sam wracał na kafelek, z
+           którego ktoś właśnie wyszedł. */
+        if (state.open && state.open.id === row.id) state.open.picking = false;
         cta.focus({ preventScroll: true });
         return;
       }

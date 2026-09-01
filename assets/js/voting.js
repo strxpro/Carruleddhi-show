@@ -24,7 +24,7 @@
  */
 import {
   $, $$, reducedMotion, demoMode, text, toast,
-  stamp, remaining, readState, paintDemoBar, avatarFor, votesLabel, tieNotes
+  stamp, remaining, readState, paintDemoBar, avatarFor, votesLabel, tieNotes, normalizeAwards
 } from './voting-core.js';
 
 (function () {
@@ -36,6 +36,26 @@ import {
     votingEndsAt: null,
     podium: [],
     participants: [],
+    /**
+     * Zwycięzcy dwunastu nagród jury: `[{ awardKey, startNumber, firstName, lastName,
+     * projectName, photo, note }]`, gdzie `awardKey` to `'prize-1'`…`'prize-12'`.
+     *
+     * POLE MA DWIE NAZWY (`awards` i `prizes`) I MOŻE NIE PRZYJŚĆ WCALE. Wdrożona funkcja
+     * Workera bywa starsza od strony — statyczne pliki lądują na krawędzi w chwili wypchnięcia,
+     * a Worker osobnym wdrożeniem. Sprowadza to do jednego kształtu `normalizeAwards` w
+     * voting-core.js; tam stoi też powód, dla którego BRAK pola (`null`) jest inną odpowiedzią
+     * niż pusta tablica:
+     *   `null`  ta wersja funkcji nie umie o tym powiedzieć → cała lista się nie pokazuje
+     *   `[]`    dwanaście kategorii, żadna jeszcze nierozstrzygnięta → lista stoi, wiersze czekają
+     *
+     * Wartość początkowa to `null`, bo przed pierwszym odczytem nie przyszło NIC — a nie
+     * „przyszło zero zwycięzców".
+     */
+    awards: null,
+    /** Roczniki z `readVotingEditions`. Karmią wybór w archiwum. */
+    editions: [],
+    /** Rocznik, którego dotyczy ten odczyt — z niego bierzemy liczbę widowni. */
+    selectedEdition: null,
     /** Ile wierszy klasyfikacji jest już narysowanych. Zero znaczy „lista zwinięta". */
     shown: 0,
     loaded: false
@@ -60,6 +80,13 @@ import {
       /* Pełna stawka, nie tylko trójka z cokołu. Potrzebna do rozwijanej klasyfikacji pod
          przyciskiem — ta sama odpowiedź serwera, więc ani jednego żądania więcej. */
       participants: Array.isArray(result.participants) ? result.participants : [],
+      /* Zwycięzcy dwunastu kategorii, sprowadzeni do jednego kształtu z `awards` ALBO
+         `prizes` — patrz `normalizeAwards` w voting-core.js po powód, dla którego pole ma dwie
+         nazwy. Zły kształt i brak pola znaczą tu to samo: „nic nie przyszło", czyli dwanaście
+         kategorii bez zwycięzców i ani jednego błędu w konsoli. */
+      awards: normalizeAwards(result),
+      editions: Array.isArray(result.editions) ? result.editions : [],
+      selectedEdition: result.selectedEdition || null,
       loaded: true
     });
     paint();
@@ -99,6 +126,12 @@ import {
     paintClock();
     paintHeroVote();
     paintField();
+    /* Nagrody jury PO cokole i po stawce, bo tak stoją na ekranie i tak czyta się wynik:
+       najpierw jedna nagroda publiczności, potem dwanaście nagród jury. */
+    paintAwards();
+    /* Archiwum ostatnie i niezależne od fazy: poprzednie roczniki są zamknięte także wtedy,
+       gdy bieżące głosowanie dopiero czeka na start. */
+    paintArchive();
   }
 
   /**
@@ -379,6 +412,11 @@ import {
     if (podium) podium.hidden = !closed;
     const stage = $('[data-podium-stage]');
     if (stage) stage.hidden = !(closed && hasWinners);
+    /* Wstążka „Nagroda Publiczności" chodzi dokładnie z cokołem, nie z sekcją: przy zerze
+       głosów sekcja zostaje (jest w niej zdanie wyjaśniające), ale nie ma zwycięzcy, którego
+       ta wstążka by podpisywała. */
+    const crown = $('[data-podium-crown]');
+    if (crown) crown.hidden = !(closed && hasWinners);
     const emptyNote = $('[data-podium-empty]');
     if (emptyNote) emptyNote.hidden = !(closed && !hasWinners);
     /* Klasa dla CSS: pusta sekcja zwija sie do wysokosci tresci zamiast zostawac
@@ -667,6 +705,401 @@ import {
   }
 
   /* ===========================================================================
+     DWANAŚCIE NAGRÓD JURY
+     ===========================================================================
+     Publiczność przyznaje jedną nagrodę i cokół wyżej jest w całości o niej. Pozostałych
+     dwunastu rozstrzyga jury i stoper, a do tej zmiany nie było ich na stronie ani jednego:
+     sekcja nagród wymieniała dwanaście kategorii, wieczorem rozdawano w nich statuetki, i na
+     tym ślad się kończył.
+
+     TO NIE JEST WYLICZANE Z GŁOSÓW I NIE MOŻE BYĆ. Zwycięzców tych dwunastu podaje Worker w
+     `awards`, bo wpisuje ich organizator w panelu. Lista wyliczona z głosów publiczności
+     mówiłaby o „najszybszym Classic" coś, czego z tych głosów wyliczyć nie można — i to jest
+     ten sam powód, dla którego zwijana lista dwunastu zwycięzców została stąd zdjęta przy
+     przejściu na nagrodę publiczności (migracja 0026). Wraca teraz, bo są prawdziwe dane.
+
+     PUSTA KATEGORIA ZOSTAJE NA LIŚCIE
+       Wynik ogłasza się wieczorem, po kolei, więc przez pierwsze minuty część kategorii ma
+       zwycięzcę, a część nie. Znikająca kategoria znaczyłaby „tej nagrody nie ma", a prawda
+       jest inna: nagroda jest, wynik nie jest jeszcze ogłoszony. Dwa różne zdania nie mogą
+       wyglądać tak samo, więc różnią się stanem (`data-award-state`), obwódką i napisem. */
+
+  /** Dwanaście, bo tyle jest nagród jury. Klucze `prize-1`…`prize-12` przychodzą z serwera. */
+  const AWARD_COUNT = 12;
+
+  /**
+   * Lista `<li>` dla dwunastu kategorii — ta sama dla bieżącego wyniku i dla archiwum.
+   *
+   * Jedna funkcja na dwa miejsca z rozmysłu: gdyby archiwum miało własny egzemplarz, ten sam
+   * zwycięzca wyglądałby w dwóch miejscach inaczej po pierwszej poprawce w którymkolwiek.
+   *
+   * @param {Array} awards zwycięzcy z serwera; puste znaczy „nic nie ogłoszono"
+   */
+  function buildAwardItems(awards) {
+    const source = Array.isArray(awards) ? awards : [];
+    return Array.from({ length: AWARD_COUNT }, (_, index) => {
+      const number = index + 1;
+      const key = `prize-${number}`;
+      /* Dopasowanie po `awardKey`, nie po pozycji w tablicy: serwer oddaje tylko rozstrzygnięte
+         nagrody i w kolejności ogłaszania, więc `awards[3]` nie jest czwartą nagrodą. */
+      const won = source.find((row) => String(row?.awardKey || '') === key) || null;
+
+      const item = document.createElement('li');
+      item.className = 'award-card';
+      item.dataset.awardKey = key;
+      /* Stan czytany przez CSS i przez sondę. Dwa słowa zamiast klasy „is-empty", bo to nie
+         jest brak treści — to jest treść „jeszcze nie ogłoszono". */
+      item.dataset.awardState = won ? 'won' : 'pending';
+
+      const head = document.createElement('div');
+      head.className = 'award-card__head';
+      const rank = document.createElement('span');
+      rank.className = 'award-card__rank';
+      // Dwucyfrowo, tak jak na talii kart w sekcji nagród: „01", nie „1".
+      rank.textContent = String(number).padStart(2, '0');
+      const title = document.createElement('h4');
+      title.className = 'award-card__title';
+      /* Nazwa kategorii ze słownika. Klucz jest składany, a nie wpisany — dlatego dwanaście
+         nazw musi istnieć we wszystkich sześciu językach, patrz `podiumResultsExtras`
+         w i18n.js. Do tej zmiany trzy języki dostawały tu włoski. */
+      title.textContent = text(`prize.${number}`);
+      head.append(rank, title);
+      item.append(head);
+
+      if (!won) {
+        const pending = document.createElement('p');
+        pending.className = 'award-card__pending';
+        pending.textContent = text('voting.awardPending');
+        item.append(pending);
+        return item;
+      }
+
+      const who = document.createElement('div');
+      who.className = 'award-card__who';
+
+      /* Zdjęcie, a gdy go nie ma — rysowany kafelek z numerem startowym (`avatarFor`), ten sam
+         co na cokole i w tabeli. Nie jest to fotografia z banku ani udawanie zdjęcia: to
+         jawny rysunek. Pusty prostokąt w tym miejscu wygląda jak nieudane wczytanie, a wiersz
+         bez obrazka rozjeżdżałby wysokości kart w siatce. */
+      const image = document.createElement('img');
+      image.className = 'award-card__photo';
+      image.src = won.photo || avatarFor(won);
+      image.alt = '';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+
+      const identity = document.createElement('div');
+      identity.className = 'award-card__identity';
+      const start = document.createElement('span');
+      start.className = 'award-card__start';
+      start.textContent = String(won.startNumber ?? '').padStart(3, '0');
+      const project = document.createElement('strong');
+      project.textContent = won.projectName || text('voting.noProject');
+      const rider = document.createElement('span');
+      rider.className = 'award-card__rider';
+      rider.textContent = `${won.firstName || ''} ${won.lastName || ''}`.trim();
+      identity.append(start, project, rider);
+
+      who.append(image, identity);
+      item.append(who);
+
+      /* `note` to wynik tej kategorii — czas przejazdu, wymiar, wiek kierowcy. Wiersz pojawia
+         się tylko wtedy, gdy jest co w nim napisać: „Wynik: —" udaje pomiar, którego nie ma. */
+      const note = String(won.note || '').trim();
+      if (note) {
+        const result = document.createElement('p');
+        result.className = 'award-card__result';
+        const label = document.createElement('span');
+        label.textContent = text('voting.awardResult');
+        const value = document.createElement('b');
+        value.textContent = note;
+        result.append(label, value);
+        item.append(result);
+      }
+
+      return item;
+    });
+  }
+
+  /**
+   * Dwanaście nagród pod cokołem bieżącej edycji.
+   *
+   * Odsłaniane razem z cokołem, nie przed nim: zdrapka zakrywa wynik nagrody publiczności, a
+   * lista jury stojąca nad zakrytym cokołem znaczyłaby stronę, która najpierw pokazuje
+   * dwanaście wyników, a potem prosi o zdrapanie trzynastego. Wyjątkiem jest edycja bez ani
+   * jednego głosu: nie ma wtedy czego zdrapywać, a nagrody jury istnieją niezależnie od tego,
+   * czy publiczność zagłosowała.
+   */
+  function paintAwards() {
+    const box = $('[data-podium-awards]');
+    const list = $('[data-podium-awards-list]');
+    if (!box || !list) return;
+
+    /* `state.awards === null` to „Worker o tym polu nie wie" — patrz `normalizeAwards` w
+       voting-core.js. Wtedy sekcja nie pokazuje się wcale: dwanaście wierszy „jeszcze nie
+       ogłoszono" opowiadałoby o wieczorze, w którym statuetki dawno rozdano, i nie byłoby ani
+       jak tego sprostować, ani po czym poznać. Cicho i bez błędu, bo dla gościa nie ma tu nic
+       do zrobienia. */
+    const ready = state.phase === 'closed'
+      && Array.isArray(state.awards)
+      && (scratchRevealed() || !state.podium.length);
+    box.hidden = !ready;
+    if (!ready) {
+      list.replaceChildren();
+      return;
+    }
+    list.replaceChildren(...buildAwardItems(state.awards));
+  }
+
+  /* ===========================================================================
+     ARCHIWUM ROCZNIKÓW
+     ===========================================================================
+     Nowy sezon zabiera poprzedniemu status bieżącego, ale nie zabiera mu istnienia: zdjęcia,
+     punkty i zwycięzcy zostają w `voting_editions` (migracja 0030). Do tej zmiany jedyną drogą
+     do nich było dopisanie `?edition=2025` w adresie podstrony — czyli droga dla kogoś, kto
+     czytał kod.
+
+     ANI JEDNEGO NOWEGO ADRESU. Roczniki przychodzą w `editions` z tej samej odpowiedzi, którą
+     ta strona i tak odczytuje, a wejście w rocznik to `action: 'state'` z polem `edition` —
+     `readState(demoPhase, key)` w voting-core.js. Ta droga działa od migracji 0030 i jest już
+     używana na podstronie (`paintEditions` w voting-page.js).
+
+     OSOBNY STAN, NIE NADPISANIE `state`
+       Wybrany rocznik NIE wchodzi do `state`. Wszedłszy, przerysowałby cokół, stawkę i nagrody
+       bieżącej edycji danymi z 2025 roku — a odczyt fazy raz na trzydzieści sekund cofnąłby to
+       z powrotem. Wynik na ekranie zależałby wtedy od tego, kiedy ktoś ostatnio kliknął. */
+
+  /** Wybrany rocznik archiwalny. `null` znaczy „nic nie wybrano". */
+  let archive = null;
+  /** Trwa odczyt rocznika — dla napisu w podsumowaniu i żeby nie wysłać dwóch żądań. */
+  let archiveBusy = false;
+
+  /**
+   * Roczniki, które wolno otworzyć.
+   *
+   * Wyłącznie `archived`: tylko zarchiwizowany rocznik ma zapisane `results`, więc tylko dla
+   * niego Worker (`readVotingArchive`) potrafi cokolwiek oddać. Rocznik bieżący jest na tej
+   * stronie wyżej — wpisany do listy „wcześniejszych" byłby drogą do tego samego wyniku,
+   * tylko dłuższą.
+   */
+  function archivedEditions() {
+    const current = state.selectedEdition?.key || '';
+    return state.editions.filter((row) => row?.key && row.key !== current && row.status === 'archived');
+  }
+
+  function paintArchive() {
+    const section = $('[data-archive]');
+    if (!section) return;
+
+    const years = archivedEditions();
+    /* Sekcja i przycisk pojawiają się dopiero, gdy jest co pokazać. Przed pierwszą
+       archiwizacją „zobacz wcześniejsze wyniki" prowadziłoby do pustego wyboru. */
+    section.hidden = years.length === 0;
+    if (years.length === 0) return;
+
+    const select = $('[data-archive-edition]');
+    if (select) {
+      /* Pusta pozycja na początku, bo wybór ma być decyzją: bez niej pierwszy rocznik jest
+         wybrany od wejścia, a mimo to nic pod spodem nie stoi — i wygląda to na usterkę. */
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = text('voting.archivePickNone');
+      select.replaceChildren(blank, ...years.map((row) => {
+        const option = document.createElement('option');
+        option.value = row.key;
+        option.textContent = `${row.key} · ${row.name}`;
+        // Zaznaczone to, co naprawdę stoi na ekranie, a nie to, co pamięta pole wyboru:
+        // lista jest przebudowywana przy każdym odczycie stanu.
+        option.selected = row.key === archive?.key;
+        return option;
+      }));
+    }
+
+    paintArchivePanel();
+  }
+
+  /**
+   * Ile nas wtedy było — z `attendeeCount`, a gdy go nie ma, to szczerze o czymś innym.
+   *
+   * `attendeeCount` liczy ludzi, którzy powiedzieli „będę tam". `participantCount` liczy
+   * zapisane wozy. To dwie różne liczby i różnią się kilkukrotnie, więc podstawienie jednej
+   * pod etykietę drugiej nie jest przybliżeniem — jest zmyśleniem. Rocznik zarchiwizowany
+   * przed dołożeniem `attendeeCount` (albo starsza wdrożona funkcja) nie ma pierwszej liczby;
+   * wtedy zdanie zmienia się razem z liczbą i mówi wprost, czego nie wiemy.
+   *
+   * @returns {{lead: string, count: number, label: string}|null}
+   */
+  function crowdLine(entry) {
+    const edition = entry?.edition || null;
+    const attendees = Number(edition?.attendeeCount);
+    if (Number.isFinite(attendees) && attendees > 0) {
+      return { lead: text('voting.archiveWeWere'), count: attendees, label: text('voting.archiveAttendees') };
+    }
+
+    /* Zapas po zapasie: `participantCount` przychodzi i w `selectedEdition`, i w wierszu z
+       listy roczników (`readVotingEditions` liczy je od migracji 0030). Gdy nie ma ani tego,
+       zostaje długość zapisanej stawki — ta sama liczba, tylko policzona na miejscu. */
+    const riders = [
+      Number(edition?.participantCount),
+      Number(entry?.participants?.length)
+    ].find((value) => Number.isFinite(value) && value > 0);
+    if (!riders) return null;
+    return { lead: text('voting.archiveOnlyRiders'), count: riders, label: text('voting.archiveRiders') };
+  }
+
+  function paintArchivePanel() {
+    const summary = $('[data-archive-summary]');
+    const meta = $('[data-archive-meta]');
+    const podiumTitle = $('[data-archive-podium-title]');
+    const podiumList = $('[data-archive-podium]');
+    const awardsTitle = $('[data-archive-awards-title]');
+    const awardsList = $('[data-archive-awards]');
+    const note = $('[data-archive-note]');
+
+    if (!archive) {
+      if (summary) summary.hidden = !archiveBusy;
+      if (summary && archiveBusy) {
+        $('[data-archive-summary-lead]', summary).textContent = text('voting.archiveLoading');
+        $('[data-archive-summary-count]', summary).textContent = '';
+        $('[data-archive-summary-label]', summary).textContent = '';
+      }
+      if (meta) meta.hidden = true;
+      if (podiumTitle) podiumTitle.hidden = true;
+      if (awardsTitle) awardsTitle.hidden = true;
+      if (note) note.hidden = true;
+      podiumList?.replaceChildren();
+      awardsList?.replaceChildren();
+      return;
+    }
+
+    const crowd = crowdLine(archive);
+    if (summary) {
+      summary.hidden = !crowd;
+      if (crowd) {
+        $('[data-archive-summary-lead]', summary).textContent = crowd.lead;
+        $('[data-archive-summary-count]', summary).textContent = String(crowd.count);
+        $('[data-archive-summary-label]', summary).textContent = crowd.label;
+      }
+    }
+
+    if (meta) {
+      const edition = archive.edition;
+      const parts = [edition?.name, editionDate(edition?.date), edition?.location].filter(Boolean);
+      meta.textContent = parts.join(' · ');
+      meta.hidden = parts.length === 0;
+    }
+
+    /* Trójka nagrody publiczności z tamtego roku — bez cokołu, bo cokół jest kształtem dla
+       wyniku ŚWIEŻEGO. Tu jest to zapis, więc trzy wiersze wystarczą. */
+    if (podiumList) {
+      podiumList.replaceChildren(...archive.podium.map((row, index) => {
+        const item = document.createElement('li');
+        item.className = 'archive-row';
+        item.dataset.archivePlace = String(index + 1);
+
+        const place = document.createElement('span');
+        place.className = 'archive-row__place';
+        place.textContent = String(index + 1);
+
+        const image = document.createElement('img');
+        image.className = 'archive-row__photo';
+        image.src = row.photo || avatarFor(row);
+        image.alt = '';
+        image.loading = 'lazy';
+        image.decoding = 'async';
+
+        const identity = document.createElement('span');
+        identity.className = 'archive-row__who';
+        const project = document.createElement('strong');
+        project.textContent = row.projectName || text('voting.noProject');
+        const rider = document.createElement('small');
+        rider.textContent = `${String(row.startNumber).padStart(3, '0')} · `
+          + `${`${row.firstName} ${row.lastName}`.trim()}`;
+        identity.append(project, rider);
+
+        const score = document.createElement('span');
+        score.className = 'archive-row__score';
+        const points = document.createElement('b');
+        points.textContent = String(row.totalScore ?? 0);
+        const votes = document.createElement('small');
+        votes.textContent = `${text('voting.points')} · ${row.voteCount || 0} ${votesLabel(row.voteCount || 0)}`;
+        score.append(points, votes);
+
+        item.append(place, image, identity, score);
+        return item;
+      }));
+    }
+    if (podiumTitle) podiumTitle.hidden = archive.podium.length === 0;
+
+    /* Nagrody jury z rocznika. Brak `awards` w archiwalnej odpowiedzi to nie to samo, co brak
+       zwycięzcy w jednej kategorii: tam nic nie zapisano, więc dwanaście wierszy „jeszcze nie
+       ogłoszono" byłoby nieprawdą o wyniku, który dawno ogłoszono. Wtedy jedno zdanie. */
+    /* `Array.isArray` przed `.length`: od czasu, gdy brak pola oddaje `null` (patrz
+       `normalizeAwards`), samo `.length` przewróciłoby tu całą sekcję archiwum wyjątkiem — i to
+       dokładnie w przypadku, który ma być najcichszy z wszystkich. */
+    const hasAwards = Array.isArray(archive.awards) && archive.awards.length > 0;
+    if (awardsList) awardsList.replaceChildren(...(hasAwards ? buildAwardItems(archive.awards) : []));
+    if (awardsTitle) awardsTitle.hidden = !hasAwards;
+    if (note) note.hidden = hasAwards;
+  }
+
+  /** Data rocznika po ludzku, z zapasem na surowy ISO — ta sama droga co w voting-page.js. */
+  function editionDate(value) {
+    if (!value) return '';
+    try {
+      return new Intl.DateTimeFormat(document.documentElement.lang || 'it', {
+        day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome'
+      }).format(new Date(value));
+    } catch (_) {
+      return String(value).slice(0, 10);
+    }
+  }
+
+  /**
+   * Wejście w rocznik: odczyt, podsumowanie, konfetti.
+   *
+   * Konfetti dostaje SCENĘ ARCHIWUM jako gospodarza, nie cokół bieżącej edycji: `.podium-confetti`
+   * jest pozycjonowane względem najbliższego rodzica z `position: relative`, więc puszczone nad
+   * cokołem spadałoby kilka ekranów wyżej niż wynik, na który patrzy człowiek.
+   */
+  async function openEdition(key) {
+    if (archiveBusy) return;
+    if (!key) {
+      archive = null;
+      paintArchivePanel();
+      return;
+    }
+
+    archiveBusy = true;
+    archive = null;
+    paintArchivePanel();
+
+    const result = await readState(demoPhase, key);
+    archiveBusy = false;
+
+    if (!result) {
+      archive = null;
+      paintArchivePanel();
+      toast(text('voting.archiveFailed'), 'error');
+      return;
+    }
+
+    archive = {
+      key,
+      /* Rocznik z odpowiedzi, a gdy jej `selectedEdition` nie niesie liczników — wiersz z
+         listy roczników. To ten sam rocznik z dwóch źródeł, a nie dwa różne. */
+      edition: result.selectedEdition || state.editions.find((row) => row.key === key) || null,
+      podium: Array.isArray(result.podium) ? result.podium : [],
+      /* Ta sama normalizacja co dla bieżącej edycji: archiwalny rocznik przyjdzie z tej samej
+         końcówki, więc niesie tę samą dwuznaczność `awards`/`prizes`. */
+      awards: normalizeAwards(result),
+      participants: Array.isArray(result.participants) ? result.participants : []
+    };
+    paintArchivePanel();
+    confetti($('[data-archive-stage]'));
+  }
+
+  /* ===========================================================================
      ZDRAPKA NAD COKOŁEM
      ===========================================================================
      Wynik był gotowy w chwili zamknięcia głosowania i pojawiał się na ekranie sam — czyli
@@ -733,6 +1166,10 @@ import {
       layer.hidden = true;
       rememberReveal();
       paintField();
+      /* Nagrody jury odsłaniają się w tej samej chwili co cokół — patrz paintAwards(). Bez tej
+         linijki dwanaście kategorii czekało do następnego odczytu stanu, czyli do trzydziestu
+         sekund po zdrapaniu: wynik był na ekranie, a nagrody „jeszcze nieogłoszone". */
+      paintAwards();
       confetti();
       // Ogłoszone, bo dla czytnika ekranu nic się nie zmieniło poza zniknięciem warstwy.
       toast(text('voting.scratchDone'), 'success');
@@ -844,9 +1281,20 @@ import {
    * pokazać raz w roku. Elementy sprzątają się same po animacji, żeby nie zostawić trzydziestu
    * węzłów w drzewie do końca wizyty.
    */
-  function confetti() {
-    if (reducedMotion) return;
-    const host = $('[data-podium-stage]');
+  /**
+   * @param {Element|null} [host] gdzie mają spadać. Domyślnie scena cokołu — bo tam zaczęły
+   *   i tam nadal spadają po zdrapaniu wyniku. Archiwum podaje własne pudełko: `.podium-confetti`
+   *   jest pozycjonowane bezwzględnie, więc gospodarz decyduje, NAD CZYM to leci. Jedna funkcja
+   *   na dwa miejsca, nie dwie — drugi egzemplarz rozjechałby się z pierwszym przy pierwszej
+   *   zmianie liczby albo kolorów.
+   */
+  function confetti(host = $('[data-podium-stage]')) {
+    /* Zgoda na ruch sprawdzana W CHWILI PUSZCZENIA, nie tylko raz przy wczytaniu modułu.
+       `reducedMotion` ze wspólnego spodu jest odczytane przy imporcie; ustawienie systemowe
+       zmienione w trakcie wizyty (albo podstawione przez sondę) nie miałoby jak zadziałać, a
+       konfetti jest najbardziej ruchliwą rzeczą na tej stronie. Warunek jest sumą obu: kto
+       prosił o mniej ruchu kiedykolwiek, nie dostaje konfetti. */
+    if (reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (!host) return;
     const colors = ['#ffd75e', '#ff83ae', '#8d76ff', '#37c9a5', '#9ad9ff'];
     const box = document.createElement('div');
@@ -991,6 +1439,28 @@ import {
     /* Kolejne dziesięć wierszy pozostałej stawki. Przewijanie wewnątrz tabeli pokazuje to, co
        już jest; ten przycisk dokłada więcej — dwie różne czynności, dwa różne elementy. */
     $('[data-podium-field-more]')?.addEventListener('click', showMoreField);
+
+    /* ---------------------------------------------------------------- archiwum roczników */
+
+    /* Rozwinięcie panelu. `hidden`, nie sam CSS: zwinięty panel wypada wtedy także z
+       kolejności tabulacji i z czytnika ekranu, więc pole wyboru rocznika nie jest celem,
+       którego nie widać. */
+    const archiveToggle = $('[data-archive-open]');
+    archiveToggle?.addEventListener('click', () => {
+      const panel = $('[data-archive-panel]');
+      if (!panel) return;
+      const open = panel.hidden;
+      panel.hidden = !open;
+      archiveToggle.setAttribute('aria-expanded', String(open));
+      const label = $('[data-archive-open-label]', archiveToggle) || archiveToggle;
+      label.textContent = text(open ? 'voting.archiveClose' : 'voting.archiveOpen');
+    });
+
+    /* Zmiana rocznika w polu wyboru, nie osobny przycisk „pokaż": wybór rocznika JEST
+       decyzją, a drugi krok po niej byłby pytaniem, na które odpowiedź już padła. */
+    $('[data-archive-edition]')?.addEventListener('change', (event) => {
+      openEdition(String(event.target.value || ''));
+    });
 
     /* Jeden tik na sekundę dla licznika i jeden odczyt na trzydzieści sekund dla fazy — i oba
        tylko wtedy, gdy karta jest z przodu. Odliczanie w karcie schowanej za innymi to praca,
