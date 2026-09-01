@@ -34,6 +34,8 @@ const files = readdirSync(dir).filter((name) => name.endsWith('.sql')).sort();
 const announcements = read('0029_event_announcements.sql');
 const editions = read('0030_voting_editions.sql');
 const editionsCode = code(editions);
+const sponsorPurpose = read('0032_sponsor_code_purpose.sql');
+const sponsorPurposeCode = code(sponsorPurpose);
 
 /* --- kolumny, na których stoją nowe migracje ----------------------------- */
 
@@ -164,6 +166,46 @@ check('0030 dopuszcza glos bez imienia i adresu',
   && /alter column voter_email drop not null/i.test(editionsCode));
 check('0030 unikalnosc adresu tylko dla podanych adresow',
   /votes_email_category_key[\s\S]{0,160}where voter_email is not null/i.test(editionsCode));
+
+/* --- 0032: nowy cel kodu weryfikacyjnego -------------------------------- */
+
+/* `check` nie da się zmienić w miejscu, więc migracja musi go zdjąć i założyć ponownie.
+   Odwrotna kolejność to `duplicate_object` na starym ograniczeniu — czyli migracja, która
+   nie przechodzi ani pierwszy raz, ani żaden następny. */
+const purposeDrop = sponsorPurposeCode.search(/drop constraint\s+verification_codes_purpose_check/i);
+const purposeAdd = sponsorPurposeCode.search(/add constraint\s+verification_codes_purpose_check/i);
+check('0032 zdejmuje ograniczenie purpose', purposeDrop >= 0);
+check('0032 zaklada ograniczenie purpose ponownie', purposeAdd >= 0);
+check('0032 zdejmuje ograniczenie PRZED zalozeniem nowego',
+  purposeDrop >= 0 && purposeAdd >= 0 && purposeDrop < purposeAdd,
+  `drop=${purposeDrop} add=${purposeAdd}`);
+
+/* Nazwa ograniczenia musi być potwierdzona w katalogu, a nie wpisana z pamięci: na cudzej
+   instalacji Postgres mógł nadać inną i `drop constraint` wywala całą migrację. Tak samo
+   robią 0016 i 0018. */
+const purposeLookup = sponsorPurposeCode.search(/from\s+pg_constraint/i);
+check('0032 szuka nazwy ograniczenia w pg_constraint', purposeLookup >= 0);
+check('0032 zaweza wyszukanie do verification_codes',
+  /conrelid\s*=\s*'public\.verification_codes'::regclass/i.test(sponsorPurposeCode));
+check('0032 sprawdza katalog PRZED zdjeciem ograniczenia',
+  purposeLookup >= 0 && purposeDrop >= 0 && purposeLookup < purposeDrop,
+  `lookup=${purposeLookup} drop=${purposeDrop}`);
+
+/* Komplet wartości w nowym `CHECK`. Brak którejkolwiek to odrzucony zapis kodu dopiero na
+   produkcji — objaw widoczny jako odmowa na końcu przepływu, po tym jak gość przeszedł całą
+   drogę. Nadmiar znaczy, że lista rozjechała się z tym, co obsługuje Worker. */
+const purposeCheck = sponsorPurposeCode
+  .slice(purposeAdd >= 0 ? purposeAdd : 0)
+  .match(/check\s*\(\s*purpose\s+in\s*\(([^)]*)\)/i);
+const purposeValues = purposeCheck
+  ? [...purposeCheck[1].matchAll(/'([^']+)'/g)].map((match) => match[1])
+  : [];
+check('0032 ogranicza purpose lista wartosci', purposeValues.length > 0);
+for (const value of ['unsubscribe', 'manage-entry', 'edit-entry', 'cancel-entry', 'sponsor']) {
+  check(`0032 dopuszcza cel ${value}`, purposeValues.includes(value));
+}
+check('0032 nie dopuszcza celow poza tymi pieciu', purposeValues.length === 5,
+  `znalezione: ${purposeValues.join(', ') || 'brak'}`);
 
 /* --- wynik -------------------------------------------------------------- */
 

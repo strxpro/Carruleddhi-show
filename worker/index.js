@@ -15,6 +15,10 @@
  *   WALL_SALT          secret, optional — salt for the stored IP hash
  */
 import { COPY_DECK } from './copy-deck.js';
+/* Przepisanie wiersza na pola formularza i token do niego — wspólne dla strony do druku
+   (printableForm niżej) i dla wypełnionego PDF-a w załączniku (api/form-pdf.js). Dwie kopie
+   tej reguły to pierwsze miejsce, w którym link i załącznik zaczęłyby mówić co innego. */
+import { formValues, formStem, printToken } from './form-values.js';
 import { EMAIL_TEMPLATES } from './email-templates.js';
 import { PRINT_TEMPLATES, PRINT_WORDING, PRINT_DATA_KEYS } from './print-templates.js';
 
@@ -602,6 +606,159 @@ function faqAnswer(deck, question) {
     if (answer && topic.patterns.some((pattern) => pattern.test(text))) return answer;
   }
   return null;
+}
+
+/* ============================================================================
+   JĘZYK ROZMOWY
+   ============================================================================
+
+   DLACZEGO HEURYSTYKA, A NIE ZAPYTANIE DO MODELU
+
+   Zapytanie o język byłoby dokładniejsze i kosztowałoby jedno wywołanie modelu na każdą
+   wiadomość gościa — także na „ok", „grazie" i „no", czyli dokładnie tam, gdzie nie ma
+   czego rozpoznawać, bo takie słowo nie należy do żadnego języka na wyłączność. Przy
+   sześciu językach o w większości rozłącznych słowach funkcyjnych tabela jest darmowa,
+   deterministyczna i nie potrzebuje sieci — a to znaczy, że da się ją objąć checkerem
+   w `npm run check`, a nie tylko sondą przeciwko żywemu Workerowi. Rozpoznawanie języka,
+   którego nikt nie sprawdza, cicho zwraca ten sam kod na wszystko.
+
+   Druga strona tej samej decyzji: model bywa uprzejmy i odpowiada w języku, o którym
+   myśli, że gość go woli. Tabela nie ma opinii — albo trafia w słowo, albo nie punktuje.
+
+   Tablice stoją tuż nad funkcją, bo checker wyjmuje ten fragment źródła jednym cięciem:
+   `worker/index.js` jest modułem Workera i nie zaimportuje się w Node, a eksport dodany
+   wyłącznie pod test zmieniałby produkcyjny plik pod test.
+
+   Klucze `LOCALE_HINTS` są zestawem języków tej funkcji i muszą się zgadzać z `LOCALES`
+   oraz z ograniczeniem `CHECK` na `chat_threads.locale`. Rozjazd tutaj to zapis wątku
+   odrzucony przez bazę, bez błędu widocznego dla gościa. */
+
+const LOCALE_HINTS = {
+  /* Słowa funkcyjne: waga 2 za każde trafienie, dopasowanie na granicy wyrazu.
+     `only` — znaki należące do jednego języka na wyłączność, waga 3 raz na język.
+     `shared` — znaki wspólne dla kilku języków (`à è é ì ò ù` i akcenty hiszpańskie);
+     punktują 3 wyłącznie wtedy, gdy ten sam język trafił choć jednym słowem funkcyjnym.
+     Same z siebie nie znaczą nic: „è" stoi po włosku, po francusku i w cytacie.
+
+     Słowa wieloznaczne między naszymi językami (`non`, `que`, `was`, `come`, `comment`)
+     są wpisane po OBU stronach — wtedy same się znoszą i o wyniku decyduje reszta zdania.
+     (Powtórzenie słowa w dwóch tabelach jest świadome, nie przeoczeniem.)
+     Podziękowania i potwierdzenia (`ok`, `grazie`, `merci`, `no`) nie są wpisane nigdzie:
+     jedno takie słowo dałoby pewne rozpoznanie z niczego. */
+  it: {
+    words: [
+      'che', 'chi', 'cosa', 'come', 'dove', 'quando', 'quanto', 'quanti', 'quale',
+      'perché', 'perche', 'posso', 'vorrei', 'devo', 'bisogna', 'sono', 'siamo', 'siete',
+      'essere', 'della', 'dello', 'delle', 'degli', 'nella', 'nelle', 'sulla',
+      'questo', 'questa', 'anche', 'molto', 'però', 'non', 'mio', 'mia', 'gli'
+    ],
+    only: '',
+    shared: 'àèéìòù'
+  },
+  pl: {
+    words: [
+      'czy', 'jest', 'jestem', 'gdzie', 'kiedy', 'dlaczego', 'jak', 'jaki', 'jaka',
+      'mam', 'mogę', 'moge', 'chcę', 'chce', 'proszę', 'prosze', 'można', 'mozna',
+      'trzeba', 'będzie', 'bedzie', 'moje', 'mój', 'moj', 'nie', 'tak', 'żeby', 'zeby',
+      'oraz', 'bardzo', 'dobrze'
+    ],
+    only: 'ąćęłńśźż',
+    shared: 'ó'
+  },
+  en: {
+    words: [
+      'the', 'is', 'are', 'what', 'where', 'when', 'why', 'how', 'can', 'could',
+      'do', 'does', 'did', 'my', 'your', 'you', 'we', 'want', 'need', 'would',
+      'should', 'please', 'with', 'for', 'there', 'this', 'that', 'and',
+      'was', 'come', 'comment'
+    ],
+    only: '',
+    shared: ''
+  },
+  de: {
+    words: [
+      'ist', 'sind', 'wie', 'wo', 'wann', 'warum', 'weshalb', 'nicht', 'ich', 'wir',
+      'sie', 'kann', 'können', 'konnen', 'möchte', 'mochte', 'muss', 'das', 'der',
+      'dem', 'den', 'und', 'mit', 'für', 'fur', 'haben', 'bitte', 'auch', 'sehr',
+      'ein', 'eine', 'einen', 'was', 'nie'
+    ],
+    only: 'äöüß',
+    shared: ''
+  },
+  es: {
+    words: [
+      'qué', 'dónde', 'donde', 'cuándo', 'cuando', 'cómo', 'como', 'cuánto', 'cuanto',
+      'puedo', 'quiero', 'necesito', 'tengo', 'soy', 'está', 'esta', 'están', 'hay',
+      'para', 'por', 'los', 'las', 'muy', 'pero', 'también', 'tambien', 'el', 'que'
+    ],
+    only: 'ñ¿¡',
+    shared: 'áéíóú'
+  },
+  fr: {
+    words: [
+      'je', 'vous', 'nous', 'est', 'où', 'quand', 'pourquoi', 'peux', 'puis', 'pouvez',
+      'voudrais', 'veux', 'faut', 'les', 'dans', 'avec', 'pour', 'très', 'tres',
+      'aussi', 'quel', 'quelle', 'mais', 'cette', 'votre', 'notre', "c'est", "qu'est",
+      'que', 'non', 'comment'
+    ],
+    only: 'çœ',
+    shared: 'àèéêîôûù'
+  }
+};
+
+/* Jedno wyrażenie na język, składane raz przy wczytaniu modułu. Alternatywy sortowane od
+   najdłuższej, żeby `qu'est` nie przegrało z `que` o pierwszeństwo. Granica wyrazu jest
+   pisana przez lookaround na literach i cyfrach Unicode, a nie przez `\b`: `\b` nie widzi
+   ogonków, więc „mogę" kończyłoby się na „mog". Ten sam wzorzec chodzi wyżej w
+   DATA_INTENT_PATTERNS. */
+const LOCALE_WORD_RE = Object.fromEntries(
+  Object.entries(LOCALE_HINTS).map(([code, hint]) => [
+    code,
+    new RegExp(
+      `(?<![\\p{L}\\p{N}])(?:${hint.words
+        .slice()
+        .sort((a, b) => b.length - a.length)
+        .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|')})(?![\\p{L}\\p{N}])`,
+      'giu'
+    )
+  ])
+);
+
+/**
+ * Rozpoznaje język wiadomości gościa. Czysta funkcja: bez bazy, bez sieci, bez stanu.
+ *
+ * Zwraca jeden z kodów `LOCALE_HINTS` albo `fallback`, gdy rozpoznanie nie jest pewne.
+ * Pewne znaczy: zwycięzca ma co najmniej 2 punkty i wyprzedza drugiego o co najmniej 2.
+ * Próg jest celowo ostrożny — przy „ok" wynik jest zero-zero i lepiej zostać w języku,
+ * który już był ustalony, niż przeskakiwać przy każdym potwierdzeniu.
+ */
+function detectLocale(text, fallback = 'it') {
+  const safe = LOCALE_HINTS[fallback] ? fallback : 'it';
+  /* Apostrof z klawiatury telefonu przychodzi jako „’" i bez tej zamiany `c'est` nigdy
+     nie trafia. Małe litery raz, bo znaki diakrytyczne sprawdzamy przez `includes`. */
+  const raw = String(text || '').replace(/[’‘`]/g, "'").toLowerCase();
+  if (!/\p{L}/u.test(raw)) return safe;
+
+  let best = safe;
+  let bestScore = 0;
+  let runnerUp = 0;
+  for (const [code, hint] of Object.entries(LOCALE_HINTS)) {
+    const words = (raw.match(LOCALE_WORD_RE[code]) || []).length;
+    let score = words * 2;
+    if (hint.only && [...hint.only].some((char) => raw.includes(char))) score += 3;
+    if (words > 0 && hint.shared && [...hint.shared].some((char) => raw.includes(char))) score += 3;
+    if (score > bestScore) {
+      runnerUp = bestScore;
+      bestScore = score;
+      best = code;
+    } else if (score > runnerUp) {
+      runnerUp = score;
+    }
+  }
+
+  if (bestScore < 2 || bestScore - runnerUp < 2) return safe;
+  return best;
 }
 
 /** Loads a thread by its browser token, creating it on first contact. */
@@ -4392,9 +4549,30 @@ function attachCopy(payload) {
      the foreign one. */
   const base = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
   const stem = payload.isMinor ? 'Carruleddhi-minori' : 'Carruleddhi-modulo';
-  payload.pdfUrl = `${base}/emails/${stem}-it.pdf`;
+
+  /* ZAŁĄCZNIK PRZYCHODZI WYPEŁNIONY, ODKĄD JEST CZYM GO WYPEŁNIĆ.
+     ---------------------------------------------------------------------------
+     Stały tu adresy statycznych blankietów i to była świadoma decyzja: jeden plik idzie do
+     wszystkich, więc nie może nieść niczyich danych — poprzedni generator wpisywał w nie
+     „Marco Rossi" i wysyłał to każdemu. Dopóki plik był jeden, pusty był jedynym poprawnym.
+
+     Teraz plik nie jest jeden. `/api/form-pdf` bierze ten sam blankiet i dopisuje na nim dane
+     TEGO zgłoszenia (worker/fill-form.js), więc każdy dostaje swój. Bilet jest ten sam, co do
+     strony do druku: HMAC z uuid, bez którego adres nie otwiera niczyich danych.
+
+     Bez `formId` — czyli gdy zapisu w bazie nie było — zostają blankiety. To nie jest gorszy
+     wariant do usunięcia przy okazji, tylko jedyna poprawna odpowiedź: nie ma wiersza, nie ma
+     czego wpisać, a formularz do wypełnienia długopisem nadal jest formularzem. */
+  const ticket = payload.formId && payload.formTicket
+    ? `?id=${payload.formId}&t=${payload.formTicket}`
+    : '';
+  const form = (lang) => (ticket
+    ? `${base}/api/form-pdf${ticket}&lang=${lang}`
+    : `${base}/emails/${stem}-${lang}.pdf`);
+
+  payload.pdfUrl = form('it');
   payload.pdfName = `${stem}-IT-`;
-  payload.pdfUrlOwn = locale === 'it' ? '' : `${base}/emails/${stem}-${locale}.pdf`;
+  payload.pdfUrlOwn = locale === 'it' ? '' : form(locale);
   payload.pdfNameOwn = `${stem}-${locale.toUpperCase()}-`;
 
   /* Przycisk „otwórz wypełniony formularz" nie może prowadzić w nikąd.
@@ -4717,34 +4895,6 @@ function supabaseHeaders(env, extra = {}) {
   };
 }
 
-/**
- * Token do formularza jednej osoby — liczony, nie przechowywany.
- *
- * DLACZEGO NIE SAMO `id` W ADRESIE
- *   Uuid zgłoszenia jest w panelu, w logach i w każdym zapytaniu do bazy. Adres
- *   `/form?id=<uuid>` znaczyłby, że każdy, kto je gdziekolwiek zobaczy, otwiera cudzy
- *   formularz z adresem zamieszkania i numerem telefonu — a przy nieletnim także
- *   z danymi opiekuna.
- *
- * DLACZEGO NIE NOWA KOLUMNA
- *   Token dałoby się wylosować i zapisać przy zgłoszeniu, ale to migracja, kolumna
- *   i jeden stan więcej do utrzymania. HMAC z `id` daje to samo bez niczego z tych
- *   trzech: serwer przelicza go w locie i porównuje.
- *
- *   Efekt uboczny, który jest zaletą: rotacja `WALL_SALT` unieważnia wszystkie linki
- *   naraz. Gdyby kiedyś trzeba było je odciąć, jest czym.
- */
-async function printToken(env, id) {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(env.WALL_SALT || 'carruleddhi'),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`print:${id}`));
-  return [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-}
 
 /**
  * Napisy paska „zapisz jako PDF", dopisywanego do formularza z danymi.
@@ -4905,32 +5055,12 @@ async function printableForm(env, url, cors) {
   const words = PRINT_WORDING[`${locale}:${minor ? 'minor' : 'adult'}`];
   if (!template || !words) return fail(500, 'Brak szablonu dla tego języka.');
 
+  /* Pola bierze wspólny formValues() — ten sam, którym wypełniany jest PDF w załączniku. */
+  const values = formValues(row);
   const date = (value) => {
     const parsed = value ? new Date(value) : null;
     if (!parsed || Number.isNaN(parsed.getTime())) return '';
     return new Intl.DateTimeFormat('pl-PL', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }).format(parsed);
-  };
-  const relation = COPY_DECK[locale]?.minRel?.[row.guardian_relation] || row.guardian_relation || '';
-
-  const values = {
-    RACE_NUMBER: String(row.race_number ?? '').padStart(3, '0'),
-    FULL_NAME: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
-    BIRTH_DATE: date(row.birth_date),
-    POSTAL_CODE: row.postal_code || '',
-    PHONE: row.phone || '',
-    EMAIL: row.email || '',
-    ADDRESS: row.address || '',
-    CART_NAME: row.cart_name || '',
-    CATEGORY: String(row.category || '').toUpperCase(),
-    TEAM: row.team_name || '—',
-    CART_NOTES: row.cart_notes || '—',
-    RIDER_AGE: String(row.rider_age ?? ''),
-    GUARDIAN_NAME: row.guardian_name || '',
-    GUARDIAN_EMAIL: row.guardian_email || '',
-    GUARDIAN_PHONE: row.guardian_phone || '',
-    MOTHER_NAME: row.mother_name || '—',
-    FATHER_NAME: row.father_name || '—',
-    GUARDIAN_RELATION: relation
   };
 
   /* Każde pole przez escapeHtml: to są dane wpisane przez człowieka w formularzu na
@@ -7114,8 +7244,14 @@ export default {
          async znaczyłoby przerobienie dwóch wywołań po to, żeby dołożyć jedno pole. */
       if (stored.id && type === 'registration') {
         const site = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
-        payload.formUrl = `${site}/api/carruleddhi/form?id=${stored.id}`
-          + `&t=${await printToken(env, stored.id)}`;
+        const ticket = await printToken(env, stored.id);
+        payload.formUrl = `${site}/api/carruleddhi/form?id=${stored.id}&t=${ticket}`;
+        /* Ten sam bilet niesie ZAŁĄCZNIK. attachCopy() niżej robi z niego adresy do PDF-ów
+           wypełnionych; bez tych dwóch pól zostaje przy pustych blankietach, bo nie ma czym
+           powiedzieć serwerowi, o które zgłoszenie chodzi. Liczone tutaj z tego samego powodu
+           co `formUrl`: `printToken` jest asynchroniczne, a attachCopy nie jest. */
+        payload.formId = stored.id;
+        payload.formTicket = ticket;
       }
       /* The way out of the list, in the letter that puts them on it. Only the reminder
          opt-in returns a token: a registration confirmation is a receipt, and a contact

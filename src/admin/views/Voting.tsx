@@ -472,7 +472,27 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
           </button>
           <button
             type="button"
-            disabled={busy || state?.phase === 'closed'}
+            /* `status`, NIE `phase` — i to jest cała naprawa martwego przycisku.
+               ---------------------------------------------------------------------------
+               To są dwie różne rzeczy i panel sam to gdzie indziej rozróżnia (patrz napis
+               `vote.manualClosed` wyżej). `status` to DEKLARACJA organizatora, zapisana w
+               bazie. `phase` liczy votingPhase() w Workerze i wychodzi mu `closed` także
+               wtedy, gdy nikt niczego nie zamknął, tylko minęła godzina z `voting_ends_at`.
+
+               Warunek na `phase` gasił więc przycisk dokładnie w chwili, w której sięga się
+               po niego najczęściej: głosowanie otwarte przyciskiem „Otwórz teraz" dostaje
+               okno na `durationMinutes`, po jego upływie `phase` robi się `closed`, a
+               `status` zostaje `voting`. Strona pokazuje już podium, panel pokazuje
+               „zamknięte" — i nie da się tego zapisać, bo jedyny przycisk, który to robi,
+               jest wyłączony. Zgłoszone jako „klikam i nic się nie dzieje, nie chce się
+               kliknąć": przycisk był po prostu `disabled`.
+
+               Naciśnięcie ma sens zawsze, dopóki deklaracji nie ma: przed startem znaczy
+               „odwołujemy głosowanie", w trakcie „kończymy wcześniej", a po upływie okna
+               „potwierdzamy to, co i tak pokazuje zegar" — i dopiero to wpisuje
+               `status: 'closed'`, które wygrywa z zegarem przy każdym następnym odczycie.
+               Bez treści jest tylko jeden przypadek: gdy deklaracja już stoi. */
+            disabled={busy || state?.status === 'closed'}
             onClick={() => {
               // Zamknięcia nie da się cofnąć zegarem, więc pytanie jest tu na miejscu.
               if (window.confirm(t('vote.closeConfirm'))) void run(() => closeVoting(apiKey));

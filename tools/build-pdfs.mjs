@@ -29,7 +29,7 @@
  *   page, and page two would be the wrong language for five riders out of six.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -218,6 +218,218 @@ function toPdf(chrome, html, outFile) {
   if (!existsSync(outFile)) throw new Error(`Chrome produced nothing for ${outFile}`);
 }
 
+/* ===========================================================================
+   GDZIE NA STRONIE STOI KAŻDE POLE — mapa dla funkcji, która wypełnia PDF
+   ===========================================================================
+   PO CO
+     Załącznik w mailu ma przyjść z wpisanymi danymi. Pliki tutaj są puste i jeden służy
+     wszystkim, więc wypełnienie musi się dziać przy zgłoszeniu — a funkcja na Vercelu nie ma
+     Chrome i nie ma jak wyrenderować HTML-a od nowa.
+
+     Nie musi. Wystarczy DOPISAĆ tekst na gotowej stronie: pdf-lib rysuje napis w podanym
+     punkcie i niczego poza tym nie rusza. Układ zostaje dokładnie taki, jaki wyszedł z
+     Chrome — łącznie z tym, że wszystko mieści się na jednej stronie, co kosztowało dwa
+     przebiegi pomiarów i czego żadna biblioteka PDF nie odtworzyłaby sama.
+
+     Brakuje jednego: współrzędnych. Stąd ten przebieg.
+
+   DLACZEGO POMIAR, A NIE WYLICZENIE
+     Pozycje wynikają z układu: siatki, zawijania etykiet, długości tłumaczeń. Włoskie
+     „Nome e cognome" i niemieckie „Vor- und Nachname" łamią się inaczej i przesuwają wiersze
+     pod sobą. Policzyć tego z arkusza się nie da; można za to zapytać Chrome, który i tak
+     składa te strony linijkę niżej.
+
+   DLACZEGO W UKŁADZIE DRUKU
+     `Emulation.setEmulatedMedia('print')` plus okno wielkości pola zadruku. Bez tego mierzy
+     się układ ekranowy — inna szerokość, inne łamanie, inne wiersze. Pole zadruku to A4 minus
+     marginesy z `@page`, przeliczone na piksele CSS (96 dpi).
+
+   CO WRACA
+     Dla każdego pola: prostokąt KOMÓRKI (stąd szerokość, w którą tekst ma się zmieścić) i
+     dolna krawędź LINII do pisania (stąd linia bazowa — napis siada na kresce dokładnie tam,
+     gdzie usiadłby długopis). Wszystko w punktach PDF, licząc od lewego dolnego rogu strony,
+     bo w tym układzie współrzędnych rysuje pdf-lib.
+   =========================================================================== */
+
+const MM_PER_IN = 25.4;
+const A4 = { w: 210, h: 297 };
+const PX_PER_MM = 96 / MM_PER_IN;
+const PT_PER_MM = 72 / MM_PER_IN;
+const PT_PER_PX = 72 / 96;
+
+/**
+ * Marginesy odczytane z `@page` SZABLONU, nie wpisane tutaj.
+ *
+ * DWA SZABLONY MAJĄ RÓŻNE MARGINESY I TO KOSZTOWAŁO JEDEN PRZEBIEG POMIARÓW.
+ *   Dorosły ma `margin: 11mm 12mm`, nieletni `margin: 7mm 10mm` — bo formularz nieletniego
+ *   niesie blok opiekuna i siedem punktów oświadczenia, i mieści się na jednej stronie tylko
+ *   przy węższych marginesach. Liczba wpisana na sztywno była dobra dla jednego z nich i
+ *   przesuwała cały drugi: pole zadruku miało inną szerokość, więc etykiety łamały się gdzie
+ *   indziej, a początek układu współrzędnych leżał 4 mm wyżej, niż leży naprawdę.
+ *
+ *   Wartość stoi w pliku, więc się ją czyta. Zmiana marginesu w szablonie przenosi się wtedy
+ *   do mapy sama, zamiast czekać, aż ktoś zauważy przesunięty formularz.
+ */
+function pageBox(template) {
+  const rule = /@page\s*\{[^}]*margin:\s*([\d.]+)mm\s+([\d.]+)mm/.exec(template);
+  if (!rule) throw new Error('nie znalazlem marginesow w @page — szablon zmienil ksztalt');
+  const [, vertical, horizontal] = rule.map(Number);
+  return {
+    top: vertical, bottom: vertical, left: horizontal, right: horizontal,
+    widthPx: Math.round((A4.w - horizontal * 2) * PX_PER_MM),
+    heightPx: Math.round((A4.h - vertical * 2) * PX_PER_MM),
+    originXPt: horizontal * PT_PER_MM,
+    originYPt: (A4.h - vertical) * PT_PER_MM
+  };
+}
+
+const MEASURE_PORT = 9422;
+const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/**
+ * Ten sam układ, ale z PRZYKŁADOWYMI danymi w polach i z kluczem przy każdym z nich.
+ *
+ * Nie z kreskami do pisania, i to nie jest szczegół: kreska ma sztywne 44 mm i na formularzu
+ * nieletniego zawija się do własnego wiersza, czyli leży gdzie indziej niż wpisana wartość.
+ * Mierzyć trzeba to miejsce, w którym Chrome stawia TEKST — więc dokument pomiarowy jest
+ * dokumentem wypełnionym, tym samym, który buduje `--sample`.
+ *
+ * Długość przykładu nie ma znaczenia dla wyniku: mierzona jest pozycja pierwszego wiersza
+ * komórki, a ta nie zależy od tego, co w niej stoi. Wypełniacz i tak skraca stopień pisma tak,
+ * żeby wartość została w jednym wierszu.
+ */
+function measurableHtml(template, wordsFor, locale, minor) {
+  const sample = { ...EXAMPLE, GUARDIAN_RELATION: COPY[locale].rel.mother };
+  if (minor) Object.assign(sample, { FULL_NAME: 'Sara Rossi', BIRTH_DATE: '04.03.2011' });
+  const marked = { ...wordsFor };
+  for (const key of DATA_KEYS) {
+    marked[key] = `<span data-pdf-field="${key}">${sample[key]}</span>`;
+  }
+  return render(template, marked);
+}
+
+async function openChrome() {
+  const child = spawn(chromePath(), [
+    '--headless=new', '--disable-gpu', '--no-first-run', '--disable-extensions',
+    `--remote-debugging-port=${MEASURE_PORT}`,
+    `--user-data-dir=${join(tmpdir(), 'carruleddhi-measure-' + Date.now())}`,
+    'about:blank'
+  ], { windowsHide: true, stdio: 'ignore' });
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      const info = await (await fetch(`http://127.0.0.1:${MEASURE_PORT}/json/version`)).json();
+      return { child, wsUrl: info.webSocketDebuggerUrl };
+    } catch { await wait(250); }
+  }
+  child.kill();
+  throw new Error('Chrome nie otworzył portu do pomiaru');
+}
+
+function cdp(wsUrl) {
+  const socket = new WebSocket(wsUrl);
+  let id = 0;
+  const pending = new Map();
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (!message.id || !pending.has(message.id)) return;
+    const { resolve: done, reject } = pending.get(message.id);
+    pending.delete(message.id);
+    if (message.error) reject(new Error(JSON.stringify(message.error)));
+    else done(message.result);
+  });
+  const ready = new Promise((done) => socket.addEventListener('open', done));
+  const send = (method, params = {}, sessionId) => new Promise((done, reject) => {
+    id += 1;
+    pending.set(id, { resolve: done, reject });
+    socket.send(JSON.stringify({ id, method, params, sessionId }));
+  });
+  return { socket, ready, send };
+}
+
+/* MIERZONA JEST LINIA BAZOWA TEKSTU, NIE KRESKA DO PISANIA — i to jest różnica między
+   formularzem dorosłego a formularzem nieletniego.
+   ---------------------------------------------------------------------------
+   Pierwsza wersja brała dolną krawędź kreski. Na formularzu dorosłego wychodziło to co do
+   piksela, bo kreska leży tam w osobnym wierszu pod etykietą. Na formularzu nieletniego
+   etykieta i kreska dzielą wiersz tabeli, a kreska ma sztywne 44 mm min-width — więc się
+   ZAWIJA i ląduje o wiersz niżej, niż Chrome kładzie tam wpisaną wartość. Zmierzone:
+   wszystkie pola nieletniego wychodziły 12 pt za nisko, a numer startowy 21 pt.
+
+   Więc mierzy się dokument z PRZYKŁADOWYMI danymi — tam, gdzie Chrome naprawdę stawia tekst —
+   a z pudełka tekstu odejmuje się zejście kroju, żeby dostać linię bazową. Zejście czyta się
+   z `TextMetrics` tej samej czcionki, którą składa strona; wpisana na sztywno byłaby dobra dla
+   Segoe UI i zła wszędzie, gdzie go nie ma. */
+const COLLECT = `(() => {
+  const out = {};
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  for (const el of document.querySelectorAll('[data-pdf-field]')) {
+    const box = el.getBoundingClientRect();
+    /* Komórka, nie sam napis: w niej musi się zmieścić wartość dowolnej długości.
+       Przy numerze startowym rodzicem jest <b>, co jest dokładnie tym, czego chcemy. */
+    const host = el.parentElement || el;
+    const cell = host.getBoundingClientRect();
+    const style = getComputedStyle(host);
+    ctx.font = style.font || (style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily);
+    const metrics = ctx.measureText(el.textContent || 'Hxg');
+    const descent = metrics.fontBoundingBoxDescent || metrics.actualBoundingBoxDescent || 0;
+    out[el.dataset.pdfField] = {
+      cellX: cell.left, cellW: cell.width,
+      baseline: box.bottom - descent,
+      size: parseFloat(style.fontSize)
+    };
+  }
+  return out;
+})()`;
+
+async function measureFields(documents) {
+  const { child, wsUrl } = await openChrome();
+  const bus = cdp(wsUrl);
+  await bus.ready;
+  const { targetId } = await bus.send('Target.createTarget', { url: 'about:blank' });
+  const { sessionId } = await bus.send('Target.attachToTarget', { targetId, flatten: true });
+  const call = (method, params) => bus.send(method, params, sessionId);
+
+  await call('Page.enable');
+  await call('Runtime.enable');
+  await call('Emulation.setEmulatedMedia', { media: 'print' });
+
+  const measured = {};
+  for (const [name, html, box] of documents) {
+    /* Okno wielkości pola zadruku TEGO szablonu. Ustawiane per dokument, bo oba szablony mają
+       inne marginesy — przy jednym rozmiarze na oba etykiety w drugim łamią się inaczej niż
+       przy druku i cała mapa jest o wiersz obok. */
+    await call('Emulation.setDeviceMetricsOverride', {
+      width: box.widthPx, height: box.heightPx, deviceScaleFactor: 1, mobile: false
+    });
+    const temp = join(tmpdir(), `carruleddhi-measure-${Date.now()}-${Math.random().toString(36).slice(2)}.html`);
+    writeFileSync(temp, html, 'utf8');
+    try {
+      await call('Page.navigate', { url: `file:///${temp.replace(/\\/g, '/')}` });
+      await wait(700);
+      const answer = await call('Runtime.evaluate', { expression: COLLECT, returnByValue: true });
+      if (answer.exceptionDetails) throw new Error(JSON.stringify(answer.exceptionDetails));
+      const boxes = answer.result.value;
+      if (!Object.keys(boxes).length) throw new Error(`nie zmierzono ani jednego pola w ${name}`);
+
+      measured[name] = Object.fromEntries(Object.entries(boxes).map(([key, field]) => [key, {
+        x: round(box.originXPt + field.cellX * PT_PER_PX),
+        y: round(box.originYPt - field.baseline * PT_PER_PX),
+        width: round(field.cellW * PT_PER_PX),
+        size: round(field.size * PT_PER_PX)
+      }]));
+    } finally {
+      rmSync(temp, { force: true });
+    }
+  }
+
+  bus.socket.close();
+  child.kill();
+  return measured;
+}
+
+const round = (value) => Math.round(value * 100) / 100;
+
 /* --------------------------------------------------------------------- build */
 
 const chrome = chromePath();
@@ -229,15 +441,22 @@ const templates = {
 mkdirSync(OUT_DIR, { recursive: true });
 
 let built = 0;
+/** Dokumenty do zmierzenia, pod nazwą pliku bez rozszerzenia — patrz measureFields(). */
+const toMeasure = [];
 for (const locale of LOCALES) {
   for (const kind of ['adult', 'minor']) {
     const minor = kind === 'minor';
     const values = { ...wording(locale, minor), ...data(locale, minor) };
-    const name = `${minor ? 'Carruleddhi-minori' : 'Carruleddhi-modulo'}-${locale}.pdf`;
-    const outFile = join(OUT_DIR, name);
+    const stem = `${minor ? 'Carruleddhi-minori' : 'Carruleddhi-modulo'}-${locale}`;
+    const outFile = join(OUT_DIR, `${stem}.pdf`);
     toPdf(chrome, render(templates[kind], values), outFile);
+    /* Mierzony jest TEN SAM układ, który przed chwilą poszedł do druku — tylko z polami
+       podpisanymi kluczami, żeby dało się je od siebie odróżnić. Przy `--sample` nie ma czego
+       mierzyć: pola niosą wtedy przykładowe dane zamiast kresek, a mapa opisuje pusty
+       formularz, bo to na nim wypełniacz rysuje. */
+    if (!SAMPLE) toMeasure.push([stem, measurableHtml(templates[kind], wording(locale, minor), locale, minor), pageBox(templates[kind])]);
     built += 1;
-    console.log(`  ${name}  (${(statSync(outFile).size / 1024).toFixed(1)} kB)`);
+    console.log(`  ${stem}.pdf  (${(statSync(outFile).size / 1024).toFixed(1)} kB)`);
   }
 }
 
@@ -294,4 +513,29 @@ writeFileSync(
 );
 
 console.log(`\n${built} PDFs + 2 legacy names in public/emails/${SAMPLE ? '  (sample data)' : '  (blank forms)'}`);
+/* ------------------------------------------------- mapa pol dla wypelniacza PDF */
+if (!SAMPLE) {
+  const fields = await measureFields(toMeasure);
+  /* Dwie nazwy zgodnosciowe wskazuja na te same pliki co wersje wloskie, wiec dostaja te
+     same wspolrzedne — inaczej wypelniacz trafilby na plik, o ktorym mapa nic nie wie. */
+  fields['Carruleddhi-modulo'] = fields['Carruleddhi-modulo-it'];
+  fields['Carruleddhi-modulo-minori'] = fields['Carruleddhi-minori-it'];
+
+  writeFileSync(
+    join(ROOT, 'worker', 'form-fields.js'),
+    [
+      '/* GENERATED by tools/build-pdfs.mjs. Do not edit.',
+      '   Wspolrzedne kazdego pola na PUSTYM formularzu, w punktach PDF liczonych od lewego',
+      '   dolnego rogu strony. Zmierzone w ukladzie DRUKU przez Chrome — patrz measureFields()',
+      '   w generatorze. Uzywa ich worker/fill-form.js, zeby dopisac dane na gotowej stronie. */',
+      '/* eslint-disable */',
+      `export const FORM_FIELDS = ${JSON.stringify(fields, null, 1)};`,
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+  const inAdult = Object.keys(fields['Carruleddhi-modulo-it'] || {}).length;
+  console.log(`worker/form-fields.js  (${Object.keys(fields).length} formularzy, ${inAdult} pol w doroslym)`);
+}
+
 console.log('worker/print-templates.js  (szablony i slowa dla funkcji)');
