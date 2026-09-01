@@ -14,6 +14,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// `git ls-files` — patrz kontrola sekretow na koncu pliku: liczy sie to, co jest sledzone.
+import { execSync } from 'node:child_process';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
@@ -454,11 +456,77 @@ for (const question of [
   check(`slownik NIE zgaduje: ${question}`, faqAnswer(faqDeck, question) === null, faqAnswer(faqDeck, question));
 }
 
-/* Repozytorium jest publiczne. Klucze CallMeBota sa juz jawne w blueprincie i to jest
-   jedna kopia za duzo — druga, w kodzie funkcji, nie ma prawa powstac. */
+/* Repozytorium jest publiczne. Klucz CallMeBota nie ma prawa stac w kodzie funkcji —
+   generator czyta go z WHATSAPP_ALERTS, patrz komentarz w build-make-blueprints.mjs. */
 check(
   'worker nie ma wpisanych na sztywno kluczy CallMeBota',
   !/apikey['"]?\s*[:,]\s*['"]\d{6,}/.test(worker)
+);
+
+/* --- sekrety w CALYM sledzonym drzewie ------------------------------------
+   Powyzszy warunek pilnowal jednego pliku, a wyciekly dwie rzeczy i obie w innych:
+   klucze CallMeBota w generatorze, w blueprincie i w czterech dokumentach, oraz adres
+   webhooka Make w INSTRUKCJA.md, KROKI.md i make-webhook-feed.ps1.
+
+   DLACZEGO ADRES WEBHOOKA JEST SEKRETEM
+     Na webhooku Make nie ma hasla — adres JEST haslem. Kto go zna, wstawia scenariuszowi
+     dowolny payload, a scenariusz wysyla maila z adresu organizatorow z podanym HTML-em,
+     pinguje oba numery na WhatsAppie i zuzywa operacje.
+
+   DLACZEGO PRZEZ `git ls-files`, A NIE PO KATALOGACH
+     Liczy sie to, co jest SLEDZONE. Kopia zywego scenariusza z Make lezy na dysku autora
+     i ma w sobie wypelnione klucze — jest w .gitignore i ma tam zostac, wiec checker,
+     ktory chodzi po plikach na dysku, wywalalby sie na czyms, co nigdzie nie jedzie.
+
+   CZEGO TO NIE ROBI
+     Nie czyta historii. Oba sekrety w niej leza i trzeba je przegenerowac u zrodla —
+     napisane wprost w START-TUTAJ.md i w naglowku make-webhook-feed.ps1. */
+const tracked = execSync('git ls-files', { cwd: root, encoding: 'utf8' })
+  .split('\n')
+  .map((line) => line.trim())
+  .filter(Boolean)
+  /* Bez plikow blokad i bez tego checkera. package-lock.json niesie setki skrotow
+     integralnosci, ktore lapie kazdy wzorzec na dlugi ciag znakow, a ten plik cytuje
+     wzorce w tresci i zlapalby sam siebie. */
+  .filter((file) => !/^(package(-lock)?\.json|tools\/check-minor-blueprint\.mjs)$/.test(file));
+
+const SECRET_PATTERNS = [
+  {
+    label: 'adres webhooka Make',
+    // Sama domena bez sciezki jest w porzadku: o czyms trzeba moc napisac.
+    re: /hook\.(eu\d+\.)?make\.com\/[a-z0-9]{8,}/i
+  },
+  {
+    label: 'klucz CallMeBota przy numerze organizatora',
+    /* Waski celowo: dowolne szesc cyfr to takze kod pocztowy i numer startowy. Szukamy
+       ksztaltu, w jakim ten klucz naprawde wystepuje — obok slowa apikey albo w trojce
+       `numer:klucz` z WHATSAPP_ALERTS. */
+    re: /(apikey\s*[=:]\s*['"]?\d{6,8}\b|\b(?:48665626101|393284981574):\d{6,8}\b)/i
+  }
+];
+
+const leaks = [];
+for (const file of tracked) {
+  let body = '';
+  try {
+    body = readFileSync(resolve(root, file), 'utf8');
+  } catch {
+    // Binarny albo usuniety w drzewie roboczym — nie ma czego czytac.
+    continue;
+  }
+  for (const { label, re } of SECRET_PATTERNS) {
+    const hit = body.match(re);
+    if (!hit) continue;
+    /* Zastepniki i nazwy zmiennych przechodza: chodzi o wartosci, nie o to, zeby nie
+       dalo sie o nich napisac. */
+    if (/WSTAW-KLUCZ-CALLMEBOT|NOWY_KLUCZ|KLUCZ|<z WHATSAPP_ALERTS>/i.test(hit[0])) continue;
+    leaks.push(`${file}: ${label} (${hit[0].slice(0, 46)})`);
+  }
+}
+check(
+  'zaden sledzony plik nie niesie zywego sekretu (webhook Make, klucz CallMeBota)',
+  leaks.length === 0,
+  leaks.slice(0, 6).join(' | ')
 );
 
 let failed = 0;

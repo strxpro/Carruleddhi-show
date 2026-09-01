@@ -1,3 +1,20 @@
+/**
+ * UWAGA: TA SONDA MIERZY `admin-legacy.html`, NIE OBECNY PANEL.
+ * ===========================================================================
+ * Panel administratora jest dzisiaj aplikacją Reacta w `src/admin/` i buduje się do
+ * `dist/admin.html`. Znaczniki, których szuka ten plik — `#moderation-title`, `.panel`,
+ * `[data-wall-load]`, `.moderation__*`, `window.__wallCalls` — należą do poprzedniego,
+ * pisanego ręcznie panelu, który został w repozytorium jako `admin-legacy.html`.
+ *
+ * Sprawdzone: `admin-legacy.html` NIE trafia do `dist/`, więc nie ma go na produkcji.
+ * Ta sonda nadal przechodzi, ale odpowiada na pytanie o stronę, której nikt nie otwiera.
+ *
+ * Uruchamiać wyłącznie tak, i tylko gdy grzebiesz w starym panelu:
+ *     node tools/cdp.mjs probe tools/probe-admin-wall.js --url /admin-legacy.html
+ *
+ * Zapisane, bo przegląd sond zajął się tym plikiem dwa razy, zanim ustalił, że mierzy
+ * co innego, niż wygląda.
+ */
 (async () => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];

@@ -50,7 +50,11 @@ Skrypt zbuduje stronę, wdroży Workera i **sam zapyta o sekrety**. Podaj:
 | `SUPABASE_SERVICE_KEY` | service_role key z kroku 2 |
 | `WALL_SALT` | cokolwiek długiego i losowego, np. 30 znaków z klawiatury |
 | `ROSTER_KEY` | hasło, które **Ty** wymyślasz — będziesz je wpisywał w panelu admina |
-| `MAKE_WEBHOOK_URL` | `https://hook.eu1.make.com/2stphbryuh84wzer92leg7fgub1aikqg` |
+| `MAKE_WEBHOOK_URL` | adres webhooka scenariusza 1 z Make (moduł 1 → *Copy address to clipboard*) |
+
+> Adresu webhooka **nie wpisujemy do repozytorium**. Na webhooku Make nie ma hasła —
+> adres jest hasłem, a kto go zna, każe scenariuszowi wysłać maila z adresu organizatorów.
+> Stąd tylko nazwa zmiennej, a wartość w Vercelu i w `.env.local`.
 
 Po wdrożeniu skrypt pokaże adres Workera. Zapisz go.
 

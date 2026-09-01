@@ -836,7 +836,9 @@ Dostajesz numer startowy i nazwę pojazdu; resztę widzisz w arkuszu.
 I allow callmebot to send me messages
 ```
 
-3. Bot odpowie Twoim osobistym kluczem, np. `apikey: 123456`. Zapisz go.
+3. Bot odpowie Twoim osobistym kluczem — siedem cyfr. Zapisz go **poza repozytorium**:
+   w `WHATSAPP_ALERTS` w Vercelu i w `.env.local`. Do żadnego pliku w repo nie wpisuj samej
+   wartości; checker `check-minor-blueprint.mjs` tego pilnuje i przerwie `npm run make`.
 4. W Make, w scenariuszu A: plus po module 11 → **HTTP → Make a request**
 5. Ustaw:
 

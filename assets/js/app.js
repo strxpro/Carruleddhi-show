@@ -3746,6 +3746,10 @@ import {
         ENTRY_CODE_WRONG: 'entry.codeWrong',
         ENTRY_CODE_EXPIRED: 'entry.codeExpired',
         ENTRY_TOO_MANY_TRIES: 'entry.codeBlocked',
+        /* Osobny tekst, nie `codeBlocked`. Tamten mówi „za dużo prób, poproś o nowy kod" —
+           tu właśnie o nowy kod poprosić nie można, bo to jego wysyłka ma sufit. Ta sama
+           rada w obu znaczyłaby pętlę: poproś o coś, czego odmawiamy. */
+        ENTRY_CODE_TOO_OFTEN: 'entry.codeTooOften',
         ENTRY_NO_CODE: 'entry.codeExpired',
         ENTRY_BAD_CODE: 'entry.codeShort',
         ENTRY_NOT_FOUND: 'entry.gone',
@@ -6996,7 +7000,11 @@ import {
           NOTIFY_CODE_EXPIRED: 'chat.dataCodeOld',
           NOTIFY_NO_CODE: 'chat.dataCodeOld',
           NOTIFY_CODE_WRONG: 'chat.dataCodeWrong',
-          NOTIFY_TOO_MANY_TRIES: 'chat.dataCodeBurnt'
+          NOTIFY_TOO_MANY_TRIES: 'chat.dataCodeBurnt',
+          /* Klucz z przestrzeni `entry`, użyty w rozmowie świadomie: zdanie jest dosłownie
+             to samo, a druga kopia tego samego tekstu w sześciu językach to druga rzecz do
+             utrzymania i pierwsze miejsce, w którym te dwa napisy się rozjadą. */
+          NOTIFY_CODE_TOO_OFTEN: 'entry.codeTooOften'
         }[code];
         flowSay(key || 'chat.dataFailed');
         // Zły kod nie kończy rozmowy: zostaje krok z kodem, żeby dało się wpisać poprawny.

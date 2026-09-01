@@ -4,8 +4,18 @@
  * WHY THIS FILE IS AN ADAPTER AND NOT AN IMPLEMENTATION
  *   worker/index.js was written for Cloudflare but only ever uses web platform APIs —
  *   Request, Response, fetch, crypto, URL. No node: modules, no process. So it runs
- *   unchanged here, and there is one copy of the validation, rate limiting, Supabase
- *   access and Make forwarding rather than two to keep in step.
+ *   unchanged here, and there is one copy of the validation, Supabase access and Make
+ *   forwarding rather than two to keep in step.
+ *
+ *   JEDNA RZECZ NIE PRZENOSI SIĘ RAZEM Z KODEM: limitowanie po IP.
+ *   `overRateLimit` w worker/index.js chodzi po powiązaniu `RATE_LIMIT`, czyli po namespace
+ *   KV Cloudflare. Tutaj `env` to `process.env` — zwykły obiekt napisów — więc tego powiązania
+ *   nie ma i tamta funkcja zwraca `false` dla wszystkiego. Ten nagłówek wymieniał kiedyś
+ *   „rate limiting" wśród rzeczy wspólnych, co było nieprawdą i uspokajało bez powodu.
+ *
+ *   Co naprawdę broni wrażliwych końcówek na tej platformie: `overCodeSendLimit` (sufit na
+ *   listy z kodem wysyłane na jeden adres) i licznik świeżych wierszy przy `wall-post`. Oba
+ *   liczą w Supabase, więc działają wszędzie, gdzie ta funkcja stoi.
  *
  * WHY IT HANDLES TWO CALLING CONVENTIONS
  *   This cost a day, so it is worth writing down. Vercel decides a function's runtime

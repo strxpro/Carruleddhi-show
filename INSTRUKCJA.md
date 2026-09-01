@@ -11,11 +11,19 @@ Stan na 22.08.2026. Build przechodzi, 0 błędów JS na stronie i w panelu.
 > Sekcja 5 poniżej opisuje, jak to działa w środku; do samego wgrania nie jest
 > potrzebna.
 >
-> **Aktualny webhook scenariusza 1** (stan 22.08.2026):
-> `https://hook.eu1.make.com/2stphbryuh84wzer92leg7fgub1aikqg`
-> To ten adres idzie do `wrangler secret put MAKE_WEBHOOK_URL`. Poprzedni
-> (`ope15dyrs…`) już nie działa. Jeśli znów go wymienisz, popraw dwa miejsca:
-> `tools/make-webhook-feed.ps1` (parametr `$WebhookUrl`) i sekret Workera.
+> **Webhook scenariusza 1 nie jest tu wpisany — i to jest celowe.**
+> Adres webhooka Make jest gołą przepustką: kto go zna, wstawia scenariuszowi dowolny
+> payload, a scenariusz wysyła maila z adresu organizatorów z podanym HTML-em, pinguje
+> oba numery na WhatsAppie i zużywa operacje. Na webhooku Make nie ma hasła — adres **jest**
+> hasłem. To repozytorium jest publiczne, więc wpisany tutaj adres przestawał być sekretem
+> w chwili commita.
+>
+> Adres bierz z jednego miejsca: `MAKE_WEBHOOK_URL` w Vercelu, a lokalnie w `.env.local`
+> (objętym `.gitignore`). `tools/make-webhook-feed.ps1` czyta go stamtąd sam.
+>
+> Wcześniejsze wersje tego pliku go zawierały, więc **leży w historii gita**. Wygeneruj nowy:
+> w Make moduł 1 → *Redetermine data structure* daje nowy adres. Potem popraw
+> `MAKE_WEBHOOK_URL` w Vercelu i w `.env.local`.
 
 ---
 

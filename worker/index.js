@@ -2623,9 +2623,75 @@ async function unsubStart(env, payload, cors) {
    odpowiadać nikomu, kto nie ma dostępu do tej skrzynki.
    ========================================================================== */
 
+/**
+ * Ile kodów wolno WYSŁAĆ na jeden adres w danym oknie.
+ *
+ * ============================================================================
+ * TO NIE JEST TO SAMO CO `CODE_ATTEMPT_LIMIT`, I TA RÓŻNICA BYŁA DZIURĄ.
+ * ============================================================================
+ * `CODE_ATTEMPT_LIMIT` liczy PRÓBY ZGADNIĘCIA istniejącego kodu i broni czyjegoś konta przed
+ * zgadywaniem. Nie broni niczego przed WYSYŁANIEM: `notify-code` i `entry-code` przyjmowały
+ * dowolny adres i za każdym razem wysyłały na niego list. Czyli dowolny człowiek z internetu
+ * zasypywał dowolną skrzynkę listami z serwera organizatorów — cudzym kosztem, z cudzej
+ * domeny i z konsekwencjami dla jej reputacji.
+ *
+ * DLACZEGO NIE PRZEZ `overRateLimit`
+ *   Tamten limiter chodzi po `env.RATE_LIMIT`, czyli po namespace KV Cloudflare. Ten kod jedzie
+ *   na Vercelu, gdzie `env` to `process.env` — zwykły obiekt napisów. `overRateLimit` kończy
+ *   więc na pierwszej linii i zwraca `false` dla wszystkiego. Limit, który polega na cudzej
+ *   platformie, na tej platformie nie istnieje.
+ *
+ * DLACZEGO BEZ MIGRACJI
+ *   `verification_codes` ma już `email` i `created_at`, a każde wysłanie kodu i tak wstawia
+ *   tam wiersz. Liczenie tych wierszy to ten sam wzorzec, którym `wall-post` broni się przed
+ *   zalewem komentarzy (`WALL_POST_MAX`) — bez nowej tabeli, bez nowej kolumny i bez czekania,
+ *   aż ktoś wykona migrację na produkcji.
+ *
+ * PO ADRESIE, NIE PO IP
+ *   Bronimy skrzynki odbiorcy, a nie serwera. Adres jest tym, co dostaje listy, i to on ma
+ *   sufit. IP napastnika i tak jest za tanie, żeby na nim cokolwiek opierać.
+ *
+ * TRZY NA KWADRANS: dwa razy „nie doszło, wyślij jeszcze raz" i jeden zapas. Czwarte żądanie
+ * w tym samym oknie to już nie człowiek, który nie widzi listu.
+ */
+const CODE_SEND_MAX = 3;
+const CODE_SEND_WINDOW_SECONDS = 900;
+
+/**
+ * Czy na ten adres poszło już tyle kodów, że kolejny jest zalewem.
+ *
+ * Przy nieudanym odczycie z bazy PRZEPUSZCZA. Świadomie: zerwane połączenie z Supabase
+ * zablokowałoby wtedy każdemu poprawienie własnego zgłoszenia, a to jest gorsze niż okno,
+ * w którym limit nie działa. Awaria odczytu nie ma zamykać drzwi uczciwym.
+ */
+async function overCodeSendLimit(env, email, purposes) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return false;
+  const since = new Date(Date.now() - CODE_SEND_WINDOW_SECONDS * 1000).toISOString();
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/verification_codes`);
+  url.searchParams.set('select', 'id');
+  url.searchParams.set('email', `eq.${email}`);
+  url.searchParams.set('created_at', `gte.${since}`);
+  /* Zakres celów podany przez wołającego: kod na wypisanie z powiadomień i kod na zmianę
+     zgłoszenia to dwie różne sprawy i nie mają zjadać sobie limitu. */
+  if (purposes?.length) url.searchParams.set('purpose', `in.(${purposes.join(',')})`);
+  url.searchParams.set('limit', String(CODE_SEND_MAX + 1));
+
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response || !response.ok) return false;
+  const rows = await response.json().catch(() => null);
+  return Array.isArray(rows) && rows.length >= CODE_SEND_MAX;
+}
+
 async function notifyCode(env, payload, cors) {
   const email = String(payload.email || '').trim().toLowerCase();
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'NOTIFY_BAD_EMAIL' }, 422, cors);
+
+  if (await overCodeSendLimit(env, email, ['unsubscribe'])) {
+    return json({ ok: false, code: 'NOTIFY_CODE_TOO_OFTEN' }, 429, {
+      ...cors,
+      'Retry-After': String(CODE_SEND_WINDOW_SECONDS)
+    });
+  }
 
   const lists = await findSubscriptionsByEmail(env, email);
   const active = lists.filter((entry) => entry.row.status !== 'unsubscribed');
@@ -3332,6 +3398,17 @@ const ENTRY_PURPOSE = { edit: 'edit-entry', withdraw: 'cancel-entry' };
 async function entryCode(env, payload, cors) {
   const email = String(payload.email || '').trim().toLowerCase();
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
+
+  /* Ten sam sufit co przy powiadomieniach — patrz `overCodeSendLimit`. Sprawdzany PRZED
+     wyszukaniem zgłoszenia, żeby zalew nie kosztował nawet odczytu listy startowej.
+     Oba cele w jednym zakresie: „popraw" i „wycofaj" idą na tę samą skrzynkę, więc trzy listy
+     w kwadrans to trzy listy, niezależnie od tego, o co ktoś prosił. */
+  if (await overCodeSendLimit(env, email, ['edit-entry', 'cancel-entry'])) {
+    return json({ ok: false, code: 'ENTRY_CODE_TOO_OFTEN' }, 429, {
+      ...cors,
+      'Retry-After': String(CODE_SEND_WINDOW_SECONDS)
+    });
+  }
 
   /* Which of the two, decided here and named in the letter. Defaults to editing rather than to
      withdrawing: if the field is ever missing, the harmless one is the one to fall back to. */
@@ -6641,9 +6718,27 @@ function clientIp(request) {
   return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
 }
 
-/** Read-modify-write in KV is not atomic; good enough to stop casual flooding. */
+/**
+ * Read-modify-write in KV is not atomic; good enough to stop casual flooding.
+ *
+ * DZIAŁA WYŁĄCZNIE NA CLOUDFLARE, I TRZEBA TO WIEDZIEĆ.
+ * ---------------------------------------------------------------------------
+ * `RATE_LIMIT` to powiązanie z namespace KV, czyli obiekt z `get` i `put`. Na Vercelu `env`
+ * to `process.env` — zwykły obiekt napisów — więc tego powiązania nie ma i ta funkcja zwraca
+ * `false` dla wszystkiego. Nagłówek `api/intake.js` twierdził, że adapter dzieli z Workerem
+ * „walidację, limitowanie i dostęp do Supabase"; dwie trzecie tego jest prawdą.
+ *
+ * Co naprawdę broni wrażliwych końcówek na tej platformie: `overCodeSendLimit` przy wysyłce
+ * kodów i licznik świeżych wierszy przy `wall-post`. Oba liczą w Supabase, więc nie zależą od
+ * tego, gdzie funkcja stoi.
+ *
+ * SPRAWDZANIE KSZTAŁTU, NIE ISTNIENIA.
+ * Było `if (!env.RATE_LIMIT)`. Wystarczyłoby, że ktoś doda w panelu Vercela zmienną o tej
+ * nazwie — choćby `"1"` albo `"off"` — i pierwsze wywołanie `.get()` na napisie rzuca
+ * wyjątkiem, czyli KAŻDE zgłoszenie kończy się pustym 500. Pytanie o funkcję zamyka tę pułapkę.
+ */
 async function overRateLimit(env, request, type) {
-  if (!env.RATE_LIMIT || type === 'counts') return false;
+  if (typeof env.RATE_LIMIT?.get !== 'function' || type === 'counts') return false;
   const key = `rl:${type}:${clientIp(request)}`;
   const ceiling = type === 'roster' ? 12 : RATE_LIMIT_MAX;
   const current = Number.parseInt((await env.RATE_LIMIT.get(key)) || '0', 10) || 0;

@@ -23,11 +23,27 @@
 #   These are made-up people. Do not point this at a production scenario that is
 #   switched ON unless you want four real e-mails and a WhatsApp message.
 
+# WHY THE WEBHOOK URL IS NOT WRITTEN IN THIS FILE ANY MORE
+#   It used to be the default value of -WebhookUrl. That URL is a bare capability:
+#   anybody who has it can POST whatever they like into scenario 1, which sends
+#   e-mail from the organisers' address with the HTML it was handed, pings both
+#   organisers on WhatsApp and burns Make operations. There is no password on a
+#   Make webhook - the address IS the password.
+#
+#   This repository is public, so the address stopped being a secret the moment it
+#   was committed. It now comes from MAKE_WEBHOOK_URL: the environment, or
+#   .env.local, which is covered by .gitignore. Same variable the Worker uses, so
+#   there is one place to change it.
+#
+#   Removing it from the file does NOT remove it from git history. Regenerate the
+#   hook in Make (module 1 -> Redetermine data structure gives a new address),
+#   then update MAKE_WEBHOOK_URL in Vercel and in .env.local.
+
 [CmdletBinding()]
 param(
-  # Scenario 1 webhook ("ZAPISY NA WYSCIG"). Override with -WebhookUrl if you
-  # ever regenerate the hook in Make; the old one was replaced on 22.08.2026.
-  [string]$WebhookUrl = 'https://hook.eu1.make.com/2stphbryuh84wzer92leg7fgub1aikqg',
+  # Scenario 1 webhook ("ZAPISY NA WYSCIG"). Read from MAKE_WEBHOOK_URL when left
+  # empty - see the note above. Pass -WebhookUrl to aim somewhere else once.
+  [string]$WebhookUrl = '',
 
   # Send through the Cloudflare Worker instead of straight to Make. Use this for
   # the real end-to-end test once the Worker is deployed; the Worker validates,
@@ -48,6 +64,30 @@ param(
   # learning or the scenario is already ON.
   [switch]$All
 )
+
+# --- where to send -----------------------------------------------------------
+# Order: -WebhookUrl, then the environment, then .env.local. A missing address is a
+# hard stop with the fix spelled out, not a silent POST to nowhere: this script's
+# whole job is to make Make learn a structure, and a 404 teaches it nothing.
+if (-not $WebhookUrl) { $WebhookUrl = $env:MAKE_WEBHOOK_URL }
+if (-not $WebhookUrl) {
+  $envFile = Join-Path (Split-Path -Parent $PSScriptRoot) '.env.local'
+  if (Test-Path $envFile) {
+    foreach ($line in Get-Content $envFile) {
+      if ($line -match '^\s*MAKE_WEBHOOK_URL\s*=\s*(.+?)\s*$') {
+        $WebhookUrl = $matches[1].Trim("'", '"')
+        break
+      }
+    }
+  }
+}
+if (-not $WebhookUrl -and -not $WorkerBase) {
+  Write-Host 'Nie znam adresu webhooka.' -ForegroundColor Red
+  Write-Host '  Ustaw MAKE_WEBHOOK_URL w .env.local (ten sam adres, co w Vercelu),' -ForegroundColor DarkGray
+  Write-Host '  albo podaj go raz: -WebhookUrl https://hook.eu1.make.com/...' -ForegroundColor DarkGray
+  Write-Host '  Adres nie jest juz wpisany w tym pliku - repozytorium jest publiczne.' -ForegroundColor DarkGray
+  exit 1
+}
 
 $ErrorActionPreference = 'Stop'
 

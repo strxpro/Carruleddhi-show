@@ -1,3 +1,15 @@
+/**
+ * UWAGA: TA SONDA MIERZY `admin-legacy.html`, NIE OBECNY PANEL.
+ * ===========================================================================
+ * `[data-sponsor-demo]`, `[data-sponsor-list]` i `.sponsor-row` to znaczniki poprzedniego,
+ * pisanego ręcznie panelu. Dzisiejszy panel to React w `src/admin/`, budowany do
+ * `dist/admin.html`, i tych klas nie ma nigdzie poza `admin-legacy.html`.
+ *
+ * Sprawdzone: `admin-legacy.html` NIE trafia do `dist/`, więc nie ma go na produkcji.
+ *
+ * Uruchamiać wyłącznie tak, i tylko gdy grzebiesz w starym panelu:
+ *     node tools/cdp.mjs probe tools/probe-admin-sponsors.js --url /admin-legacy.html
+ */
 async (doc, win) => {
   const out = {};
   const demo = doc.querySelector('[data-sponsor-demo]');
