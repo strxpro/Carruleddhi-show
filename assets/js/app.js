@@ -9072,6 +9072,16 @@ import {
            i przedrostki („de", „van") zostają w całości, bo dzielenie ich po drugim odstępie
            gubiłoby połowę nazwiska w połowie przypadków, w których w ogóle o coś tu chodzi. */
         const said = message.trim().replace(/\s+/g, ' ').slice(0, 120);
+        /* CYFRA W NAZWISKU ODBIJA SIĘ OD RAZU, A NIE DOPIERO U ORGANIZATORA.
+           ---------------------------------------------------------------------------
+           „Na kogo mam pytać” to imię człowieka, a nie nazwa firmy — ta ma własne pytanie
+           krok wyżej. Cyfra w tej odpowiedzi znaczy prawie zawsze jedno z dwojga: ktoś
+           wkleił tu numer telefonu, albo napisał nazwę wozu drugi raz. Jedno i drugie
+           dojechałoby do zgłoszenia i zostało w mailu do organizatorów jako „Jan 512334455”.
+
+           Sprawdzane PRZED podziałem na imię i nazwisko, bo cyfra po odstępie zrobiłaby się
+           nazwiskiem i przeszłaby dalej bez słowa. */
+        if (/\d/.test(said)) { flowSay('chat.sponsorNoDigits'); return; }
         const gap = said.indexOf(' ');
         if (gap < 1) { flowSay('chat.sponsorNeedPerson'); return; }
         flow.firstName = said.slice(0, gap);
@@ -9099,14 +9109,85 @@ import {
         return;
       }
       flow.email = email;
+      sponsorSummary();
+    }
 
-      /* Bramka z celem `sponsor`: kod na ten adres i nic nie wychodzi na zewnątrz, dopóki nie
-         wróci poprawny (5.5, 5.6). `flowGuard` wokół wysyłki, bo błąd rzucony z zaczepu
-         wpadłby w obsługę odmów bramki i pokazał pastylki bramki, której już nie ma. */
-      await gateStart(email, 'sponsor', {
-        onConfirmed: (code) => flowGuard(() => sponsorSubmit(code)),
-        onChangeEmail: () => sponsorAskEmail()
+    /**
+     * PODSUMOWANIE PRZED WYSŁANIEM — OSTATNI MOMENT, W KTÓRYM WIDAĆ CAŁOŚĆ.
+     * ---------------------------------------------------------------------------
+     * Kreator pyta o pięć rzeczy w pięciu osobnych wierszach, a odpowiedzi rozjeżdżają się po
+     * wątku razem z pytaniami automatu. Kto pomylił się w nazwie trzy pytania temu, nie ma jak
+     * tego zobaczyć — chyba że przewinie rozmowę w górę i pozbiera ją z bąbelków.
+     *
+     * Ta kartka pokazuje wszystko naraz i pyta wprost. Stoi PRZED bramką, nie za nią: kod na
+     * skrzynkę jest kosztem, którego nie warto ponosić po to, żeby dopiero potem zobaczyć
+     * literówkę — a poprawianie danych po zużyciu kodu znaczyłoby drugi kod.
+     *
+     * „Popraw dane” wraca do pierwszego pytania, ale ZGODA ZOSTAJE. Zgoda dotyczy dokumentów,
+     * które się nie zmieniły, i była osobną decyzją podjętą po przeczytaniu regulaminu do końca
+     * — kazanie komuś przewijać go drugi raz za literówkę w telefonie jest karą, nie ochroną.
+     */
+    function sponsorSummary() {
+      if (!flow) return;
+      flow.step = 'summary';
+      /* Zdanie i kartka w JEDNYM zadaniu kolejki: pytanie „czy się zgadza” bez tego, co ma się
+         zgadzać, wisiałoby przez 280 ms samo. */
+      sayLater(() => {
+        sayNow('chat.sponsorSummaryLead');
+        sponsorSummaryCard();
       });
+      flowChoices([
+        ['chat.sponsorSummaryYes', async () => {
+          if (!flow) return;
+          /* Bramka z celem `sponsor`: kod na ten adres i nic nie wychodzi na zewnątrz, dopóki
+             nie wróci poprawny (5.5, 5.6). `flowGuard` wokół wysyłki, bo błąd rzucony z zaczepu
+             wpadłby w obsługę odmów bramki i pokazał pastylki bramki, której już nie ma. */
+          await gateStart(flow.email, 'sponsor', {
+            onConfirmed: (code) => flowGuard(() => sponsorSubmit(code)),
+            onChangeEmail: () => sponsorAskEmail()
+          });
+        }],
+        ['chat.sponsorSummaryFix', async () => {
+          if (!flow) return;
+          flow.step = 'name';
+          flow.cartName = '';
+          flow.firstName = '';
+          flow.lastName = '';
+          flow.phone = '';
+          flow.email = '';
+          flowSay('chat.sponsorAskName');
+          flowChoices([sponsorQuit()]);
+        }],
+        sponsorQuit()
+      ]);
+    }
+
+    /** Kartka z odpowiedziami. Bez `sayLater` — wołana wewnątrz jednego zadania kolejki. */
+    function sponsorSummaryCard() {
+      if (!log || !flow) return null;
+      const card = document.createElement('dl');
+      card.className = 'chat__summary';
+      card.dataset.chatSummary = '';
+      const wiersze = [
+        ['chat.sponsorSummaryName', flow.cartName],
+        ['chat.sponsorSummaryPerson', `${flow.firstName} ${flow.lastName}`.trim()],
+        ['chat.sponsorSummaryPhone', flow.phone || text('chat.sponsorSummaryNoPhone')],
+        ['chat.sponsorSummaryEmail', flow.email]
+      ];
+      wiersze.forEach(([key, value]) => {
+        const term = document.createElement('dt');
+        term.textContent = text(key) || key;
+        const def = document.createElement('dd');
+        /* `textContent`, nigdy `innerHTML`: to są słowa wpisane przez gościa i wracają na
+           ekran, z którego przyszły. */
+        def.textContent = value || '—';
+        if (!flow.phone && key === 'chat.sponsorSummaryPhone') def.className = 'is-empty';
+        card.append(term, def);
+      });
+      const stick = atBottom();
+      log.appendChild(card);
+      if (stick) toBottom();
+      return card;
     }
 
     async function startFlow(intent) {

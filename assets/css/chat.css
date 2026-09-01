@@ -816,6 +816,45 @@
    Odsyłacze mają `display: inline-block` z pionowym odstępem, bo naciska się je w telefonie,
    jedną ręką, obok pastylki „Zgadzam się" — dwa napisy w jednej linii wysokiej na 16 px byłyby
    celem, w który trafia się przypadkiem. */
+/* KARTKA Z PODSUMOWANIEM — OSTATNI EKRAN PRZED WYSŁANIEM.
+   ===========================================================================
+   Nie bąbelek: bąbelek jest wypowiedzią, a to jest formularz do przeczytania. Wyróżnia się
+   ramą i tłem, żeby oko od razu widziało, że skończyły się pytania i zaczęło sprawdzanie.
+
+   `dl` z dwiema kolumnami, a nie lista zdań: etykiety pod sobą dają się omštać wzrokiem w
+   pionie, a wartości mają wtedy wspólną krawędź. `minmax(0, 1fr)` na wartości, bo adres
+   e-mail bez odstępów potrafi rozepchnąć kolumnę szerzej niż okno czatu.
+
+   `overflow-wrap`, bo długi adres nie ma gdzie się złamać i wyjechałby poza ramkę. */
+.chat__summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 6px 0 8px;
+  padding: 14px 16px;
+  border: 2px solid rgb(7 26 61 / .12);
+  border-radius: 16px;
+  background: rgb(255 255 255 / .72);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.chat__summary dt {
+  color: #65718b;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  align-self: center;
+}
+.chat__summary dd {
+  margin: 0;
+  color: #071a3d;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+/* Pominięty telefon ma wyglądać na pominięty, a nie na wpisany. */
+.chat__summary dd.is-empty { color: #8b96ab; font-weight: 600; font-style: italic; }
+
 .chat__docs {
   margin: 2px 0 6px;
   text-align: center;

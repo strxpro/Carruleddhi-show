@@ -3601,7 +3601,8 @@ async function unsubStart(env, payload, cors) {
   const stored = await insertRow(env, 'verification_codes', {
     purpose: 'unsubscribe',
     email,
-    code_hash: await hashCode(env, email, code)
+    code_hash: await hashCode(env, email, code),
+    expires_at: codeExpiry()
   });
   if (!stored.ok) return json({ ok: false, code: 'UNSUB_CODE_FAILED' }, 502, cors);
 
@@ -3688,6 +3689,25 @@ async function unsubStart(env, payload, cors) {
  * w tym samym oknie to już nie człowiek, który nie widzi listu.
  */
 const CODE_SEND_MAX = 3;
+/* WAZNOSC KODU — W KODZIE, NIE TYLKO W DOMYŚLNEJ WARTOŚCI KOLUMNY.
+   ===========================================================================
+   `verification_codes.expires_at` ma domyślne `now() + interval '15 minutes'` z migracji
+   0009 i oba miejsca wstawiające kod polegały na tym domyśle. Wystarczające, dopóki nikt
+   nie pyta „ile ten kod żyje” — a odpowiedź leżała wtedy w pliku, którego nikt tu nie
+   otwiera, i w innym zdaniu w słowniku strony.
+
+   Teraz decyduje ta jedna stała: obie wstawki liczą `expires_at` z niej, a migracja
+   0035 przestawia domyślną wartość kolumny na to samo — żeby wiersz wstawiony kiedykolwiek
+   z pominięciem tego kodu mówił to samo, co zdanie pokazane gościowi.
+
+   Dziesięć minut, nie piętnaście: dość, żeby przełączyć się do poczty, znaleźć list i
+   wrócić; krócej, gdy kod zostaje w cudzej skrzynce. Zdanie „kod jest ważny 10 minut”
+   w słowniku strony (`unsub.leadCode`) musi się z tą liczbą zgadzać. */
+const CODE_TTL_MINUTES = 10;
+
+/** `expires_at` dla nowego kodu, w ISO — jedno miejsce dla obu wstawek. */
+const codeExpiry = () => new Date(Date.now() + CODE_TTL_MINUTES * 60_000).toISOString();
+
 const CODE_SEND_WINDOW_SECONDS = 900;
 
 /**
@@ -3778,7 +3798,9 @@ async function sendCodeLetter(env, { email, purpose, entryId = null, locale }) {
 
   /* `entry_id` dokładane tylko wtedy, gdy jest: cele bez zgłoszenia za sobą (`sponsor`,
      `unsubscribe`) zostawiają kolumnę pustą, a `checkCode` szuka ich przez `is.null`. */
-  const row = { purpose, email, code_hash: await hashCode(env, email, code) };
+  const row = {
+    purpose, email, code_hash: await hashCode(env, email, code), expires_at: codeExpiry()
+  };
   if (entryId) row.entry_id = entryId;
 
   const stored = await insertRow(env, 'verification_codes', row);
