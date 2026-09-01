@@ -4957,8 +4957,11 @@ import {
     function placeMarkers() {
       place(startNode, 0);
       place(finishNode, total);
-      place(startPin, 0, 22);
-      place(finishPin, total, 22);
+      // 1.2, nie 22. Wieksze wciecie odsuwalo napis od punktu, ktory nazywa: trasa
+      // zaczyna sie na x = 100 %, wiec PARTENZA ladowala o jedna piata kadru dalej.
+      // Tyle zostaje, zeby kropka nie zostala przycieta krawedzia zdjecia.
+      place(startPin, 0, 1.2);
+      place(finishPin, total, 1.2);
     }
 
     /* Hand the cart placer to setupRouteZoom.

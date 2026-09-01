@@ -673,42 +673,57 @@
   stroke-width: 3;
   stroke-dasharray: 9 13;
   animation-duration: .9s;
-  filter: drop-shadow(0 0 2px rgba(7, 26, 61, .9));
 }
 
-/* Start and finish only, and small. Both were 89x34 badges with a 30px dot
-   beside them — four objects fighting for two corners of a photograph. One
-   compact chip per end, and the dot shrinks to a bead that just marks the spot. */
-.route__node {
-  width: 16px;
-  height: 16px;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, .9), 0 4px 10px rgba(7, 26, 61, .45);
-}
-.route__node::after { display: none; }
+/* One marker per end, and the word stands where the dot stands.
+   Before: a bead on the route plus a bordered chip parked 14 px above it, and the
+   chip was positioned with a 22 % inset. On this photograph the route starts on
+   the right-hand edge, so that inset pushed PARTENZA a fifth of the frame away
+   from the spot it was naming. Now the bead lives inside the label, the pair is
+   anchored on the route point itself, and the text leans away from the edge it
+   would otherwise fall off: start reads leftwards, finish rightwards.
+   No pill, no border, no hard shadow either — over a photograph the quietest
+   legible thing is white type with a dark halo. */
+.route__node { display: none; }
+
 .route__frame .route__pin {
-  gap: 5px;
-  padding: 4px 10px;
-  border: 2px solid var(--navy-950);
-  border-radius: 999px;
+  gap: 7px;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--white);
   font-family: var(--font-meta);
-  font-size: 9.5px;
+  font-size: clamp(9px, .78vw, 11px);
   font-weight: 800;
-  letter-spacing: .14em;
+  letter-spacing: .16em;
   text-transform: uppercase;
-  box-shadow: 0 2px 0 rgba(7, 26, 61, .35);
+  text-shadow: 0 1px 3px rgba(7, 26, 61, .95), 0 0 10px rgba(7, 26, 61, .75);
+  white-space: nowrap;
 }
-.route__frame .route__pin::before { width: 5px; height: 5px; }
-.route__frame .route__pin--start { background: var(--yellow); color: var(--navy-950); }
-.route__frame .route__pin--end { background: var(--coral); color: var(--white); }
-/* Pull the labels clear of their dots so neither sits on the line. */
-.route__frame .route__pin--start { transform: translate(-50%, calc(-100% - 14px)); }
-.route__frame .route__pin--end { transform: translate(-50%, 16px); }
+.route__frame .route__pin::before {
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, .92), 0 2px 8px rgba(7, 26, 61, .55);
+}
+.route__frame .route__pin--start::before { background: var(--yellow); }
+.route__frame .route__pin--end::before { background: var(--coral); }
 
-/* The finish pin was hidden below 760 px, so a phone showed a start marker and
-   nothing at the bottom. Both ends matter more than either label being roomy. */
+/* The anchor is the bead, not the box. Half a bead is 5 px, so `100% - 5px` drops
+   a trailing bead onto the point and `-5px` drops a leading one there. */
+.route__frame .route__pin--start {
+  flex-direction: row-reverse;
+  transform: translate(calc(-100% + 5px), -50%);
+}
+.route__frame .route__pin--end { transform: translate(-5px, -50%); }
+
+/* Both ends matter on a phone more than either label being roomy. */
 @media (max-width: 760px) {
   .route__frame .route__pin--end { display: flex; }
-  .route__frame .route__pin { padding: 5px 9px; font-size: 9px; letter-spacing: .1em; border-width: 2px; }
+  .route__frame .route__pin { gap: 6px; letter-spacing: .12em; }
+  .route__frame .route__pin::before { width: 9px; height: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

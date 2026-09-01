@@ -418,6 +418,12 @@ import {
    * Warunkiem jest wyłącznie faza `voting` odczytana z serwera. Nieudany odczyt daje
    * `scheduled` i nie blokuje niczego — awaria tej sekcji nie ma prawa zamknąć zapisów.
    */
+  /* Jedna lista dla malowania i dla strażnika. Rozdzielone rozjechałyby się przy pierwszej
+     zmianie: coś wyglądałoby na wyłączone, a dalej by działało — albo odwrotnie. */
+  const LOCKABLE_LINKS = 'a[href="#signup"], a[data-feature-link="registration"], '
+    + 'a[href="#attendance"], a[data-feature-link="attendance"]';
+  const LOCKABLE_ATTEND = '[data-attendance-button], [data-quick-attend]';
+
   function paintSignupLock(locked, closed = false) {
     const section = $('#signup');
     if (section) {
@@ -475,12 +481,33 @@ import {
        `aria-disabled` plus przechwycony klik, nie `pointer-events: none`: wyłączony przez CSS
        odsyłacz nadal jest w kolejności tabulacji i czytnik ekranu nadal go czyta jako
        działający. Tutaj klawiatura i lektor dowiadują się tego samego co mysz. */
-    $$('a[href="#signup"], a[data-feature-link="registration"]').forEach((link) => {
+    $$(LOCKABLE_LINKS).forEach((link) => {
       if (link.dataset.voteCta !== undefined) return;
-      link.classList.toggle('is-race-locked', locked);
-      link.setAttribute('aria-disabled', String(locked));
-      if (locked) link.setAttribute('tabindex', '-1');
+      link.classList.toggle('is-race-locked', locked || closed);
+      link.setAttribute('aria-disabled', String(locked || closed));
+      if (locked || closed) link.setAttribute('tabindex', '-1');
       else link.removeAttribute('tabindex');
+    });
+
+    /* „BĘDĘ TAM" TEŻ GAŚNIE — I W TRAKCIE, I PO WSZYSTKIM.
+       ---------------------------------------------------------------------------
+       „Będę tam" znaczy „przyjdę popatrzeć", a tego zdania nie da się już wypowiedzieć
+       ani w czasie zjazdu, ani po dekoracji. Licznik widowni zostaje na widoku, bo mówi,
+       ilu ludzi przyszło; martwy jest tylko przycisk, który by go jeszcze podbijał.
+
+       `aria-disabled`, a nie `disabled`: wyłączony przycisk nie wysyła kliknięcia, więc nie
+       da się na nie odpowiedzieć — a człowiek, który właśnie w niego trafił, dostaje ciszę
+       zamiast powodu. Tutaj klik dolatuje, guardSignupLinks() go przechwytuje w fazie
+       przechwytywania i mówi, co się dzieje.
+
+       Zaproszenie na przyszły rok w sekcji zapisów otwiera to samo okno przypomnienia
+       (`data-open-reminder`) i celowo NIE jest tu wyłączane — dlatego lista wymienia
+       konkretne przyciski widowni zamiast całej rodziny `data-open-reminder`. */
+    const attendance = $('#attendance');
+    if (attendance) attendance.classList.toggle('is-race-locked', locked || closed);
+    $$(LOCKABLE_ATTEND).forEach((button) => {
+      button.classList.toggle('is-race-locked', locked || closed);
+      button.setAttribute('aria-disabled', String(locked || closed));
     });
   }
 
@@ -492,14 +519,27 @@ import {
    * trafia tam, gdzie w tej chwili coś się dzieje.
    */
   function guardSignupLinks() {
+    /* Faza przechwytywania (`true`), nie bąbelkowania. Przycisk widowni ma własną obsługę
+       kliknięcia podpiętą do siebie; gdybyśmy słuchali dopiero na dokumencie, tamta
+       zdążyłaby już podbić licznik. Przechwytywanie idzie od dokumentu w dół, więc
+       zatrzymujemy zdarzenie, zanim dojdzie do przycisku. */
     document.addEventListener('click', (event) => {
-      if (state.phase !== 'voting') return;
-      const link = event.target.closest?.('a[href="#signup"], a[data-feature-link="registration"]');
-      if (!link || link.dataset.voteCta !== undefined) return;
+      const phase = state.phase;
+      if (phase !== 'voting' && phase !== 'closed') return;
+      const target = event.target.closest?.(LOCKABLE_LINKS + ', ' + LOCKABLE_ATTEND);
+      if (!target || target.dataset.voteCta !== undefined) return;
       event.preventDefault();
-      toast(text('voting.signupLockedLead'), 'info');
-      $('[data-vote-cta]:not([hidden])')?.focus?.();
-    });
+      event.stopPropagation();
+      if (phase === 'voting') {
+        toast(text('voting.signupLockedLead'), 'info');
+        $('[data-vote-cta]:not([hidden])')?.focus?.();
+      } else {
+        /* Po zamknięciu jedyne, co człowiek jeszcze może zrobić, to zostawić adres na
+           przyszły rok — więc komunikat mówi o tym, a ostrość trafia na ten przycisk. */
+        toast(text('voting.signupClosedLead'), 'info');
+        $('[data-signup-closed] [data-open-reminder]')?.focus?.();
+      }
+    }, true);
   }
 
 

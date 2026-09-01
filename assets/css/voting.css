@@ -585,6 +585,17 @@ a.is-race-locked {
   text-decoration-thickness: 2px;
 }
 
+/* Ten sam znak dla przyciskow widowni. Przekreslenia tu nie ma — na wielkim „CI SARÒ!”
+   wyglądałoby jak błąd składu, a nie jak decyzja. Wystarczy przygaszenie, brak koloru i
+   kursor. Nasłuch kliknięć znowu zostaje włączony: klik jest przechwytywany i odpowiada
+   komunikatem, bo przycisk, który milczy, wygląda na zepsuty. */
+button.is-race-locked {
+  opacity: .45;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+.attendance.is-race-locked .attendance__hint { opacity: .55; }
+
 /* ============================================================================
    Podstrona głosowania — votazione.html
    ============================================================================ */
