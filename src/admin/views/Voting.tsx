@@ -227,7 +227,20 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
 
   /** Każde działanie kończy się świeżym stanem z serwera, więc ekran nigdy nie zgaduje. */
   const run = useCallback(
-    async (action: () => Promise<unknown>, message?: string): Promise<boolean> => {
+    async (
+      action: () => Promise<unknown>,
+      message?: string,
+      /* Sprawdzenie WYNIKU, nie żądania.
+         ---------------------------------------------------------------------------
+         Zapis może się udać i mimo to nie dać tego, o co proszono. „Wróć do odliczania" z datą
+         startu, która już minęła, zapisuje się bez błędu — Worker przyjmuje `status:
+         'scheduled'` — a `votingPhase` i tak liczy z zegara `closed`, bo okno się skończyło.
+         Panel wypisywał wtedy „Odliczanie wróciło", stojąc obok napisu GŁOSOWANIE ZAMKNIĘTE.
+
+         Zwrócony napis zastępuje potwierdzenie komunikatem o błędzie. Pusty albo `null` znaczy
+         „wyszło tak, jak miało wyjść". */
+      verify?: (next: VotingState) => string | null
+    ): Promise<boolean> => {
       setBusy(true);
       setError(null);
       setNote(null);
@@ -236,10 +249,17 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
         const result = await action();
         /* Część działań oddaje cały stan, część samo `ok`. Te drugie muszą go doczytać: po
            zapisie uczestnika zmieniają się nie tylko jego pola, ale i średnie obok. */
+        let next: VotingState;
         if (result && typeof result === 'object' && 'participants' in result) {
-          absorb(result as VotingState);
+          next = result as VotingState;
         } else {
-          absorb(await fetchVoting(apiKey));
+          next = await fetchVoting(apiKey);
+        }
+        absorb(next);
+        const wrong = verify ? verify(next) : null;
+        if (wrong) {
+          setError(wrong);
+          return false;
         }
         if (message) setNote(message);
         return true;
@@ -363,9 +383,9 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
    * termin musi zostać na ekranie do ponowienia; bez tego pierwsze odpytanie po zerwanym
    * łączu wyczyściłoby to, co ktoś właśnie wpisał.
    */
-  const commitSchedule = (message: string) => {
+  const commitSchedule = (message: string, verify?: (next: VotingState) => string | null) => {
     timeTouched.current = false;
-    void run(() => scheduleVoting(apiKey, startIso, duration), message).then((ok) => {
+    void run(() => scheduleVoting(apiKey, startIso, duration), message, verify).then((ok) => {
       if (!ok) timeTouched.current = true;
     });
   };
@@ -521,6 +541,18 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               co widzi publiczność. Jedno i drugie zdejmuje ręczne zamknięcie, więc licznik na
               stronie głównej wraca od razu.
 
+              DATA, KTÓRA JUŻ MINĘŁA, NIE JEST TERMINEM ODLICZANIA
+              Pole trzyma ostatni wpisany start wyścigu, więc dzień po zawodach stoi w nim
+              godzina z przeszłości. Zapisanie jej udawało się bez błędu — Worker przyjmuje
+              `status: 'scheduled'` — ale `votingPhase` liczy fazę z zegara i po upływie okna
+              wychodzi mu `closed`. Panel wypisywał „Odliczanie wróciło" tuż obok napisu
+              GŁOSOWANIE ZAMKNIĘTE, a strona główna dalej pokazywała wynik.
+
+              Przeszła godzina schodzi więc na tę samą drogę co puste pole: datę wydarzenia z
+              Ustawień, czyli dokładnie ten termin, do którego liczy licznik dla publiczności.
+              Potwierdzenie mówi wtedy, skąd wzięta jest data, żeby nie wyglądało to na
+              zignorowanie tego, co ktoś ma przed oczami.
+
               Wyłączany TYLKO na czas żądania i na niepełną datę w polu. Puste pole nie jest
               powodem: ma wtedy własną, poprawną drogę przez datę z Ustawień. */}
           <ActionButton
@@ -529,11 +561,21 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             tone="bg-blue-400/15 text-blue-100 hover:bg-blue-400/25"
             icon={<Hourglass size={13} />}
             onPress={() => {
-              if (startIso) {
-                commitSchedule(t('vote.countdownDone'));
+              /* Ostatnia linia obrony jest wspólna dla obu dróg: jeżeli po zapisie Worker
+                 nadal liczy `closed`, to znaczy, że termin, do którego mieliśmy odliczać, też
+                 jest za nami — i wtedy trzeba to powiedzieć, a nie potwierdzić. */
+              const stillClosed = (next: VotingState) =>
+                next.phase === 'closed' ? t('vote.countdownStillPast') : null;
+
+              if (startIso && Date.parse(startIso) > Date.now()) {
+                commitSchedule(t('vote.countdownDone'), stillClosed);
                 return;
               }
-              void run(() => showCountdown(apiKey), t('vote.countdownDone'));
+              void run(
+                () => showCountdown(apiKey),
+                startIso ? t('vote.countdownFromSettings') : t('vote.countdownDone'),
+                stillClosed
+              );
             }}
           />
           <ActionButton

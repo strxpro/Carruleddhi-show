@@ -864,11 +864,41 @@ const LOCALE_HINTS = {
     shared: 'àèéìòù'
   },
   pl: {
+    /* POLSZCZYZNA BEZ OGONKÓW MUSI BYĆ ROZPOZNAWANA TAK SAMO JAK Z OGONKAMI.
+       ---------------------------------------------------------------------------
+       Punkt +3 za `only` dostaje tylko wiadomość, w której stoi choć jeden ogonek. Na telefonie
+       ogonków nie stawia prawie nikt, więc typowe polskie pytanie zostawało z samymi słowami
+       funkcyjnymi — a tych była garść i żadnego z najczęstszych.
+
+       Gorzej: „się" bez ogonka to „sie", czyli niemieckie zaimek osobowy, który stoi w tabeli
+       `de` i nie stał w tej. Zdanie „O ktorej godzinie zaczyna sie wyscig?" wychodziło więc
+       PEWNYM niemieckim — 2 punkty do 0 — i gość dostawał odpowiedź po niemiecku na pytanie
+       po polsku. Sprawdzone na produkcji 01.09: polskie pytanie, niemiecka odpowiedź.
+
+       Dlatego dwie rzeczy naraz. Po pierwsze `sie` i `do` dopisane po TEJ stronie, choć stoją
+       już po niemieckiej i angielskiej — zgodnie z regułą z komentarza wyżej słowo wieloznaczne
+       stoi po obu stronach i wtedy samo się znosi, a o wyniku decyduje reszta zdania. Po drugie
+       dopisane najczęstsze polskie słowa pytające i przyimki w obu pisowniach, żeby ta reszta
+       zdania miała czym zdecydować.
+
+       Niemieckie zdania z „Sie" nadal wychodzą niemieckie, bo mają obok `können`, `ist`, `wie`
+       albo `ich` — sprawdzone czterema takimi zdaniami w teście rozpoznawania. */
     words: [
       'czy', 'jest', 'jestem', 'gdzie', 'kiedy', 'dlaczego', 'jak', 'jaki', 'jaka',
       'mam', 'mogę', 'moge', 'chcę', 'chce', 'proszę', 'prosze', 'można', 'mozna',
       'trzeba', 'będzie', 'bedzie', 'moje', 'mój', 'moj', 'nie', 'tak', 'żeby', 'zeby',
-      'oraz', 'bardzo', 'dobrze'
+      'oraz', 'bardzo', 'dobrze',
+      // zaimki pytające, w obu pisowniach
+      'co', 'ile', 'kto', 'kogo', 'komu',
+      'który', 'ktory', 'która', 'ktora', 'które', 'ktore', 'której', 'ktorej', 'którego', 'ktorego',
+      'jakie', 'jakiej', 'jakich', 'jakim',
+      // czasowniki i tryb przypuszczający, w obu pisowniach
+      'może', 'moze', 'muszę', 'musze', 'mogła', 'mogla', 'jestem', 'byłem', 'bylem',
+      'chciałbym', 'chcialbym', 'chciałabym', 'chcialabym', 'zapisać', 'zapisac',
+      // przyimki i spójniki
+      'na', 'za', 'od', 'dla', 'przy', 'ale', 'lub', 'już', 'juz', 'tylko', 'więc', 'wiec',
+      // wieloznaczne — stoją też po niemieckiej i angielskiej stronie, więc się znoszą
+      'sie', 'do'
     ],
     only: 'ąćęłńśźż',
     shared: 'ó'

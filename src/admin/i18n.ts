@@ -332,8 +332,12 @@ export const pl = {
   'vote.restoreSchedule': 'Przywróć harmonogram',
   'vote.showCountdown': 'Wróć do odliczania',
   'vote.countdownDone': 'Odliczanie wróciło — licznik na stronie głównej znowu odlicza.',
+  'vote.countdownFromSettings':
+    'Godzina w polu „Start wyścigu” już minęła, więc odliczanie wróciło do daty wydarzenia z Ustawień — czyli tam, dokąd liczy licznik dla publiczności.',
+  'vote.countdownStillPast':
+    'Nie ma do czego odliczać: data wydarzenia w Ustawieniach też już minęła. Wpisz przyszłą datę w Ustawieniach albo w polu „Start wyścigu”, a potem naciśnij ten przycisk jeszcze raz.',
   'vote.countdownHint':
-    'Wpisz dokładną datę i godzinę startu w polu „Start wyścigu”, potem naciśnij „Wróć do odliczania”. Zdejmuje to ręczne zamknięcie i licznik na stronie głównej odlicza do tego terminu. Puste pole bierze datę wydarzenia z Ustawień.',
+    'Wpisz dokładną datę i godzinę startu w polu „Start wyścigu”, potem naciśnij „Wróć do odliczania”. Zdejmuje to ręczne zamknięcie i licznik na stronie głównej odlicza do tego terminu. Puste pole — albo godzina, która już minęła — bierze datę wydarzenia z Ustawień.',
   'vote.restoreConfirm': 'Przywrócić działanie według wpisanego terminu i odliczania?',
   'vote.restored': 'Harmonogram i odliczanie zostały przywrócone.',
   'vote.clearVotes': 'Wyczyść wszystkie głosy',
@@ -846,6 +850,10 @@ export const it: Dict = {
   'vote.restoreSchedule': 'Ripristina il programma',
   'vote.showCountdown': 'Torna al conto alla rovescia',
   'vote.countdownDone': 'Il conto alla rovescia è tornato: il contatore in home riparte.',
+  'vote.countdownFromSettings':
+    'L’ora nel campo „Partenza della gara” è già passata, quindi il conto alla rovescia è tornato alla data dell’evento nelle Impostazioni — la stessa verso cui punta il contatore pubblico.',
+  'vote.countdownStillPast':
+    'Non c’è nulla da contare: anche la data dell’evento nelle Impostazioni è passata. Inserisci una data futura nelle Impostazioni o nel campo „Partenza della gara”, poi premi di nuovo questo pulsante.',
   'vote.countdownHint':
     'Scrivi data e ora esatte nel campo «Partenza della gara», poi premi «Torna al conto alla rovescia». Toglie la chiusura manuale e il contatore in home conta fino a quel momento. Se il campo è vuoto, prende la data dell’evento dalle Impostazioni.',
   'vote.restoreConfirm': 'Ripristinare il funzionamento secondo l’orario e il conto alla rovescia inseriti?',
