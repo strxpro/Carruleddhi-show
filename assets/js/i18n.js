@@ -2176,6 +2176,8 @@
       'chat.sponsorConsentAsk': 'Prima dei contatti una cosa sola: per andare avanti mi serve il tuo consenso alla privacy e al regolamento. Puoi aprire i due documenti qui sotto, la conversazione resta aperta.',
       'chat.sponsorConsentPrivacy': 'Privacy policy',
       'chat.sponsorConsentRules': 'Regolamento',
+      'chat.sponsorConsentRead': 'Leggi e accetta',
+      'chat.sponsorConsentDone': 'Ho letto e accetto la privacy policy e il regolamento.',
       'chat.sponsorConsentYes': 'Accetto',
       'chat.sponsorConsentNo': 'Rinuncio',
       'chat.sponsorConsentNoted': 'Capito, e lo rispettiamo: senza consenso non ti chiedo nessun dato e non mando niente agli organizzatori. Se cambi idea siamo qui.'
@@ -2184,6 +2186,8 @@
       'chat.sponsorConsentAsk': 'Przed pytaniami o kontakt jedna rzecz: żeby iść dalej, potrzebuję Twojej zgody na politykę prywatności i regulamin. Oba dokumenty otworzysz poniżej — rozmowa zostaje otwarta.',
       'chat.sponsorConsentPrivacy': 'Polityka prywatności',
       'chat.sponsorConsentRules': 'Regulamin',
+      'chat.sponsorConsentRead': 'Przeczytaj i zaakceptuj',
+      'chat.sponsorConsentDone': 'Przeczytałem i akceptuję politykę prywatności oraz regulamin.',
       'chat.sponsorConsentYes': 'Zgadzam się',
       'chat.sponsorConsentNo': 'Rezygnuję',
       'chat.sponsorConsentNoted': 'Rozumiemy i szanujemy to: bez zgody nie pytam o żadne dane i nie wysyłam niczego do organizatorów. Jeśli zmienisz zdanie, jesteśmy tu.'
@@ -2192,6 +2196,8 @@
       'chat.sponsorConsentAsk': 'One thing before the contact details: to carry on I need your consent to the privacy policy and the rules. You can open both documents below — this conversation stays open.',
       'chat.sponsorConsentPrivacy': 'Privacy policy',
       'chat.sponsorConsentRules': 'Race rules',
+      'chat.sponsorConsentRead': 'Read and accept',
+      'chat.sponsorConsentDone': 'I have read and accept the privacy policy and the rules.',
       'chat.sponsorConsentYes': 'I agree',
       'chat.sponsorConsentNo': 'I would rather not',
       'chat.sponsorConsentNoted': 'Understood, and we respect it: without consent I ask for no details and send nothing to the organisers. We are here if you change your mind.'
@@ -2200,6 +2206,8 @@
       'chat.sponsorConsentAsk': 'Eine Sache vor den Kontaktdaten: um weiterzumachen, brauche ich deine Zustimmung zur Datenschutzerklärung und zum Reglement. Beide Dokumente kannst du unten öffnen — das Gespräch bleibt offen.',
       'chat.sponsorConsentPrivacy': 'Datenschutzerklärung',
       'chat.sponsorConsentRules': 'Reglement',
+      'chat.sponsorConsentRead': 'Lesen und zustimmen',
+      'chat.sponsorConsentDone': 'Ich habe Datenschutzerklärung und Reglement gelesen und stimme zu.',
       'chat.sponsorConsentYes': 'Ich stimme zu',
       'chat.sponsorConsentNo': 'Ich lasse es',
       'chat.sponsorConsentNoted': 'Verstanden, und wir respektieren das: ohne Zustimmung frage ich nach keinen Daten und schicke nichts an die Organisatoren. Wenn du es dir anders überlegst, sind wir da.'
@@ -2208,6 +2216,8 @@
       'chat.sponsorConsentAsk': 'Una cosa antes de los contactos: para seguir necesito tu consentimiento a la política de privacidad y al reglamento. Puedes abrir los dos documentos aquí abajo, la conversación se queda abierta.',
       'chat.sponsorConsentPrivacy': 'Política de privacidad',
       'chat.sponsorConsentRules': 'Reglamento',
+      'chat.sponsorConsentRead': 'Leer y aceptar',
+      'chat.sponsorConsentDone': 'He leído y acepto la política de privacidad y el reglamento.',
       'chat.sponsorConsentYes': 'Acepto',
       'chat.sponsorConsentNo': 'Lo dejo',
       'chat.sponsorConsentNoted': 'Entendido, y lo respetamos: sin consentimiento no te pido ningún dato y no envío nada a los organizadores. Si cambias de idea, estamos aquí.'
@@ -2216,6 +2226,8 @@
       'chat.sponsorConsentAsk': 'Une chose avant les coordonnées : pour continuer, il me faut votre consentement à la politique de confidentialité et au règlement. Vous pouvez ouvrir les deux documents ci-dessous, la conversation reste ouverte.',
       'chat.sponsorConsentPrivacy': 'Politique de confidentialité',
       'chat.sponsorConsentRules': 'Règlement',
+      'chat.sponsorConsentRead': 'Lire et accepter',
+      'chat.sponsorConsentDone': 'J’ai lu et j’accepte la politique de confidentialité et le règlement.',
       'chat.sponsorConsentYes': 'J’accepte',
       'chat.sponsorConsentNo': 'Je renonce',
       'chat.sponsorConsentNoted': 'Compris, et nous le respectons : sans consentement je ne demande aucune donnée et n’envoie rien aux organisateurs. Si vous changez d’avis, nous sommes là.'

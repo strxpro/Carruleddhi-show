@@ -8084,7 +8084,7 @@ import {
      */
     const flowChoices = (options, variant = '') => {
       if (!chipsList) return;
-      chipsList.replaceChildren(...options.map(([label, run]) => {
+      chipsList.replaceChildren(...options.map(([label, run, quiet]) => {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = variant ? `chat__chip ${variant}` : 'chat__chip';
@@ -8113,7 +8113,13 @@ import {
              Bąbelek jest LOKALNY — nie leci przez `send()` do wątku. Odpowiedzi kreatorowi są
              interfejsem, nie treścią rozmowy; tak samo lokalne są jego własne zdania
              (`flowSay`), więc jedno i drugie znika razem z kartą i nie zaśmieca historii. */
-          append({ author: 'visitor', body: chip.textContent || '', at: '' }, false);
+          /* `quiet` — pastylka, która NICZEGO JESZCZE NIE ROZSTRZYGA.
+             „Przeczytaj i zaakceptuj” otwiera okno z dokumentem; zgoda pada dopiero po
+             doczytaniu go do końca, a okno można zamknąć bez niczego. Zostawiony tu bąbelek
+             mówiłby w zapisie rozmowy „zaakceptowałem” w chwili, w której nikt nic nie
+             zaakceptował — a przy trzecim otwarciu okna stałyby już trzy takie zdania.
+             Bąbelek dopisuje się po przyjęciu zgody, jednym zdaniem i raz. */
+          if (!quiet) append({ author: 'visitor', body: chip.textContent || '', at: '' }, false);
           // Fokus przekładany PRZED podmianą rzędu: patrz `keepFocus`.
           keepFocus();
           void run();
@@ -8937,12 +8943,36 @@ import {
         sayNow('chat.sponsorConsentAsk');
         consentDocs();
       });
+      /* ZGODA PO PRZECZYTANIU, NIE PO KLIKNIĘCIU.
+         ---------------------------------------------------------------------------
+         Były tu dwa odsyłacze otwierane w nowej karcie i pastylka „Zgadzam się”, która nie
+         wiedziała, czy którykolwiek z nich został otwarty. Zgoda padała więc za jednym
+         naciśnięciem obok dokumentów — formalnie zebrana, faktycznie niczyja.
+
+         Teraz otwiera się to samo okno, którego używa formularz zapisu i okno przypomnień:
+         dokument w języku gościa (z `assets/legal/regolamento.json`, nie włoska strona dla
+         wszystkich), a przycisk „akceptuję” odblokowuje się dopiero, gdy tekst zostanie
+         przewinięty do końca. Jedno okno w całym serwisie, więc zgoda znaczy tu dokładnie to
+         samo, co przy zapisie.
+
+         Po przyjęciu zgoda wraca do rozmowy zdaniem gościa — „przeczytałem i akceptuję” —
+         żeby w zapisie zostało WIDAĆ, na co się zgodził, a nie tylko że kreator poszedł dalej.
+
+         Bez okna (starsza przeglądarka, błąd wczytywania) kreator nie kończy się ślepą uliczką:
+         odsyłacze pod pytaniem nadal prowadzą do obu dokumentów, a zgoda pada z pastylki, jak
+         wcześniej. Lepiej zgoda słabsza niż kreator, którego nie da się dokończyć. */
+      const consentGiven = () => {
+        if (!flow) return;
+        append({ author: 'visitor', body: text('chat.sponsorConsentDone'), at: '' }, false);
+        flow.consent = true;
+        sponsorAskPerson();
+      };
       flowChoices([
-        ['chat.sponsorConsentYes', async () => {
+        ['chat.sponsorConsentRead', async () => {
           if (!flow) return;
-          flow.consent = true;
-          sponsorAskPerson();
-        }],
+          if (typeof openConsentDocuments === 'function') openConsentDocuments(consentGiven);
+          else consentGiven();
+        }, typeof openConsentDocuments === 'function'],
         ['chat.sponsorConsentNo', async () => { flowSay('chat.sponsorConsentNoted'); endFlow(); }]
       ]);
     }
