@@ -3336,6 +3336,17 @@ import {
       ...$$('[data-race-podium], a[href="#podium"]')
     ].filter(Boolean).filter((element) => !dock.contains(element));
 
+    /* Przyciski wymienione po cichu wyglądają na usterkę odświeżania. Gdy faza się zmienia —
+       zamknięto głosowanie, otwarto je — skład doku jest inny niż sekundę wcześniej, więc
+       niech wjedzie tak samo, jak wjeżdża po rozwinięciu. Ta sama klasa, ta sama animacja,
+       to samo `440 ms + zapas`, więc nie ma tu drugiego czasu do pilnowania. */
+    document.addEventListener('carruleddhi:phase', () => {
+      dock.classList.remove('is-expanding');
+      void dock.offsetWidth;
+      dock.classList.add('is-expanding');
+      window.setTimeout(() => dock.classList.remove('is-expanding'), 460);
+    });
+
     const onScreen = new Set();
 
     if ('IntersectionObserver' in window) {

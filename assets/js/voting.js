@@ -400,6 +400,10 @@ import {
     }
   }
 
+  /** Faza narysowana ostatnio. `null` znaczy „jeszcze nic” — pierwsze malowanie niczego nie
+      ogłasza, bo wtedy nie ma z czego robić przejścia. */
+  let lastPaintedPhase = null;
+
   function paintPhase() {
     const voting = state.phase === 'voting';
     const closed = state.phase === 'closed';
@@ -453,6 +457,23 @@ import {
     $$('[data-race-podium]').forEach((element) => { element.hidden = !(closed && hasWinners); });
 
     paintSignupLock(voting, closed);
+
+    /* Jedno ogłoszenie na zmianę fazy, nie na każde odpytanie serwera.
+       ---------------------------------------------------------------------------
+       paintPhase() chodzi co trzydzieści sekund przy każdym odczycie stanu, a faza zmienia
+       się dwa razy w roku. Bez tego strażnika dok odgrywałby swoje wejście w kółko, co pół
+       minuty, na oczach kogoś, kto po prostu czyta stronę.
+
+       Zdarzenie, a nie bezpośrednie sięgnięcie do doku: dok należy do app.js i wie o sobie
+       rzeczy, których voting.js nie zna (czy jest zwinięty, czy schowany pod klawiaturą).
+       Tutaj pada tylko „faza się zmieniła” — co z tym zrobić, decyduje ten, kto rysuje. */
+    const painted = closed ? (hasWinners ? 'closed' : 'closed-empty') : state.phase;
+    if (lastPaintedPhase !== null && lastPaintedPhase !== painted) {
+      document.dispatchEvent(new CustomEvent('carruleddhi:phase', {
+        detail: { phase: state.phase, hasWinners }
+      }));
+    }
+    lastPaintedPhase = painted;
   }
 
   /**

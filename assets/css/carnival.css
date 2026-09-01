@@ -506,6 +506,21 @@
    then took a click. On a mouse, hovering the pill expands it straight back to
    the full bar; touch devices keep the click, because there is no hover there and
    a hover-only affordance would be unreachable. */
+/* JEDNA WYSOKOŚĆ DLA CAŁEGO RZĘDU.
+   ---------------------------------------------------------------------------
+   Zmierzone: koło z flagą 52 px, „Menu” 50 px, przycisk fazy 50,3 px — bo jego
+   wysokość wychodziła z paddingu i wysokości linii, a nie była niczym ustalona.
+   Wszystkie trzy są wyśrodkowane w tej samej osi, więc „krzywo” to nie jest — ale dwa
+   koła obok siebie różniące się o dwa piksele czyta się jako niechlujstwo, nie jako
+   różnicę. Do 52, nie do 50: niższe byłoby zmniejszaniem celu dotyku, a flaga i tak
+   wyznaczała tę wysokość od początku.
+
+   `min-height` na przyciskach, a nie `height` na wybieraku języka: wybierak ma pod sobą
+   rozwijaną listę, która pozycjonuje się względem niego, i przykręcanie mu rozmiarów
+   ruszyłoby rzecz, która działa. */
+.nav-actions .btn--small,
+.nav-actions .menu-toggle { min-height: 52px; }
+
 /* The first attempt expanded the pill to the full 1120 px bar, which looked
    broken: the "current section" chip un-clipped from zero width and its spinning
    dot appeared as a lone yellow circle floating in the middle of the bar while
@@ -516,6 +531,7 @@
    the current-section chip collapsed, because that information is already in the
    scroll progress line at the top of the screen. Nothing un-clips, nothing floats,
    and the pill stays a pill. */
+
 @media (hover: hover) and (pointer: fine) {
   .site-header.is-compact:hover,
   .site-header.is-compact:focus-within {
@@ -528,6 +544,7 @@
   }
   .site-header.is-compact:hover .nav-actions,
   .site-header.is-compact:focus-within .nav-actions { gap: 8px; }
+
   /* `visibility` i `pointer-events` z tego samego powodu, co przy `is-peeked` nizej:
      bez nich rozwiniety pasek robil miejsce na przycisk, ktory zostawal niewidoczny
      i nieklikalny, bo stan zwiniety chowa go wlasnie tymi dwiema wlasciwosciami.
@@ -1171,7 +1188,13 @@ html {
   transform: translateX(-50%);
 }
 .quick-actions.is-expanding .quick-action { animation: dock-open .44s var(--ease-snap) both; }
-.quick-actions.is-expanding .quick-action:nth-child(2) { animation-delay: .035s; }
+/* Drugi WIDOCZNY, nie drugie dziecko. Dok ma teraz pięcioro dzieci, z których naraz stoi
+   jedno albo dwoje — `nth-child(2)` trafiał w przycisk, którego akurat nie ma, i po
+   dekoracji oba wjeżdżały równo, bez schodka. Ten zapis znaczy „widoczny, przed którym stoi
+   inny widoczny”, więc liczy to, co widać, a nie to, co leży w znaczniku. */
+.quick-actions.is-expanding .quick-action:not([hidden]) ~ .quick-action:not([hidden]) {
+  animation-delay: .035s;
+}
 .quick-actions.is-held { transition-duration: 0s; }
 @keyframes dock-open {
   0% { transform: scale(.78) translateY(7px); }
@@ -3260,6 +3283,51 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
     box-shadow: 0 10px 22px -12px rgb(246 73 79 / .85);
   }
   .quick-action--signup::after { border-color: rgb(255 255 255 / .3); }
+
+  /* ---------------------------------------------------------------- fazy wyścigu
+     Ile przycisków stoi w doku, zależy od tego, co się właśnie dzieje: dwa przed startem,
+     JEDEN w trakcie głosowania, dwa po dekoracji. Sztywne `1fr 1fr` zostawiało przy jednym
+     przycisku pustą połowę doku — szklany prostokąt z guzikiem dosuniętym do lewej.
+     Kolumny liczone z liczby dzieci, a nie wpisane na stałe, rozciągają jedyny przycisk na
+     całą szerokość i dzielą ją po równo, gdy wraca drugi. */
+  .quick-actions:not(.is-mini) {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-template-columns: none;
+  }
+  .quick-actions.is-mini {
+    grid-auto-flow: column;
+    grid-auto-columns: 52px;
+    grid-template-columns: none;
+  }
+
+  /* Głosowanie i cokół prowadzą — złoto, jak gwiazdka przy zaproszeniu w hero. Nigdy nie
+     stoją obok siebie (różne fazy), więc mogą mieć ten sam, najmocniejszy kolor. */
+  .quick-action--vote,
+  .quick-action--podium {
+    background: var(--yellow);
+    color: var(--navy-950);
+    box-shadow: 0 10px 22px -12px rgb(255 201 40 / .9);
+  }
+  .quick-action--vote .quick-action__icon,
+  .quick-action--podium .quick-action__icon {
+    background: rgb(7 26 61 / .12);
+    color: var(--navy-950);
+  }
+  .quick-action--vote::after,
+  .quick-action--podium::after { border-color: rgb(7 26 61 / .18); }
+
+  /* Przypomnienie stoi obok zwycięzców i nie ma się z nimi bić o wzrok — to samo szkło co
+     „będę tam”, po którym właśnie przejęło miejsce. */
+  .quick-action--remind {
+    background: rgb(255 255 255 / .07);
+    color: var(--white);
+  }
+  .quick-action--remind .quick-action__icon {
+    background: rgb(255 255 255 / .14);
+    color: var(--white);
+  }
+  .quick-action--remind::after { border-color: rgb(255 255 255 / .34); }
 
   /* ---------------------------------------------------------------- wejście i wyjście
      Dok zjeżdża w dół i lekko się kurczy, zamiast po prostu zniknąć pod krawędzią —
