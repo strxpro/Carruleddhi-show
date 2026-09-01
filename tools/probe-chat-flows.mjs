@@ -343,12 +343,119 @@ const probe = `
      organizatora to kod w miejscu, w którym nie ma prawa być.
      ====================================================================== */
   await say('Trattoria Probe');
-  chipByKey('chat.sponsorConsentYes')?.click();
-  await sleep(700);
-  await say('Mario Rossi');
-  chipByKey('chat.sponsorPhoneSkip')?.click();
-  await sleep(700);
+
+  /* Zgoda nie ma już pastylki „Zgadzam się": pada po przewinięciu dokumentu do końca w tym
+     samym oknie, którego używa formularz zapisu. Pętla, bo treść dociąga się osobnym żądaniem
+     i pierwsze przewinięcie trafia czasem w pustą jeszcze ramkę. */
+  chipByKey('chat.sponsorConsentRead')?.click();
+  await sleep(500);
+  for (let round = 0; round < 14; round += 1) {
+    const scroller = document.querySelector('[data-consent-scroll]');
+    const accept = document.querySelector('[data-consent-accept]');
+    if (scroller) {
+      scroller.scrollTop = scroller.scrollHeight;
+      scroller.dispatchEvent(new Event('scroll'));
+    }
+    if (accept && !accept.disabled) break;
+    await sleep(200);
+  }
+  document.querySelector('[data-consent-accept]')?.click();
+  await sleep(1100);
+
+  /* ======================================================================
+     6. CYFRA W IMIENIU I NAZWISKU — BŁĄD OD PIERWSZEGO ZNAKU
+     ======================================================================
+     Mierzone w dwóch miejscach, bo obietnica jest podwójna: ostrzeżenie ma STANĄĆ NA EKRANIE
+     przy wpisanej cyfrze (nie po wysłaniu, nie po zejściu z pola), a wysłanie takiej odpowiedzi
+     ma się odbić od kreatora. Sonda sprawdza też, że ostrzeżenie SCHODZI, gdy cyfry nie ma —
+     komunikat, który zostaje na zawsze, jest gorszy od braku komunikatu.
+     ====================================================================== */
+  const warnRow = () => document.querySelector('[data-chat-warn]');
+  writeInput('Mario2');
+  await sleep(220);
+  out.nameDigit = {
+    expected: T('chat.sponsorNoDigits').trim(),
+    liveShown: Boolean(warnRow()) && warnRow().hidden === false,
+    liveText: String(warnRow()?.textContent || '').trim()
+  };
+  writeInput('Mario');
+  await sleep(220);
+  out.nameDigit.liveGone = warnRow()?.hidden === true;
+
+  await say('Mario2 Rossi', 1100);
+  out.nameDigit.refused = logText().includes(T('chat.sponsorNoDigits'));
+  out.nameDigit.stillPerson = !logText().includes(T('chat.sponsorAskPhone'));
+
+  await say('Mario Rossi', 1100);
+  out.nameDigit.acceptedClean = logText().includes(T('chat.sponsorAskPhone'));
+
+  /* ======================================================================
+     7. DWA KROKI OPCJONALNE: ZDJĘCIE I ODSYŁACZ
+     ======================================================================
+     Telefon podany, zdjęcie pominięte pastylką, odsyłacz najpierw wpisany BŁĘDNIE (bez
+     "https://") i dopiero potem pominięty. Trzy rzeczy naraz: że pominięcie zdjęcia prowadzi
+     do pytania o odsyłacz, że odsyłacz bez "https://" odbija się z komunikatem, i że
+     pominięcie obu prowadzi do podsumowania — czyli że najczęstsza droga przez ten kreator
+     („nie mam logo pod ręką") nie kończy się w ślepej uliczce.
+     ====================================================================== */
+  await say('+39 328 111 2233', 1100);
+  out.optional = { logoAsked: logText().includes(T('chat.sponsorAskLogo')) };
+  chipByKey('chat.sponsorLogoSkip')?.click();
+  await sleep(900);
+  out.optional.linkAsked = logText().includes(T('chat.sponsorAskLink'));
+  await say('trattoria-probe.it', 1100);
+  out.optional.badLinkRefused = logText().includes(T('chat.sponsorBadLink'));
+  out.optional.notFixedForUs = !logText().includes('https://trattoria-probe.it');
+  chipByKey('chat.sponsorLinkSkip')?.click();
+  await sleep(900);
+  out.optional.emailAsked = logText().includes(T('chat.sponsorAskEmail'));
+
   await say('probe@example.com', 1300);
+
+  /* ======================================================================
+     8. PODSUMOWANIE I POTWIERDZENIE
+     ======================================================================
+     Czytany OSTATNI blok podsumowania w dzienniku, nie pierwszy: po „nie, popraw" stoją tam
+     dwa, a pytanie brzmi „co widzi gość teraz".
+     ====================================================================== */
+  const summaryText = () => {
+    const all = document.querySelectorAll('[data-chat-summary]');
+    return all.length ? String(all[all.length - 1].textContent || '') : '';
+  };
+  const chipLabels = () => [...document.querySelectorAll('[data-chat-chips-list] .chat__chip')]
+    .map((chip) => chip.textContent.trim());
+
+  out.summary = {
+    shown: Boolean(document.querySelector('[data-chat-summary]')),
+    gateBefore: Boolean(document.querySelector('[data-chat-code]')),
+    cart: summaryText().includes('Trattoria Probe'),
+    person: summaryText().includes('Mario Rossi'),
+    phone: summaryText().includes('2233'),
+    email: summaryText().includes('probe@example.com'),
+    /* Liczone przez podział, nie wyrażeniem regularnym: napis ze słownika bywa w innym języku
+       i wolno mu zawierać kropkę albo nawias, czyli znaki, które w wyrażeniu znaczą co innego. */
+    skipped: summaryText().split(T('chat.sponsorSummaryNone')).length - 1,
+    chips: chipLabels()
+  };
+
+  /* „Nie, popraw" poprawia JEDNO pole i wraca do podsumowania z resztą nietkniętą. Poprawiany
+     jest telefon, bo jest polem opcjonalnym w środku kolejki — gdyby menu poprawek wracało do
+     początku kreatora, zgubiłoby nazwę i osobę przed nim ORAZ adres po nim. */
+  chipByKey('chat.sponsorSummaryFix')?.click();
+  await sleep(900);
+  out.fix = { asked: logText().includes(T('chat.sponsorFixWhich')), menu: chipLabels() };
+  chipByKey('chat.sponsorSummaryPhone')?.click();
+  await sleep(900);
+  await say('+39 328 999 8877', 1300);
+  out.fix.backToSummary = document.querySelectorAll('[data-chat-summary]').length === 2;
+  out.fix.keptCart = summaryText().includes('Trattoria Probe');
+  out.fix.keptPerson = summaryText().includes('Mario Rossi');
+  out.fix.keptEmail = summaryText().includes('probe@example.com');
+  out.fix.newPhone = summaryText().includes('8877');
+  out.fix.oldPhoneGone = !summaryText().includes('2233');
+
+  chipByKey('chat.sponsorSummaryYes')?.click();
+  await sleep(1300);
 
   const codeInput = document.querySelector('[data-chat-code]');
   out.code = { fieldThere: Boolean(codeInput) };
@@ -560,6 +667,64 @@ try {
     check(r.code.codeInLog === false, 'sześciu cyfr nie ma w treści rozmowy');
   } else {
     check(false, 'pomiar pola na kod się nie wykonał');
+  }
+
+  /* ------------------------------------- 6. cyfra w imieniu i nazwisku w kreatorze */
+  console.log('');
+  if (r.nameDigit) {
+    check(r.nameDigit.liveShown === true,
+      'cyfra w imieniu pokazuje błąd OD RAZU, przy wpisywaniu, nie po wysłaniu');
+    check(r.nameDigit.liveText === r.nameDigit.expected,
+      `ostrzeżenie jest napisem ze słownika: "${r.nameDigit.liveText}"`);
+    check(r.nameDigit.liveGone === true, 'ostrzeżenie schodzi, gdy cyfry już nie ma');
+    check(r.nameDigit.refused === true, 'wysłana odpowiedź z cyfrą odbija się od kreatora');
+    check(r.nameDigit.stillPerson === true,
+      'kreator zostaje na pytaniu o imię i nazwisko, nie idzie dalej z cyfrą w polu');
+    check(r.nameDigit.acceptedClean === true, 'imię i nazwisko bez cyfr przechodzi');
+  } else {
+    check(false, 'pomiar cyfry w imieniu się nie wykonał');
+  }
+
+  /* ------------------------------------------- 7. zdjęcie i odsyłacz, oba opcjonalne */
+  console.log('');
+  if (r.optional) {
+    check(r.optional.logoAsked === true, 'po telefonie kreator pyta o zdjęcie albo logo');
+    check(r.optional.linkAsked === true, 'pominięcie zdjęcia prowadzi do pytania o odsyłacz');
+    check(r.optional.badLinkRefused === true, 'odsyłacz bez https:// odbija się z komunikatem');
+    check(r.optional.notFixedForUs === true,
+      'strona NIE dokleja https:// za gościa — mówi, czego brakuje');
+    check(r.optional.emailAsked === true, 'pominięcie odsyłacza prowadzi do pytania o adres');
+  } else {
+    check(false, 'pomiar kroków opcjonalnych się nie wykonał');
+  }
+
+  /* --------------------------------------------- 8. podsumowanie i „nie, popraw" */
+  console.log('');
+  if (r.summary) {
+    check(r.summary.shown === true, 'przed wysłaniem staje podsumowanie zgłoszenia');
+    check(r.summary.gateBefore === false,
+      'i staje PRZED bramką: kod wychodzi dopiero po potwierdzeniu');
+    check(r.summary.cart && r.summary.person && r.summary.phone && r.summary.email,
+      `podsumowanie wymienia wszystkie podane dane (nazwa ${r.summary.cart},`
+      + ` osoba ${r.summary.person}, telefon ${r.summary.phone}, adres ${r.summary.email})`);
+    check(r.summary.skipped === 2,
+      `pominięte zdjęcie i odsyłacz są wypisane jako pominięte: ${r.summary.skipped} z 2`);
+    check(r.summary.chips.length === 2,
+      `dwie pastylki: tak, wyślij / nie, popraw (${r.summary.chips.join(' | ')})`);
+  } else {
+    check(false, 'pomiar podsumowania się nie wykonał');
+  }
+  if (r.fix) {
+    check(r.fix.asked === true, '„nie, popraw" pyta, które pole poprawić');
+    check(r.fix.menu.length === 7, `menu poprawek ma pole na każdą odpowiedź i wyjście: ${r.fix.menu.length}`);
+    check(r.fix.backToSummary === true, 'po poprawce jednego pola wraca podsumowanie');
+    check(r.fix.keptCart && r.fix.keptPerson && r.fix.keptEmail,
+      `„nie, popraw" NIE gubi wcześniejszych odpowiedzi (nazwa ${r.fix.keptCart},`
+      + ` osoba ${r.fix.keptPerson}, adres ${r.fix.keptEmail})`);
+    check(r.fix.newPhone === true && r.fix.oldPhoneGone === true,
+      `poprawione pole ma nową wartość, nie starą (nowy ${r.fix.newPhone}, stary ${!r.fix.oldPhoneGone})`);
+  } else {
+    check(false, 'pomiar menu poprawek się nie wykonał');
   }
 
   /* ------------------------------------------------------- 5. klawiatura na telefonie */

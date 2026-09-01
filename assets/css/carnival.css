@@ -1780,7 +1780,21 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 .language-picker__menu button > span:first-child svg { width: 100%; height: 100%; object-fit: cover; }
 
 @media (max-width: 760px) {
-  .language-picker__trigger { width: 46px; min-width: 46px; height: 46px; }
+  /* KOŁO ZOSTAJE 52 PX TAKŻE NA TELEFONIE — INACZEJ DWIE OKRĄGŁE KONTROLKI OBOK SIEBIE
+     RÓŻNIĄ SIĘ O SZEŚĆ PIKSELI.
+     ---------------------------------------------------------------------------
+     Wyżej ustalono jedną wysokość dla wszystkich kontrolek w pasku: `.language-picker__trigger`
+     ma 52 px, a `.nav-actions .menu-toggle` dostał `min-height: 52px` bez warunku, więc trzyma
+     52 na każdej szerokości. To nadpisanie zbijało samą flagę do 46 i tylko na telefonie —
+     czyli dokładnie tam, gdzie te dwa koła stoją najbliżej siebie i różnicę widać najlepiej.
+
+     Zmierzone na 390x844: flaga 46 px, menu 52 px. Wyśrodkowane w tej samej osi, więc krzywo
+     nie było, ale dwa koła obok siebie różniące się o sześć pikseli czyta się jako niechlujstwo
+     — i tak właśnie zostało zgłoszone.
+
+     Sam znaczek flagi zostaje mniejszy (30 px zamiast 34): to jest zawartość koła, nie koło,
+     a przy węższym pasku mniejszy znaczek zostawia obwódce więcej powietrza. */
+  .language-picker__trigger { width: 52px; min-width: 52px; height: 52px; }
   .language-picker__flag { width: 30px; height: 30px; }
 }
 

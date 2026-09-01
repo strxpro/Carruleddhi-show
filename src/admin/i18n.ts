@@ -299,6 +299,57 @@ export const pl = {
      pole bez podpowiedzi wygląda jak pole wymagane, którego ktoś zapomniał wypełnić. */
   'set.galleryCaptionPlaceholder': 'Podpis (opcjonalnie)',
 
+  /* ---------------------------------------- zgłoszenia sponsorów z czatu
+     Karta stoi NAD listą sponsorów, bo to jest skrzynka wejściowa, a lista jest jej skutkiem.
+     Napisy mówią, co się stanie po kliknięciu, a nie jak się nazywa działanie: „zatwierdź"
+     bez zdania o autozapisie zostawiłoby pytanie, czy trzeba jeszcze kliknąć „Zapisz" niżej. */
+  'set.leads': 'Zgłoszenia sponsorów',
+  'set.leadsLead':
+    'Firmy, które zgłosiły się przez czat i potwierdziły adres kodem. Zatwierdzenie dopisuje sponsora do listy niżej i zapisuje od razu — nie trzeba klikać „Zapisz".',
+  'set.leadsWaiting': 'oczekuje',
+  /* Pusty stan jest TREŚCIĄ, nie brakiem treści: mówi, że tak ma być, i mówi, skąd te
+     zgłoszenia przychodzą. Bez drugiego zdania „brak zgłoszeń" czyta się jak awaria. */
+  'set.leadsEmpty':
+    'Brak nowych zgłoszeń — i to jest normalny stan. Kiedy ktoś zgłosi się przez czat, pojawi się tutaj razem z kontaktem i logo.',
+  /* Osobne zdanie od pustego stanu, bo to jest coś innego: nie wiemy, czy ktoś czeka. */
+  'set.leadsFailed':
+    'Nie udało się odczytać zgłoszeń, więc nie wiadomo, czy ktoś czeka na odpowiedź. Lista sponsorów niżej jest w porządku — nie działa tylko ta skrzynka.',
+  'set.leadsReload': 'Odśwież',
+  'set.leadCart': 'Nazwa na carruleddhi',
+  'set.leadPerson': 'Osoba',
+  'set.leadEmail': 'E-mail',
+  'set.leadPhone': 'Telefon',
+  'set.leadUrl': 'Odsyłacz',
+  'set.leadWhen': 'Zgłoszono',
+  'set.leadLocale': 'Język rozmowy',
+  'set.leadNoPhone': 'bez telefonu',
+  'set.leadNoUrl': 'bez odsyłacza',
+  'set.leadNoLogo': 'bez logo',
+  'set.leadLogoAlt': 'Logo ze zgłoszenia',
+  /* Odsyłacz, który nie jest adresem, pokazujemy jako napis i mówimy dlaczego — inaczej
+     zniknięcie go z zapisanego sponsora wygląda na zgubienie danych. */
+  'set.leadBadUrl': 'To nie jest adres strony, więc nie zostanie zapisany przy sponsorze.',
+  'set.leadApprove': 'Zatwierdź',
+  'set.leadReject': 'Odrzuć',
+  /* Pytanie mówi, czego dotyczy i że nie ma cofnięcia. „Czy na pewno?" bez tego zdania jest
+     pytaniem, na które odpowiada się odruchowo. Wiersz w bazie zostaje — i to też jest tu
+     napisane, bo „zniknie na zawsze" o wierszu, który zostaje, byłoby nieprawdą. */
+  'set.leadRejectConfirm':
+    'Odrzucić to zgłoszenie? Zniknie z tej listy i firma nie trafi na stronę. Tego nie da się cofnąć z panelu — zgłoszenie zostaje tylko jako ślad w bazie.',
+  'set.leadApproved': 'Zatwierdzono. Sponsor jest na liście niżej i już zapisany.',
+  /* Odpowiedź na drugie kliknięcie. Osobne zdanie, bo „zatwierdzono" brzmiałoby jak dopisanie
+     sponsora po raz drugi i ktoś poszedłby szukać na stronie duplikatu, którego nie ma. */
+  'set.leadAlreadyThere': 'Ten sponsor był już na liście, więc nic się nie zdublowało — zgłoszenie jest zamknięte.',
+  'set.leadRejected': 'Zgłoszenie odrzucone.',
+  'set.leadFailed': 'Nie udało się. Nic się nie zmieniło — zgłoszenie nadal czeka, spróbuj ponownie.',
+  /* Trzy odmowy, które opisują trzy różne sytuacje. Wspólne „nie udało się" kazałoby klikać
+     w kółko przycisk, który nigdy nie przejdzie. */
+  'set.leadListFull': 'Lista sponsorów jest pełna, więc nie ma gdzie dopisać. Usuń jednego niżej i spróbuj ponownie.',
+  'set.leadNoName': 'Zgłoszenie nie ma nazwy, a bez nazwy sponsor nie może stanąć na stronie. Dopisz go ręcznie niżej.',
+  'set.leadGone': 'Tego zgłoszenia już nie ma — ktoś rozstrzygnął je w międzyczasie. Lista jest już odświeżona.',
+  'set.leadBusy': 'Zapisywanie decyzji…',
+  'set.leadWait': 'Poczekaj — trwa decyzja o innym zgłoszeniu.',
+
   'set.sponsors': 'Sponsorzy',
   'set.sponsorsLead': 'Logo, nazwa i link. Kolejność na stronie jest taka jak tutaj.',
   'set.sponsorName': 'Nazwa',
@@ -829,6 +880,42 @@ export const it: Dict = {
   'set.galleryPending': 'Modifiche non salvate — si salvano tra un istante.',
   'set.gallerySaveNow': 'Salva ora',
   'set.galleryCaptionPlaceholder': 'Didascalia (facoltativa)',
+
+  /* ------------------------------- richieste di sponsorizzazione dalla chat */
+  'set.leads': 'Richieste di sponsorizzazione',
+  'set.leadsLead':
+    'Aziende che si sono proposte in chat e hanno confermato l’indirizzo con il codice. Approvando, lo sponsor entra nell’elenco qui sotto e viene salvato subito: non serve premere «Salva».',
+  'set.leadsWaiting': 'in attesa',
+  'set.leadsEmpty':
+    'Nessuna nuova richiesta, ed è la normalità. Quando qualcuno si propone in chat, comparirà qui con contatto e logo.',
+  'set.leadsFailed':
+    'Non è stato possibile leggere le richieste, quindi non sappiamo se qualcuno sta aspettando una risposta. L’elenco degli sponsor qui sotto è a posto: non funziona solo questa casella.',
+  'set.leadsReload': 'Aggiorna',
+  'set.leadCart': 'Nome sulla carruleddhi',
+  'set.leadPerson': 'Persona',
+  'set.leadEmail': 'E-mail',
+  'set.leadPhone': 'Telefono',
+  'set.leadUrl': 'Link',
+  'set.leadWhen': 'Ricevuta il',
+  'set.leadLocale': 'Lingua della conversazione',
+  'set.leadNoPhone': 'senza telefono',
+  'set.leadNoUrl': 'senza link',
+  'set.leadNoLogo': 'senza logo',
+  'set.leadLogoAlt': 'Logo dalla richiesta',
+  'set.leadBadUrl': 'Non è l’indirizzo di un sito, quindi non verrà salvato con lo sponsor.',
+  'set.leadApprove': 'Approva',
+  'set.leadReject': 'Rifiuta',
+  'set.leadRejectConfirm':
+    'Rifiutare questa richiesta? Sparirà da questo elenco e l’azienda non finirà sul sito. Dal pannello non si può annullare: della richiesta resta solo la traccia nel database.',
+  'set.leadApproved': 'Approvata. Lo sponsor è nell’elenco qui sotto ed è già salvato.',
+  'set.leadAlreadyThere': 'Questo sponsor era già in elenco, quindi non è stato duplicato: la richiesta è chiusa.',
+  'set.leadRejected': 'Richiesta rifiutata.',
+  'set.leadFailed': 'Non è riuscito. Nulla è cambiato: la richiesta è ancora in attesa, riprova.',
+  'set.leadListFull': 'L’elenco degli sponsor è pieno, non c’è dove aggiungere. Rimuovine uno qui sotto e riprova.',
+  'set.leadNoName': 'La richiesta non ha un nome, e senza nome lo sponsor non può stare sul sito. Aggiungilo a mano qui sotto.',
+  'set.leadGone': 'Questa richiesta non c’è più: qualcuno l’ha decisa nel frattempo. L’elenco è già aggiornato.',
+  'set.leadBusy': 'Salvataggio della decisione…',
+  'set.leadWait': 'Attendi: è in corso la decisione su un’altra richiesta.',
 
   'set.sponsors': 'Sponsor',
   'set.sponsorsLead': 'Logo, nome e link. L’ordine sul sito è quello di questo elenco.',

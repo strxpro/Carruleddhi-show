@@ -98,6 +98,31 @@ const probe = `
     field.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
+  /* ZGODA PRZEZ OKNO Z DOKUMENTEM, BO TAK JĄ TERAZ DAJE CZŁOWIEK
+     ---------------------------------------------------------------------------
+     Pastylka „Zgadzam się" zniknęła: zgoda pada dopiero po przewinięciu dokumentu do końca
+     w tym samym oknie, którego używa formularz zapisu. Sonda robi więc to, co palec —
+     otwiera okno, przewija do dołu, naciska „akceptuję". Pętla, a nie jedno przewinięcie:
+     treść dociąga się osobnym żądaniem, więc pierwsze przewinięcie trafia czasem w pustą
+     ramkę, a przycisk odblokowuje się dopiero, gdy tekst już jest. */
+  const acceptConsent = async () => {
+    chip('chat.sponsorConsentRead')?.click();
+    await sleep(500);
+    for (let round = 0; round < 14; round += 1) {
+      const scroller = document.querySelector('[data-consent-scroll]');
+      const accept = document.querySelector('[data-consent-accept]');
+      if (scroller) {
+        scroller.scrollTop = scroller.scrollHeight;
+        scroller.dispatchEvent(new Event('scroll'));
+      }
+      if (accept && !accept.disabled) break;
+      await sleep(200);
+    }
+    document.querySelector('[data-consent-accept]')?.click();
+    // Przycisk „akceptuję" ma 520 ms animacji wypełnienia, po niej leci wywołanie zwrotne.
+    await sleep(1100);
+  };
+
   const say = async (message) => {
     const input = document.querySelector('[data-chat-input]');
     if (!input) return;
@@ -142,25 +167,41 @@ const probe = `
         chips: chips().map((c) => c.textContent.trim())
       };
 
-      chip('chat.sponsorConsentYes')?.click();
-      await sleep(250);
+      await acceptConsent();
       await say('Mario Rossi');
       const afterPerson = {
         phoneAsked: logText().includes(T('chat.sponsorAskPhone')),
         skipPill: Boolean(chip('chat.sponsorPhoneSkip'))
       };
 
+      /* Trzy pominięcia pod rząd: numer, zdjęcie i odsyłacz. Wszystkie trzy kroki są
+         opcjonalne i wszystkie mają własną pastylkę — droga „nic nie podaję" musi dojść do
+         podsumowania, bo to jest najczęstsza droga przez ten kreator. */
       chip('chat.sponsorPhoneSkip')?.click();
-      await sleep(250);
+      await sleep(400);
+      chip('chat.sponsorLogoSkip')?.click();
+      await sleep(400);
+      chip('chat.sponsorLinkSkip')?.click();
+      await sleep(400);
       await say('probe@example.com');
       await sleep(700);
-      return { offer, afterName, afterPerson };
+      /* Bramka staje dopiero po potwierdzeniu podsumowania: kod na skrzynkę jest pierwszą
+         rzeczą, która wychodzi na zewnątrz, i wychodzi po naciśnięciu „tak, wyślij". */
+      const summary = {
+        shown: Boolean(document.querySelector('[data-chat-summary]')),
+        gateBefore: Boolean(codeInput()),
+        chips: chips().map((c) => c.textContent.trim())
+      };
+      chip('chat.sponsorSummaryYes')?.click();
+      await sleep(900);
+      return { offer, afterName, afterPerson, summary };
     };
 
     const first = await toGate();
     out.offer = first.offer;
     out.afterName = first.afterName;
     out.afterPerson = first.afterPerson;
+    out.summary = first.summary;
 
     // ------------------------------------------------------------------ pole na kod
     const field = codeInput();
@@ -308,7 +349,7 @@ try {
   /* Nieobecny pomiar to nie brak asercji, to asercja niezaliczona. Bez tego przejście, które
      zatrzymało się przed bramką, dawałoby „wszystko zaliczone" na pustym zestawie. */
   const wanted = ['field', 'gateLine', 'pills', 'sieve', 'five', 'sixth', 'noBubble',
-    'afterName', 'afterPerson', 'secondRun', 'paste'];
+    'afterName', 'afterPerson', 'summary', 'secondRun', 'paste'];
   const missing = wanted.filter((key) => !r[key]);
   check(missing.length === 0, `komplet pomiarów${missing.length ? `, brakuje: ${missing.join(', ')}` : ''}`);
   console.log('');
@@ -377,6 +418,15 @@ try {
     check(r.afterName.docLinks === 2, `dwa odsyłacze do dokumentów przy zgodzie: ${r.afterName.docLinks}`);
     check(r.afterPerson.phoneAsked === true, 'pytanie o telefon dopiero po zgodzie');
     check(r.afterPerson.skipPill === true, 'telefon da się pominąć naciśnięciem');
+  }
+
+  if (r.summary) {
+    console.log('');
+    check(r.summary.shown === true, 'podsumowanie staje po adresie, przed bramką');
+    check(r.summary.gateBefore === false,
+      'pole na kod NIE stoi przed potwierdzeniem — kod wychodzi po „tak, wyślij"');
+    check(r.summary.chips.length === 2, `dwie pastylki pod podsumowaniem: ${r.summary.chips.length}`);
+    console.log(`      treść: ${r.summary.chips.join(' | ')}`);
   }
 
   if (r.paste) {

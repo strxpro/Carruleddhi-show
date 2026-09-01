@@ -3589,7 +3589,49 @@ import {
     return valid;
   }
 
+  /**
+   * CYFRA W IMIENIU I NAZWISKU — JEDEN WZORZEC NA CAŁĄ STRONĘ
+   * ---------------------------------------------------------------------------
+   * `\p{Nd}` z flagą `u`: dziesiętna cyfra w JAKIMKOLWIEK piśmie, a nie tylko `0-9`.
+   *
+   * DLACZEGO NIE `[^A-Za-z\s'-]`, CZYLI „WSZYSTKO POZA LITERAMI ŁACIŃSKIMI"
+   *   Bo to odrzuciłoby połowę nazwisk na tej stronie. Zapisy przychodzą z Sardynii, z Polski,
+   *   z Hiszpanii i z Niemiec: D'Angelo, Sanna-Pinna, Niño, Łukasz, Müller, Ó Séaghdha. Lista
+   *   dozwolonych znaków jest ZAWSZE za krótka — po tygodniu ktoś dopisuje do niej ligaturę,
+   *   po miesiącu spację nierozdzielającą. Zakaz jest dokładnie jeden i wąski: CYFRA. Wszystko
+   *   inne, co ktoś potrafi wpisać jako swoje nazwisko, przechodzi.
+   *
+   * Skąd się wziął zakaz: „Jan1" i „Kowalski 2" trafiały na podpisany formularz i na listę
+   * startową, a numer startowy w polu nazwiska nie da się odkręcić po wydruku.
+   */
+  const DIGIT_IN_TEXT = /\p{Nd}/u;
+
+  /**
+   * Podmienia zdanie pod polem, zostawiając je przetłumaczalnym.
+   *
+   * Napis jedzie razem z `data-i18n`, a nie samym `textContent`: `applyLanguage` przechodzi po
+   * wszystkim, co nosi ten atrybut, więc po zmianie języka komunikat o cyfrze zostaje
+   * komunikatem o cyfrze. Wpisanie samego tekstu dawałoby zdanie, które przy przełączeniu na
+   * inny język wraca do „uzupełnij to pole" — i mówi wtedy coś nieprawdziwego.
+   */
+  function setFieldErrorKey(control, key) {
+    const slot = control.closest('[data-field]')?.querySelector('.field__error, [data-error]');
+    if (!slot || slot.dataset.i18n === key) return;
+    slot.dataset.i18n = key;
+    slot.textContent = text(key) || '';
+  }
+
   function validateControl(control) {
+    /* Pola oznaczone `data-no-digits` (imię i nazwisko) sprawdzane PRZED resztą: komunikat
+       o cyfrze jest dokładniejszy niż „uzupełnij to pole", a wywołanie siedzi w obsłudze
+       zdarzenia `input`, więc błąd staje na ekranie przy pierwszej wpisanej cyfrze — nie po
+       wysłaniu i nie po zejściu z pola. */
+    if (control.dataset.noDigits !== undefined) {
+      const dirty = DIGIT_IN_TEXT.test(String(control.value || ''));
+      setFieldErrorKey(control, dirty ? 'validation.noDigits' : 'validation.required');
+      if (dirty) return markField(control, false);
+      return markField(control, control.checkValidity());
+    }
     if (control.type === 'email') {
       const valid = !control.required && !control.value ? true : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(control.value.trim());
       return markField(control, valid);
@@ -7464,7 +7506,7 @@ import {
       const done = identified();
       const live = done && !ended;
       if (gate) gate.hidden = done || ended;
-      if (log) log.hidden = !live;
+      if (log) log.hidden = !done;
       if (form) form.hidden = !live;
       if (chips) chips.hidden = !live;
       tools.hidden = !live;
@@ -8015,6 +8057,108 @@ import {
     }
 
     /* ========================================================================
+       ZDJĘCIE ALBO LOGO SPONSORA — WŁASNE UKRYTE POLE PLIKU
+       ========================================================================
+       Osobne od `fileField` wyżej i to jest rozmyślne. Tamto należy do spinacza w kompozytorze,
+       który stoi za flagą `features.chatPhotos` i jest dziś wyłączony (powód przy fladze: brak
+       modelu wizyjnego). Logo sponsora nie ma z modelem nic wspólnego — to pole formularza
+       zadane zdaniem w rozmowie — więc nie może zależeć od tej flagi, bo wtedy krok kreatora
+       byłby ślepy w chwili, w której ktoś tę flagę przestawi.
+
+       `hidden`, a nie `display: none` z arkusza: element ukryty tym atrybutem wypada z drzewa
+       dostępności i z kolejności tabulacji, czyli nie da się w niego trafić tabulatorem
+       w drodze do przycisku wysyłki. Otwiera je NACIŚNIĘCIE PASTYLKI („Wybierz obraz"), więc
+       widocznym celem dotykowym jest pastylka, a nie surowe `input[type=file]`, które w każdej
+       przeglądarce wygląda inaczej i w żadnej nie wygląda jak reszta tej strony.
+
+       Zmniejszanie: `shrinkPhoto` z tego samego zasięgu, ta jedna droga dla obu przypadków.
+       ====================================================================== */
+    const logoField = document.createElement('input');
+    logoField.type = 'file';
+    logoField.accept = 'image/jpeg,image/png,image/webp';
+    logoField.hidden = true;
+    logoField.dataset.chatLogo = '';
+
+    logoField.addEventListener('change', async () => {
+      const file = logoField.files?.[0];
+      if (!file) return;
+      try {
+        const dataUrl = await shrinkPhoto(file);
+        /* Kreator mógł się w tym czasie skończyć — wybór pliku trwa tyle, ile trwa grzebanie
+           w galerii telefonu, a „rezygnuję" jest naciskane także wtedy. */
+        if (!flow || flow.intent !== 'sponsor') return;
+        flow.logo = dataUrl;
+        /* Bąbelek gościa z samym obrazem, bez podpisu: to jest jego odpowiedź na pytanie
+           o zdjęcie i ma po niej zostać ślad w rozmowie — a „dołączone" powiedziane słowem
+           nie mówi, KTÓRE zdjęcie się dołączyło. Z galerii łatwo trafić w sąsiedni plik. */
+        append({ author: 'visitor', body: '', at: '', image: dataUrl }, false);
+        flowSay('chat.sponsorLogoDone');
+        sponsorNext(sponsorAskLink);
+      } catch (error) {
+        console.warn('Chat sponsor logo could not be prepared:', error);
+        if (flow?.intent === 'sponsor') flowSay('chat.sponsorLogoFailed');
+      } finally {
+        /* Wyczyszczone, żeby wybranie TEGO SAMEGO pliku drugi raz znowu wywołało `change`.
+           Bez tego druga próba po nieudanym zmniejszaniu nie robi nic i wygląda na zawieszenie. */
+        logoField.value = '';
+      }
+    });
+
+    /* ========================================================================
+       OSTRZEŻENIE NAD KOMPOZYTOREM — CYFRA W IMIENIU WIDAĆ OD PIERWSZEGO ZNAKU
+       ========================================================================
+       Wiersz nad polem wiadomości, a nie zdanie w wątku. Zdanie w wątku po każdym naciśnięciu
+       klawisza znaczyłoby dziesięć bąbelków na dziesięć liter, a jedno na końcu — komunikat po
+       wysłaniu, czyli dokładnie to, co miało przestać być jedyną informacją zwrotną.
+
+       Ostrzeżenie nie blokuje wysłania. Blokada stoi w `sponsorStep`, gdzie odpowiedź z cyfrą
+       jest odrzucana zdaniem automatu — bo pole wiadomości w czacie służy też do zwykłej
+       rozmowy i odbieranie mu przycisku wysyłki na podstawie zgadywania, co gość właśnie pisze,
+       zamieniłoby ostrzeżenie w awarię.
+
+       `hidden`, gdy nie ma co powiedzieć: pusty akapit nad kompozytorem to pasek odstępu, który
+       w przypiętej karcie czatu zjada wysokość dziennika przy każdej wysokości ekranu.
+       ====================================================================== */
+    const warnRow = document.createElement('p');
+    warnRow.className = 'chat__warn';
+    warnRow.dataset.chatWarn = '';
+    warnRow.hidden = true;
+    /* `role="status"` z `aria-live="polite"`: czytnik ekranu przeczyta ostrzeżenie, gdy się
+       pojawi, i NIE przerwie tego, co właśnie mówi. `assertive` przerywałby literowanie
+       wpisywanego imienia przy każdej cyfrze. */
+    warnRow.setAttribute('role', 'status');
+    warnRow.setAttribute('aria-live', 'polite');
+
+    const setWarn = (key) => {
+      const line = key ? (text(key) || '') : '';
+      if (warnRow.textContent === line) return;
+      warnRow.textContent = line;
+      warnRow.hidden = !line;
+    };
+
+    /**
+     * Czy w tym, co teraz stoi w polu wiadomości, jest cyfra — i czy to w ogóle krok, w którym
+     * cyfra jest błędem.
+     *
+     * Warunek na `flow.step` jest tu po to, żeby ostrzeżenie NIE pojawiało się przy zwykłej
+     * rozmowie: „ile kosztuje numer 7" to poprawne pytanie i nie ma o czym ostrzegać.
+     */
+    const watchPersonDigits = () => {
+      const said = String(input?.value || '');
+      const wrong = flow?.intent === 'sponsor' && flow.step === 'person' && DIGIT_IN_TEXT.test(said);
+      setWarn(wrong ? 'chat.sponsorNoDigits' : '');
+    };
+
+    if (form) {
+      form.append(logoField);
+      form.before(warnRow);
+    }
+    input?.addEventListener('input', watchPersonDigits);
+    /* Zmiana języka w trakcie kroku: ostrzeżenie stojące na ekranie ma się przetłumaczyć razem
+       z resztą, a nie zostać w poprzednim języku do następnego naciśnięcia klawisza. */
+    window.addEventListener('carruleddhi:language', watchPersonDigits);
+
+    /* ========================================================================
        SAMOOBSŁUGA WŁASNYCH DANYCH W ROZMOWIE
        ========================================================================
        Cztery rzeczy, o które ludzie piszą najczęściej i na które dotąd odpowiadał człowiek
@@ -8073,7 +8217,15 @@ import {
     /* Koniec kreatora zabiera ze sobą bramkę: pole na kod, adres, potwierdzenie i sam kod.
        Bez tego „rezygnuję" zostawiałoby na ekranie pole, które wysyła cyfry do sprawy, której
        już nie ma — i sześć cyfr w pamięci karty bez powodu. */
-    const endFlow = () => { gateForget(); flow = null; paintChips(); };
+    const endFlow = () => {
+      gateForget();
+      flow = null;
+      /* Ostrzeżenie o cyfrze w imieniu należy do kroku, nie do panelu. Bez tego „rezygnuję"
+         naciśnięte przy ostrzeżeniu na ekranie zostawiałoby nad kompozytorem zdanie o polu,
+         o które już nikt nie pyta. */
+      setWarn('');
+      paintChips();
+    };
 
     /**
      * Przyciski wyboru w rozmowie. Ten sam rząd i ta sama klasa co podpowiedzi pytań.
@@ -8866,15 +9018,20 @@ import {
         cartName: '',
         firstName: '',
         lastName: '',
-        phone: ''
+        phone: '',
+        /* Dwa pola opcjonalne. Puste znaczy „pominięte" i takie NIE JADĄ w żądaniu — patrz
+           `sponsorSubmit`. Zdjęcie jest data URL-em po zmniejszeniu w przeglądarce, nie plikiem:
+           w tej postaci przyjmuje je Worker i w tej postaci da się je pokazać w podsumowaniu. */
+        logo: '',
+        siteUrl: '',
+        /* Ustawione na `'summary'`, gdy gość poprawia JEDNO pole z menu poprawek. Wtedy krok po
+           odpowiedzi nie idzie dalej w kolejce pytań, a wraca do podsumowania — i to jest cały
+           mechanizm „nie, popraw" bez gubienia pozostałych odpowiedzi. */
+        after: ''
       });
       flowSay('chat.sponsorOffer');
       flowChoices([
-        ['chat.sponsorYes', async () => {
-          flow.step = 'name';
-          flowSay('chat.sponsorAskName');
-          flowChoices([['chat.dataCancel', async () => { flowSay('chat.sponsorNo'); endFlow(); }]]);
-        }],
+        ['chat.sponsorYes', async () => sponsorAskName()],
         ['chat.sponsorNoThanks', async () => { flowSay('chat.sponsorNo'); endFlow(); }]
       ]);
     }
@@ -8981,17 +9138,58 @@ import {
     const sponsorQuit = () => ['chat.dataCancel', async () => { flowSay('chat.sponsorNo'); endFlow(); }];
 
     /**
+     * Dokąd po zamkniętym kroku: dalej w kolejce pytań albo z powrotem do podsumowania.
+     *
+     * TO JEST CAŁE „NIE, POPRAW" BEZ GUBIENIA ODPOWIEDZI
+     * ---------------------------------------------------------------------------
+     * Menu poprawek ustawia `flow.after = 'summary'` i zadaje JEDNO pytanie. Odpowiedź na nie
+     * nadpisuje jedno pole w `flow` i wraca do podsumowania — pozostałe pola nikt nie rusza,
+     * bo nikt ich nie pyta. Wariant „wracamy na początek kreatora" znaczyłby przepisywanie
+     * pięciu poprawnych odpowiedzi po to, żeby zmienić literówkę w szóstej.
+     */
+    const sponsorNext = (step) => {
+      if (!flow) return;
+      if (flow.after === 'summary') {
+        flow.after = '';
+        sponsorSummary();
+        return;
+      }
+      step();
+    };
+
+    /**
+     * Nazwa na carruleddhi — pierwsze pytanie po przyjęciu oferty.
+     *
+     * Osobna funkcja, bo wchodzi się tu z dwóch stron: z oferty i z menu poprawek. Za drugim
+     * razem `flow.after` odsyła odpowiedź prosto do podsumowania, bez ponownej zgody — ta padła
+     * raz i jest w `flow.consent`.
+     */
+    function sponsorAskName() {
+      if (!flow) return;
+      flow.step = 'name';
+      flowSay('chat.sponsorAskName');
+      flowChoices([sponsorQuit()]);
+    }
+
+    /**
      * Imię i nazwisko — pierwsze pytanie po zgodzie (5.1).
      *
      * Osobny krok, a nie doklejenie do nazwy carruleddhi: nazwa na wózku to nazwa firmy, a to
      * jest człowiek, do którego się dzwoni. Zgłoszenie bez nazwiska jest zgłoszeniem, na które
      * nie da się odpowiedzieć inaczej niż „dzień dobry".
+     *
+     * CYFRA JEST BŁĘDEM OD PIERWSZEGO ZNAKU, NIE PO WYSŁANIU
+     *   Ostrzeżenie nad kompozytorem (`watchPersonDigits`) staje w chwili, w której cyfra
+     *   wchodzi do pola, i schodzi, gdy zniknie. Wysłanie takiej odpowiedzi jest dodatkowo
+     *   odrzucane w `sponsorStep` — bo ostrzeżenie da się zignorować, a „Jan1" na podpisanym
+     *   formularzu nie da się odkręcić po wydruku.
      */
     function sponsorAskPerson() {
       if (!flow) return;
       flow.step = 'person';
       flowSay('chat.sponsorAskPerson');
       flowChoices([sponsorQuit()]);
+      watchPersonDigits();
     }
 
     /**
@@ -9010,24 +9208,214 @@ import {
         ['chat.sponsorPhoneSkip', async () => {
           if (!flow) return;
           flow.phone = '';
-          sponsorAskEmail();
+          sponsorNext(sponsorAskLogo);
         }],
         sponsorQuit()
       ]);
     }
 
     /**
-     * Adres — OBOWIĄZKOWY (5.2) i pytany na końcu, bo prowadzi wprost do bramki.
+     * ZDJĘCIE ALBO LOGO — KROK OPCJONALNY, POMIJANY JEDNYM NACIŚNIĘCIEM
+     * ---------------------------------------------------------------------------
+     * DLACZEGO PRZYCISK, A NIE „WYŚLIJ ZDJĘCIE SPINACZEM"
+     *   Spinacz w kompozytorze stoi za flagą `features.chatPhotos` i jest dziś wyłączony (powód
+     *   przy samej fladze: brak modelu wizyjnego). Ten krok nie jest rozmową ze modelem — to
+     *   pole formularza zadane zdaniem, więc ma własny, jawny przycisk i własne ukryte pole
+     *   pliku. Dzięki temu logo sponsora działa niezależnie od tego, czy automat kiedykolwiek
+     *   będzie umiał patrzeć na zdjęcia.
      *
-     * Osobna funkcja, bo wchodzi się tu z dwóch stron: po telefonie oraz z powrotem z bramki,
-     * gdy gość naciśnie „zmień adres". Za drugim razem pozostałe odpowiedzi zostają w `flow`
-     * i pytanie jest jedno, nie cała rozmowa od początku.
+     * ZMNIEJSZANIE: JEDNA DROGA, TA SAMA CO PRZY SPINACZU
+     *   Woła `shrinkPhoto` z tego samego zasięgu (1400 px po dłuższej krawędzi, JPEG 0.8).
+     *   Druga funkcja skalująca znaczyłaby dwa różne limity dla dwóch dróg tego samego obrazu
+     *   i dwa różne miejsca, w których trafia się na sufit rozmiaru ciała żądania.
+     */
+    function sponsorAskLogo() {
+      if (!flow) return;
+      flow.step = 'logo';
+      flowSay('chat.sponsorAskLogo');
+      flowChoices([
+        ['chat.sponsorLogoPick', async () => { logoField.click(); }],
+        ['chat.sponsorLogoSkip', async () => {
+          if (!flow) return;
+          flow.logo = '';
+          sponsorNext(sponsorAskLink);
+        }],
+        sponsorQuit()
+      ]);
+    }
+
+    /**
+     * ODSYŁACZ DO STRONY ALBO PROFILU — TEŻ OPCJONALNY, TYLKO `https://`
+     * ---------------------------------------------------------------------------
+     * NIC NIE JEST NAPRAWIANE ZA CZŁOWIEKA
+     *   Doklejenie `https://` do „trattoria.it" wyglądałoby na uprzejmość, a znaczyłoby, że
+     *   strona zgaduje adres, który potem stanie się odsyłaczem na publicznej stronie. Zgadnięty
+     *   adres bywa cudzą domeną. Dlatego zdanie o błędzie MÓWI, czego brakuje, i podaje przykład
+     *   — a poprawia człowiek, bo tylko on wie, gdzie chciał wskazać.
+     *
+     * DLACZEGO NIE `http://`
+     *   Odsyłacz jedzie na stronę, która chodzi po HTTPS. `http://` z niej to ostrzeżenie
+     *   przeglądarki przy każdym naciśnięciu i treść mieszana w raporcie bezpieczeństwa —
+     *   za jeden odsyłacz sponsora, którego nikt nie sprawdzi ręcznie.
+     */
+    function sponsorAskLink() {
+      if (!flow) return;
+      flow.step = 'link';
+      flowSay('chat.sponsorAskLink');
+      flowChoices([
+        ['chat.sponsorLinkSkip', async () => {
+          if (!flow) return;
+          flow.siteUrl = '';
+          sponsorNext(sponsorAskEmail);
+        }],
+        sponsorQuit()
+      ]);
+    }
+
+    /**
+     * Adres — OBOWIĄZKOWY (5.2) i pytany na końcu, bo prowadzi wprost do podsumowania.
+     *
+     * Osobna funkcja, bo wchodzi się tu z trzech stron: po odsyłaczu, z menu poprawek oraz
+     * z powrotem z bramki, gdy gość naciśnie „zmień adres". Za każdym razem pozostałe odpowiedzi
+     * zostają w `flow` i pytanie jest jedno, nie cała rozmowa od początku.
      */
     function sponsorAskEmail() {
       if (!flow) return;
       flow.step = 'email';
       flowSay('chat.sponsorAskEmail');
       flowChoices([sponsorQuit()]);
+    }
+
+    /**
+     * PODSUMOWANIE ZGŁOSZENIA — WIERSZ NA POLE, W DZIENNIKU
+     * ---------------------------------------------------------------------------
+     * `<dl>`, a nie akapit z przecinkami: to jest lista par „co — co podano", i czytnik ekranu
+     * ma ją przeczytać jako listę, a nie jako zdanie. Zdjęcie pokazywane jako miniatura, bo
+     * „dołączone" nie mówi, KTÓRE zdjęcie się dołączyło — a wybiera się je z galerii telefonu,
+     * gdzie łatwo trafić w sąsiedni plik.
+     *
+     * WSZYSTKIE SZEŚĆ WIERSZY, TAKŻE PUSTE
+     *   Pominięty telefon, pominięte zdjęcie i pominięty odsyłacz stoją tu ze zdaniem „nie
+     *   podano". Wiersz, którego nie ma, nie odpowiada na pytanie „czy pominięcie się zapisało" —
+     *   a to jest pytanie, które ma się rozstrzygnąć TUTAJ, przed wysłaniem, nie po nim.
+     *
+     * `textContent` na każdej wartości. Wszystko to napisał gość, a ten sam dziennik czyta potem
+     * organizator w panelu.
+     */
+    function sponsorSummaryBlock() {
+      if (!log || !flow) return null;
+      const none = text('chat.sponsorSummaryNone');
+      const rows = [
+        ['chat.sponsorSummaryName', flow.cartName],
+        ['chat.sponsorSummaryPerson', `${flow.firstName} ${flow.lastName}`.trim()],
+        ['chat.sponsorSummaryPhone', flow.phone || none],
+        ['chat.sponsorSummaryEmail', flow.email],
+        ['chat.sponsorSummaryLogo', flow.logo ? text('chat.sponsorSummaryLogoSet') : none],
+        ['chat.sponsorSummaryLink', flow.siteUrl || none]
+      ];
+      const list = document.createElement('dl');
+      list.className = 'chat__summary';
+      list.dataset.chatSummary = '';
+      rows.forEach(([key, value]) => {
+        const label = document.createElement('dt');
+        label.textContent = text(key) || key;
+        const said = document.createElement('dd');
+        said.textContent = value || none;
+        list.append(label, said);
+      });
+      if (flow.logo) {
+        const shot = document.createElement('dd');
+        shot.className = 'chat__summary-shot';
+        const picture = document.createElement('img');
+        picture.src = flow.logo;
+        picture.alt = text('chat.photoAlt');
+        shot.append(picture);
+        list.append(shot);
+      }
+      const stick = atBottom();
+      log.appendChild(list);
+      if (stick) toBottom();
+      return list;
+    }
+
+    /**
+     * OSTATNI KROK PRZED WYSŁANIEM: CAŁE ZGŁOSZENIE I PYTANIE „POTWIERDZASZ?"
+     * ---------------------------------------------------------------------------
+     * DLACZEGO PRZED BRAMKĄ, A NIE PO NIEJ
+     *   Za „tak, wyślij" idzie kod na skrzynkę, a za kodem samo zgłoszenie. Gdyby podsumowanie
+     *   stanęło po bramce, gość dostawałby list z kodem, przepisywał sześć cyfr — i DOPIERO
+     *   wtedy dowiadywał się, że ma jeszcze coś potwierdzić. A gdyby chciał wtedy poprawić
+     *   literówkę, kod na stary adres byłby już wysłany. Kolejność „potwierdź, potem kod" znaczy
+     *   też, że jedna pomyłka w adresie kosztuje jeden list, nie dwa.
+     *
+     * DWIE PASTYLKI, NIE TRZY
+     *   „Rezygnuję" tu nie stoi z rozmysłu. Pytanie brzmi „wysłać to?", a nie „co dalej z
+     *   Twoim życiem": trzecie wyjście obok „tak" i „popraw" jest w tym miejscu zaproszeniem do
+     *   przypadkowego zamknięcia sprawy, która jest gotowa do wysłania. Wyjście zostaje w każdym
+     *   kroku poprawek i w samej bramce.
+     */
+    function sponsorSummary() {
+      if (!flow) return;
+      flow.step = 'summary';
+      flow.after = '';
+      setWarn('');
+      /* Zdanie i tabelka w JEDNYM zadaniu kolejki: podsumowanie bez danych pod nim to zdanie
+         „sprawdź, czy się zgadza" o niczym. Ta sama decyzja, co przy zgodzie i jej dokumentach. */
+      sayLater(() => {
+        sayNow('chat.sponsorSummaryLead');
+        sponsorSummaryBlock();
+      });
+      flowChoices([
+        ['chat.sponsorSummaryYes', async () => {
+          if (!flow) return;
+          /* Dopiero tutaj cokolwiek wychodzi na zewnątrz: bramka wysyła kod na podany adres,
+             a `sponsorSubmit` jedzie po poprawnym kodzie. `flowGuard` wokół wysyłki, bo błąd
+             rzucony z zaczepu wpadłby w obsługę odmów bramki. */
+          await gateStart(flow.email, 'sponsor', {
+            onConfirmed: (code) => flowGuard(() => sponsorSubmit(code)),
+            onChangeEmail: () => {
+              if (!flow) return;
+              /* Nowy adres wraca do PODSUMOWANIA, nie prosto do bramki: zmieniony adres jest
+                 zmianą zgłoszenia, więc gość ma go jeszcze raz zobaczyć, zanim pójdzie kod. */
+              flow.after = 'summary';
+              sponsorAskEmail();
+            }
+          });
+        }],
+        ['chat.sponsorSummaryFix', async () => sponsorFix()]
+      ]);
+    }
+
+    /**
+     * MENU POPRAWEK: JEDNO POLE, POTEM Z POWROTEM DO PODSUMOWANIA
+     * ---------------------------------------------------------------------------
+     * Pastylki noszą etykiety Z PODSUMOWANIA (`chat.sponsorSummary*`) — jedna kopia nazw pól na
+     * obie listy. Dwie kopiie znaczyłyby, że po poprawce nazwy pole w podsumowaniu nazywa się
+     * inaczej niż pastylka, którą się je poprawia, i nikt tego nie zauważy do pierwszego
+     * zgłoszenia od kogoś, kto zapyta „które to pole".
+     *
+     * „Wróć do podsumowania" jest wyjściem dla kogoś, kto otworzył menu przez pomyłkę. Bez niego
+     * jedynym wyjściem byłoby poprawienie czegokolwiek — czyli zmiana pola, którego nikt nie
+     * chciał zmieniać.
+     */
+    function sponsorFix() {
+      if (!flow) return;
+      flow.step = 'fix';
+      flowSay('chat.sponsorFixWhich');
+      const fix = (ask) => async () => {
+        if (!flow) return;
+        flow.after = 'summary';
+        ask();
+      };
+      flowChoices([
+        ['chat.sponsorSummaryName', fix(sponsorAskName)],
+        ['chat.sponsorSummaryPerson', fix(sponsorAskPerson)],
+        ['chat.sponsorSummaryPhone', fix(sponsorAskPhone)],
+        ['chat.sponsorSummaryEmail', fix(sponsorAskEmail)],
+        ['chat.sponsorSummaryLogo', fix(sponsorAskLogo)],
+        ['chat.sponsorSummaryLink', fix(sponsorAskLink)],
+        ['chat.sponsorSummaryBack', async () => sponsorSummary()]
+      ]);
     }
 
     /**
@@ -9051,6 +9439,21 @@ import {
         email: flow.email,
         code,
         ...(flow.phone ? { phone: flow.phone } : {}),
+        /* DWA POLA OPCJONALNE JADĄ TYLKO WTEDY, GDY COŚ W NICH JEST
+           ---------------------------------------------------------------------------
+           `logo` to data URL po zmniejszeniu w przeglądarce (`shrinkPhoto`), `siteUrl` to adres
+           sprawdzony na `https://`. Nazwy są takie same jak w panelu ustawień (`logo` przy
+           sponsorach) i jak `siteUrl` w kształcie ustawień — a nie `photo`/`url`, bo te w tym
+           Workerze znaczą już co innego (`photo` to ładowanie pliku w `settings-admin`).
+
+           Puste pole NIE jedzie wcale: `logo: ''` w żądaniu to obietnica obrazu, którego nie ma,
+           i jedna gałąź więcej po stronie serwera. Ta sama decyzja, co przy `phone` wyżej.
+
+           Gdyby Worker jeszcze nie znał tych nazw, nic się nie psuje: `FIELD_WHITELIST`
+           przepuszcza tylko znane klucze i po cichu odsiewa resztę (patrz komentarz „Anything
+           else is dropped, not rejected" przy tej tablicy) — zgłoszenie przechodzi bez logo. */
+        ...(flow.logo ? { logo: flow.logo } : {}),
+        ...(flow.siteUrl ? { siteUrl: flow.siteUrl } : {}),
         consent: flow.consent === true
       });
       if (!result?.ok) throw Object.assign(new Error('sponsor'), { payload: result });
@@ -9058,12 +9461,32 @@ import {
       endFlow();
     }
 
-    /** Kolejne odpowiedzi sponsora: nazwa → zgoda → imię → telefon → adres → bramka. */
+    /**
+     * Adres wolno tu wpisać tylko przez `https://`.
+     *
+     * Host musi mieć kropkę i końcówkę z dwóch znaków, bo `https://sklep` jest adresem w sieci
+     * lokalnej, a nie stroną, którą otworzy zwiedzający. Ścieżka po hoście przechodzi w całości:
+     * profil w mediach społecznościowych to prawie zawsze `https://instagram.com/nazwa`.
+     */
+    const SPONSOR_LINK = /^https:\/\/[^\s/?#]+\.[^\s/?#]{2,}(?:[/?#]\S*)?$/i;
+
+    /**
+     * Kolejne odpowiedzi sponsora, wpisane w kompozytorze.
+     *
+     * KOLEJNOŚĆ KROKÓW
+     *   nazwa → zgoda → imię i nazwisko → telefon → zdjęcie → odsyłacz → adres →
+     *   PODSUMOWANIE → bramka → wysyłka.
+     *   Zdjęcie i odsyłacz są opcjonalne (każde z własną pastylką pominięcia), a podsumowanie
+     *   stoi PRZED bramką z powodu wypisanego przy `sponsorSummary`.
+     *
+     * Każde `sponsorNext` niżej jest miejscem, w którym poprawka jednego pola wraca do
+     * podsumowania, zamiast ciągnąć gościa przez wszystkie pozostałe pytania jeszcze raz.
+     */
     async function sponsorStep(message) {
       if (flow.step === 'name') {
         flow.cartName = message.trim().slice(0, 120);
         if (!flow.cartName) { flowSay('chat.sponsorAskName'); return; }
-        sponsorConsent();
+        sponsorNext(sponsorConsent);
         return;
       }
 
@@ -9080,13 +9503,23 @@ import {
            dojechałoby do zgłoszenia i zostało w mailu do organizatorów jako „Jan 512334455”.
 
            Sprawdzane PRZED podziałem na imię i nazwisko, bo cyfra po odstępie zrobiłaby się
-           nazwiskiem i przeszłaby dalej bez słowa. */
-        if (/\d/.test(said)) { flowSay('chat.sponsorNoDigits'); return; }
+           nazwiskiem i przeszłaby dalej bez słowa.
+
+           `DIGIT_IN_TEXT`, czyli `\p{Nd}` z flagą `u`, a nie `\d` i nie „wszystko poza literami
+           łacińskimi": zakazana jest CYFRA w dowolnym piśmie, a apostrofy, łączniki, spacje
+           i znaki diakrytyczne przechodzą — D'Angelo, Sanna-Pinna, Niño, Łukasz. Ten sam
+           wzorzec pilnuje pól imienia i nazwiska w formularzu zapisu, żeby dwie drogi do tego
+           samego pola nie miały dwóch różnych zdań na temat tego, co jest nazwiskiem.
+
+           Ostrzeżenie nad kompozytorem stanęło już przy PIERWSZEJ wpisanej cyfrze
+           (`watchPersonDigits`); to jest twardy bezpiecznik dla kogoś, kto je zignorował. */
+        if (DIGIT_IN_TEXT.test(said)) { flowSay('chat.sponsorNoDigits'); return; }
         const gap = said.indexOf(' ');
         if (gap < 1) { flowSay('chat.sponsorNeedPerson'); return; }
         flow.firstName = said.slice(0, gap);
         flow.lastName = said.slice(gap + 1);
-        sponsorAskPhone();
+        setWarn('');
+        sponsorNext(sponsorAskPhone);
         return;
       }
 
@@ -9097,97 +9530,43 @@ import {
         const digits = message.replace(/\D/g, '');
         if (digits.length < 6) { flowSay('chat.sponsorBadPhone'); return; }
         flow.phone = message.trim().slice(0, 40);
-        sponsorAskEmail();
+        sponsorNext(sponsorAskLogo);
+        return;
+      }
+
+      if (flow.step === 'logo') {
+        /* Zdjęcia nie da się napisać. Kto pisze w tym kroku, albo szuka przycisku, albo chce
+           pominąć — zdanie wskazuje jedno i drugie, zamiast brać wpisany tekst za nazwę pliku. */
+        flowSay('chat.sponsorLogoUseButtons');
+        return;
+      }
+
+      if (flow.step === 'link') {
+        const said = message.trim().slice(0, 300);
+        /* Bez naprawiania adresu za człowieka: „trattoria.it" NIE zamienia się w
+           „https://trattoria.it". Domyślony adres bywa cudzą domeną, a ten napis staje się
+           potem odsyłaczem na publicznej stronie wydarzenia. Zdanie o błędzie mówi, czego
+           brakuje, i podaje przykład — poprawia człowiek, bo tylko on wie, gdzie chciał
+           wskazać. */
+        if (!SPONSOR_LINK.test(said)) { flowSay('chat.sponsorBadLink'); return; }
+        flow.siteUrl = said;
+        sponsorNext(sponsorAskEmail);
         return;
       }
 
       const email = message.trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         /* Ponowna prośba o sam adres, bez utraty tego, co już podane (5.4): nazwa, imię,
-           nazwisko i telefon zostają w `flow`, zmienia się tylko odpowiedź na jedno pytanie. */
+           nazwisko, telefon, zdjęcie i odsyłacz zostają w `flow`, zmienia się tylko odpowiedź
+           na jedno pytanie. */
         flowSay('chat.dataBadEmail');
         return;
       }
       flow.email = email;
+      /* Adres jest ostatnią odpowiedzią, więc stąd idzie się do PODSUMOWANIA, nie wprost do
+         bramki. Nic nie wychodzi na zewnątrz — ani kod, ani zgłoszenie — dopóki gość nie
+         naciśnie „tak, wyślij" (5.5, 5.6). */
       sponsorSummary();
-    }
-
-    /**
-     * PODSUMOWANIE PRZED WYSŁANIEM — OSTATNI MOMENT, W KTÓRYM WIDAĆ CAŁOŚĆ.
-     * ---------------------------------------------------------------------------
-     * Kreator pyta o pięć rzeczy w pięciu osobnych wierszach, a odpowiedzi rozjeżdżają się po
-     * wątku razem z pytaniami automatu. Kto pomylił się w nazwie trzy pytania temu, nie ma jak
-     * tego zobaczyć — chyba że przewinie rozmowę w górę i pozbiera ją z bąbelków.
-     *
-     * Ta kartka pokazuje wszystko naraz i pyta wprost. Stoi PRZED bramką, nie za nią: kod na
-     * skrzynkę jest kosztem, którego nie warto ponosić po to, żeby dopiero potem zobaczyć
-     * literówkę — a poprawianie danych po zużyciu kodu znaczyłoby drugi kod.
-     *
-     * „Popraw dane” wraca do pierwszego pytania, ale ZGODA ZOSTAJE. Zgoda dotyczy dokumentów,
-     * które się nie zmieniły, i była osobną decyzją podjętą po przeczytaniu regulaminu do końca
-     * — kazanie komuś przewijać go drugi raz za literówkę w telefonie jest karą, nie ochroną.
-     */
-    function sponsorSummary() {
-      if (!flow) return;
-      flow.step = 'summary';
-      /* Zdanie i kartka w JEDNYM zadaniu kolejki: pytanie „czy się zgadza” bez tego, co ma się
-         zgadzać, wisiałoby przez 280 ms samo. */
-      sayLater(() => {
-        sayNow('chat.sponsorSummaryLead');
-        sponsorSummaryCard();
-      });
-      flowChoices([
-        ['chat.sponsorSummaryYes', async () => {
-          if (!flow) return;
-          /* Bramka z celem `sponsor`: kod na ten adres i nic nie wychodzi na zewnątrz, dopóki
-             nie wróci poprawny (5.5, 5.6). `flowGuard` wokół wysyłki, bo błąd rzucony z zaczepu
-             wpadłby w obsługę odmów bramki i pokazał pastylki bramki, której już nie ma. */
-          await gateStart(flow.email, 'sponsor', {
-            onConfirmed: (code) => flowGuard(() => sponsorSubmit(code)),
-            onChangeEmail: () => sponsorAskEmail()
-          });
-        }],
-        ['chat.sponsorSummaryFix', async () => {
-          if (!flow) return;
-          flow.step = 'name';
-          flow.cartName = '';
-          flow.firstName = '';
-          flow.lastName = '';
-          flow.phone = '';
-          flow.email = '';
-          flowSay('chat.sponsorAskName');
-          flowChoices([sponsorQuit()]);
-        }],
-        sponsorQuit()
-      ]);
-    }
-
-    /** Kartka z odpowiedziami. Bez `sayLater` — wołana wewnątrz jednego zadania kolejki. */
-    function sponsorSummaryCard() {
-      if (!log || !flow) return null;
-      const card = document.createElement('dl');
-      card.className = 'chat__summary';
-      card.dataset.chatSummary = '';
-      const wiersze = [
-        ['chat.sponsorSummaryName', flow.cartName],
-        ['chat.sponsorSummaryPerson', `${flow.firstName} ${flow.lastName}`.trim()],
-        ['chat.sponsorSummaryPhone', flow.phone || text('chat.sponsorSummaryNoPhone')],
-        ['chat.sponsorSummaryEmail', flow.email]
-      ];
-      wiersze.forEach(([key, value]) => {
-        const term = document.createElement('dt');
-        term.textContent = text(key) || key;
-        const def = document.createElement('dd');
-        /* `textContent`, nigdy `innerHTML`: to są słowa wpisane przez gościa i wracają na
-           ekran, z którego przyszły. */
-        def.textContent = value || '—';
-        if (!flow.phone && key === 'chat.sponsorSummaryPhone') def.className = 'is-empty';
-        card.append(term, def);
-      });
-      const stick = atBottom();
-      log.appendChild(card);
-      if (stick) toBottom();
-      return card;
     }
 
     async function startFlow(intent) {
@@ -9237,10 +9616,13 @@ import {
       /* Sponsoring ma własne kroki i własne pola. Osobna gałąź, nie wspólny „email/code":
          tam adres jest tożsamością do potwierdzenia kodem, tu jest kontaktem do oddzwonienia. */
       if (flow.intent === 'sponsor') {
-        /* Dwa kroki są wyborem, nie odpowiedzią: oferta na wejściu i zgoda po nazwie. „Tak"
-           napisane w kompozytorze nie jest zgodą — zgoda ma być naciśnięta świadomie, przy
-           odsyłaczach do obu dokumentów pod ręką, więc kreator odsyła do pastylek (4.3). */
-        if (flow.step === 'decide' || flow.step === 'consent') {
+        /* Cztery kroki są WYBOREM, nie odpowiedzią: oferta na wejściu, zgoda po nazwie,
+           potwierdzenie podsumowania i menu poprawek. „Tak" napisane w kompozytorze nie jest
+           ani zgodą, ani potwierdzeniem wysyłki — jedno i drugie ma być naciśnięte świadomie
+           (zgoda przy odsyłaczach do obu dokumentów pod ręką, potwierdzenie przy widocznym
+           podsumowaniu), więc kreator odsyła do pastylek (4.3). */
+        if (flow.step === 'decide' || flow.step === 'consent'
+          || flow.step === 'summary' || flow.step === 'fix') {
           flowSay('chat.dataUseButtons');
           return true;
         }

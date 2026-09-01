@@ -215,10 +215,29 @@ export default function App() {
 
   const bottom = useMemo<NavItemData[]>(
     () => [
-      { id: 'settings', title: t('nav.settings'), icon: Settings },
+      {
+        id: 'settings',
+        title: t('nav.settings'),
+        icon: Settings,
+        /* PLAKIETKA ZGŁOSZEŃ SPONSORÓW — DOŁĄCZONA DO ISTNIEJĄCEGO MECHANIZMU.
+           ------------------------------------------------------------------
+           Skrzynka zgłoszeń sponsorów stoi w ustawieniach, a ustawienia są na dole rai, poza
+           polem wzroku: bez liczby przy nich zgłoszenie od firmy czekałoby na przypadkowe
+           wejście na ten ekran. Plakietka jest tym samym mechanizmem, co przy rozmowach i
+           tablicy — `inbox.counts`, odpytywane raz na dziesięć sekund — bo druga droga do
+           tej samej liczby to druga wersja prawdy i drugie żądanie.
+
+           `counts.sponsors` jest POLEM OPCJONALNYM i dziś nie przychodzi: końcówka `inbox`
+           w Workerze liczy sześć rzeczy i o sponsorach nie wie (sprawdzone). Dopisanie
+           siódmego licznika jest zmianą w Workerze, której to zadanie NIE robi — patrz
+           raport. Dopóki jej nie ma, wartość jest `undefined`, a `NavRow` rysuje plakietkę
+           tylko dla wartości prawdziwej, więc na rai po prostu nic nie ma. W dniu, w którym
+           Worker zacznie tę liczbę oddawać, plakietka zapali się sama, bez poprawki tutaj. */
+        badge: inbox?.counts.sponsors
+      },
       { id: 'logout', title: t('nav.logout'), icon: LogOut }
     ],
-    [t]
+    [t, inbox]
   );
 
   const flat = useMemo(() => flattenNav(groups, bottom), [groups, bottom]);

@@ -174,14 +174,17 @@
     "rcptLead": "Il Premio del pubblico lo decidete voi, un voto alla volta. Il tuo è arrivato.",
     "rcptVoteTitle": "Il tuo voto",
     "rcptScoreLabel": "Punteggio",
-    "rcptChange": "Puoi correggere il voto una volta sola: apri la pagina dal pulsante qui sotto. Dopo la chiusura non si cambia più nulla.",
+    "rcptChange": "Puoi cambiare il voto una volta sola, fino alla chiusura della votazione: apri la pagina dal pulsante qui sotto. Dopo la chiusura non si cambia più nulla.",
     "rcptResults": "Se hai chiesto i risultati, te li mandiamo appena la votazione si chiude.",
     "rcptCta": "Apri la pagina del voto",
     "sponsorAckSubject": "Abbiamo ricevuto la tua proposta di sponsorizzazione",
     "sponsorAckHeading": "Grazie, la proposta è arrivata",
     "sponsorAckLead": "Ciao %FIRSTNAME%, grazie per voler sostenere il Carruleddhi Show. Questo messaggio conferma che la tua proposta è arrivata agli organizzatori.",
     "sponsorAckSummary": "Riepilogo della proposta",
-    "sponsorAckSoon": "Ti rispondiamo il prima possibile. Se vuoi aggiungere qualcosa, rispondi a questa e-mail: arriva direttamente agli organizzatori, a %ORGEMAIL%."
+    "sponsorAckSoon": "Ti rispondiamo il prima possibile. Se vuoi aggiungere qualcosa, rispondi a questa e-mail: arriva direttamente agli organizzatori, a %ORGEMAIL%.",
+    "sponsorAckSiteLabel": "Sito o profilo",
+    "sponsorAckLogoLabel": "Logo",
+    "sponsorAckLogoYes": "allegato"
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -347,14 +350,17 @@
     "rcptLead": "Nagrodę publiczności rozstrzygacie wy, głos po głosie. Twój już doszedł.",
     "rcptVoteTitle": "Twój głos",
     "rcptScoreLabel": "Ocena",
-    "rcptChange": "Głos możesz poprawić tylko raz — otwórz stronę przyciskiem poniżej. Po zamknięciu głosowania nic już się nie zmienia.",
+    "rcptChange": "Głos możesz zmienić jeden raz, do końca głosowania — otwórz stronę przyciskiem poniżej. Po zamknięciu głosowania nic już się nie zmienia.",
     "rcptResults": "Jeśli poprosiłeś o wyniki, wyślemy je zaraz po zamknięciu głosowania.",
     "rcptCta": "Otwórz stronę głosowania",
     "sponsorAckSubject": "Mamy Twoje zgłoszenie sponsorskie",
     "sponsorAckHeading": "Dziękujemy, zgłoszenie doszło",
     "sponsorAckLead": "Cześć %FIRSTNAME%, dziękujemy za chęć wsparcia Carruleddhi Show. Ta wiadomość potwierdza, że Twoje zgłoszenie dotarło do organizatorów.",
     "sponsorAckSummary": "Podsumowanie zgłoszenia",
-    "sponsorAckSoon": "Odezwiemy się najszybciej, jak to możliwe. Jeśli chcesz coś dopisać, odpowiedz na tego maila — trafi wprost do organizatorów, na %ORGEMAIL%."
+    "sponsorAckSoon": "Odezwiemy się najszybciej, jak to możliwe. Jeśli chcesz coś dopisać, odpowiedz na tego maila — trafi wprost do organizatorów, na %ORGEMAIL%.",
+    "sponsorAckSiteLabel": "Strona lub profil",
+    "sponsorAckLogoLabel": "Logo",
+    "sponsorAckLogoYes": "dołączone"
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -520,14 +526,17 @@
     "rcptLead": "The Audience Award is decided by you, one vote at a time. Yours has arrived.",
     "rcptVoteTitle": "Your vote",
     "rcptScoreLabel": "Score",
-    "rcptChange": "You can correct your vote once — open the page with the button below. Once voting closes nothing changes any more.",
+    "rcptChange": "You can change your vote once, any time until voting closes — open the page with the button below. After the close nothing changes any more.",
     "rcptResults": "If you asked for the results, we will send them as soon as voting closes.",
     "rcptCta": "Open the voting page",
     "sponsorAckSubject": "We have your sponsorship proposal",
     "sponsorAckHeading": "Thank you, your proposal arrived",
     "sponsorAckLead": "Hello %FIRSTNAME%, thank you for wanting to support the Carruleddhi Show. This message confirms your proposal reached the organisers.",
     "sponsorAckSummary": "Summary of your proposal",
-    "sponsorAckSoon": "We will get back to you as soon as we can. If you want to add anything, reply to this e-mail: it goes straight to the organisers, at %ORGEMAIL%."
+    "sponsorAckSoon": "We will get back to you as soon as we can. If you want to add anything, reply to this e-mail: it goes straight to the organisers, at %ORGEMAIL%.",
+    "sponsorAckSiteLabel": "Site or profile",
+    "sponsorAckLogoLabel": "Logo",
+    "sponsorAckLogoYes": "attached"
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -693,14 +702,17 @@
     "rcptLead": "Den Publikumspreis entscheidet ihr, Stimme für Stimme. Deine ist angekommen.",
     "rcptVoteTitle": "Deine Stimme",
     "rcptScoreLabel": "Bewertung",
-    "rcptChange": "Du kannst deine Stimme genau einmal korrigieren — öffne die Seite mit der Schaltfläche unten. Nach Abstimmungsende ändert sich nichts mehr.",
+    "rcptChange": "Du kannst deine Stimme einmal ändern, bis zum Ende der Abstimmung — öffne die Seite mit der Schaltfläche unten. Nach Abstimmungsende ändert sich nichts mehr.",
     "rcptResults": "Wenn du die Ergebnisse angefordert hast, schicken wir sie, sobald die Abstimmung schließt.",
     "rcptCta": "Abstimmungsseite öffnen",
     "sponsorAckSubject": "Wir haben deinen Sponsoring-Vorschlag",
     "sponsorAckHeading": "Danke, dein Vorschlag ist angekommen",
     "sponsorAckLead": "Hallo %FIRSTNAME%, danke, dass du Carruleddhi Show unterstützen möchtest. Diese Nachricht bestätigt, dass dein Vorschlag bei den Organisatoren angekommen ist.",
     "sponsorAckSummary": "Zusammenfassung des Vorschlags",
-    "sponsorAckSoon": "Wir melden uns so schnell wie möglich. Wenn du etwas ergänzen möchtest, antworte einfach auf diese E-Mail: sie geht direkt an die Organisatoren, an %ORGEMAIL%."
+    "sponsorAckSoon": "Wir melden uns so schnell wie möglich. Wenn du etwas ergänzen möchtest, antworte einfach auf diese E-Mail: sie geht direkt an die Organisatoren, an %ORGEMAIL%.",
+    "sponsorAckSiteLabel": "Website oder Profil",
+    "sponsorAckLogoLabel": "Logo",
+    "sponsorAckLogoYes": "beigefügt"
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -866,14 +878,17 @@
     "rcptLead": "El Premio del público lo decidís vosotros, voto a voto. El tuyo ya ha llegado.",
     "rcptVoteTitle": "Tu voto",
     "rcptScoreLabel": "Puntuación",
-    "rcptChange": "Puedes corregir tu voto una sola vez: abre la página con el botón de abajo. Cuando la votación cierre ya no se cambia nada.",
+    "rcptChange": "Puedes cambiar tu voto una sola vez, hasta el cierre de la votación: abre la página con el botón de abajo. Después del cierre ya no se cambia nada.",
     "rcptResults": "Si has pedido los resultados, te los enviamos en cuanto cierre la votación.",
     "rcptCta": "Abrir la página del voto",
     "sponsorAckSubject": "Hemos recibido tu propuesta de patrocinio",
     "sponsorAckHeading": "Gracias, tu propuesta ha llegado",
     "sponsorAckLead": "Hola %FIRSTNAME%, gracias por querer apoyar el Carruleddhi Show. Este mensaje confirma que tu propuesta ha llegado a los organizadores.",
     "sponsorAckSummary": "Resumen de la propuesta",
-    "sponsorAckSoon": "Te respondemos lo antes posible. Si quieres añadir algo, responde a este correo: llega directamente a los organizadores, a %ORGEMAIL%."
+    "sponsorAckSoon": "Te respondemos lo antes posible. Si quieres añadir algo, responde a este correo: llega directamente a los organizadores, a %ORGEMAIL%.",
+    "sponsorAckSiteLabel": "Web o perfil",
+    "sponsorAckLogoLabel": "Logo",
+    "sponsorAckLogoYes": "adjunto"
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -1039,13 +1054,16 @@
     "rcptLead": "Le Prix du public, c’est vous qui le décidez, une voix à la fois. La vôtre est arrivée.",
     "rcptVoteTitle": "Votre vote",
     "rcptScoreLabel": "Note",
-    "rcptChange": "Vous pouvez corriger votre vote une seule fois : ouvrez la page avec le bouton ci-dessous. Après la clôture, plus rien ne change.",
+    "rcptChange": "Vous pouvez changer votre vote une seule fois, jusqu’à la clôture du vote : ouvrez la page avec le bouton ci-dessous. Après la clôture, plus rien ne change.",
     "rcptResults": "Si vous avez demandé les résultats, nous vous les envoyons dès la clôture du vote.",
     "rcptCta": "Ouvrir la page du vote",
     "sponsorAckSubject": "Nous avons reçu votre proposition de partenariat",
     "sponsorAckHeading": "Merci, votre proposition est arrivée",
     "sponsorAckLead": "Bonjour %FIRSTNAME%, merci de vouloir soutenir le Carruleddhi Show. Ce message confirme que votre proposition est bien arrivée aux organisateurs.",
     "sponsorAckSummary": "Résumé de la proposition",
-    "sponsorAckSoon": "Nous vous répondons dès que possible. Si vous voulez ajouter quelque chose, répondez à cet e-mail, il arrive directement aux organisateurs, à %ORGEMAIL%."
+    "sponsorAckSoon": "Nous vous répondons dès que possible. Si vous voulez ajouter quelque chose, répondez à cet e-mail, il arrive directement aux organisateurs, à %ORGEMAIL%.",
+    "sponsorAckSiteLabel": "Site ou profil",
+    "sponsorAckLogoLabel": "Logo",
+    "sponsorAckLogoYes": "joint"
   }
 }

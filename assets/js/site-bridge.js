@@ -462,3 +462,73 @@ export function installBridge({ eventName, eventDate, preview, getLang }) {
   });
   return text;
 }
+
+/* ------------------------------------------------------------------------- popouts for legal pages */
+function setupLegalPopouts() {
+  document.addEventListener('click', async (event) => {
+    const link = event.target.closest('a');
+    if (!link) return;
+    const href = link.getAttribute('href') || '';
+    if (href.startsWith('privacy.html') || href.startsWith('cookies.html') || href.startsWith('regolamento.html')) {
+      event.preventDefault();
+      let dialog = document.querySelector('.legal-popout');
+      if (!dialog) {
+        const style = document.createElement('style');
+        style.textContent = `
+          .legal-popout { max-width: 800px; width: 90vw; max-height: 90vh; border: 3px solid var(--navy-950, #071a3d); border-radius: 12px; padding: 0; background: #fff; box-shadow: 0 20px 50px rgba(0,0,0,0.3); overflow: hidden; }
+          .legal-popout::backdrop { background: rgba(7, 26, 61, 0.6); backdrop-filter: blur(5px); }
+          .legal-popout__surface { display: flex; flex-direction: column; height: 100%; max-height: 90vh; position: relative; }
+          .legal-popout__close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; background: #f0f0f0; border: none; border-radius: 50%; cursor: pointer; z-index: 10; transition: background 0.2s; }
+          .legal-popout__close:hover { background: #e0e0e0; }
+          .legal-popout__close::before, .legal-popout__close::after { content: ''; position: absolute; top: 50%; left: 50%; width: 16px; height: 2px; background: #333; margin: -1px 0 0 -8px; }
+          .legal-popout__close::before { transform: rotate(45deg); }
+          .legal-popout__close::after { transform: rotate(-45deg); }
+          .legal-popout__content { overflow-y: auto; padding: 48px 24px 24px; color: #333; }
+        `;
+        document.head.appendChild(style);
+
+        dialog = document.createElement('dialog');
+        dialog.className = 'legal-popout';
+        dialog.innerHTML = `
+          <div class="legal-popout__surface">
+            <button type="button" class="legal-popout__close" aria-label="Close"></button>
+            <div class="legal-popout__content"></div>
+          </div>
+        `;
+        document.body.appendChild(dialog);
+        dialog.querySelector('.legal-popout__close').addEventListener('click', () => dialog.close());
+        dialog.addEventListener('click', (e) => {
+          if (e.target === dialog) dialog.close();
+        });
+      }
+      
+      const content = dialog.querySelector('.legal-popout__content');
+      content.innerHTML = '<p>Loading...</p>';
+      dialog.showModal();
+      document.body.style.overflow = 'hidden';
+      dialog.addEventListener('close', () => { document.body.style.overflow = ''; }, { once: true });
+      
+      try {
+        const response = await fetch(link.href);
+        if (!response.ok) throw new Error();
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        // Extract main content from legal pages
+        const main = doc.querySelector('.legal-doc') || doc.querySelector('main') || doc.body;
+        content.innerHTML = main.innerHTML;
+        // Strip any absolute positioning or large margins from inner elements
+        const title = content.querySelector('h1');
+        if (title) title.style.marginTop = '0';
+      } catch (e) {
+        content.innerHTML = '<p>Error loading content.</p>';
+      }
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupLegalPopouts);
+} else {
+  setupLegalPopouts();
+}

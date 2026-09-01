@@ -38,6 +38,8 @@ const sponsorPurpose = read('0032_sponsor_code_purpose.sql');
 const sponsorPurposeCode = code(sponsorPurpose);
 const prizeWinners = read('0034_prize_winners.sql');
 const prizeWinnersCode = code(prizeWinners);
+const ttlSponsors = read('0035_code_ttl_and_sponsor_submissions.sql');
+const ttlSponsorsCode = code(ttlSponsors);
 
 /* --- kolumny, na których stoją nowe migracje ----------------------------- */
 
@@ -50,7 +52,11 @@ for (const column of [
   'participant_id', 'device_id', 'edit_token', 'image_path', 'registration_id', 'start_number',
   /* Kolumny, na których stoi werdykt nagród i ogłoszenie dla drugiej listy (0034). Worker
      czyta je po nazwie, więc literówka tutaj to 400 z PostgREST w dniu zawodów. */
-  'prize_key', 'winner_label', 'prizes', 'last_announcement_event'
+  'prize_key', 'winner_label', 'prizes', 'last_announcement_event',
+  /* Kolumny zgłoszenia sponsora (0035). Worker czyta je po nazwie w `SPONSOR_LEAD_COLUMNS`,
+     więc literówka tutaj to 400 z PostgREST w panelu — i to na liście, która ma pokazać
+     zgłoszenie warte sto euro. */
+  'logo_path', 'site_url', 'decided_at'
 ]) {
   check(`kolumna ${column} jest gdzies utworzona`, everything.includes(column));
 }
@@ -393,6 +399,118 @@ check('0034 nie warunkuje powrotu harmonogramu poprzednim zamknieciem',
 check('0034 nie kasuje niczego w galezi "ta sama edycja"', !/delete from/i.test(sameEdition));
 check('0034 oddaje slad po zostawionych glosach', /'staleVotes'/.test(roll));
 check('0034 mowi panelowi, ze harmonogram wrocil', /'scheduleReset', true/.test(roll));
+
+/* ============================================================================
+   0035 — ważność kodu i zgłoszenia sponsorów
+   ============================================================================
+   Ta migracja robi dwie rzeczy, których nie da się sprawdzić inaczej niż z tekstu: zmienia
+   DOMYŚLNĄ wartość kolumny (a nie dane) i zakłada tabelę z danymi osobowymi. Pierwsze psuje
+   się przez pomyłkę w liczbie, drugie przez zapomniane RLS — i żadne z tych dwóch nie krzyczy
+   po wdrożeniu. Pomyłka w liczbie objawia się kodem wygasłym wcześniej, niż obiecuje list;
+   brak RLS objawia się dopiero wtedy, gdy ktoś zapyta klucza `anon` o cudze telefony.
+   ========================================================================== */
+
+/* --- 0035: dziesięć minut, i ani jedna wartość istniejącego wiersza ------ */
+
+check('0035 przestawia DOMYSLNA wartosc expires_at',
+  /alter column expires_at set default/i.test(ttlSponsorsCode));
+check('0035 ustawia dziesiec minut',
+  /alter column expires_at set default now\(\) \+ interval '10 minutes'/i.test(ttlSponsorsCode));
+/* Piętnaście minut nie ma prawa zostać w KODZIE tej migracji. W komentarzu owszem — nagłówek
+   opowiada, co się zmienia i co dzieje się z wierszami już wystawionymi — dlatego badany jest
+   tekst po wycięciu komentarzy. */
+check('0035 nie zostawia pietnastu minut w kodzie',
+  !/interval '15 minutes'/i.test(ttlSponsorsCode));
+check('0035 aktualizuje komentarz kolumny',
+  /comment on column public\.verification_codes\.expires_at is/i.test(ttlSponsors));
+check('0035 pisze dziesiec minut takze w komentarzu kolumny',
+  /comment on column public\.verification_codes\.expires_at is[\s\S]{0,200}?Dziesiec/i
+    .test(ttlSponsors));
+
+/* WIERSZE JUŻ ISTNIEJĄCE ZOSTAJĄ. Domyślna wartość dotyczy wstawek przyszłych; `update` na
+   tej tabeli skróciłby termin kodom, które ktoś właśnie ma otwarte w skrzynce i wpisuje na
+   stronie — odmowa w połowie czynności, której nikt mu nie przerwał. */
+check('0035 nie przepisuje expires_at istniejacym wierszom',
+  !/update\s+public\.verification_codes/i.test(ttlSponsorsCode));
+check('0035 nie kasuje zadnych wierszy',
+  !/\bdelete\s+from\b|\btruncate\b/i.test(ttlSponsorsCode));
+check('0035 nie usuwa zadnej tabeli',
+  !/\bdrop\s+table\b/i.test(ttlSponsorsCode));
+/* Kolumny też nie: `drop column` na tabeli kodów albo ustawień to dane, których nie da się
+   odzyskać z niczego, co ten projekt trzyma. */
+check('0035 nie usuwa zadnej kolumny', !/\bdrop\s+column\b/i.test(ttlSponsorsCode));
+
+/* --- 0035: tabela zgłoszeń sponsorów ------------------------------------ */
+
+check('0035 tworzy tabele zgloszen warunkowo',
+  /create table if not exists public\.sponsor_submissions/i.test(ttlSponsorsCode));
+check('0035 tworzy indeksy warunkowo',
+  (ttlSponsorsCode.match(/create index if not exists/gi) || []).length >= 2);
+/* Predykat indeksu częściowego MUSI być IMMUTABLE — `now()` w `where` to błąd 42P17, a gdyby
+   przeszedł, byłby kłamliwy (Postgres liczy predykat raz, przy zakładaniu). Patrz 0033. */
+const sponsorIndexes = [...ttlSponsorsCode.matchAll(/create index if not exists[\s\S]{0,220}?;/gi)]
+  .map((match) => match[0]);
+check('0035 nie wola funkcji w predykacie indeksu',
+  sponsorIndexes.every((sql) => !/now\s*\(/i.test(sql)),
+  sponsorIndexes.find((sql) => /now\s*\(/i.test(sql))?.replace(/\s+/g, ' ').slice(0, 120) || '');
+
+for (const column of [
+  'id', 'created_at', 'cart_name', 'first_name', 'last_name', 'email', 'phone', 'locale',
+  'logo_path', 'site_url', 'status', 'decided_at'
+]) {
+  const block = ttlSponsorsCode.slice(
+    ttlSponsorsCode.search(/create table if not exists public\.sponsor_submissions/i)
+  );
+  check(`0035 tabela zgloszen ma kolumne ${column}`,
+    new RegExp(`\\b${column}\\b`).test(block.slice(0, block.indexOf(');') + 2)));
+}
+
+/* Trzy stany i ani jednego więcej. Nadmiar znaczy, że lista rozjechała się z tym, co
+   obsługuje Worker (`SPONSOR_LEAD_STATUSES`), a brak któregokolwiek to odmowa zapisu
+   dopiero na produkcji — widoczna jako przycisk w panelu, który zawsze mówi „nie". */
+const statusDrop = ttlSponsorsCode.search(/drop constraint sponsor_submissions_status_check/i);
+const statusAdd = ttlSponsorsCode.search(/add constraint\s+sponsor_submissions_status_check/i);
+const statusLookup = ttlSponsorsCode.search(
+  /from pg_constraint[\s\S]{0,200}conname = 'sponsor_submissions_status_check'/i
+);
+check('0035 zaklada wiez na status', statusAdd >= 0);
+check('0035 zdejmuje wiez przed zalozeniem od nowa',
+  statusDrop >= 0 && statusAdd >= 0 && statusDrop < statusAdd, `drop=${statusDrop} add=${statusAdd}`);
+check('0035 szuka nazwy wiezu w pg_constraint przed zdjeciem',
+  statusLookup >= 0 && statusDrop >= 0 && statusLookup < statusDrop,
+  `lookup=${statusLookup} drop=${statusDrop}`);
+check('0035 zaweza wyszukanie wiezu do wlasnej tabeli',
+  /conrelid\s*=\s*'public\.sponsor_submissions'::regclass/i.test(ttlSponsorsCode));
+
+const statusCheck = ttlSponsorsCode
+  .slice(statusAdd >= 0 ? statusAdd : 0)
+  .match(/check\s*\(\s*status\s+in\s*\(([^)]*)\)/i);
+const statusValues = statusCheck
+  ? [...statusCheck[1].matchAll(/'([^']+)'/g)].map((match) => match[1])
+  : [];
+for (const value of ['pending', 'approved', 'rejected']) {
+  check(`0035 dopuszcza status ${value}`, statusValues.includes(value));
+}
+check('0035 nie dopuszcza stanow poza tymi trzema', statusValues.length === 3,
+  `znalezione: ${statusValues.join(', ') || 'brak'}`);
+check('0035 zaczyna zgloszenie od pending',
+  /status text not null default 'pending'/i.test(ttlSponsorsCode));
+
+/* Dane osobowe firmy i osoby kontaktowej. Bez RLS tabela w projekcie z publicznym kluczem
+   `anon` jest listą telefonów do odczytania z przeglądarki — patrz 0033. */
+check('0035 wlacza RLS na tabeli zgloszen',
+  /alter table public\.sponsor_submissions enable row level security/i.test(ttlSponsorsCode));
+check('0035 odbiera anonimowym dostep do zgloszen',
+  /revoke all on public\.sponsor_submissions from anon, authenticated/i.test(ttlSponsorsCode));
+check('0035 nie zaklada zadnej polityki dopuszczajacej anon',
+  !/create policy/i.test(ttlSponsorsCode));
+/* Ścieżka w buckecie, nie bajty i nie podpisany adres — podpis wygasa po godzinie, więc
+   wiersz z nim byłby wierszem z martwym linkiem. */
+check('0035 trzyma logo jako sciezke, nie jako plik',
+  /logo_path text/i.test(ttlSponsorsCode) && !/logo_bytes|bytea/i.test(ttlSponsorsCode));
+check('0035 opisuje tabele i kolumny komentarzem',
+  /comment on table public\.sponsor_submissions is/i.test(ttlSponsors)
+  && (ttlSponsors.match(/comment on column public\.sponsor_submissions/gi) || []).length >= 3);
 
 /* --- wynik -------------------------------------------------------------- */
 

@@ -486,7 +486,15 @@
       'date.placeholder': 'GG · MM · AAAA',
       'date.selected': 'Data selezionata',
       'validation.date': 'Inserisci una data valida.',
-      'validation.dateRange': 'Scegli una data tra {min} e {max}.'
+      'validation.dateRange': 'Scegli una data tra {min} e {max}.',
+      /* CIFRA NEL NOME — zdanie mówi, CO usunąć, nie „pole jest niepoprawne".
+         ---------------------------------------------------------------------------
+         Ten napis stoi pod imieniem i nazwiskiem w formularzu zapisu i pojawia się przy
+         PIERWSZEJ wpisanej cyfrze, a nie po wysłaniu. Mówi wprost o cyfrach, bo jedyną
+         rzeczą, której tu nie wolno, jest cyfra: apostrof, łącznik, spacja i znaki
+         diakrytyczne przechodzą (D'Angelo, Sanna-Pinna, Niño, Łukasz). Ogólne „popraw pole"
+         kazałoby zgadywać, co jest nie tak, i pierwszym podejrzanym byłby apostrof. */
+      'validation.noDigits': 'Nome e cognome non contengono cifre. Togli i numeri.'
     },
     pl: {
       'stepper.label': 'Etapy zgłoszenia',
@@ -504,7 +512,8 @@
       'date.placeholder': 'DD · MM · RRRR',
       'date.selected': 'Wybrana data',
       'validation.date': 'Wpisz prawidłową datę.',
-      'validation.dateRange': 'Wybierz datę od {min} do {max}.'
+      'validation.dateRange': 'Wybierz datę od {min} do {max}.',
+      'validation.noDigits': 'Imię i nazwisko nie zawierają cyfr. Usuń cyfry.'
     },
     en: {
       'stepper.label': 'Registration steps',
@@ -522,7 +531,8 @@
       'date.placeholder': 'DD · MM · YYYY',
       'date.selected': 'Selected date',
       'validation.date': 'Enter a valid date.',
-      'validation.dateRange': 'Choose a date between {min} and {max}.'
+      'validation.dateRange': 'Choose a date between {min} and {max}.',
+      'validation.noDigits': 'A first or last name has no digits in it. Remove the numbers.'
     },
     de: {
       'stepper.label': 'Schritte der Anmeldung',
@@ -540,7 +550,8 @@
       'date.placeholder': 'TT · MM · JJJJ',
       'date.selected': 'Ausgewähltes Datum',
       'validation.date': 'Gib ein gültiges Datum ein.',
-      'validation.dateRange': 'Wähle ein Datum zwischen {min} und {max}.'
+      'validation.dateRange': 'Wähle ein Datum zwischen {min} und {max}.',
+      'validation.noDigits': 'Vor- und Nachname enthalten keine Ziffern. Nimm die Zahlen heraus.'
     },
     es: {
       'stepper.label': 'Pasos de inscripción',
@@ -558,7 +569,8 @@
       'date.placeholder': 'DD · MM · AAAA',
       'date.selected': 'Fecha elegida',
       'validation.date': 'Introduce una fecha válida.',
-      'validation.dateRange': 'Elige una fecha entre {min} y {max}.'
+      'validation.dateRange': 'Elige una fecha entre {min} y {max}.',
+      'validation.noDigits': 'El nombre y el apellido no llevan cifras. Quita los números.'
     },
     fr: {
       'stepper.label': 'Étapes de l’inscription',
@@ -576,7 +588,8 @@
       'date.placeholder': 'JJ · MM · AAAA',
       'date.selected': 'Date sélectionnée',
       'validation.date': 'Saisissez une date valide.',
-      'validation.dateRange': 'Choisissez une date entre {min} et {max}.'
+      'validation.dateRange': 'Choisissez une date entre {min} et {max}.',
+      'validation.noDigits': 'Le prénom et le nom ne contiennent pas de chiffres. Retirez les chiffres.'
     }
   };
 
@@ -2178,13 +2191,16 @@
       'chat.sponsorConsentRules': 'Regolamento',
       'chat.sponsorNoDigits': 'Nome e cognome senza cifre, per favore. Scrivili di nuovo.',
       'chat.sponsorSummaryLead': 'Ecco tutto. Controlla che sia giusto: lo mando solo se confermi.',
-      'chat.sponsorSummaryYes': 'Sì, conferma',
-      'chat.sponsorSummaryFix': 'Correggi',
+      'chat.sponsorSummaryYes': 'Sì, invia',
+      'chat.sponsorSummaryFix': 'No, correggi',
       'chat.sponsorSummaryName': 'Nome sul carruleddhu',
       'chat.sponsorSummaryPerson': 'Persona',
       'chat.sponsorSummaryPhone': 'Telefono',
       'chat.sponsorSummaryEmail': 'E-mail',
-      'chat.sponsorSummaryNoPhone': 'non indicato',
+      'chat.sponsorSummaryLogo': 'Foto o logo',
+      'chat.sponsorSummaryLink': 'Sito o profilo',
+      'chat.sponsorSummaryLogoSet': 'allegata',
+      'chat.sponsorSummaryNone': 'non indicato',
       'chat.sponsorConsentRead': 'Leggi e accetta',
       'chat.sponsorConsentDone': 'Ho letto e accetto la privacy policy e il regolamento.',
       'chat.sponsorConsentYes': 'Accetto',
@@ -2197,13 +2213,16 @@
       'chat.sponsorConsentRules': 'Regulamin',
       'chat.sponsorNoDigits': 'Imię i nazwisko bez cyfr — wpisz je jeszcze raz.',
       'chat.sponsorSummaryLead': 'To wszystko. Sprawdź, czy się zgadza: wysyłam dopiero po Twoim potwierdzeniu.',
-      'chat.sponsorSummaryYes': 'Tak, potwierdzam',
-      'chat.sponsorSummaryFix': 'Popraw dane',
+      'chat.sponsorSummaryYes': 'Tak, wyślij',
+      'chat.sponsorSummaryFix': 'Nie, popraw',
       'chat.sponsorSummaryName': 'Nazwa na carruleddhi',
       'chat.sponsorSummaryPerson': 'Osoba',
       'chat.sponsorSummaryPhone': 'Telefon',
       'chat.sponsorSummaryEmail': 'E-mail',
-      'chat.sponsorSummaryNoPhone': 'nie podano',
+      'chat.sponsorSummaryLogo': 'Zdjęcie lub logo',
+      'chat.sponsorSummaryLink': 'Strona lub profil',
+      'chat.sponsorSummaryLogoSet': 'dołączone',
+      'chat.sponsorSummaryNone': 'nie podano',
       'chat.sponsorConsentRead': 'Przeczytaj i zaakceptuj',
       'chat.sponsorConsentDone': 'Przeczytałem i akceptuję politykę prywatności oraz regulamin.',
       'chat.sponsorConsentYes': 'Zgadzam się',
@@ -2216,13 +2235,16 @@
       'chat.sponsorConsentRules': 'Race rules',
       'chat.sponsorNoDigits': 'First and last name without digits, please. Type them again.',
       'chat.sponsorSummaryLead': 'That is everything. Check it is right: I only send it once you confirm.',
-      'chat.sponsorSummaryYes': 'Yes, confirm',
-      'chat.sponsorSummaryFix': 'Let me fix it',
+      'chat.sponsorSummaryYes': 'Yes, send it',
+      'chat.sponsorSummaryFix': 'No, let me fix it',
       'chat.sponsorSummaryName': 'Name on the cart',
       'chat.sponsorSummaryPerson': 'Person',
       'chat.sponsorSummaryPhone': 'Phone',
       'chat.sponsorSummaryEmail': 'E-mail',
-      'chat.sponsorSummaryNoPhone': 'not given',
+      'chat.sponsorSummaryLogo': 'Photo or logo',
+      'chat.sponsorSummaryLink': 'Site or profile',
+      'chat.sponsorSummaryLogoSet': 'attached',
+      'chat.sponsorSummaryNone': 'not given',
       'chat.sponsorConsentRead': 'Read and accept',
       'chat.sponsorConsentDone': 'I have read and accept the privacy policy and the rules.',
       'chat.sponsorConsentYes': 'I agree',
@@ -2235,13 +2257,16 @@
       'chat.sponsorConsentRules': 'Reglement',
       'chat.sponsorNoDigits': 'Vor- und Nachname ohne Ziffern, bitte. Schreib sie noch einmal.',
       'chat.sponsorSummaryLead': 'Das ist alles. Prüf, ob es stimmt: ich schicke es erst nach deiner Bestätigung.',
-      'chat.sponsorSummaryYes': 'Ja, bestätigen',
-      'chat.sponsorSummaryFix': 'Korrigieren',
+      'chat.sponsorSummaryYes': 'Ja, senden',
+      'chat.sponsorSummaryFix': 'Nein, korrigieren',
       'chat.sponsorSummaryName': 'Name auf dem Wagen',
       'chat.sponsorSummaryPerson': 'Person',
       'chat.sponsorSummaryPhone': 'Telefon',
       'chat.sponsorSummaryEmail': 'E-Mail',
-      'chat.sponsorSummaryNoPhone': 'nicht angegeben',
+      'chat.sponsorSummaryLogo': 'Foto oder Logo',
+      'chat.sponsorSummaryLink': 'Seite oder Profil',
+      'chat.sponsorSummaryLogoSet': 'angehängt',
+      'chat.sponsorSummaryNone': 'nicht angegeben',
       'chat.sponsorConsentRead': 'Lesen und zustimmen',
       'chat.sponsorConsentDone': 'Ich habe Datenschutzerklärung und Reglement gelesen und stimme zu.',
       'chat.sponsorConsentYes': 'Ich stimme zu',
@@ -2254,13 +2279,16 @@
       'chat.sponsorConsentRules': 'Reglamento',
       'chat.sponsorNoDigits': 'Nombre y apellido sin cifras, por favor. Escríbelos otra vez.',
       'chat.sponsorSummaryLead': 'Esto es todo. Comprueba que esté bien: lo envío solo si lo confirmas.',
-      'chat.sponsorSummaryYes': 'Sí, confirmo',
-      'chat.sponsorSummaryFix': 'Corregir',
+      'chat.sponsorSummaryYes': 'Sí, envíalo',
+      'chat.sponsorSummaryFix': 'No, corregir',
       'chat.sponsorSummaryName': 'Nombre en el carro',
       'chat.sponsorSummaryPerson': 'Persona',
       'chat.sponsorSummaryPhone': 'Teléfono',
       'chat.sponsorSummaryEmail': 'E-mail',
-      'chat.sponsorSummaryNoPhone': 'no indicado',
+      'chat.sponsorSummaryLogo': 'Foto o logo',
+      'chat.sponsorSummaryLink': 'Web o perfil',
+      'chat.sponsorSummaryLogoSet': 'adjunta',
+      'chat.sponsorSummaryNone': 'no indicado',
       'chat.sponsorConsentRead': 'Leer y aceptar',
       'chat.sponsorConsentDone': 'He leído y acepto la política de privacidad y el reglamento.',
       'chat.sponsorConsentYes': 'Acepto',
@@ -2273,13 +2301,16 @@
       'chat.sponsorConsentRules': 'Règlement',
       'chat.sponsorNoDigits': 'Prénom et nom sans chiffres, merci. Écris-les à nouveau.',
       'chat.sponsorSummaryLead': 'C’est tout. Vérifie que c’est juste : je n’envoie qu’après ta confirmation.',
-      'chat.sponsorSummaryYes': 'Oui, je confirme',
-      'chat.sponsorSummaryFix': 'Corriger',
+      'chat.sponsorSummaryYes': 'Oui, envoyez',
+      'chat.sponsorSummaryFix': 'Non, corriger',
       'chat.sponsorSummaryName': 'Nom sur le carruleddhu',
       'chat.sponsorSummaryPerson': 'Personne',
       'chat.sponsorSummaryPhone': 'Téléphone',
       'chat.sponsorSummaryEmail': 'E-mail',
-      'chat.sponsorSummaryNoPhone': 'non indiqué',
+      'chat.sponsorSummaryLogo': 'Photo ou logo',
+      'chat.sponsorSummaryLink': 'Site ou profil',
+      'chat.sponsorSummaryLogoSet': 'jointe',
+      'chat.sponsorSummaryNone': 'non indiqué',
       'chat.sponsorConsentRead': 'Lire et accepter',
       'chat.sponsorConsentDone': 'J’ai lu et j’accepte la politique de confidentialité et le règlement.',
       'chat.sponsorConsentYes': 'J’accepte',
@@ -2352,6 +2383,109 @@
       'chat.sponsorNeedPerson': 'Il me faut le prénom et le nom, les deux ensemble.',
       'chat.sponsorPhoneSkip': 'Passer le numéro',
       'chat.sponsorBadPhone': 'Ce numéro ne semble pas complet. Réécrivez-le, ou passez cette étape.'
+    }
+  };
+
+  /**
+   * DWA KROKI OPCJONALNE I MENU POPRAWEK
+   * ===========================================================================
+   * ZDJĘCIE I ODSYŁACZ SĄ OPCJONALNE I MÓWIĄ TO W PIERWSZYM ZDANIU
+   *   Nie w nawiasie na końcu i nie drobnym drukiem. Kreator sponsora prowadzi kogoś, kto
+   *   właśnie zgodził się zapłacić: pytanie o logo bez słowa „opcjonalne" czyta się jak
+   *   warunek, a brak logo pod ręką w telefonie kończy rozmowę na tym kroku. Każdy z tych
+   *   dwóch kroków ma widoczną pastylkę pominięcia — pominięcie jest NACIŚNIĘCIEM, nie słowem,
+   *   które trzeba trafić w swoim języku (ta sama decyzja, co przy `chat.sponsorPhoneSkip`).
+   *
+   * ODSYŁACZ: TYLKO `https://`, I ZDANIE MÓWI, CZEGO BRAKUJE
+   *   `chat.sponsorBadLink` podaje wymaganie i przykład, bo „niepoprawny adres" nie mówi, czy
+   *   problemem jest brak kropki, brak `https://`, czy literówka. Strona NIE dokleja `https://`
+   *   za człowieka: adres poprawiony po cichu bywa innym adresem niż zamierzony, a ten trafia
+   *   potem na publiczną stronę jako odsyłacz sponsora.
+   *
+   * MENU POPRAWEK
+   *   `chat.sponsorFixWhich` prowadzi rząd pastylek nazwanych etykietami z podsumowania
+   *   (`chat.sponsorSummary*`) — jedna kopia nazw pól, nie druga do rozjechania. Poprawia się
+   *   JEDNO pole i wraca do podsumowania; `chat.sponsorSummaryBack` jest wyjściem dla kogoś,
+   *   kto otworzył menu przez pomyłkę i nie chce nic zmieniać.
+   */
+  const chatSponsorOptionalExtras = {
+    it: {
+      'chat.sponsorAskLogo': 'Facoltativo: hai una foto o un logo da mettere sul sito? Puoi allegarla adesso oppure saltare — l’iscrizione vale comunque.',
+      'chat.sponsorLogoPick': 'Scegli l’immagine',
+      'chat.sponsorLogoSkip': 'Senza immagine',
+      'chat.sponsorLogoDone': 'Immagine allegata, grazie.',
+      'chat.sponsorLogoFailed': 'Non riesco a preparare questa immagine. Prova con un JPG o un PNG, oppure salta il passaggio.',
+      'chat.sponsorLogoUseButtons': 'Per l’immagine serve il pulsante qui sopra: aprilo, oppure salta il passaggio.',
+      'chat.sponsorAskLink': 'Anche questo è facoltativo: un link al sito o al profilo social? Scrivilo qui, oppure salta.',
+      'chat.sponsorLinkSkip': 'Senza link',
+      'chat.sponsorBadLink': 'Il link deve iniziare con https:// e contenere l’indirizzo, per esempio https://iltuoristorante.it. Riscrivilo, oppure salta il passaggio.',
+      'chat.sponsorFixWhich': 'Cosa correggo? Il resto lo tengo così com’è.',
+      'chat.sponsorSummaryBack': 'Torna al riepilogo'
+    },
+    pl: {
+      'chat.sponsorAskLogo': 'Krok opcjonalny: masz zdjęcie albo logo na stronę? Możesz je teraz dołączyć albo pominąć — zgłoszenie liczy się tak samo.',
+      'chat.sponsorLogoPick': 'Wybierz obraz',
+      'chat.sponsorLogoSkip': 'Bez obrazu',
+      'chat.sponsorLogoDone': 'Obraz dołączony, dziękuję.',
+      'chat.sponsorLogoFailed': 'Nie udało się przygotować tego obrazu. Spróbuj z plikiem JPG lub PNG albo pomiń ten krok.',
+      'chat.sponsorLogoUseButtons': 'Obraz wybiera się przyciskiem powyżej — otwórz go albo pomiń ten krok.',
+      'chat.sponsorAskLink': 'To też jest opcjonalne: odsyłacz do strony albo profilu w mediach społecznościowych? Wpisz go tutaj albo pomiń.',
+      'chat.sponsorLinkSkip': 'Bez odsyłacza',
+      'chat.sponsorBadLink': 'Odsyłacz musi zaczynać się od https:// i zawierać adres strony, na przykład https://twojarestauracja.it. Wpisz go jeszcze raz albo pomiń ten krok.',
+      'chat.sponsorFixWhich': 'Co poprawić? Resztę zostawiam bez zmian.',
+      'chat.sponsorSummaryBack': 'Wróć do podsumowania'
+    },
+    en: {
+      'chat.sponsorAskLogo': 'Optional step: do you have a photo or a logo for the site? You can attach it now or skip it — the entry counts either way.',
+      'chat.sponsorLogoPick': 'Choose the image',
+      'chat.sponsorLogoSkip': 'No image',
+      'chat.sponsorLogoDone': 'Image attached, thank you.',
+      'chat.sponsorLogoFailed': 'This image could not be prepared. Try a JPG or a PNG, or skip this step.',
+      'chat.sponsorLogoUseButtons': 'The image goes in through the button above — open it, or skip this step.',
+      'chat.sponsorAskLink': 'Optional as well: a link to your site or a social profile? Write it here, or skip.',
+      'chat.sponsorLinkSkip': 'No link',
+      'chat.sponsorBadLink': 'The link has to start with https:// and carry the address, for example https://yourrestaurant.it. Type it again, or skip this step.',
+      'chat.sponsorFixWhich': 'What should I fix? Everything else stays as it is.',
+      'chat.sponsorSummaryBack': 'Back to the summary'
+    },
+    de: {
+      'chat.sponsorAskLogo': 'Freiwilliger Schritt: hast du ein Foto oder ein Logo für die Seite? Du kannst es jetzt anhängen oder überspringen — die Anmeldung gilt so oder so.',
+      'chat.sponsorLogoPick': 'Bild auswählen',
+      'chat.sponsorLogoSkip': 'Ohne Bild',
+      'chat.sponsorLogoDone': 'Bild angehängt, danke.',
+      'chat.sponsorLogoFailed': 'Dieses Bild konnte nicht vorbereitet werden. Versuch ein JPG oder PNG, oder überspring den Schritt.',
+      'chat.sponsorLogoUseButtons': 'Das Bild kommt über den Knopf oben herein — öffne ihn, oder überspring den Schritt.',
+      'chat.sponsorAskLink': 'Ebenfalls freiwillig: ein Link zur Seite oder zum Social-Profil? Schreib ihn hier, oder überspring.',
+      'chat.sponsorLinkSkip': 'Ohne Link',
+      'chat.sponsorBadLink': 'Der Link muss mit https:// beginnen und die Adresse enthalten, zum Beispiel https://deinrestaurant.it. Schreib ihn nochmal, oder überspring den Schritt.',
+      'chat.sponsorFixWhich': 'Was soll ich korrigieren? Alles andere bleibt so.',
+      'chat.sponsorSummaryBack': 'Zurück zur Übersicht'
+    },
+    es: {
+      'chat.sponsorAskLogo': 'Paso opcional: ¿tienes una foto o un logo para la web? Puedes adjuntarlo ahora u omitirlo: la inscripción vale igual.',
+      'chat.sponsorLogoPick': 'Elegir la imagen',
+      'chat.sponsorLogoSkip': 'Sin imagen',
+      'chat.sponsorLogoDone': 'Imagen adjunta, gracias.',
+      'chat.sponsorLogoFailed': 'No se ha podido preparar esta imagen. Prueba con un JPG o un PNG, u omite este paso.',
+      'chat.sponsorLogoUseButtons': 'La imagen entra por el botón de arriba: ábrelo, u omite este paso.',
+      'chat.sponsorAskLink': 'También es opcional: ¿un enlace a tu web o a un perfil social? Escríbelo aquí, u omítelo.',
+      'chat.sponsorLinkSkip': 'Sin enlace',
+      'chat.sponsorBadLink': 'El enlace tiene que empezar por https:// y llevar la dirección, por ejemplo https://turestaurante.it. Escríbelo otra vez, u omite este paso.',
+      'chat.sponsorFixWhich': '¿Qué corrijo? El resto lo dejo igual.',
+      'chat.sponsorSummaryBack': 'Volver al resumen'
+    },
+    fr: {
+      'chat.sponsorAskLogo': 'Étape facultative : avez-vous une photo ou un logo pour le site ? Vous pouvez le joindre maintenant ou passer — l’inscription compte de toute façon.',
+      'chat.sponsorLogoPick': 'Choisir l’image',
+      'chat.sponsorLogoSkip': 'Sans image',
+      'chat.sponsorLogoDone': 'Image jointe, merci.',
+      'chat.sponsorLogoFailed': 'Cette image n’a pas pu être préparée. Essayez un JPG ou un PNG, ou passez cette étape.',
+      'chat.sponsorLogoUseButtons': 'L’image passe par le bouton ci-dessus : ouvrez-le, ou passez cette étape.',
+      'chat.sponsorAskLink': 'Facultatif aussi : un lien vers votre site ou un profil social ? Écrivez-le ici, ou passez.',
+      'chat.sponsorLinkSkip': 'Sans lien',
+      'chat.sponsorBadLink': 'Le lien doit commencer par https:// et contenir l’adresse, par exemple https://votrerestaurant.it. Réécrivez-le, ou passez cette étape.',
+      'chat.sponsorFixWhich': 'Qu’est-ce que je corrige ? Le reste ne change pas.',
+      'chat.sponsorSummaryBack': 'Retour au récapitulatif'
     }
   };
 
@@ -2626,6 +2760,7 @@
   Object.keys(chatGateExtras).forEach((locale) => Object.assign(extras[locale], chatGateExtras[locale]));
   Object.keys(chatConsentExtras).forEach((locale) => Object.assign(extras[locale], chatConsentExtras[locale]));
   Object.keys(chatSponsorFormExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorFormExtras[locale]));
+  Object.keys(chatSponsorOptionalExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorOptionalExtras[locale]));
   Object.keys(chatHandoverExtras).forEach((locale) => Object.assign(extras[locale], chatHandoverExtras[locale]));
   Object.keys(podiumResultsExtras).forEach((locale) => Object.assign(extras[locale], podiumResultsExtras[locale]));
 

@@ -767,19 +767,20 @@ import {
    */
   function buildAwardItems(awards) {
     const source = Array.isArray(awards) ? awards : [];
-    return Array.from({ length: AWARD_COUNT }, (_, index) => {
+    const items = Array.from({ length: AWARD_COUNT }, (_, index) => {
       const number = index + 1;
       const key = `prize-${number}`;
       /* Dopasowanie po `awardKey`, nie po pozycji w tablicy: serwer oddaje tylko rozstrzygnięte
          nagrody i w kolejności ogłaszania, więc `awards[3]` nie jest czwartą nagrodą. */
       const won = source.find((row) => String(row?.awardKey || '') === key) || null;
 
+      if (!won) return null; // Nie pokazujemy kategorii, która nie ma jeszcze zwycięzcy
+
       const item = document.createElement('li');
       item.className = 'award-card';
       item.dataset.awardKey = key;
-      /* Stan czytany przez CSS i przez sondę. Dwa słowa zamiast klasy „is-empty", bo to nie
-         jest brak treści — to jest treść „jeszcze nie ogłoszono". */
-      item.dataset.awardState = won ? 'won' : 'pending';
+      /* Stan czytany przez CSS i przez sondę. */
+      item.dataset.awardState = 'won';
 
       const head = document.createElement('div');
       head.className = 'award-card__head';
@@ -795,14 +796,6 @@ import {
       title.textContent = text(`prize.${number}`);
       head.append(rank, title);
       item.append(head);
-
-      if (!won) {
-        const pending = document.createElement('p');
-        pending.className = 'award-card__pending';
-        pending.textContent = text('voting.awardPending');
-        item.append(pending);
-        return item;
-      }
 
       const who = document.createElement('div');
       who.className = 'award-card__who';
@@ -849,6 +842,8 @@ import {
 
       return item;
     });
+
+    return items.filter(Boolean);
   }
 
   /**

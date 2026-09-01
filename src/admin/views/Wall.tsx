@@ -4,6 +4,45 @@ import { cn, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import { fetchWall, moderateWall, type WallComment } from '../api';
 
+function DeleteButton({ id, act, t }: { id: string, act: (id: string, action: 'delete') => void, t: (key: TranslateKey) => string }) {
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<number>(0);
+
+  const disarm = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = 0;
+    setArmed(false);
+  }, []);
+
+  const click = () => {
+    if (armed) {
+      disarm();
+      act(id, 'delete');
+    } else {
+      setArmed(true);
+      timer.current = window.setTimeout(disarm, 5000);
+    }
+  };
+
+  useEffect(() => disarm, [disarm]);
+
+  return (
+    <button
+      type="button"
+      onClick={click}
+      className={cn(
+        "flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+        armed 
+          ? "bg-coral text-white border border-coral shadow-lg" 
+          : "border border-coral/40 text-coral hover:bg-coral hover:text-white"
+      )}
+    >
+      <Trash2 className="size-3.5" />
+      {armed ? (t('locale.intl') === 'pl-PL' ? 'Na pewno usunąć?' : 'Confermi?') : t('wall.delete')}
+    </button>
+  );
+}
+
 type Filter = 'pending' | 'approved' | 'all';
 
 export function Wall({
@@ -54,7 +93,6 @@ export function Wall({
    * twenty pending messages, and the next one they meant to press would have moved.
    */
   const act = async (id: string, action: 'approve' | 'hide' | 'delete') => {
-    if (action === 'delete' && !window.confirm(t('wall.confirmDelete'))) return;
     setBusy(id);
     try {
       await moderateWall(apiKey, id, action);
@@ -200,14 +238,7 @@ export function Wall({
                     {t('wall.approve')}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => act(row.id, 'delete')}
-                  className="flex items-center gap-1.5 rounded-full border border-coral/40 px-3.5 py-1.5 text-xs font-semibold text-coral hover:bg-coral hover:text-white"
-                >
-                  <Trash2 className="size-3.5" />
-                  {t('wall.delete')}
-                </button>
+                <DeleteButton id={row.id} act={act} t={t} />
               </div>
             </li>
           ))

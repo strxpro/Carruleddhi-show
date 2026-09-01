@@ -52,6 +52,19 @@ export interface InboxCounts {
   newsletter: number;
   wall: number;
   chats: number;
+  /**
+   * Zgłoszenia sponsorów czekające na decyzję. OPCJONALNE, i to jest cała treść tego pola.
+   *
+   * Końcówka `inbox` liczy dziś sześć rzeczy i o sponsorach nie wie — sprawdzone w
+   * `worker/index.js`. Dopisanie siódmego licznika jest zmianą W WORKERZE, a ten ekran jej nie
+   * robi. Pole jest tu, żeby plakietka w nawigacji zapaliła się sama w dniu, w którym Worker
+   * zacznie tę liczbę oddawać, bez ani jednej poprawki w panelu.
+   *
+   * Dlatego opcjonalne, a nie `number` z zerem: zero znaczyłoby „sprawdziliśmy, nikt nie
+   * czeka", a prawdą jest „nie pytaliśmy". Plakietka rysuje się tylko dla wartości prawdziwej
+   * (`item.badge ? …` w `dashboard-sidebar.tsx`), więc `undefined` to po prostu brak plakietki.
+   */
+  sponsors?: number;
 }
 
 /** One thing that happened, for the bell's list. `kind` matches a key of InboxCounts. */
@@ -325,6 +338,79 @@ export const uploadSponsorLogo = (key: string, photo: string) =>
 
 export const uploadGalleryImage = (key: string, photo: string) =>
   call<{ ok: true; imagePath: string; url: string }>('settings-admin', key, { action: 'gallery', photo });
+
+/* ------------------------------------------- zgłoszenia sponsorów z czatu
+
+   TRZY AKCJE `settings-admin`, NAZWY PRZECZYTANE Z WORKERA
+     `sponsor-leads` (odczyt listy), `sponsor-approve` i `sponsor-reject` — dokładnie te napisy
+     rozpoznaje `settingsAdmin` w `worker/index.js`; każdy inny wraca jako
+     `400 SETTINGS_UNKNOWN_ACTION`. Zgłoszenia leżą w tabeli `sponsor_submissions` (migracja
+     0035) ze stanem `pending | approved | rejected`.
+
+   ZATWIERDZENIE ZAPISUJE SPONSORA PO STRONIE WORKERA — I DLATEGO PANEL TEGO NIE ROBI
+     `sponsorLeadApprove` czyta ustawienia, dopisuje wpis do `site_settings.sponsors`,
+     przepuszcza CAŁĄ listę przez `cleanSettings` i tylko wtedy stawia status `approved`.
+     W odpowiedzi oddaje nowe ustawienia w kształcie panelowym. Dopisanie sponsora także tutaj,
+     przez `saveSettings`, dałoby DWA kafelki tej samej firmy na stronie — raz od Workera, raz
+     od panelu. Zamiast tego widok wchłania `settings` z odpowiedzi, więc lista sponsorów
+     odrysowuje się bez klikania „Zapisz" i bez drugiego żądania.
+
+   DLACZEGO `submissions` I `counts` SĄ `unknown`
+     Ten sam powód, co przy dwunastu nagrodach wyżej: to jest kształt Z DRUTU, a wdrożona
+     funkcja może być starsza od tego panelu. Typ obiecujący tablicę zamienia taki rozjazd
+     w `undefined.map(...)`, czyli biały ekran w zakładce, w której stoi też kłódka całej
+     strony i termin zawodów. Kształt sprawdzają `normaliseSponsorLeads` i
+     `normalisePendingCount` w `lib/sponsorLeads.ts`.
+
+   CZEGO TU NIE MA
+     Żadnej akcji „cofnij odrzucenie". Odrzucenie jest w tym kontrakcie nieodwracalne (Worker
+     zna tylko trzy stany i nie ma drogi z `rejected` z powrotem), a widok pyta o potwierdzenie
+     właśnie dlatego. Funkcja, która by je cofała, kazałaby traktować odrzucenie jak stan
+     przełącznika, a to jest decyzja przekazana firmie mailem. */
+
+/**
+ * Zgłoszenia czekające na decyzję.
+ *
+ * `status` jedzie jawnie, choć to jedyna wartość, o jaką ta karta kiedykolwiek pyta: bez tego
+ * pola Worker odpowiada `all`, czyli razem z archiwum — a wtedy karta „do zatwierdzenia"
+ * pokazałaby zgłoszenia już odrzucone, z żywym guzikiem „Zatwierdź" obok. Filtr jest też
+ * powtórzony w panelu, patrz `normaliseSponsorLeads`.
+ */
+export const fetchSponsorLeads = (key: string, limit = 50) =>
+  call<{ ok: true; submissions?: unknown; counts?: unknown }>('settings-admin', key, {
+    action: 'sponsor-leads',
+    status: 'pending',
+    limit
+  });
+
+/**
+ * Zatwierdza zgłoszenie: sponsor wchodzi na listę, zgłoszenie dostaje `approved`.
+ *
+ * `settings` w odpowiedzi to CAŁE ustawienia po zmianie, w kształcie panelowym — panel je
+ * wchłania, zamiast doczytywać osobnym żądaniem, żeby lista sponsorów na ekranie nie mogła
+ * się rozjechać z tym, co naprawdę leży w bazie.
+ *
+ * `added: false` znaczy „ten sponsor już tam był" — Worker rozpoznaje powtórkę po ścieżce logo
+ * albo po parze nazwa+adres i wtedy tylko przestawia status. To jest normalna odpowiedź na
+ * drugie kliknięcie, nie awaria, i widok mówi o tym osobnym zdaniem.
+ *
+ * Oba pola opcjonalne, bo to kształt z drutu — patrz komentarz nad sekcją.
+ */
+export const approveSponsorLead = (key: string, id: string) =>
+  call<{ ok: true; settings?: SiteSettings; added?: boolean }>('settings-admin', key, {
+    action: 'sponsor-approve',
+    id
+  });
+
+/**
+ * Odrzuca zgłoszenie. Zmienia wyłącznie status — wiersz i logo zostają w bazie.
+ *
+ * Nieodwracalne z panelu, dlatego widok pyta „czy na pewno". Wiersz zostaje po to, żeby dało
+ * się odpowiedzieć na „czy oni się już zgłaszali", które pada przy każdym telefonie od firmy
+ * piszącej po pół roku.
+ */
+export const rejectSponsorLead = (key: string, id: string) =>
+  call<{ ok: true }>('settings-admin', key, { action: 'sponsor-reject', id });
 
 /** Archives the previous voting edition, prepares the saved date and arms its mailing. Safe to press twice. */
 export const announceEdition = (key: string) =>

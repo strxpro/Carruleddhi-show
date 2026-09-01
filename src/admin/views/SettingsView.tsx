@@ -26,6 +26,7 @@ import {
 } from '../api';
 import { PurgePanel } from './PurgePanel';
 import { EditionWizard } from './EditionWizard';
+import { SponsorLeads } from './SponsorLeads';
 
 /**
  * Settings, and the two things that used to need a developer.
@@ -50,6 +51,44 @@ import { EditionWizard } from './EditionWizard';
 
 const MAX_LOGO_EDGE = 480;
 const MAX_LOGO_BYTES = 900_000;
+
+/*
+ * SUFIT GALERII: DWANAŚCIE KADRÓW — DZIŚ TYLKO JAKO NOTATKA, BEZ STAŁEJ.
+ * ============================================================================
+ * Liczba żyje w `worker/index.js` (`GALLERY_MAX`, tam pełne uzasadnienie) i w
+ * `assets/js/site-config.js`. Trzecia kopia stała tutaj, żeby guzik „Dodaj zdjęcie" gasł PRZED
+ * wgraniem trzynastego pliku — ale tego guzika w tej karcie NIE MA: kafelki są stałej liczby i
+ * da się je tylko podmieniać. Stała bez ani jednego odczytu nie przechodzi `noUnusedLocals`,
+ * więc została z niej ta notatka: wiedza zostaje, martwy kod nie.
+ *
+ * Gdy dodawanie i usuwanie kadrów wróci na tę kartę, sufit wraca tu jako `const GALLERY_MAX`
+ * i gasi guzik po dwunastym kadrze. Bez niego panel zmniejszy zdjęcie, wyśle je do bucketa,
+ * dostanie odmowę `SETTINGS_GALLERY_SIZE` i pokaże „nie udało się zapisać" — z plikiem, który
+ * już leży na serwerze i nikt go nie użyje.
+ */
+
+/**
+ * Ile czekać od ostatniego uderzenia w klawiaturę w polu podpisu, zanim poleci zapis.
+ *
+ * Tyle samo co wcześniej. Krócej i dwudziestoznakowy podpis to dwadzieścia zapisów, z
+ * których dziewiętnaście zapisuje ucięty tekst; dłużej i ktoś zdąży zamknąć kartę przed
+ * zapisem. Dodanie, usunięcie i przestawienie kadru NIE korzystają z odczekania — to są
+ * pojedyncze decyzje, nie pisanie, więc zapisują się od razu.
+ */
+const GALLERY_AUTOSAVE_MS = 800;
+
+/**
+ * Podpisy dociągnięte do liczby zdjęć.
+ *
+ * Ten sam warunek co `alignGalleryCaptions` w workerze i `cleanGalleryCaptions` na stronie
+ * publicznej. Tutaj jest potrzebny, bo wiersz w bazie mógł być zapisany starszą wersją
+ * (pięć podpisów na sztywno), a wtedy `settings.galleryCaptions[7]` jest `undefined` —
+ * czyli pole tekstowe bez wartości, które React uznaje za niekontrolowane i zaczyna
+ * wypisywać ostrzeżenia, a wpisany w nie podpis nie ma gdzie trafić.
+ */
+function alignCaptions(images: string[], captions: string[]): string[] {
+  return images.map((_image, index) => captions[index] ?? '');
+}
 
 /**
  * Shrinks a picked file to something sensible before it is uploaded.
@@ -129,6 +168,29 @@ const EMPTY: SiteSettings = {
   ],
   announcementEventDate: ''
 };
+
+/**
+ * Podpisane adresy podglądu, ułożone WEDŁUG ŚCIEŻKI, nie według pozycji.
+ *
+ * JAKI BŁĄD TO ZAPOBIEGA
+ *   Wcześniej kafelek szukał swojego podglądu przez `settings.galleryPreviewUrls[index]`.
+ *   Dopóki kolejności nie dało się zmienić, indeks był tym samym co ścieżka. Od teraz da
+ *   się przestawiać i usuwać kadry, a wtedy indeks znaczy coś innego niż w chwili odczytu:
+ *   po przesunięciu kadru z pozycji trzeciej na pierwszą kafelek pierwszy pokazywałby
+ *   podpisany adres zdjęcia, które stoi teraz na trzeciej pozycji. Dwa kafelki z tym samym
+ *   obrazkiem i żaden z tym, który naprawdę mają.
+ *
+ *   Klucz ze ścieżki nie zależy od kolejności, więc przestawianie kafelków jest wtedy
+ *   przestawianiem kafelków, a nie także przestawianiem obrazków między nimi.
+ */
+function galleryPreviewMap(settings: SiteSettings): Record<string, string> {
+  const map: Record<string, string> = {};
+  settings.galleryImages.forEach((path, index) => {
+    const url = settings.galleryPreviewUrls[index];
+    if (url) map[path] = url;
+  });
+  return map;
+}
 
 function toLocalInput(iso: string): string {
   const date = new Date(iso);
@@ -237,6 +299,25 @@ export function SettingsView({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
   const [galleryBusy, setGalleryBusy] = useState<Set<number>>(new Set());
+
+  /**
+   * Zapisana wersja galerii, trzymana obok edytowanej.
+   *
+   * TYLKO SETTER, I TO JEST STAN PRZEJŚCIOWY, NIE DECYZJA
+   *   Ta sama sztuczka co `savedSponsors`: „masz niezapisane zmiany" ma być FAKTEM policzonym
+   *   z dwóch tablic, a nie flagą, którą ktoś musi pamiętać ustawić i skasować. Karta galerii
+   *   nie ma jeszcze guzika „Zapisz teraz" ani przestawiania kadrów, więc nikt tej kopii nie
+   *   czyta — a odczyt zapisany „na przyszłość" nie przechodzi `noUnusedLocals` i wywraca
+   *   `tsc --noEmit` całego panelu.
+   *
+   *   Zapis został, bo jest już wołany po odczycie ustawień i kosztuje jedno przypisanie:
+   *   gdy tamte guziki wrócą, mają z czym porównywać od pierwszego renderu, zamiast
+   *   pokazywać „niezapisane zmiany" do pierwszego zapisu.
+   */
+  const [, setSavedGallery] = useState<{ images: string[]; captions: string[] }>({
+    images: EMPTY.galleryImages,
+    captions: EMPTY.galleryCaptions
+  });
   /* Czy kreator nowej edycji jest otwarty. Ogłaszanie wyprowadzone z tej karty do osobnego
      ekranu — patrz komentarz przy guziku, który go otwiera. */
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -255,8 +336,13 @@ export function SettingsView({
   const fileInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
   const pendingLogoFor = useRef<number | null>(null);
-  const pendingGalleryFor = useRef<number | null>(null);
+  /* `'append'` zamiast liczby znaczy „wgrywam nowy kadr na koniec", a nie „podmieniam
+     istniejący". Jedno pole `<input type="file">` obsługuje oba przypadki, bo to ten sam
+     wybierak plików i ta sama droga wgrywania — druga kopia znaczyłaby dwa miejsca do
+     poprawienia, gdy zmieni się dozwolony format albo rozmiar. */
+  const pendingGalleryFor = useRef<number | 'append' | null>(null);
   const galleryImagesRef = useRef(EMPTY.galleryImages);
+  const galleryCaptionsRef = useRef(EMPTY.galleryCaptions);
   const captionsTimerRef = useRef<number>(0);
   const gallerySaveChain = useRef<Promise<void>>(Promise.resolve());
 
@@ -265,9 +351,16 @@ export function SettingsView({
     fetchSettings(apiKey)
       .then((response) => {
         if (!alive) return;
-        setSettings(response.settings);
+        const captions = alignCaptions(response.settings.galleryImages, response.settings.galleryCaptions);
+        setSettings({ ...response.settings, galleryCaptions: captions });
         setSavedSponsors(response.settings.sponsors);
         galleryImagesRef.current = response.settings.galleryImages;
+        galleryCaptionsRef.current = captions;
+        setSavedGallery({ images: response.settings.galleryImages, captions });
+        /* Podpisane adresy zapamiętane pod ŚCIEŻKĄ, nie pod pozycją — powód przy
+           `galleryPreviewMap`. Bez tego pierwsze przestawienie kadrów pokazałoby obrazki
+           przesunięte względem kafelków. */
+        setPreview((current) => ({ ...current, ...galleryPreviewMap(response.settings) }));
         setEventDraft({
           eventName: response.settings.eventName,
           eventDate: toLocalInput(response.settings.eventDate),
@@ -392,6 +485,55 @@ export function SettingsView({
     || settings.galleryPreviewUrls[index]
     || (image.startsWith('/') || image.startsWith('http') ? image : '');
 
+  /**
+   * Przyjmuje listę sponsorów po zatwierdzeniu zgłoszenia. Bez zapisu — zapis zrobił Worker.
+   * ==========================================================================
+   * DLACZEGO TU NIE MA `push()`
+   *   Bo końcówka `sponsor-approve` sama dopisuje wpis do `site_settings.sponsors`, przepuszcza
+   *   całą listę przez `cleanSettings` i tylko wtedy stawia zgłoszeniu status `approved` —
+   *   sprawdzone w `worker/index.js`. Wywołanie `push({ sponsors: [...] })` obok tego byłoby
+   *   DRUGIM dopisaniem tej samej firmy: dwa kafelki na stronie, jeden od Workera, jeden od
+   *   panelu. Skutek dla patrzącego jest ten sam, o który chodziło — sponsor pojawia się na
+   *   liście niżej i jest zapisany bez klikania „Zapisz" — tylko zapisującym jest serwer.
+   *
+   * DLACZEGO NIE `absorbSettings`, KTÓRE JUŻ ISTNIEJE
+   *   Tamta funkcja przepisuje także `eventDraft`, bo służy kreatorowi nowej edycji, który
+   *   nazwę, termin i miejsce właśnie ustawił. Tutaj byłoby to szkodliwe: decyzja o sponsorze
+   *   skasowałaby wpisywany w tej chwili termin zawodów, zanim autozapis karty wydarzenia
+   *   zdąży wystrzelić. Ta wersja rusza dokładnie to, co zmieniła odpowiedź — listę sponsorów
+   *   i to, z czym porównuje ją `sponsorsDirty`.
+   *
+   * `undefined` znaczy „końcówka nie przysłała ustawień" (starsze wdrożenie Workera). Wtedy
+   * doczytujemy je osobno, bo alternatywą jest lista sponsorów bez właśnie zatwierdzonej firmy
+   * — czyli ekran mówiący, że zatwierdzenie nic nie zrobiło.
+   */
+  const absorbApproved = useCallback(
+    (next: SiteSettings | undefined) => {
+      if (next) {
+        setSettings(next);
+        setSavedSponsors(next.sponsors);
+        galleryImagesRef.current = next.galleryImages;
+        setLoadFailed(false);
+        return;
+      }
+      void fetchSettings(apiKey)
+        .then((response) => {
+          setSettings(response.settings);
+          setSavedSponsors(response.settings.sponsors);
+          galleryImagesRef.current = response.settings.galleryImages;
+          setPreview((current) => ({ ...current, ...galleryPreviewMap(response.settings) }));
+          setLoadFailed(false);
+        })
+        .catch(() => {
+          /* Zatwierdzenie SIĘ UDAŁO — mówi o tym karta zgłoszeń — a nie udało się doczytanie
+             listy. Zaznaczone jako nieudany odczyt, żeby guzik „Zapisz" przy sponsorach nie
+             wysłał zaraz listy sprzed zatwierdzenia i nie skasował świeżo dopisanej firmy. */
+          setLoadFailed(true);
+        });
+    },
+    [apiKey]
+  );
+
   const pickGallery = (index: number) => {
     pendingGalleryFor.current = index;
     setUploadError(false);
@@ -402,7 +544,13 @@ export function SettingsView({
     const file = event.target.files?.[0];
     const index = pendingGalleryFor.current;
     event.target.value = '';
-    if (!file || index === null) return;
+    /* `typeof index === 'number'` zamiast `index !== null`, i to nie jest kosmetyka: typ tego
+       uchwytu dopuszcza `'append'` („wgraj nowy kadr na koniec"), a cała droga niżej numeruje
+       kafelki — `galleryBusy` jest zbiorem liczb, a podmiana kadru szuka pozycji przez
+       `at === index`. Napis w tych miejscach oznacza kółko, które nie kręci się przy żadnym
+       kafelku, i zdjęcie wgrane w nikąd. Dopisywania na koniec ta karta jeszcze nie ma, więc
+       póki co jest to warunek, który po prostu nie ma jak nie być spełniony. */
+    if (!file || typeof index !== 'number') return;
     pendingGalleryFor.current = null;
 
     setGalleryBusy((prev) => new Set(prev).add(index));
@@ -883,7 +1031,11 @@ export function SettingsView({
                   } catch (err) {
                     console.error('Failed to save caption', err);
                   }
-                }, 800);
+                  /* Stała zamiast wpisanego tu wcześniej `800`. Ta sama liczba, ale opisana:
+                     uzasadnienie długości odczekania stoi przy `GALLERY_AUTOSAVE_MS`, a liczba
+                     wpisana w wywołanie znaczyła, że komentarz opisywał wartość, której nikt
+                     nie używał. */
+                }, GALLERY_AUTOSAVE_MS);
               }}
             />
           </div>
@@ -891,6 +1043,17 @@ export function SettingsView({
         </div>
         {uploadError ? <p className="mt-3 text-[12px] text-coral">{t('set.uploadFailed')}</p> : null}
       </section>
+
+      {/* ------------------------------------------------- zgłoszenia sponsorów
+          NAD listą sponsorów, nie pod nią: to jest skrzynka wejściowa, a lista poniżej jest
+          jej skutkiem. Pod listą trzydziestu sponsorów nowe zgłoszenie leżałoby poza pierwszym
+          ekranem telefonu — a pytanie, z którym się tu wchodzi, brzmi „czy ktoś się zgłosił",
+          nie „kto już jest".
+
+          Zatwierdzenie zapisuje się samo, po stronie Workera; `onApproved` wnosi oddane przez
+          niego ustawienia do stanu tego ekranu, żeby lista niżej odrysowała się od razu i nie
+          mogła się rozjechać z bazą — uzasadnienie przy `absorbApproved`. */}
+      <SponsorLeads t={t} apiKey={apiKey} onApproved={absorbApproved} />
 
       {/* ---------------------------------------------------------- sponsors */}
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">

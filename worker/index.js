@@ -228,8 +228,12 @@ const FIELD_WHITELIST = {
   // A public read takes no input at all, which is the shortest possible answer to
   // "what can a visitor ask this endpoint to do".
   settings: [],
-  // `photo` is a data URL, downscaled in the browser, only used by action 'logo'.
-  'settings-admin': ['settings', 'action', 'photo'],
+  /* `photo` is a data URL, downscaled in the browser, only used by action 'logo'.
+     `id`, `status` i `limit` obsługują listę zgłoszeń sponsorów i werdykt nad nią (akcje
+     `sponsor-leads`, `sponsor-approve`, `sponsor-reject`). Bez nich sanitizacja wyrzuca je
+     po cichu, `sponsor-approve` widzi puste `id` i odmawia tak, jakby panel przysłał
+     śmieci — awaria wyglądająca jak działający przycisk, który zawsze mówi „nie". */
+  'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit'],
   /* The clock supplies nothing: the function works out what is due from the date it
      already knows.
        dryRun   render the letters without recording that they went out, so the whole
@@ -270,8 +274,20 @@ const FIELD_WHITELIST = {
      `code` i `consent` doszły razem z bramką: to żądanie jest czynnością, więc niesie parę
      (adres, kod) przy sobie (O5), a zgoda jest sprawdzana po stronie serwera — pastylka
      w przeglądarce jest sugestią, nie dowodem. `consent` jest wartością logiczną i przechodzi
-     przez `sanitizeScalar` nietknięte, tak jak `dryRun` przy przypomnieniach. */
-  'sponsor-lead': ['cartName', 'firstName', 'lastName', 'phone', 'email', 'code', 'consent', 'locale'],
+     przez `sanitizeScalar` nietknięte, tak jak `dryRun` przy przypomnieniach.
+
+     `logo` i `siteUrl` doszły razem z kreatorem, który zbiera je opcjonalnie.
+     `logo` to data URL, zmniejszony w przeglądarce, i JEST na liście `LONG_FIELDS` — bez
+     tego sanitizacja przycięłaby go do 3000 znaków, czyli do połowy obrazka, a
+     `decodePhoto` odmówiłby formatu, którego nikt nie przysłał. `sponsor-lead` jest też
+     dopisany do `carriesImage` w routerze, inaczej całe żądanie odbija się o 413 zanim
+     handler cokolwiek zobaczy. To znowu te same CZTERY miejsca, o których mówią komentarze
+     przy `ALLOWED_TYPES` — pominięcie któregokolwiek daje końcówkę, która wygląda na
+     działającą i po cichu gubi logo. */
+  'sponsor-lead': [
+    'cartName', 'firstName', 'lastName', 'phone', 'email', 'code', 'consent', 'locale',
+    'logo', 'siteUrl'
+  ],
 
   /* Zgłoszenie widziane oczami zawodnika.
      `entry-lookup` bierze adres, a od niedawna także imię i nazwisko — oba opcjonalne.
@@ -323,8 +339,14 @@ const MAX_BODY_BYTES = 16 * 1024;
  * refuses anything over 5 MB, so this is the first of two limits, not the only one.
  */
 const MAX_PHOTO_BODY_BYTES = 1536 * 1024;
-/** Fields that are allowed to be long. Everything else is capped at 3000 chars. */
-const LONG_FIELDS = new Set(['photo']);
+/* Fields that are allowed to be long. Everything else is capped at 3000 chars.
+
+   `logo` to ta sama rzecz co `photo`, tylko pod inną nazwą: data URL z logo sponsora,
+   przysyłany przez kreator w czacie (`sponsor-lead`). Nazwa jest inna, bo w tym żądaniu
+   „photo" nic by nie znaczyło — zgłoszenie sponsora nie ma zdjęcia, ma logo. Gdyby ten
+   klucz tu nie stał, sanitizacja przycięłaby obrazek do 3000 znaków i `decodePhoto`
+   odmówiłby formatu, którego nikt nie przysłał. */
+const LONG_FIELDS = new Set(['photo', 'logo']);
 
 /**
  * Pola, w których nowa linia jest treścią, a nie śmieciem.
@@ -1549,6 +1571,11 @@ const SPONSOR_FRAMES = {
     who: '👤 Persona',
     phone: '📞 Telefono',
     email: '✉️ E-mail',
+    /* Odsyłacz i logo są OPCJONALNE, więc linie z nimi pojawiają się tylko wtedy, gdy jest
+       co pokazać. Puste etykiety w ramce to dwie linijki, po których organizator za każdym
+       razem sprawdza, czy to awaria, czy brak danych. */
+    site: '🔗 Sito / profilo',
+    logo: '🖼️ Logo allegato',
     note: 'Vuole collaborare. Richiama.'
   },
   pl: {
@@ -1557,6 +1584,8 @@ const SPONSOR_FRAMES = {
     who: '👤 Osoba',
     phone: '📞 Telefon',
     email: '✉️ E-mail',
+    site: '🔗 Strona / profil',
+    logo: '🖼️ Logo dołączone',
     note: 'Chętny do współpracy. Oddzwoń.'
   },
   en: {
@@ -1565,6 +1594,8 @@ const SPONSOR_FRAMES = {
     who: '👤 Person',
     phone: '📞 Phone',
     email: '✉️ E-mail',
+    site: '🔗 Site / profile',
+    logo: '🖼️ Logo attached',
     note: 'Wants to work with us. Call back.'
   },
   de: {
@@ -1573,6 +1604,8 @@ const SPONSOR_FRAMES = {
     who: '👤 Person',
     phone: '📞 Telefon',
     email: '✉️ E-Mail',
+    site: '🔗 Website / Profil',
+    logo: '🖼️ Logo beigefügt',
     note: 'Möchte zusammenarbeiten. Bitte zurückrufen.'
   },
   es: {
@@ -1581,6 +1614,8 @@ const SPONSOR_FRAMES = {
     who: '👤 Persona',
     phone: '📞 Teléfono',
     email: '✉️ Correo',
+    site: '🔗 Web / perfil',
+    logo: '🖼️ Logo adjunto',
     note: 'Quiere colaborar. Devuelve la llamada.'
   },
   fr: {
@@ -1589,6 +1624,8 @@ const SPONSOR_FRAMES = {
     who: '👤 Personne',
     phone: '📞 Téléphone',
     email: '✉️ E-mail',
+    site: '🔗 Site / profil',
+    logo: '🖼️ Logo joint',
     note: 'Souhaite collaborer. Rappelle.'
   }
 };
@@ -1615,6 +1652,13 @@ async function alertSponsor(env, lead) {
       `${frame.who}: ${lead.person}`,
       lead.phone ? `${frame.phone}: ${lead.phone}` : '',
       `${frame.email}: ${lead.email}`,
+      /* Odsyłacz leci SUROWY, tak jak nazwa i imię (6.4): WhatsApp sam zrobi z niego link,
+         a skrócony albo „upiększony" adres to adres, którego organizator nie może porównać
+         z tym, co zobaczy potem w panelu. Linia znika, gdy adresu nie podano.
+         Logo idzie samą etykietą — bajtów w WhatsAppie z CallMeBota nie ma jak wysłać, a
+         zdanie „logo dołączone" mówi organizatorowi, że jest po co wejść do panelu. */
+      lead.siteUrl ? `${frame.site}: ${lead.siteUrl}` : '',
+      lead.hasLogo ? frame.logo : '',
       `🌐 ${guestLocale}`,
       '',
       frame.note
@@ -4124,11 +4168,71 @@ async function notifyOff(env, payload, cors) {
      kreatora żyje w przeglądarce i nikt go nie pilnuje (O5). Z naszej strony ten przypadek
      nie powinien się zdarzyć, więc gość dostaje ogólne zdanie o niepowodzeniu.
 
-   Nic nie jest zapisywane w bazie: to nie jest lista, którą ktokolwiek będzie przeglądał, a
-   dodanie tabeli znaczyłoby dane osobowe firmy leżące bez powodu (O3). Jedynym wierszem jest
-   kod, który właśnie wygasł przez zużycie. Wiadomość dochodzi do ludzi, którzy odpowiadają,
-   i tam żyje.
+   DLACZEGO TERAZ JEST JEDNAK WIERSZ W BAZIE (migracja 0035)
+     Poprzednia wersja tego komentarza mówiła „nic nie jest zapisywane, bo dodanie tabeli
+     znaczyłoby dane osobowe firmy leżące bez powodu". Powód się pojawił i jest konkretny:
+     zgłoszenie niesie teraz LOGO i ODSYŁACZ, czyli plik w prywatnym buckecie i adres, który
+     po zatwierdzeniu staje w `href` na stronie głównej. Plik bez wiersza w bazie to obiekt,
+     o którym nikt nie wie — nie da się go ani pokazać w panelu, ani sprzątnąć. Odsyłacz
+     przepisywany ręcznie z maila do panelu to literówka w linku, który klika całe miasteczko.
+
+     `sponsor_submissions` jest więc listą ze stanem: `pending` czeka, `approved` dopisuje
+     sponsora do `site_settings.sponsors` jednym kliknięciem w panelu, `rejected` zostaje
+     jako odpowiedź na „czy oni się już zgłaszali". Tabela jest zamknięta RLS-em i kluczem
+     `service_role`, tak samo jak `site_visits` — patrz nagłówek migracji.
+
+   CO SIĘ DZIEJE, GDY ZAPIS ALBO WGRANIE LOGO NIE WYJDZIE
+     Nic się nie odrzuca. Kod jest już zużyty (patrz akapit o kolejności), więc odmowa
+     kazałaby zgłaszającemu przejść całą weryfikację od nowa za awarię, której nie wywołał.
+     Zgłoszenie leci dalej WhatsAppem i mailem — te dwa kanały były jedyne przed tą migracją
+     i nadal wystarczają, żeby organizator wiedział, do kogo zadzwonić. Odpowiedź niesie
+     `stored` i `logoStored`, żeby czat mógł powiedzieć „logo nie doszło, wyślij je mailem"
+     zamiast udawać, że wszystko jest na miejscu.
    ========================================================================== */
+
+/* Sufit na odsyłacz. Nie „byle jaki adres": 300 znaków starcza na profil na Facebooku z
+   ogonem parametrów, a odsiewa wklejony akapit od kogoś, kto woła końcówkę wprost. */
+const SPONSOR_URL_MAX = 300;
+
+/**
+ * Odsyłacz do strony albo profilu sponsora — albo pusty napis.
+ *
+ * DLACZEGO TYLKO `https://`
+ *   Ten napis trafia po zatwierdzeniu do `site_settings.sponsors[].url`, a stamtąd do
+ *   atrybutu `href` na stronie głównej. `javascript:` w takim miejscu to wykonanie cudzego
+ *   kodu w przeglądarce każdego odwiedzającego, a `http://` to mieszana treść na stronie po
+ *   HTTPS — przeglądarka pokaże ostrzeżenie przy kafelku sponsora, który za to zapłacił.
+ *   `cleanSettings` dopuszcza jeszcze `http:`, bo tam wpisuje organizator, który wie, co
+ *   wkleja; tutaj wpisuje obcy z internetu, więc granica jest węższa.
+ *
+ *   Sprawdzane PARSEREM, nie wyrażeniem regularnym na początku napisu. „https://" da się
+ *   udać (`https:/\/evil`, spacje, znaki sterujące), a `new URL` albo rozumie adres, albo
+ *   nie — i to jest ta sama decyzja, którą podejmie potem przeglądarka.
+ *
+ * Zwraca `{ url }` albo `{ error }`. Puste wejście to `{ url: '' }`: odsyłacz jest
+ * opcjonalny i firma bez strony ma się móc zgłosić.
+ */
+function sponsorSiteUrl(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return { url: '' };
+  if (raw.length > SPONSOR_URL_MAX) return { error: 'SPONSOR_BAD_URL' };
+  /* Odrzucone wprost, zanim parser zdąży zinterpretować cokolwiek. `new URL` i tak by tego
+     nie przepuścił dalej niż do sprawdzenia protokołu, ale nazwa tego schematu wypisana
+     tutaj mówi czytającemu, o co w tej funkcji chodzi. */
+  if (/^\s*javascript:/i.test(raw) || /^\s*data:/i.test(raw)) return { error: 'SPONSOR_BAD_URL' };
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (_) {
+    return { error: 'SPONSOR_BAD_URL' };
+  }
+  if (parsed.protocol !== 'https:') return { error: 'SPONSOR_BAD_URL' };
+  if (!parsed.hostname || !parsed.hostname.includes('.')) return { error: 'SPONSOR_BAD_URL' };
+  const url = parsed.toString();
+  if (url.length > SPONSOR_URL_MAX) return { error: 'SPONSOR_BAD_URL' };
+  return { url };
+}
+
 async function sponsorLead(env, payload, cors) {
   const cartName = trimmed(payload.cartName, '');
   const firstName = trimmed(payload.firstName, '');
@@ -4153,6 +4257,30 @@ async function sponsorLead(env, payload, cors) {
   if (payload.consent !== true) return json({ ok: false, code: 'SPONSOR_NO_CONSENT' }, 422, cors);
   if (code.length !== 6) return json({ ok: false, code: 'SPONSOR_BAD_CODE' }, 422, cors);
 
+  /* Odsyłacz i logo: SPRAWDZANE tutaj, czyli przed zużyciem kodu, WGRYWANE dopiero za tą
+     granicą. Rozdział jest celowy.
+
+     Sprawdzenie jest samą pracą procesora — parser adresu i dekoder base64 z sprawdzeniem
+     bajtów nagłówka pliku. Zrobione przed bramką, żeby zły adres albo uszkodzony obrazek
+     wracał zwykłym 422 i NIE zjadał kodu: inaczej literówka w adresie kosztowałaby całą
+     weryfikację od nowa, a to jest kara za pomyłkę, nie ochrona przed nadużyciem.
+
+     Wgranie pliku to zapis na zewnątrz i stoi po drugiej stronie bramki — bez tego
+     niepotwierdzony ktokolwiek mógłby zapełniać bucket obrazkami po pięć megabajtów. */
+  const site = sponsorSiteUrl(payload.siteUrl);
+  if (site.error) return json({ ok: false, code: site.error }, 422, cors);
+
+  /* Logo tą samą drogą co każdy inny obrazek w tym pliku: `decodePhoto` sprawdza typ z data
+     URL-a I bajty nagłówka pliku, bo skrypt przemianowany na .jpg nadal zaczyna się od złych
+     bajtów. Kod błędu przechodzi jego własny (`WALL_PHOTO_FORMAT` / `WALL_PHOTO_TOO_LARGE`),
+     żeby zgłaszający dowiedział się, CZY plik jest zły, czy za duży. */
+  let logo = null;
+  if (payload.logo) {
+    const decoded = decodePhoto(payload.logo);
+    if (decoded.error) return json({ ok: false, code: decoded.error }, 422, cors);
+    logo = decoded;
+  }
+
   /* TU jest granica: powyżej nic nie wyszło na zewnątrz, poniżej kod jest już zużyty.
      `entryId` to `null`, bo za celem `sponsor` nie stoi żadne zgłoszenie do wyścigu —
      `checkCode` szuka takich wierszy przez `is.null`.
@@ -4167,12 +4295,57 @@ async function sponsorLead(env, payload, cors) {
   const locale = localeOf(payload.locale);
   const person = `${firstName} ${lastName}`;
 
+  /* Plik najpierw, wiersz potem — ta sama kolejność co przy tablicy i przy zdjęciach
+     uczestników. Odwrotna zostawiałaby w bazie wiersz wskazujący na obiekt, którego nie ma,
+     a panel pokazywałby przy zgłoszeniu pustą ramkę zamiast logo.
+
+     Folder `sponsors` jest STAŁYM napisem wybranym tutaj, nigdy niczym z żądania — ten sam,
+     do którego wgrywa `settings-admin`, więc zatwierdzenie zgłoszenia nie musi nigdzie
+     przenosić pliku. Bucket domyślny (`wall-photos`) i prywatny; podpis robi się przy
+     odczycie i wygasa po godzinie. */
+  let logoPath = '';
+  if (logo) {
+    logoPath = await uploadPhoto(env, logo, 'sponsors');
+    /* Nieudane wgranie NIE odrzuca zgłoszenia: kod jest zużyty, a firma nie ma jak
+       powtórzyć weryfikacji za awarię Storage. Zapisane tam, gdzie panel to zobaczy, i
+       oddane w odpowiedzi jako `logoStored: false`, żeby czat mógł poprosić o logo mailem. */
+    if (!logoPath) noteMailFailure(`sponsor-logo ${maskEmail(email)}: nie wyszlo wgranie`);
+  }
+
+  /* Wiersz `pending`. Zapis PRZED wysyłkami, bo to on jest odtąd zapisem zgłoszenia — a
+     wysyłka, po której nie zostaje ślad w bazie, jest zgłoszeniem żyjącym w cudzej skrzynce
+     (dokładnie stan sprzed migracji 0035).
+
+     Niepowodzenie zapisu też nie odrzuca: organizatorzy dostaną WhatsAppa i maila, czyli
+     tyle, ile mieli przedtem. Odpowiedź niesie `stored: false`. */
+  const stored = await insertRow(env, 'sponsor_submissions', {
+    cart_name: cartName,
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    phone: phone || null,
+    locale,
+    logo_path: logoPath || null,
+    site_url: site.url || null,
+    status: 'pending'
+  }, 'id');
+  if (!stored.ok) {
+    noteMailFailure(`sponsor-row ${maskEmail(email)}: nie zapisano (${stored.status || '?'})`);
+  }
+
   /* WhatsApp do wszystkich numerów z konfiguracji, każdy w języku swojego numeru (6.2).
      Pętla po numerach wyszła stąd do `alertSponsor`, bo była bliźniacza do tej z
      `alertOrganisers` — dwie kopie tego samego czytania odmowy ze statusem 200 to jedna
      kopia za dużo. Awaria kanału jest tam zapisywana i NIE wraca tu jako odmowa (6.6):
      kod jest już zużyty, a zgłoszenie jedzie także mailem. */
-  await alertSponsor(env, { cartName, person, email, phone, locale });
+  await alertSponsor(env, {
+    cartName, person, email, phone, locale,
+    siteUrl: site.url,
+    /* Nie ścieżka, tylko „jest albo nie ma". Ścieżka w prywatnym buckecie nie jest adresem,
+       który da się otworzyć z WhatsAppa, więc wysłanie jej byłoby wysłaniem napisu, który
+       niczego nie otwiera. */
+    hasLogo: Boolean(logoPath)
+  });
 
   /* Mail do organizatorów, na ten sam adres co wiadomości z formularza. Drugi kanał, bo
      pierwszy potrafi zniknąć bez śladu — a to jest zgłoszenie, którego nie wolno zgubić. */
@@ -4192,6 +4365,20 @@ async function sponsorLead(env, payload, cors) {
         + (phone ? `<p style="margin:0 0 8px"><b>Telefon:</b> ${escapeHtml(phone)}</p>` : '')
         + `<p style="margin:0 0 8px"><b>E-mail:</b> ${escapeHtml(email)}</p>`
         + `<p style="margin:0 0 8px"><b>Język:</b> ${escapeHtml(locale.toUpperCase())}</p>`
+        /* Odsyłacz jako TEKST, nie jako `<a href>`. To adres wpisany przez obcego i jeszcze
+           niezatwierdzony — klikalny link w mailu do organizatora jest jednym
+           nieuważnym kliknięciem od otwarcia cudzej strony w imieniu organizacji. Po
+           zatwierdzeniu w panelu staje się linkiem na stronie, i wtedy ktoś już go widział. */
+        + (site.url ? `<p style="margin:0 0 8px"><b>Strona / profil:</b> ${escapeHtml(site.url)}</p>` : '')
+        /* Trzy stany, nie dwa: „jest", „nie było" i „miało być, ale nie weszło". Ostatni
+           jest tym, dla którego to zdanie tu stoi — bez niego awaria Storage wyglądałaby
+           dokładnie jak zgłoszenie bez logo. */
+        + `<p style="margin:0 0 8px"><b>Logo:</b> ${logoPath
+          ? 'dołączone, widoczne w panelu (Ustawienia → zgłoszenia sponsorów)'
+          : (logo ? 'PRZYSŁANE, ale nie udało się go zapisać — poproś o nie mailem' : 'brak')}</p>`
+        + `<p style="margin:0 0 8px"><b>Zapis w bazie:</b> ${stored.ok
+          ? 'tak, czeka na decyzję (pending)'
+          : 'NIE — zgłoszenie jest tylko w tej wiadomości i na WhatsAppie'}</p>`
         + '<p style="margin:16px 0 0;color:#65718b;font-size:13px">Pakiet: 100 EUR — logo na '
         + 'stronie plus carruleddhi z nazwą sponsora.</p>'
         + '</td></tr></table></body></html>'
@@ -4224,6 +4411,11 @@ async function sponsorLead(env, payload, cors) {
   const deck = deckFor(locale);
   const label = (key, value) =>
     `<p style="margin:0 0 8px"><b>${escapeHtml(deck.labels?.[key] || key)}:</b> ${escapeHtml(value)}</p>`;
+  /* To samo, ale z etykietą podaną wprost, a nie kluczem z `labels`. Dwie funkcje zamiast
+     jednej z dwoma trybami: „klucz albo gotowy napis" w jednym parametrze to miejsce, w
+     którym literówka w kluczu wychodzi w liście jako sam klucz. */
+  const label2 = (text, value) =>
+    `<p style="margin:0 0 8px"><b>${escapeHtml(text || '')}:</b> ${escapeHtml(value)}</p>`;
   const ackSent = await sendThroughOutbox(env, {
     to: email,
     replyTo: to,
@@ -4241,12 +4433,32 @@ async function sponsorLead(env, payload, cors) {
       + label('fullName', person)
       + label('email', email)
       + (phone ? label('phone', phone) : '')
+      /* Odsyłacz i logo w podsumowaniu, bo podsumowanie ma odpowiadać na pytanie „czy oni
+         dostali to, co wysłałem". Etykiety idą z nowych kluczy w sześciu językach, nie z
+         `labels` — tamte opisują pola formularza zapisu i nie mają nazwy na „profil w
+         mediach społecznościowych". Adres wypisany DOSŁOWNIE, jako tekst: to jest adres
+         czytającego, więc ma go rozpoznać, a nie kliknąć. */
+      + (site.url ? label2(deck.sponsorAckSiteLabel, site.url) : '')
+      + (logoPath ? label2(deck.sponsorAckLogoLabel, deck.sponsorAckLogoYes) : '')
       + `<p style="margin:16px 0 0;color:#65718b;font-size:13px">${escapeHtml(fill(deck.sponsorAckSoon, { ORGEMAIL: to }))}</p>`
       + '</td></tr></table></body></html>'
   });
   if (!ackSent) noteMailFailure(`sponsor-ack ${maskEmail(email)}: nie wyszedł`);
 
-  return json({ ok: true }, 200, cors);
+  /* Nadal 200 i nadal `ok: true`, bo zgłoszenie jest przyjęte — patrz nagłówek.
+     `stored` i `logoStored` są DODATKIEM, nie warunkiem: czat może z nich zrobić jedno
+     zdanie („logo nie doszło, dołącz je w odpowiedzi na maila"), a jeśli je zignoruje,
+     zachowanie jest dokładnie takie jak przed tą zmianą. */
+  return json({
+    ok: true,
+    stored: stored.ok,
+    /* Identyfikator wiersza, gdy zapis się udał. Oddany, bo panel i czat mówią potem o tym
+       samym zgłoszeniu, a jedynym innym sposobem na jego wskazanie byłoby zgadywanie po
+       adresie i czasie — czyli dwa zgłoszenia z tej samej firmy nie do rozróżnienia. */
+    submissionId: stored.row?.id || '',
+    logoStored: logo ? Boolean(logoPath) : null,
+    siteUrl: site.url || ''
+  }, 200, cors);
 }
 
 async function unsubConfirm(env, payload, cors) {
@@ -4939,7 +5151,9 @@ async function entryManage(env, payload, cors) {
      Somebody types six digits, sees their entry, changes the phone number and presses save —
      that is two calls, and if the first one burned the code the second would fail and they
      would have to ask for a new letter to do the thing they had just been shown. The code
-     lasts fifteen minutes either way. */
+     lasts CODE_TTL_MINUTES — ten minutes — either way. The number lives in one place now
+     (see the comment above that constant and migration 0035); a sentence here saying
+     "fifteen" was the same lie the column default used to tell. */
   if (action === 'view') {
     return json({
       ok: true,
@@ -5614,8 +5828,225 @@ async function rolloverVotingEdition(env, settings) {
   return { ok: true, result: result && typeof result === 'object' ? result : {} };
 }
 
+/* ============================================================================
+   ZGŁOSZENIA SPONSORÓW W PANELU — odczyt listy i werdykt
+   ============================================================================
+   Trzy akcje: `sponsor-leads` czyta listę, `sponsor-approve` dopisuje sponsora na stronę,
+   `sponsor-reject` odkłada zgłoszenie ze stanem. Wszystkie trzy siedzą w `settings-admin`,
+   a nie w nowym typie — i to jest decyzja, nie skrót:
+
+     1. Zatwierdzenie ZAPISUJE do `site_settings.sponsors`, czyli robi dokładnie to, co
+        zwykły zapis ustawień. Osobny typ znaczyłby dwa miejsca piszące do jednego wiersza
+        i dwie kopie walidacji ścieżki logo oraz protokołu adresu.
+     2. `settings-admin` jest już na `PROTECTED_TYPES` i na `carriesImage`. Nowy typ trzeba
+        by dopisać w czterech miejscach (patrz komentarze przy `ALLOWED_TYPES`), a pominięcie
+        któregokolwiek daje końcówkę, która wygląda na działającą.
+
+   DLACZEGO ZATWIERDZENIE PRZECHODZI PRZEZ `cleanSettings`
+     Bo ścieżka logo i adres wchodzą na stronę główną — do atrybutów `src` i `href`. Wiersz
+     w bazie był sprawdzony przy zapisie, ale sprawdzenie po drugiej stronie jest tanie, a
+     zaufanie do własnej tabeli jest dokładnie tym założeniem, które przestaje być prawdziwe
+     w dniu, w którym ktoś poprawi wiersz ręcznie w edytorze Supabase.
+   ========================================================================== */
+
+/* Ile zgłoszeń oddaje jedno zapytanie. Panel pokazuje listę do przewinięcia, nie archiwum:
+   sto wierszy to więcej, niż będzie ich w całym sezonie. */
+const SPONSOR_LEADS_LIMIT = 100;
+const SPONSOR_LEAD_STATUSES = new Set(['pending', 'approved', 'rejected']);
+
+/** Kolumny czytane po nazwie. Wypisane, a nie `*`: `select *` niesie do panelu każdą nową
+ *  kolumnę bez pytania, a ta tabela trzyma dane osobowe. */
+const SPONSOR_LEAD_COLUMNS =
+  'id,created_at,cart_name,first_name,last_name,email,phone,locale,logo_path,site_url,status,decided_at';
+
+/**
+ * Jeden wiersz przepisany na kształt, którym mówi API.
+ *
+ * `logoUrl` jest PODPISANY i ważny godzinę, bo bucket jest prywatny — dokładnie tak samo jak
+ * logo sponsora w `withSignedLogos`. `logoPath` jedzie obok, bo to jego trwała nazwa i to
+ * ona wraca potem w `site_settings.sponsors`; panel, który zapamiętałby podpisany adres,
+ * zapamiętałby napis, który za godzinę przestaje cokolwiek otwierać.
+ */
+async function sponsorLeadShape(env, row) {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    cartName: row.cart_name || '',
+    firstName: row.first_name || '',
+    lastName: row.last_name || '',
+    email: row.email || '',
+    phone: row.phone || '',
+    locale: row.locale || '',
+    logoPath: row.logo_path || '',
+    logoUrl: row.logo_path ? await signPhoto(env, row.logo_path) : '',
+    siteUrl: row.site_url || '',
+    status: row.status || 'pending',
+    decidedAt: row.decided_at || null
+  };
+}
+
+/** Jedno zgłoszenie po identyfikatorze, albo `null`. */
+async function findSponsorLead(env, id) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return { bad: true };
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/sponsor_submissions`);
+  url.searchParams.set('select', SPONSOR_LEAD_COLUMNS);
+  url.searchParams.set('id', `eq.${id}`);
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return { failed: true };
+  const rows = await response.json().catch(() => []);
+  return { row: (Array.isArray(rows) ? rows[0] : null) || null };
+}
+
+/** Lista zgłoszeń dla panelu, od najnowszych, z licznikami stanów. */
+async function sponsorLeads(env, payload, cors) {
+  const status = String(payload.status || 'all').toLowerCase();
+  if (status !== 'all' && !SPONSOR_LEAD_STATUSES.has(status)) {
+    return json({ ok: false, code: 'SPONSOR_LEAD_BAD_STATUS' }, 422, cors);
+  }
+  const asked = Number.parseInt(payload.limit, 10);
+  const limit = Number.isInteger(asked) && asked > 0
+    ? Math.min(asked, SPONSOR_LEADS_LIMIT)
+    : SPONSOR_LEADS_LIMIT;
+
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/sponsor_submissions`);
+  url.searchParams.set('select', SPONSOR_LEAD_COLUMNS);
+  if (status !== 'all') url.searchParams.set('status', `eq.${status}`);
+  url.searchParams.set('order', 'created_at.desc');
+  url.searchParams.set('limit', String(limit));
+  const response = await fetch(url, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (!response?.ok) return json({ ok: false, code: 'SPONSOR_LEAD_READ_FAILED' }, 502, cors);
+  const rows = await response.json().catch(() => []);
+  const submissions = await Promise.all(
+    (Array.isArray(rows) ? rows : []).map((row) => sponsorLeadShape(env, row))
+  );
+
+  /* Liczniki liczone z PEŁNEJ tabeli, nie z odczytanej stronicy: „3 czekają" policzone ze
+     stu wyświetlonych wierszy przestaje być prawdą w sto pierwszym i nikt tego nie zauważy.
+     Jedno dodatkowe zapytanie po samym `status` — kolumna jest w indeksie częściowym. */
+  const counts = { pending: 0, approved: 0, rejected: 0, total: 0 };
+  const countUrl = new URL(`${env.SUPABASE_URL}/rest/v1/sponsor_submissions`);
+  countUrl.searchParams.set('select', 'status');
+  countUrl.searchParams.set('limit', '1000');
+  const all = await fetch(countUrl, { headers: supabaseHeaders(env) }).catch(() => null);
+  if (all?.ok) {
+    for (const row of await all.json().catch(() => [])) {
+      counts.total += 1;
+      if (counts[row.status] !== undefined) counts[row.status] += 1;
+    }
+  }
+
+  return json({ ok: true, submissions, counts, limit }, 200, cors);
+}
+
+/** `status` i `decided_at` w jednym PATCH-u. Zwraca odświeżony wiersz albo `null`. */
+async function markSponsorLead(env, id, status) {
+  const response = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/sponsor_submissions?id=eq.${id}`,
+    {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
+      body: JSON.stringify({ status, decided_at: new Date().toISOString() })
+    }
+  ).catch(() => null);
+  if (!response?.ok) return null;
+  const rows = await response.json().catch(() => []);
+  return (Array.isArray(rows) ? rows[0] : null) || null;
+}
+
+/**
+ * Zatwierdzenie: sponsor wchodzi na stronę, zgłoszenie dostaje `approved`.
+ *
+ * KOLEJNOŚĆ: NAJPIERW USTAWIENIA, POTEM STATUS
+ *   Odwrotna zostawiałaby zgłoszenie oznaczone jako zatwierdzone i sponsora, którego nie ma
+ *   na stronie — czyli stan, w którym organizator jest przekonany, że zrobił swoje, a firma
+ *   dzwoni z pytaniem, gdzie jest logo. Jeśli zapis ustawień nie wyjdzie, status zostaje
+ *   `pending` i przycisk da się kliknąć jeszcze raz.
+ *
+ * PONOWNE ZATWIERDZENIE NIE DUBLUJE KAFELKA
+ *   Panel bywa klikany dwa razy, a lista sponsorów ma sufit `MAX_SPONSORS`. Wpis uznaje się
+ *   za ten sam po ścieżce logo (jeśli jest) albo po parze nazwa+adres — czyli po tym, co
+ *   widać na stronie, a nie po identyfikatorze zgłoszenia, którego `site_settings` nie zna.
+ */
+async function sponsorLeadApprove(env, payload, cors) {
+  const found = await findSponsorLead(env, payload.id);
+  if (found.bad) return json({ ok: false, code: 'SPONSOR_LEAD_BAD_ID' }, 422, cors);
+  if (found.failed) return json({ ok: false, code: 'SPONSOR_LEAD_READ_FAILED' }, 502, cors);
+  if (!found.row) return json({ ok: false, code: 'SPONSOR_LEAD_NOT_FOUND' }, 404, cors);
+
+  const row = found.row;
+  const entry = {
+    name: String(row.cart_name || '').trim().slice(0, 80),
+    url: String(row.site_url || '').trim(),
+    logo: String(row.logo_path || '').trim()
+  };
+  if (!entry.name) return json({ ok: false, code: 'SETTINGS_SPONSOR_NAME' }, 422, cors);
+
+  const current = await readSettings(env);
+  const sponsors = Array.isArray(current.sponsors) ? current.sponsors : [];
+  const already = sponsors.some((sponsor) => (
+    (entry.logo && sponsor.logo === entry.logo)
+    || (sponsor.name === entry.name && String(sponsor.url || '') === entry.url)
+  ));
+
+  if (!already) {
+    if (sponsors.length >= MAX_SPONSORS) {
+      return json({ ok: false, code: 'SETTINGS_TOO_MANY_SPONSORS' }, 409, cors);
+    }
+    /* Cała nowa lista przez `cleanSettings`, nie sam dopisywany wpis: ta funkcja jest
+       jedynym miejscem, które wie, jaki kształt wolno zapisać, i sprawdza też wpisy, które
+       już tam leżały. Odmowa tutaj znaczy, że w bazie siedzi wiersz, którego nie wolno
+       pokazać — i lepiej, żeby wyszła teraz niż na stronie głównej. */
+    const cleaned = cleanSettings({ sponsors: [...sponsors, entry] });
+    if (cleaned.error) return json({ ok: false, code: cleaned.error }, 422, cors);
+    const merged = alignGalleryCaptions({ ...current, ...cleaned.value });
+    const saved = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ data: merged })
+    }).catch(() => null);
+    if (!saved?.ok) return json({ ok: false, code: 'SETTINGS_WRITE_FAILED' }, 502, cors);
+  }
+
+  const marked = await markSponsorLead(env, row.id, 'approved');
+  if (!marked) return json({ ok: false, code: 'SPONSOR_LEAD_WRITE_FAILED' }, 502, cors);
+
+  const settings = await readSettings(env);
+  return json({
+    ok: true,
+    submission: await sponsorLeadShape(env, marked),
+    /* Ustawienia po zmianie w odpowiedzi, żeby panel odrysował listę sponsorów bez drugiego
+       żądania — a przy okazji nie mógł się rozjechać z tym, co naprawdę leży w bazie. */
+    settings: await adminSettingsShape(env, settings),
+    added: !already
+  }, 200, cors);
+}
+
+/**
+ * Odrzucenie: tylko status. Nic nie znika.
+ *
+ * Wiersz i logo zostają, bo pytanie „czy oni się już zgłaszali" pada przy każdym telefonie
+ * od firmy, która pisała pół roku temu — patrz nagłówek migracji 0035. Usunięcie zamieniłoby
+ * odpowiedź na to pytanie w „nie wiem".
+ */
+async function sponsorLeadReject(env, payload, cors) {
+  const found = await findSponsorLead(env, payload.id);
+  if (found.bad) return json({ ok: false, code: 'SPONSOR_LEAD_BAD_ID' }, 422, cors);
+  if (found.failed) return json({ ok: false, code: 'SPONSOR_LEAD_READ_FAILED' }, 502, cors);
+  if (!found.row) return json({ ok: false, code: 'SPONSOR_LEAD_NOT_FOUND' }, 404, cors);
+
+  const marked = await markSponsorLead(env, found.row.id, 'rejected');
+  if (!marked) return json({ ok: false, code: 'SPONSOR_LEAD_WRITE_FAILED' }, 502, cors);
+  return json({ ok: true, submission: await sponsorLeadShape(env, marked) }, 200, cors);
+}
+
 async function settingsAdmin(env, payload, cors) {
   const action = String(payload.action || '').toLowerCase();
+
+  /* Zgłoszenia sponsorów z czatu. Trzy akcje, uzasadnienie nad `sponsorLeads`. */
+  if (action === 'sponsor-leads') return sponsorLeads(env, payload, cors);
+  if (action === 'sponsor-approve') return sponsorLeadApprove(env, payload, cors);
+  if (action === 'sponsor-reject') return sponsorLeadReject(env, payload, cors);
 
   /* Upload first, save the returned stable bucket path second. Signed URLs are previews only. */
   if (action === 'logo' || action === 'gallery') {
@@ -7382,6 +7813,24 @@ async function votingVote(env, payload, cors) {
       : `${publicSiteUrl()}/votazione.html`
   };
 
+  /* NIEPOWODZENIE WYSYŁKI NIE MOŻE ODRZUCIĆ GŁOSU.
+     ---------------------------------------------------------------------------
+     Głos jest już w bazie. Zwrócenie błędu, bo automatyka poczty stoi, znaczyłoby ekran
+     „nie udało się" nad zapisanym głosem — czyli gość głosuje drugi raz, dostaje
+     `VOTING_ALREADY_VOTED` i ma prawo uznać, że strona kłamie.
+
+     Awaria jest za to ZAPISYWANA, tą samą drogą co nieudane potwierdzenie sponsora
+     (`noteMailFailure`): bez tego cicha awaria kanału nie zostawia śladu nigdzie, a jedyną
+     jej oznaką jest pytanie „dlaczego nie dostałem potwierdzenia", zadane tygodnie później.
+
+     GŁOS ANONIMOWY NIE WYSYŁA NIC I TO JEST POPRAWNE — nie ma dokąd. `mailed: false` bez
+     śladu awarii, bo żadnej awarii nie było; strona mówi wtedy „zmienisz z tego urządzenia".*/
+  let mailed = false;
+  if (email) {
+    mailed = await sendToMake(env, letter);
+    if (!mailed) noteMailFailure(`voting-receipt ${maskEmail(email)}: nie wyszedł`);
+  }
+
   return json({
     ok: true,
     category: participant.category,
@@ -7389,7 +7838,7 @@ async function votingVote(env, payload, cors) {
     anonymous: !email,
     notifyResults,
     // E-mail is optional. Anonymous voters edit from the same device instead.
-    mailed: email ? await sendToMake(env, letter) : false
+    mailed
   }, 200, cors);
 }
 
@@ -8012,13 +8461,28 @@ async function notifyVotingFollowers(env, podium) {
       type: 'outbox', branch: 'outbox', to: row.voter_email,
       subject: letter.subject, html: letter.html
     });
-    if (!sent) { failed += 1; continue; }
+    /* Awaria zapisana, nie przemilczana. `failed` wraca w odpowiedzi i panel pokazuje
+       liczbę, ale liczba nie mówi, KTÓRY kanał padł — a `result_notified_at` zostaje puste,
+       więc kolejne „ogłoś wyniki" spróbuje jeszcze raz. Bez tego zapisu jedyną informacją o
+       nieudanej wysyłce byłaby różnica dwóch liczb w oknie, do którego nikt nie zagląda. */
+    if (!sent) {
+      failed += 1;
+      noteMailFailure(`voting-result ${maskEmail(row.voter_email)}: nie wyszedł`);
+      continue;
+    }
     const marked = await fetch(`${env.SUPABASE_URL}/rest/v1/votes?id=eq.${row.id}`, {
       method: 'PATCH', headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
       body: JSON.stringify({ result_notified_at: new Date().toISOString() })
     });
-    if (marked.ok) notified += 1;
-    else failed += 1;
+    if (marked.ok) {
+      notified += 1;
+    } else {
+      /* List POSZEDŁ, a znacznik nie. To jest gorszy przypadek niż nieudana wysyłka:
+         następne „ogłoś wyniki" wyśle ten sam list drugi raz do tej samej osoby. Zapisane
+         wprost, bo tylko po tym wpisie da się to rozpoznać. */
+      failed += 1;
+      noteMailFailure(`voting-result ${maskEmail(row.voter_email)}: wyszedł, brak znacznika`);
+    }
   }
   return { notified, failed };
 }
@@ -8643,6 +9107,10 @@ export default {
     const carriesImage = WALL_FAMILY.has(pathType)
       || pathType === 'settings-admin'
       || pathType === 'voting-admin'
+      /* Zgłoszenie sponsora niesie logo jako data URL (opcjonalne). Bez tego wpisu żądanie
+         z logo dostaje 413 przed handlerem, a komunikat mówi o za dużym żądaniu, nie o za
+         dużym obrazku — czyli o czymś, czego zgłaszający nie ma jak naprawić. */
+      || pathType === 'sponsor-lead'
       // Załącznik gościa w czacie — ta sama droga co zdjęcie na tablicy. Migracja 0024.
       || pathType === 'chat';
     const bodyCeiling = carriesImage ? MAX_PHOTO_BODY_BYTES : MAX_BODY_BYTES;

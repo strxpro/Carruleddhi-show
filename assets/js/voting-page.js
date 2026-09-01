@@ -533,50 +533,7 @@ import {
    */
   function paintMyVote() {
     const panel = $('[data-vote-mine]');
-    if (!panel) return;
-    const mine = state.myVote;
-    const row = mine ? participantById(mine.participantId) : null;
-
-    panel.hidden = !mine;
-    if (!mine) return;
-
-    const photo = $('[data-vote-mine-photo]', panel);
-    if (photo) {
-      const src = row?.photo || '';
-      photo.hidden = !src;
-      if (src) {
-        photo.src = src;
-        photo.alt = row ? cartLabel(row) : '';
-      }
-    }
-    const blank = $('[data-vote-mine-blank]', panel);
-    if (blank) {
-      blank.hidden = Boolean(row?.photo);
-      blank.textContent = row ? startBadge(row) : '—';
-    }
-    $('[data-vote-mine-cart]', panel).textContent = row ? cartLabel(row) : '';
-    $('[data-vote-mine-rider]', panel).textContent = row
-      ? `${riderName(row)} · ${startBadge(row)}`
-      : '';
-    $('[data-vote-mine-score]', panel).textContent = String(mine.score);
-    /* Zmiana jest możliwa na miejscu — i to zdanie musiało się zmienić razem z tym.
-       Stało tu „zmianę zrobisz odsyłaczem z maila", co było prawdą, dopóki żeton był jedyną
-       drogą. Od teraz z tego urządzenia wystarczy przycisk na kafelku, a mail zostaje drogą z
-       każdego innego. Zdanie mówi jedno i drugie, bo obie sytuacje się zdarzają: głosowanie z
-       telefonu na placu i poprawianie wieczorem z laptopa. */
-    const note = $('[data-vote-mine-note]', panel);
-    if (note) {
-      note.hidden = state.phase !== 'voting';
-      // Jedna zmiana na głos: dopóki jest niezużyta, zdanie mówi jak jej użyć; potem mówi,
-      // że została już wykorzystana. Zgadywanie, dlaczego przycisk zniknął, nie jest potrzebne.
-      /* Trzy stany, trzy zdania: zmiana możliwa, zmiana zużyta, głos anonimowy i ostateczny.
-         Zgadywanie, dlaczego przycisk zniknął, nie jest częścią głosowania. */
-      note.textContent = text(
-        mine.canChange ? 'voting.changeHere'
-          : mine.identified ? 'voting.editUsedMine'
-            : 'voting.editNeedsContact'
-      );
-    }
+    if (panel) panel.hidden = true;
   }
 
   /**
@@ -1362,6 +1319,10 @@ import {
     };
 
     const toPick = () => {
+      if (isMine && mine && !mine.canChange && !mine.identified) {
+        askIdentity(row, mine.score);
+        return;
+      }
       closeOthers();
       const node = card();
       if (node) node.classList.add('is-armed', 'is-picking');

@@ -303,14 +303,35 @@ const probe = `
         .includes(T('chat.sponsorAskName').slice(0, 24));
     }
 
-    // Do bramki: nazwa, zgoda, imię i nazwisko, pominięty telefon, adres.
+    /* Do bramki: nazwa, zgoda przez okno z dokumentem, imię i nazwisko, pominięty telefon,
+       pominięte zdjęcie, pominięty odsyłacz, adres i potwierdzenie podsumowania.
+       Zgoda nie ma już pastylki „Zgadzam się": pada po przewinięciu dokumentu do końca w tym
+       samym oknie, którego używa formularz zapisu — więc sonda przewija je tak, jak palec. */
     await say('Trattoria Probe');
-    chipByKey('chat.sponsorConsentYes')?.click();
+    chipByKey('chat.sponsorConsentRead')?.click();
     await sleep(500);
+    for (let round = 0; round < 14; round += 1) {
+      const scroller = document.querySelector('[data-consent-scroll]');
+      const accept = document.querySelector('[data-consent-accept]');
+      if (scroller) {
+        scroller.scrollTop = scroller.scrollHeight;
+        scroller.dispatchEvent(new Event('scroll'));
+      }
+      if (accept && !accept.disabled) break;
+      await sleep(200);
+    }
+    document.querySelector('[data-consent-accept]')?.click();
+    await sleep(1100);
     await say('Mario Rossi');
     chipByKey('chat.sponsorPhoneSkip')?.click();
-    await sleep(500);
+    await sleep(450);
+    chipByKey('chat.sponsorLogoSkip')?.click();
+    await sleep(450);
+    chipByKey('chat.sponsorLinkSkip')?.click();
+    await sleep(450);
     await say('probe@example.com');
+    await sleep(700);
+    chipByKey('chat.sponsorSummaryYes')?.click();
     await sleep(900);
 
     const codeField = document.querySelector('[data-chat-code]');

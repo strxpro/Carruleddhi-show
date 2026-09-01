@@ -816,45 +816,6 @@
    Odsyłacze mają `display: inline-block` z pionowym odstępem, bo naciska się je w telefonie,
    jedną ręką, obok pastylki „Zgadzam się" — dwa napisy w jednej linii wysokiej na 16 px byłyby
    celem, w który trafia się przypadkiem. */
-/* KARTKA Z PODSUMOWANIEM — OSTATNI EKRAN PRZED WYSŁANIEM.
-   ===========================================================================
-   Nie bąbelek: bąbelek jest wypowiedzią, a to jest formularz do przeczytania. Wyróżnia się
-   ramą i tłem, żeby oko od razu widziało, że skończyły się pytania i zaczęło sprawdzanie.
-
-   `dl` z dwiema kolumnami, a nie lista zdań: etykiety pod sobą dają się omštać wzrokiem w
-   pionie, a wartości mają wtedy wspólną krawędź. `minmax(0, 1fr)` na wartości, bo adres
-   e-mail bez odstępów potrafi rozepchnąć kolumnę szerzej niż okno czatu.
-
-   `overflow-wrap`, bo długi adres nie ma gdzie się złamać i wyjechałby poza ramkę. */
-.chat__summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 6px 14px;
-  margin: 6px 0 8px;
-  padding: 14px 16px;
-  border: 2px solid rgb(7 26 61 / .12);
-  border-radius: 16px;
-  background: rgb(255 255 255 / .72);
-  font-size: 13.5px;
-  line-height: 1.5;
-}
-.chat__summary dt {
-  color: #65718b;
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  align-self: center;
-}
-.chat__summary dd {
-  margin: 0;
-  color: #071a3d;
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-/* Pominięty telefon ma wyglądać na pominięty, a nie na wpisany. */
-.chat__summary dd.is-empty { color: #8b96ab; font-weight: 600; font-style: italic; }
-
 .chat__docs {
   margin: 2px 0 6px;
   text-align: center;
@@ -876,3 +837,91 @@
   outline: 3px solid #ffc928;
   outline-offset: 2px;
 }
+
+/* ===========================================================================
+   KARTKA Z PODSUMOWANIEM — OSTATNI EKRAN PRZED WYSŁANIEM
+   ===========================================================================
+   Nie bąbelek: bąbelek jest wypowiedzią, a to jest formularz do przeczytania. Wyróżnia się
+   ramą i tłem, żeby oko od razu widziało, że skończyły się pytania i zaczęło sprawdzanie.
+
+   `dl` w dwóch kolumnach, a nie lista zdań: etykiety stoją pod sobą i przebiega się je wzrokiem
+   w pionie, a wartości mają wspólną krawędź. `minmax(0, 1fr)` na kolumnie wartości, bo adres
+   e-mail bez odstępów potrafi rozepchnąć siatkę szerzej niż okno czatu.
+
+   `overflow-wrap: anywhere`, bo długi adres strony nie ma gdzie się złamać i wyjechałby poza
+   ramkę — a to jest jedna z dwóch rzeczy, które gość ma tu sprawdzić znak po znaku. */
+.chat__summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  margin: 6px 0 8px;
+  padding: 14px 16px;
+  border: 2px solid rgb(7 26 61 / .12);
+  border-radius: 16px;
+  background: rgb(255 255 255 / .72);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.chat__summary dt {
+  align-self: center;
+  color: #65718b;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.chat__summary dd {
+  margin: 0;
+  color: #071a3d;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* Miniatura dołączonego zdjęcia. Wpuszczona przez całą szerokość siatki (`grid-column: 1 / -1`),
+   bo obraz obok etykiety byłby wysoki na jeden wiersz tekstu i nie dałoby się na nim niczego
+   rozpoznać — a to jest jedyny moment, w którym da się zauważyć, że z galerii telefonu wybrało
+   się sąsiedni plik. Sufit 120 px, żeby kartka nie przykryła całego dziennika. */
+.chat__summary-shot {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+}
+
+.chat__summary-shot img {
+  display: block;
+  max-width: 160px;
+  max-height: 120px;
+  border: 2px solid rgb(7 26 61 / .12);
+  border-radius: 12px;
+  background: #fff;
+  object-fit: contain;
+}
+
+/* ===========================================================================
+   OSTRZEŻENIE NAD KOMPOZYTOREM (CYFRA W IMIENIU I NAZWISKU)
+   ===========================================================================
+   Stoi NAD polem wiadomości, a nie w dzienniku, bo dotyczy tego, co właśnie jest w polu —
+   i pokazuje się przy pierwszej wpisanej cyfrze, nie po wysłaniu. Zdanie w wątku przy każdym
+   naciśnięciu klawisza dałoby dziesięć bąbelków na dziesięć liter.
+
+   Kolor ostrzeżenia ten sam, co przy błędach pól w formularzu (`--coral` w main.css, wpisany
+   tu wprost, bo arkusz czatu nie zależy od zmiennych tamtego), i lewa krawędź jako kotwica dla
+   oka: wiersz bez niej gubi się między pastylkami i kompozytorem.
+
+   `[hidden]` z `display: none` wpisanym jawnie — element ma na sobie `role="status"`, a
+   przeglądarki potrafią przywrócić `display` regułom, które go zmieniają. Pusty akapit nad
+   kompozytorem to pasek odstępu, który w przypiętej karcie zjada wysokość dziennika. */
+.chat__warn {
+  margin: 0 0 6px;
+  padding: 8px 12px;
+  border-left: 4px solid #f6494f;
+  border-radius: 0 10px 10px 0;
+  background: rgb(246 73 79 / .09);
+  color: #a4141a;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.chat__warn[hidden] { display: none; }

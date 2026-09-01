@@ -1165,8 +1165,12 @@
                 <h3 id="form-step-1-title" tabindex="-1" data-i18n="form.1title">Prima conosciamoci.</h3>
                 <p class="form-step__intro" data-i18n="form.1intro">I dati servono per l’iscrizione, la liberatoria e le comunicazioni organizzative.</p>
                 <div class="form-grid">
-                  <div class="field" data-field><input id="first-name" name="firstName" type="text" autocomplete="given-name" placeholder=" " required><label for="first-name" data-i18n="form.firstName">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
-                  <div class="field" data-field><input id="last-name" name="lastName" type="text" autocomplete="family-name" placeholder=" " required><label for="last-name" data-i18n="form.lastName">Cognome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                  <!-- `data-no-digits`: cyfra w imieniu albo nazwisku jest błędem od pierwszego
+                       znaku, nie po wysłaniu (patrz `validateControl` w app.js). Atrybut, a nie
+                       `pattern`: wzorzec HTML odmawia bez zdania, a to pole ma powiedzieć, że
+                       problemem jest CYFRA — apostrof, łącznik i znaki diakrytyczne przechodzą. -->
+                  <div class="field" data-field><input id="first-name" name="firstName" type="text" autocomplete="given-name" placeholder=" " data-no-digits required><label for="first-name" data-i18n="form.firstName">Nome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
+                  <div class="field" data-field><input id="last-name" name="lastName" type="text" autocomplete="family-name" placeholder=" " data-no-digits required><label for="last-name" data-i18n="form.lastName">Cognome *</label><span class="field__error" data-i18n="validation.required">Compila questo campo.</span></div>
                   <div class="field field--date" data-field data-date-picker>
                     <input id="birth-date" name="birthDate" type="date" autocomplete="bday" placeholder=" " min="1900-01-01" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" aria-describedby="birth-date-error" data-date-input required>
                     <label for="birth-date" data-i18n="form.birthDate">Data di nascita *</label>

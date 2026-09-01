@@ -98,13 +98,25 @@ const FAQ = {
 /* -------------------------------------------------- turning the reminders off
    The small grey link at the foot of every subscription letter, and the wording of the
    e-mail carrying the code. %CODE% is substituted by the function, the same way
-   %FIRSTNAME% already is — the renderer does no substitution of its own. */
+   %FIRSTNAME% already is — the renderer does no substitution of its own.
+
+   DZIESIĘĆ MINUT, NIE PIĘTNAŚCIE — I DLACZEGO TA LICZBA JEST TU WYPISANA SŁOWNIE
+     Ważność kodu decyduje się w JEDNYM miejscu: `CODE_TTL_MINUTES` w worker/index.js.
+     Migracja 0035 ustawia domyślną wartość kolumny na to samo, a te zdania mówią to
+     człowiekowi. Trzy miejsca, jedna liczba — i tylko tak długo, jak ktoś je razem
+     poprawia: kod wygasły trzy minuty przed tym, co obiecuje list, wygląda dla czytającego
+     jak zepsuta strona, a nie jak upływ czasu.
+
+     Liczba jest wpisana w każdy z osiemnastu napisów, a nie podstawiana zastępnikiem, bo
+     renderer w Make nie umie liczyć ani podstawiać niczego poza ścieżkami — patrz nagłówek
+     emails/copy.json. Zmiana `CODE_TTL_MINUTES` oznacza więc przejście przez te napisy
+     ręcznie, i to jest świadoma cena za brak drugiego mechanizmu. */
 const UNSUB = {
   it: {
     unsubFooter: 'Non voglio più questi avvisi',
     unsubSubject: 'Il tuo codice: %CODE%',
     unsubCodeTitle: 'Ecco il codice',
-    unsubCodeLead: 'Inseriscilo sul sito per disattivare gli avvisi. Vale 15 minuti.',
+    unsubCodeLead: 'Inseriscilo sul sito per disattivare gli avvisi. Vale 10 i.',
     unsubCodeNote: 'Se non hai chiesto tu questo codice, ignora il messaggio: non cambia nulla.',
     unsubDone: 'Fatto. Non ti scriveremo più.'
   },
@@ -112,7 +124,7 @@ const UNSUB = {
     unsubFooter: 'Nie chcę już tych powiadomień',
     unsubSubject: 'Twój kod: %CODE%',
     unsubCodeTitle: 'Oto kod',
-    unsubCodeLead: 'Wpisz go na stronie, żeby wyłączyć powiadomienia. Jest ważny 15 minut.',
+    unsubCodeLead: 'Wpisz go na stronie, żeby wyłączyć powiadomienia. Jest ważny 10 .',
     unsubCodeNote: 'Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — nic się nie zmieni.',
     unsubDone: 'Gotowe. Nie będziemy już pisać.'
   },
@@ -120,7 +132,7 @@ const UNSUB = {
     unsubFooter: 'I no longer want these',
     unsubSubject: 'Your code: %CODE%',
     unsubCodeTitle: 'Here is the code',
-    unsubCodeLead: 'Enter it on the website to switch the reminders off. It lasts 15 minutes.',
+    unsubCodeLead: 'Enter it on the website to switch the reminders off. It lasts 10 es.',
     unsubCodeNote: 'If you did not ask for this code, ignore this message — nothing changes.',
     unsubDone: 'Done. We will not write again.'
   },
@@ -128,7 +140,7 @@ const UNSUB = {
     unsubFooter: 'Ich möchte das nicht mehr',
     unsubSubject: 'Dein Code: %CODE%',
     unsubCodeTitle: 'Hier ist der Code',
-    unsubCodeLead: 'Gib ihn auf der Website ein, um die Erinnerungen abzuschalten. Er gilt 15 Minuten.',
+    unsubCodeLead: 'Gib ihn auf der Website ein, um die Erinnerungen abzuschalten. Er gilt 10 .',
     unsubCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — es ändert sich nichts.',
     unsubDone: 'Erledigt. Wir schreiben nicht mehr.'
   },
@@ -136,7 +148,7 @@ const UNSUB = {
     unsubFooter: 'Ya no quiero estos avisos',
     unsubSubject: 'Tu código: %CODE%',
     unsubCodeTitle: 'Aquí tienes el código',
-    unsubCodeLead: 'Escríbelo en la web para desactivar los avisos. Vale 15 minutos.',
+    unsubCodeLead: 'Escríbelo en la web para desactivar los avisos. Vale 10 os.',
     unsubCodeNote: 'Si no has pedido este código, ignora el mensaje: no cambia nada.',
     unsubDone: 'Hecho. No volveremos a escribir.'
   },
@@ -144,7 +156,7 @@ const UNSUB = {
     unsubFooter: 'Je ne veux plus ces rappels',
     unsubSubject: 'Votre code : %CODE%',
     unsubCodeTitle: 'Voici le code',
-    unsubCodeLead: 'Saisissez-le sur le site pour désactiver les rappels. Il est valable 15 minutes.',
+    unsubCodeLead: 'Saisissez-le sur le site pour désactiver les rappels. Il est valable 10 es.',
     unsubCodeNote: 'Si vous n’avez pas demandé ce code, ignorez ce message : rien ne change.',
     unsubDone: 'C’est fait. Nous n’écrirons plus.'
   }
@@ -195,37 +207,37 @@ const ENTRY = {
   it: {
     entrySubject: 'Il tuo codice: %CODE%',
     entryCodeTitle: 'Ecco il codice',
-    entryCodeLead: 'Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 15 minuti.',
+    entryCodeLead: 'Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 10 i.',
     entryCodeNote: 'Se non hai chiesto tu questo codice, ignora il messaggio: la tua iscrizione non cambia.'
   },
   pl: {
     entrySubject: 'Twój kod: %CODE%',
     entryCodeTitle: 'Oto kod',
-    entryCodeLead: 'Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 15 minut.',
+    entryCodeLead: 'Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 10 .',
     entryCodeNote: 'Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — Twoje zgłoszenie się nie zmienia.'
   },
   en: {
     entrySubject: 'Your code: %CODE%',
     entryCodeTitle: 'Here is the code',
-    entryCodeLead: 'Enter it on the website to see your entry, correct it or withdraw. It lasts 15 minutes.',
+    entryCodeLead: 'Enter it on the website to see your entry, correct it or withdraw. It lasts 10 es.',
     entryCodeNote: 'If you did not ask for this code, ignore this message — your entry does not change.'
   },
   de: {
     entrySubject: 'Dein Code: %CODE%',
     entryCodeTitle: 'Hier ist der Code',
-    entryCodeLead: 'Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 15 Minuten.',
+    entryCodeLead: 'Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 10 .',
     entryCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — an deiner Anmeldung ändert sich nichts.'
   },
   es: {
     entrySubject: 'Tu código: %CODE%',
     entryCodeTitle: 'Aquí tienes el código',
-    entryCodeLead: 'Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 15 minutos.',
+    entryCodeLead: 'Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 10 os.',
     entryCodeNote: 'Si no has pedido este código, ignora el mensaje: tu inscripción no cambia.'
   },
   fr: {
     entrySubject: 'Votre code : %CODE%',
     entryCodeTitle: 'Voici le code',
-    entryCodeLead: 'Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 15 minutes.',
+    entryCodeLead: 'Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 10 es.',
     entryCodeNote: 'Si vous n’avez pas demandé ce code, ignorez ce message : votre inscription ne change pas.'
   }
 };
@@ -242,7 +254,7 @@ const QUIT = {
   it: {
     quitSubject: 'Codice per ritirarti: %CODE%',
     quitCodeTitle: 'Vuoi ritirarti dalla gara?',
-    quitCodeLead: 'Inserisci questo codice sul sito per confermare il ritiro. Vale 15 minuti. Non serve per altro.',
+    quitCodeLead: 'Inserisci questo codice sul sito per confermare il ritiro. Vale 10 i. Non serve per altro.',
     quitCodeNote: 'Se non hai chiesto tu questo codice, ignoralo: la tua iscrizione resta come è.',
     quitDoneSubject: 'Ritiro confermato — Carruleddhi Show 2026',
     quitDoneTitle: 'Ti abbiamo ritirato dalla gara',
@@ -252,7 +264,7 @@ const QUIT = {
   pl: {
     quitSubject: 'Kod do rezygnacji: %CODE%',
     quitCodeTitle: 'Chcesz zrezygnować z wyścigu?',
-    quitCodeLead: 'Wpisz ten kod na stronie, żeby potwierdzić rezygnację. Jest ważny 15 minut. Do niczego innego nie służy.',
+    quitCodeLead: 'Wpisz ten kod na stronie, żeby potwierdzić rezygnację. Jest ważny 10 . Do niczego innego nie służy.',
     quitCodeNote: 'Jeśli to nie Ty prosiłeś o ten kod, zignoruj go — Twoje zgłoszenie zostaje bez zmian.',
     quitDoneSubject: 'Rezygnacja przyjęta — Carruleddhi Show 2026',
     quitDoneTitle: 'Wycofaliśmy Cię z wyścigu',
@@ -262,7 +274,7 @@ const QUIT = {
   en: {
     quitSubject: 'Code to withdraw: %CODE%',
     quitCodeTitle: 'Withdrawing from the race?',
-    quitCodeLead: 'Enter this code on the website to confirm the withdrawal. It lasts 15 minutes and does nothing else.',
+    quitCodeLead: 'Enter this code on the website to confirm the withdrawal. It lasts 10 es and does nothing else.',
     quitCodeNote: 'If you did not ask for this code, ignore it — your entry stays as it is.',
     quitDoneSubject: 'Withdrawal confirmed — Carruleddhi Show 2026',
     quitDoneTitle: 'You are withdrawn from the race',
@@ -272,7 +284,7 @@ const QUIT = {
   de: {
     quitSubject: 'Code zum Rücktritt: %CODE%',
     quitCodeTitle: 'Vom Rennen zurücktreten?',
-    quitCodeLead: 'Gib diesen Code auf der Website ein, um den Rücktritt zu bestätigen. Er gilt 15 Minuten und tut nichts anderes.',
+    quitCodeLead: 'Gib diesen Code auf der Website ein, um den Rücktritt zu bestätigen. Er gilt 10  und tut nichts anderes.',
     quitCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere ihn — deine Anmeldung bleibt.',
     quitDoneSubject: 'Rücktritt bestätigt — Carruleddhi Show 2026',
     quitDoneTitle: 'Du bist vom Rennen zurückgetreten',
@@ -282,7 +294,7 @@ const QUIT = {
   es: {
     quitSubject: 'Código para retirarte: %CODE%',
     quitCodeTitle: '¿Te retiras de la carrera?',
-    quitCodeLead: 'Escribe este código en la web para confirmar la retirada. Vale 15 minutos y no sirve para nada más.',
+    quitCodeLead: 'Escribe este código en la web para confirmar la retirada. Vale 10 os y no sirve para nada más.',
     quitCodeNote: 'Si no has pedido este código, ignóralo: tu inscripción se queda como está.',
     quitDoneSubject: 'Retirada confirmada — Carruleddhi Show 2026',
     quitDoneTitle: 'Te hemos retirado de la carrera',
@@ -292,7 +304,7 @@ const QUIT = {
   fr: {
     quitSubject: 'Code pour vous retirer : %CODE%',
     quitCodeTitle: 'Vous vous retirez de la course ?',
-    quitCodeLead: 'Saisissez ce code sur le site pour confirmer le retrait. Il est valable 15 minutes et ne sert à rien d’autre.',
+    quitCodeLead: 'Saisissez ce code sur le site pour confirmer le retrait. Il est valable 10 es et ne sert à rien d’autre.',
     quitCodeNote: 'Si vous n’avez pas demandé ce code, ignorez-le : votre inscription reste telle quelle.',
     quitDoneSubject: 'Retrait confirmé — Carruleddhi Show 2026',
     quitDoneTitle: 'Vous êtes retiré de la course',
@@ -516,7 +528,7 @@ const RECEIPT = {
     rcptLead: 'Il Premio del pubblico lo decidete voi, un voto alla volta. Il tuo è arrivato.',
     rcptVoteTitle: 'Il tuo voto',
     rcptScoreLabel: 'Punteggio',
-    rcptChange: 'Puoi correggere il voto una volta sola: apri la pagina dal pulsante qui sotto. Dopo la chiusura non si cambia più nulla.',
+    rcptChange: 'Puoi cambiare il voto una volta sola, fino alla chiusura della votazione: apri la pagina dal pulsante qui sotto. Dopo la chiusura non si cambia più nulla.',
     rcptResults: 'Se hai chiesto i risultati, te li mandiamo appena la votazione si chiude.',
     rcptCta: 'Apri la pagina del voto'
   },
@@ -528,7 +540,7 @@ const RECEIPT = {
     rcptLead: 'Nagrodę publiczności rozstrzygacie wy, głos po głosie. Twój już doszedł.',
     rcptVoteTitle: 'Twój głos',
     rcptScoreLabel: 'Ocena',
-    rcptChange: 'Głos możesz poprawić tylko raz — otwórz stronę przyciskiem poniżej. Po zamknięciu głosowania nic już się nie zmienia.',
+    rcptChange: 'Głos możesz zmienić jeden raz, do końca głosowania — otwórz stronę przyciskiem poniżej. Po zamknięciu głosowania nic już się nie zmienia.',
     rcptResults: 'Jeśli poprosiłeś o wyniki, wyślemy je zaraz po zamknięciu głosowania.',
     rcptCta: 'Otwórz stronę głosowania'
   },
@@ -540,7 +552,7 @@ const RECEIPT = {
     rcptLead: 'The Audience Award is decided by you, one vote at a time. Yours has arrived.',
     rcptVoteTitle: 'Your vote',
     rcptScoreLabel: 'Score',
-    rcptChange: 'You can correct your vote once — open the page with the button below. Once voting closes nothing changes any more.',
+    rcptChange: 'You can change your vote once, any time until voting closes — open the page with the button below. After the close nothing changes any more.',
     rcptResults: 'If you asked for the results, we will send them as soon as voting closes.',
     rcptCta: 'Open the voting page'
   },
@@ -552,7 +564,7 @@ const RECEIPT = {
     rcptLead: 'Den Publikumspreis entscheidet ihr, Stimme für Stimme. Deine ist angekommen.',
     rcptVoteTitle: 'Deine Stimme',
     rcptScoreLabel: 'Bewertung',
-    rcptChange: 'Du kannst deine Stimme genau einmal korrigieren — öffne die Seite mit der Schaltfläche unten. Nach Abstimmungsende ändert sich nichts mehr.',
+    rcptChange: 'Du kannst deine Stimme einmal ändern, bis zum Ende der Abstimmung — öffne die Seite mit der Schaltfläche unten. Nach Abstimmungsende ändert sich nichts mehr.',
     rcptResults: 'Wenn du die Ergebnisse angefordert hast, schicken wir sie, sobald die Abstimmung schließt.',
     rcptCta: 'Abstimmungsseite öffnen'
   },
@@ -564,7 +576,7 @@ const RECEIPT = {
     rcptLead: 'El Premio del público lo decidís vosotros, voto a voto. El tuyo ya ha llegado.',
     rcptVoteTitle: 'Tu voto',
     rcptScoreLabel: 'Puntuación',
-    rcptChange: 'Puedes corregir tu voto una sola vez: abre la página con el botón de abajo. Cuando la votación cierre ya no se cambia nada.',
+    rcptChange: 'Puedes cambiar tu voto una sola vez, hasta el cierre de la votación: abre la página con el botón de abajo. Después del cierre ya no se cambia nada.',
     rcptResults: 'Si has pedido los resultados, te los enviamos en cuanto cierre la votación.',
     rcptCta: 'Abrir la página del voto'
   },
@@ -576,7 +588,7 @@ const RECEIPT = {
     rcptLead: 'Le Prix du public, c’est vous qui le décidez, une voix à la fois. La vôtre est arrivée.',
     rcptVoteTitle: 'Votre vote',
     rcptScoreLabel: 'Note',
-    rcptChange: 'Vous pouvez corriger votre vote une seule fois : ouvrez la page avec le bouton ci-dessous. Après la clôture, plus rien ne change.',
+    rcptChange: 'Vous pouvez changer votre vote une seule fois, jusqu’à la clôture du vote : ouvrez la page avec le bouton ci-dessous. Après la clôture, plus rien ne change.',
     rcptResults: 'Si vous avez demandé les résultats, nous vous les envoyons dès la clôture du vote.',
     rcptCta: 'Ouvrir la page du vote'
   }
@@ -642,7 +654,60 @@ const SPONSORACK = {
   }
 };
 
-const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED, WINNER, VOTERESULT, RECEIPT, SPONSORACK];
+/* ------------------------------------- Sponsor: logo i odsyłacz w podsumowaniu listu
+   Kreator w czacie zbiera OPCJONALNIE logo i adres strony albo profilu w mediach
+   społecznościowych. Potwierdzenie dla zgłaszającego ma je wymienić, bo ten list odpowiada
+   na jedno pytanie: „czy oni dostali to, co wysłałem". Brak logo w podsumowaniu przy logo
+   wysłanym to godzina niepewności i drugie zgłoszenie „na wypadek gdyby".
+
+   DLACZEGO NOWE KLUCZE, A NIE `labels`
+     `labels` opisuje pola formularza zapisu na wyścig — jest tam „Telefon" i „Adres", ale
+     nie ma nazwy na „strona albo profil w mediach społecznościowych" ani na „logo". Dopisanie
+     ich tam znaczyłoby etykiety widoczne w liście z numerem startowym, gdzie nie mają czego
+     opisywać.
+
+   `sponsorAckLogoYes` JEST OSOBNYM KLUCZEM, A NIE „TAK"
+     Bo w liście stoi jako WARTOŚĆ obok etykiety „Logo": po włosku „allegato", po polsku
+     „dołączone". Zdanie „Logo: tak" jest po polsku odpowiedzią na pytanie, którego w liście
+     nie ma. Linia pojawia się tylko wtedy, gdy plik naprawdę wszedł do bucketa — przy
+     nieudanym wgraniu nie ma jej wcale, bo obietnica „logo dołączone" byłaby wtedy
+     nieprawdziwa, a organizator dostaje o tym własne zdanie w swoim mailu. */
+const SPONSORFILES = {
+  it: {
+    sponsorAckSiteLabel: 'Sito o profilo',
+    sponsorAckLogoLabel: 'Logo',
+    sponsorAckLogoYes: 'allegato'
+  },
+  pl: {
+    sponsorAckSiteLabel: 'Strona lub profil',
+    sponsorAckLogoLabel: 'Logo',
+    sponsorAckLogoYes: 'dołączone'
+  },
+  en: {
+    sponsorAckSiteLabel: 'Site or profile',
+    sponsorAckLogoLabel: 'Logo',
+    sponsorAckLogoYes: 'attached'
+  },
+  de: {
+    sponsorAckSiteLabel: 'Website oder Profil',
+    sponsorAckLogoLabel: 'Logo',
+    sponsorAckLogoYes: 'beigefügt'
+  },
+  es: {
+    sponsorAckSiteLabel: 'Web o perfil',
+    sponsorAckLogoLabel: 'Logo',
+    sponsorAckLogoYes: 'adjunto'
+  },
+  fr: {
+    sponsorAckSiteLabel: 'Site ou profil',
+    sponsorAckLogoLabel: 'Logo',
+    sponsorAckLogoYes: 'joint'
+  }
+};
+
+const GROUPS = [
+  FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED, WINNER, VOTERESULT, RECEIPT, SPONSORACK, SPONSORFILES
+];
 // (Ten plik obsługuje emails/copy.json. Klucze interfejsu strony idą przez
 //  tools/add-i18n-keys.mjs — to dwa różne słowniki i mieszanie ich kończy się kluczem,
 //  którego szuka przeglądarka, a jest tylko w mailach.)

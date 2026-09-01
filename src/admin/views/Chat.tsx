@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, Bot, Loader2, Send, User } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Bot, Loader2, Send, User } from 'lucide-react';
 import { cn, formatAgo, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import {
@@ -259,9 +259,9 @@ export function Chat({
         </p>
       ) : null}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mt-5 flex lg:grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] items-start">
         {/* ---- list ---- */}
-        <div className="rounded-2xl border border-white/10 bg-white/4">
+        <div className={cn("w-full rounded-2xl border border-white/10 bg-white/4", active ? "hidden lg:block" : "block")}>
           <div className="border-b border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/40">
             {t('chat.threads')}
           </div>
@@ -324,7 +324,7 @@ export function Chat({
         </div>
 
         {/* ---- conversation ---- */}
-        <div className="flex min-h-[62vh] flex-col rounded-2xl border border-white/10 bg-white/4">
+        <div className={cn("w-full flex-col min-h-[62vh] rounded-2xl border border-white/10 bg-white/4", active ? "flex" : "hidden lg:flex")}>
           {!current ? (
             <div className="grid flex-1 place-items-center px-6 text-center text-sm text-white/40">
               {t('chat.pick')}
@@ -332,6 +332,14 @@ export function Chat({
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setActive(null)}
+                  className="lg:hidden mr-1 rounded-full bg-white/10 p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+                  aria-label="Wróć do listy"
+                >
+                  <ArrowLeft className="size-4" />
+                </button>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold text-white">
                     {current.name || t('chat.visitor')}

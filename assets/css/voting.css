@@ -85,6 +85,33 @@
 
 .podium[hidden] { display: none; }
 
+.podium {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(120deg, #ff9a9e 0%, #fecfef 30%, #a18cd1 70%, #fbc2eb 100%);
+  background-size: 200% 200%;
+  animation: candyBg 12s ease infinite;
+}
+.podium::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  background: radial-gradient(circle at 20% 30%, rgba(255,255,255,0.4) 0%, transparent 20%),
+              radial-gradient(circle at 80% 70%, rgba(255,255,255,0.4) 0%, transparent 20%),
+              radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 0%, transparent 50%);
+  background-size: 150% 150%;
+  animation: candySparkles 8s infinite alternate;
+  pointer-events: none;
+}
+@keyframes candyBg {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes candySparkles {
+  0% { transform: scale(1) translate(0, 0); opacity: 0.8; }
+  100% { transform: scale(1.1) translate(-2%, 2%); opacity: 1; }
+}
 /* ===========================================================================
    COKÓŁ: ZDJĘCIA STOJĄ NA STOPNIACH
    ===========================================================================
@@ -180,13 +207,14 @@
 .podium-card[data-podium-place='3'] { --tone: #8d76ff; --tone-soft: rgb(141 118 255 / .45); --medal: #c07440; }
 
 .podium-card {
+  --d: clamp(8px, 1.8vw, 22px);
   display: grid;
   /* Karta u góry, blok pod nią. `min-content` na bloku, żeby wysokość brała się z jego
      własnej reguły, a nie z podziału wolnego miejsca w kolumnie. */
   grid-template-rows: auto min-content;
   align-content: end;
   gap: 0;
-  margin: 0;
+  margin: 0 var(--d) 0 0;
   padding: 0;
 }
 
@@ -209,9 +237,11 @@
   /* Odchylenie jest zmienną, bo używa go też klatka końcowa wejścia niżej: animacja
      kończąca się na `transform: none` zdjęłaby pochylenie w ostatniej klatce. */
   --lean: rotateX(5deg);
-  margin-bottom: clamp(14px, 2.2vw, 26px);
+  margin-bottom: calc(clamp(14px, 2.2vw, 26px) - var(--d));
+  left: calc(var(--d) / 2);
   transform: var(--lean);
   transform-style: preserve-3d;
+  z-index: 2;
 }
 /* Boczne karty patrzą do środka, w stronę zwycięzcy. Lewa obraca się tak, że jej prawa
    krawędź cofa się w głąb, prawa odwrotnie — dziesięć stopni, czyli tyle, ile widać kątem
@@ -253,47 +283,51 @@
      wykres, a nie jak podium. */
   height: var(--step-h);
   margin: 0;
-  /* Cieńsza obwódka i zaokrąglony szczyt: cokół przestał być głównym rysunkiem tej sekcji
-     i nie ma już rywalizować ze zdjęciem nad sobą. Zostaje po nim wysokość i kolor, czyli
-     dokładnie te dwie rzeczy, które niosą wynik. */
-  border: 2px solid rgb(7 26 61 / .55);
-  border-bottom: 0;
-  border-radius: 14px 14px 0 0;
-  /* Rośnie od dołu, więc animacja wejścia wygląda jak stawianie bloku, a nie jak
-     zjeżdżanie go z góry. */
+  border: 0;
+  border-radius: 0;
+  background: var(--block-front);
   transform-origin: 50% 100%;
-}
-.podium-card[data-podium-place='1'] .podium-card__block {
-  --step-h: clamp(78px, 11vw, 142px);
-  background: linear-gradient(180deg, #ffd75e, #e9a11b);
-}
-.podium-card[data-podium-place='2'] .podium-card__block {
-  --step-h: clamp(52px, 7.4vw, 96px);
-  background: linear-gradient(180deg, #e8eef7, #a9b8cd);
-}
-.podium-card[data-podium-place='3'] .podium-card__block {
-  --step-h: clamp(34px, 5vw, 66px);
-  background: linear-gradient(180deg, #f0b08a, #c07440);
+  z-index: 1;
 }
 
-/* Ukośne paski na stopniu, w kolorze karnawałowym tej kolumny.
-   ---------------------------------------------------------------------------
-   Osobną warstwą (`::before`), nie drugim gradientem w `background`: tło stopnia niesie medal
-   i musi dać się zmienić bez ruszania pasków. Paski są RZADKIE i półprzejrzyste, bo mają
-   dołożyć święta, a nie zamienić stopnia w tkaninę — przy gęstszym kroku na zdjęciu ekranu
-   pojawia się mora. */
+/* Right face */
 .podium-card__block::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: repeating-linear-gradient(
-    128deg,
-    var(--tone-soft) 0 10px,
-    rgb(255 255 255 / 0) 10px 26px
-  );
-  mix-blend-mode: soft-light;
-  pointer-events: none;
+  left: 100%; bottom: 0;
+  width: var(--d); height: 100%;
+  background: var(--block-side);
+  transform-origin: left bottom;
+  transform: skewY(-45deg);
+}
+/* Top face */
+.podium-card__block::after {
+  content: '';
+  position: absolute;
+  bottom: 100%; left: 0;
+  width: 100%; height: var(--d);
+  background: var(--block-top);
+  transform-origin: left bottom;
+  transform: skewX(-45deg);
+}
+
+.podium-card[data-podium-place='1'] .podium-card__block {
+  --step-h: clamp(78px, 11vw, 142px);
+  --block-front: linear-gradient(180deg, #ffd75e, #e9a11b);
+  --block-side: linear-gradient(180deg, #e9a11b, #c48300);
+  --block-top: #ffea9e;
+}
+.podium-card[data-podium-place='2'] .podium-card__block {
+  --step-h: clamp(52px, 7.4vw, 96px);
+  --block-front: linear-gradient(180deg, #e8eef7, #a9b8cd);
+  --block-side: linear-gradient(180deg, #a9b8cd, #8a9cb5);
+  --block-top: #f8fbff;
+}
+.podium-card[data-podium-place='3'] .podium-card__block {
+  --step-h: clamp(34px, 5vw, 66px);
+  --block-front: linear-gradient(180deg, #f0b08a, #c07440);
+  --block-side: linear-gradient(180deg, #c07440, #965328);
+  --block-top: #ffcdb0;
 }
 
 /* Poświata pod kartą, w barwie kolumny. Leży POD stopniem i pod zdjęciem (`z-index: -1` na
@@ -527,67 +561,22 @@
      postawić). Na pełnej szerokości mieści się i mówi miejsce bez czytania podpisu. */
 @media (max-width: 700px) {
   .podium__steps {
-    flex-direction: column;
-    align-items: stretch;
-    gap: clamp(12px, 3.4vw, 18px);
-    /* Perspektywa bez pochylonych kart nie ma czego robić, a na wąskim ekranie liczy się
-       każdy piksel szerokości: punkt zbiegu potrafi przesunąć kartę o kilka. */
+    gap: clamp(6px, 1.5vw, 12px);
     perspective: none;
   }
-  .podium-card[data-podium-place='1'],
-  .podium-card[data-podium-place='2'],
-  .podium-card[data-podium-place='3'] { order: 0; flex: none; }
-
-  /* Dwa wiersze, jedna kolumna, zero wartości w pikselach: zdjęcie, pod nim stopień na pełną
-     szerokość. Bez `grid-template-columns` w ogóle — poprzednia wersja musiała jawnie
-     przypisywać komórki (`grid-area`), bo w znaczniku karta stoi PRZED stopniem, a w dwóch
-     wierszach ta kolejność jest już właściwa. */
   .podium-card {
-    grid-template-rows: auto min-content;
-    align-content: stretch;
+    --d: clamp(4px, 1vw, 10px);
   }
-
-  /* Na telefonie karta nie lewituje: nie ma miejsca na odstęp i cień pod nią, a pochylenie na
-     wąskim ekranie zjada szerokość zdjęcia. Zostaje samo zdjęcie z napisami. */
+  .podium-card__block b { font-size: 14px; }
+  
   .podium-card__top { --lean: none; margin-bottom: 0; }
-  .podium-card__top::after { display: none; }
-
-  /* Stopień: pełna szerokość, trzy wysokości, cyfra w środku. Zaokrąglony tylko u dołu, więc
-     razem ze zdjęciem nad sobą tworzy jeden panel, a nie dwa sąsiadujące prostokąty. */
-  .podium-card__block {
-    border: 0;
-    border-radius: 0 0 clamp(14px, 3.4vw, 20px) clamp(14px, 3.4vw, 20px);
+  
+  .podium-card__photo {
+    border-radius: clamp(10px, 2vw, 14px);
   }
-  /* `.podium__steps` z przodu, żeby podnieść specyficzność — i to nie jest ozdoba selektora.
-     ---------------------------------------------------------------------------
-     Dalej w tym pliku stoi `@media (min-height: 640px)`, które ustawia te same trzy zmienne na
-     wysokości dla szerokiego ekranu. Telefon ma 844 px (i 740 px) wysokości, więc TAMTO
-     zapytanie też jest prawdziwe, a ponieważ leży niżej w pliku, przy równej specyficzności
-     wygrywa. ZMIERZONE: stopnie na 390×844 wychodziły 56/38/26 px zamiast 34/26/20 — czyli
-     kolumna dostawała wysokości policzone dla cokołu w rzędzie. Jedna klasa więcej rozstrzyga
-     to regułą, a nie kolejnością wierszy, której nikt nie widzi. */
-  .podium__steps .podium-card[data-podium-place='1'] .podium-card__block { --step-h: 34px; }
-  .podium__steps .podium-card[data-podium-place='2'] .podium-card__block { --step-h: 26px; }
-  .podium__steps .podium-card[data-podium-place='3'] .podium-card__block { --step-h: 20px; }
-  .podium-card__block b { font-size: 16px; }
-
-  /* Zdjęcie płaskie, bo w pionowej liście trzy kadry 4/5 to trzy ekrany przewijania. Górne
-     narożniki zaokrąglone, dolne wyprostowane — panel domyka stopień pod spodem. */
-  .podium-card[data-podium-place='1'] .podium-card__photo,
-  .podium-card[data-podium-place='2'] .podium-card__photo,
-  .podium-card[data-podium-place='3'] .podium-card__photo {
-    aspect-ratio: 16 / 10;
-    border-radius: clamp(14px, 3.4vw, 20px) clamp(14px, 3.4vw, 20px) 0 0;
-  }
-
-  /* Poświata schodzi: na telefonie panele stoją jeden pod drugim, a rozmyta plama pod każdym
-     z nich wchodziłaby na panel niżej i wyglądałaby jak zabrudzone tło. */
-  .podium-card::after { display: none; }
-
-  /* Podłoga zostaje, w przeciwieństwie do poprzedniej wersji. Trzy panele bez niej kończą się
-     w powietrzu, a to ona mówi, że stoją NA czymś — i przy okazji domyka kolumnę tą samą
-     tęczą, którą cokół ma na szerokim ekranie. */
-  .podium__ground { margin-top: clamp(10px, 2.6vw, 14px); }
+  
+  .podium-card__body strong { font-size: clamp(10px, 2.5vw, 14px); }
+  .podium-card__stats b { font-size: clamp(12px, 3vw, 16px); }
 }
 
 /* Kto prosi o mniej ruchu, dostaje gotowy cokół: te same bloki, te same kolory, zero
@@ -737,7 +726,16 @@ button.is-race-locked {
    Podstrona głosowania — votazione.html
    ============================================================================ */
 
-.vote-page { background: var(--cream, #fbf7ef); }
+.vote-page {
+  background: linear-gradient(135deg, #fbc2eb 0%, #a18cd1 33%, #ff9a9e 66%, #fecfef 100%);
+  background-size: 400% 400%;
+  animation: votePageBg 20s ease infinite;
+}
+@keyframes votePageBg {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
 /* Baner DEMO zajmuje trzydzieści pikseli u góry i zsuwa nagłówek o tyle samo (demo.css), więc
    treść musi zejść razem z nim — inaczej pierwszy wiersz nagłówka wchodzi pod pasek. */
 html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh) * 0.14 + 30px), 180px); }
@@ -1502,7 +1500,7 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   position: relative; max-width: 880px; padding: clamp(22px, 4vw, 42px);
   border: 3px solid var(--navy-950); border-radius: clamp(26px, 5vw, 46px);
   background: rgb(255 255 255 / .88);
-  box-shadow: 12px 12px 0 #b8eaf5, 20px 20px 0 rgb(255 105 153 / .2);
+  box-shadow: 0 16px 40px rgb(0 0 0 / .08);
   backdrop-filter: blur(12px);
 }
 .vote-head::after {
@@ -1512,25 +1510,49 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   background: var(--yellow); color: var(--navy-950); font-size: 24px;
   transform: rotate(9deg);
 }
-.vote-rule { border-color: var(--navy-950); background: #fff0a8; box-shadow: 5px 5px 0 rgb(7 26 61 / .14); }
-.vote-notice { border: 3px solid var(--navy-950); background: #fff; color: var(--navy-950); box-shadow: 8px 8px 0 #ffb4cf; }
-.vote-mine { border: 3px solid var(--navy-950); background: #dffbea; box-shadow: 8px 8px 0 #8de4bc; }
-.vote-filter { border-color: var(--navy-950); box-shadow: 3px 3px 0 rgb(7 26 61 / .15); }
+.vote-rule { border-color: var(--navy-950); background: #fff0a8; box-shadow: 0 8px 24px rgb(0 0 0 / .06); }
+.vote-notice { border: 3px solid var(--navy-950); background: #fff; color: var(--navy-950); box-shadow: 0 12px 32px rgb(0 0 0 / .08); }
+.vote-mine { display: none !important; }
+.vote-filter { border-color: var(--navy-950); box-shadow: 0 6px 16px rgb(0 0 0 / .05); }
 .vote-filter:nth-child(3n+1) { background: #fff0a8; }
 .vote-filter:nth-child(3n+2) { background: #ffddeb; }
 .vote-filter:nth-child(3n) { background: #dff6ff; }
-.vote-filter.is-active { border-color: var(--navy-950); background: var(--navy-950); color: #fff; box-shadow: 4px 4px 0 #ff6f9f; }
+.vote-filter.is-active { border-color: var(--navy-950); background: var(--navy-950); color: #fff; box-shadow: 0 8px 24px rgb(0 0 0 / .15); }
 
 .vote-card {
   --card-candy: #ff79a8;
   border: 3px solid var(--navy-950);
   background: var(--navy-950);
-  box-shadow: 9px 9px 0 var(--card-candy);
+  box-shadow: 0 14px 28px rgb(0 0 0 / .12);
 }
 .vote-card:nth-child(4n+2) { --card-candy: #55cdef; }
 .vote-card:nth-child(4n+3) { --card-candy: #ffd53d; }
 .vote-card:nth-child(4n) { --card-candy: #a987ff; }
-.vote-card.is-voted { border-color: var(--navy-950); background: #0b5944; box-shadow: 9px 9px 0 #54dda7; }
+.vote-card.is-voted { 
+  border-color: #1fa971; 
+  background: #0b5944; 
+  box-shadow: 0 14px 34px rgb(31 169 113 / .35); 
+}
+.vote-card.is-voted::before {
+  content: 'TWÓJ GŁOS';
+  position: absolute;
+  top: -14px; left: 50%; transform: translateX(-50%);
+  background: var(--yellow);
+  color: var(--navy-950);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 900;
+  font-size: 14px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  pointer-events: none;
+}
+.vote-card.is-voted .vote-card__who,
+.vote-card.is-voted .vote-card__title,
+.vote-card.is-voted .vote-card__rider,
+.vote-card.is-voted .vote-card__place {
+  color: #fff;
+}
 .vote-card__number { border: 2px solid #fff; }
 .vote-card__body { padding: 16px; }
 .vote-card__rider { color: rgb(255 255 255 / .72); }
@@ -1542,7 +1564,7 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 .vote-slider::-moz-range-thumb { width: 34px; height: 34px; }
 .vote-slider__scale { width: calc(100% - 74px); margin-right: 0; }
 
-.vote-dialog__surface { border: 3px solid var(--navy-950); background: linear-gradient(145deg, #fff, #fff7d7); box-shadow: 12px 12px 0 #ff83ae, 0 32px 90px rgb(7 26 61 / .4); }
+.vote-dialog__surface { border: 3px solid var(--navy-950); background: linear-gradient(145deg, #fff, #fff7d7); box-shadow: 0 32px 90px rgb(7 26 61 / .2); }
 
 /* ----------------------------------------------------------- zamknięte głosowanie */
 .vote-results {
@@ -1552,7 +1574,7 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
     radial-gradient(circle at 10% 8%, rgb(255 215 61 / .5), transparent 18rem),
     radial-gradient(circle at 94% 4%, rgb(255 111 159 / .34), transparent 20rem),
     linear-gradient(155deg, #fff 20%, #effbff 100%);
-  box-shadow: 14px 14px 0 #a7e5f3;
+  box-shadow: 0 24px 60px rgb(0 0 0 / .08);
 }
 .vote-results__head { display: grid; justify-items: center; gap: 10px; max-width: 720px; margin: 0 auto; text-align: center; }
 .vote-results__head h2 { margin: 0; font-family: var(--font-display); font-size: clamp(34px, 7vw, 66px); line-height: .95; }

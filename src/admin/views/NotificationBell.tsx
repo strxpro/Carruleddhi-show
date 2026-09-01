@@ -14,7 +14,12 @@ const DESTINATION: Record<keyof InboxCounts, TabId> = {
   reminders: 'reminders',
   newsletter: 'newsletter',
   wall: 'wall',
-  chats: 'chat'
+  chats: 'chat',
+  /* Zgłoszenie sponsora prowadzi do ustawień, bo tam stoi karta „Zgłoszenia sponsorów" i tam
+     zapada decyzja. Wpisane razem z licznikiem w `InboxCounts`, choć końcówka `inbox` tego
+     rodzaju jeszcze nie oddaje: te dwie mapy są `Record<keyof InboxCounts, …>`, więc dziura
+     w nich byłaby błędem kompilacji, a nie dzwonkiem prowadzącym w nieznane miejsce. */
+  sponsors: 'settings'
 };
 
 const LABELS: Record<PanelLocale, Record<keyof InboxCounts, string>> = {
@@ -24,7 +29,8 @@ const LABELS: Record<PanelLocale, Record<keyof InboxCounts, string>> = {
     reminders: 'Zapis na przypomnienia',
     newsletter: 'Zapis na newsletter',
     wall: 'Wpis na tablicy',
-    chats: 'Rozmowa na czacie'
+    chats: 'Rozmowa na czacie',
+    sponsors: 'Zgłoszenie sponsora'
   },
   it: {
     registrations: 'Nuova iscrizione',
@@ -32,7 +38,8 @@ const LABELS: Record<PanelLocale, Record<keyof InboxCounts, string>> = {
     reminders: 'Iscrizione ai promemoria',
     newsletter: 'Iscrizione alla newsletter',
     wall: 'Messaggio in bacheca',
-    chats: 'Conversazione in chat'
+    chats: 'Conversazione in chat',
+    sponsors: 'Richiesta di sponsorizzazione'
   }
 };
 
