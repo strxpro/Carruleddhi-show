@@ -913,6 +913,20 @@
           <a class="btn btn--small btn--yellow" href="#voting"><span data-i18n="voting.cta">Vota il partecipante</span></a>
         </p>
 
+        <!-- Po zamknieciu glosowania formularz nie jest juz „chwilowo zajety" — ta edycja
+             sie skonczyla. Zamiast wylaczonego przycisku, ktory nic nie tlumaczy, stoi tu
+             zaproszenie na nastepny rok i jedno klikniecie do okna z przypomnieniem.
+             Okno jest to samo, ktorego uzywa „Bede tam" (`data-open-reminder`) — ma juz pole
+             na imie, adres i zgode, wiec drugi formularz na to samo bylby drugim miejscem do
+             utrzymania i druga lista adresow do pogodzenia. -->
+        <p class="signup__locked signup__closed" data-signup-closed hidden>
+          <strong data-i18n="voting.signupClosedTitle">Questa edizione è finita.</strong>
+          <span data-i18n="voting.signupClosedLead">Lascia la mail e ti avvisiamo quando aprono le iscrizioni per la prossima.</span>
+          <button class="btn btn--small btn--yellow" type="button" data-open-reminder>
+            <span data-i18n="voting.signupClosedCta">Avvisami l’anno prossimo</span>
+          </button>
+        </p>
+
         <div class="form-shell reveal" data-form-shell>
           <nav class="form-sidebar" data-form-stepper aria-labelledby="registration-steps-title">
             <h3 id="registration-steps-title" data-i18n="signup.sidebar">La tua corsa comincia qui.</h3>

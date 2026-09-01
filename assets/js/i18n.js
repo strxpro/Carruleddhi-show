@@ -1302,7 +1302,7 @@
       'voting.demoClosed': 'Podio',
       'voting.demoSkip': 'Fine del conto alla rovescia',
       'voting.signupLockedTitle': 'La gara è in corso.',
-      'voting.signupLockedLead': 'Le iscrizioni riaprono dopo la premiazione. Intanto puoi votare i carretti in pista.',
+      'voting.signupLockedLead': 'Le iscrizioni riaprono dopo la premiazione. Intanto puoi votare i carretti in pista.', 'voting.signupClosedTitle': 'Questa edizione è finita.', 'voting.signupClosedLead': 'Lascia la mail e ti avvisiamo quando aprono le iscrizioni per la prossima.', 'voting.signupClosedCta': 'Avvisami l’anno prossimo',
       /* Podstrona głosowania — votazione.html. Jedna nagroda: Premio del pubblico. */
       'voting.pageKicker': 'Voto del pubblico',
       'voting.pageTitle': 'Premio del pubblico.',
@@ -1390,7 +1390,7 @@
       'voting.demoClosed': 'Podium',
       'voting.demoSkip': 'Zakończ odliczanie',
       'voting.signupLockedTitle': 'Wyścig właśnie trwa.',
-      'voting.signupLockedLead': 'Zapisy otworzą się po wręczeniu nagród. W tym czasie możesz oceniać pojazdy na trasie.',
+      'voting.signupLockedLead': 'Zapisy otworzą się po wręczeniu nagród. W tym czasie możesz oceniać pojazdy na trasie.', 'voting.signupClosedTitle': 'Ta edycja się skończyła.', 'voting.signupClosedLead': 'Zostaw adres, a damy znać, gdy otworzą się zapisy na następną.', 'voting.signupClosedCta': 'Powiadom mnie za rok',
       /* Podstrona głosowania — votazione.html. Jedna nagroda: Nagroda publiczności. */
       'voting.pageKicker': 'Głos publiczności',
       'voting.pageTitle': 'Nagroda publiczności.',
@@ -1478,7 +1478,7 @@
       'voting.demoClosed': 'Podium',
       'voting.demoSkip': 'End the countdown',
       'voting.signupLockedTitle': 'The race is running.',
-      'voting.signupLockedLead': 'Entries reopen after the prize ceremony. Meanwhile you can vote for the carts on the hill.',
+      'voting.signupLockedLead': 'Entries reopen after the prize ceremony. Meanwhile you can vote for the carts on the hill.', 'voting.signupClosedTitle': 'This edition is over.', 'voting.signupClosedLead': 'Leave your e-mail and we will tell you when entries open for the next one.', 'voting.signupClosedCta': 'Tell me next year',
       /* Podstrona głosowania — votazione.html. Jedna nagroda: Audience Award. */
       'voting.pageKicker': 'Audience vote',
       'voting.pageTitle': 'The Audience Award.',
@@ -1566,7 +1566,7 @@
       'voting.demoClosed': 'Podium',
       'voting.demoSkip': 'Countdown beenden',
       'voting.signupLockedTitle': 'Das Rennen läuft.',
-      'voting.signupLockedLead': 'Anmeldungen öffnen nach der Siegerehrung wieder. Bis dahin kannst du die Wagen bewerten.',
+      'voting.signupLockedLead': 'Anmeldungen öffnen nach der Siegerehrung wieder. Bis dahin kannst du die Wagen bewerten.', 'voting.signupClosedTitle': 'Diese Ausgabe ist vorbei.', 'voting.signupClosedLead': 'Hinterlasse deine E-Mail — wir melden uns, wenn die nächsten Anmeldungen öffnen.', 'voting.signupClosedCta': 'Sag mir nächstes Jahr Bescheid',
       /* Podstrona głosowania — votazione.html. Jedna nagroda: Publikumspreis. */
       'voting.pageKicker': 'Publikumsvoting',
       'voting.pageTitle': 'Der Publikumspreis.',
@@ -1654,7 +1654,7 @@
       'voting.demoClosed': 'Podio',
       'voting.demoSkip': 'Terminar la cuenta atrás',
       'voting.signupLockedTitle': 'La carrera está en marcha.',
-      'voting.signupLockedLead': 'Las inscripciones reabren tras la entrega de premios. Mientras, puedes votar los carros.',
+      'voting.signupLockedLead': 'Las inscripciones reabren tras la entrega de premios. Mientras, puedes votar los carros.', 'voting.signupClosedTitle': 'Esta edición ha terminado.', 'voting.signupClosedLead': 'Deja tu correo y te avisamos cuando abran las inscripciones de la próxima.', 'voting.signupClosedCta': 'Avísame el año que viene',
       /* Podstrona głosowania — votazione.html. Jedna nagroda: Premio del público. */
       'voting.pageKicker': 'Voto del público',
       'voting.pageTitle': 'Premio del público.',
@@ -1742,7 +1742,7 @@
       'voting.demoClosed': 'Podium',
       'voting.demoSkip': 'Terminer le décompte',
       'voting.signupLockedTitle': 'La course est en cours.',
-      'voting.signupLockedLead': 'Les inscriptions rouvrent après la remise des prix. En attendant, votez pour les chariots.',
+      'voting.signupLockedLead': 'Les inscriptions rouvrent après la remise des prix. En attendant, votez pour les chariots.', 'voting.signupClosedTitle': 'Cette édition est terminée.', 'voting.signupClosedLead': 'Laissez votre e-mail : nous vous préviendrons à l’ouverture des inscriptions.', 'voting.signupClosedCta': 'Prévenez-moi l’an prochain',
       /* Podstrona głosowania — votazione.html. Jedna nagroda: Prix du public. */
       'voting.pageKicker': 'Vote du public',
       'voting.pageTitle': 'Le Prix du public.',
@@ -1814,9 +1814,8 @@
       'chat.sponsorNoThanks': 'Rinuncio',
       'chat.sponsorNo': 'Capito, nessun problema. Restiamo a disposizione se cambia qualcosa — e ti aspettiamo comunque alla gara!',
       'chat.sponsorAskName': 'Perfetto. Che nome vuoi sul carruleddhi?',
-      'chat.sponsorAskPhone': 'Grazie. A che numero possiamo chiamarti? Se preferisci, scrivi «salta».',
-      'chat.sponsorAskEmail': 'E la tua e-mail? Basta uno dei due contatti.',
-      'chat.sponsorNeedContact': 'Mi serve almeno un contatto: un numero o un’e-mail.',
+      'chat.sponsorAskPhone': 'A che numero possiamo chiamarti? Il numero non è obbligatorio: puoi saltare questo passaggio.',
+      'chat.sponsorAskEmail': 'Adesso la tua e-mail: questa serve, perché ci mando un codice per confermare l’indirizzo.',
       'chat.sponsorThanks': 'Grazie! Ho passato tutto agli organizzatori: ti contattiamo noi. Se hai fretta, scrivi a info@carruleddhishow.com o chiama il +39 328 498 1574.'
     },
     pl: {
@@ -1851,9 +1850,8 @@
       'chat.sponsorNoThanks': 'Rezygnuję',
       'chat.sponsorNo': 'Rozumiemy, nie ma sprawy. Jesteśmy do dyspozycji, jeśli coś się zmieni — a na wyścig zapraszamy tak czy inaczej!',
       'chat.sponsorAskName': 'Świetnie. Jaką nazwę chcesz na carruleddhi?',
-      'chat.sponsorAskPhone': 'Dziękuję. Pod jaki numer możemy zadzwonić? Jeśli wolisz, napisz „pomiń”.',
-      'chat.sponsorAskEmail': 'A Twój e-mail? Wystarczy jeden z dwóch kontaktów.',
-      'chat.sponsorNeedContact': 'Potrzebuję choć jednego kontaktu: numeru albo e-maila.',
+      'chat.sponsorAskPhone': 'Pod jaki numer możemy zadzwonić? Numer nie jest obowiązkowy — możesz pominąć ten krok.',
+      'chat.sponsorAskEmail': 'Teraz Twój e-mail: ten jest potrzebny, bo wyślę na niego kod potwierdzający adres.',
       'chat.sponsorThanks': 'Dziękujemy! Przekazałem wszystko organizatorom — skontaktujemy się z Tobą. Jeśli Ci spieszno, napisz na info@carruleddhishow.com albo zadzwoń: +39 328 498 1574.'
     },
     en: {
@@ -1887,9 +1885,8 @@
       'chat.sponsorNoThanks': 'No thanks',
       'chat.sponsorNo': 'Understood, no problem. We are here if anything changes — and you are welcome at the race either way!',
       'chat.sponsorAskName': 'Great. What name should the cart carry?',
-      'chat.sponsorAskPhone': 'Thank you. What number can we call? Write “skip” if you prefer.',
-      'chat.sponsorAskEmail': 'And your e-mail? One of the two contacts is enough.',
-      'chat.sponsorNeedContact': 'I need at least one contact: a number or an e-mail.',
+      'chat.sponsorAskPhone': 'What number can we call? The number is not required — you can skip this step.',
+      'chat.sponsorAskEmail': 'Now your e-mail: this one is needed, because I send a code to it to confirm the address.',
       'chat.sponsorThanks': 'Thank you! I have passed it to the organisers — they will get in touch. In a hurry? Write to info@carruleddhishow.com or call +39 328 498 1574.'
     },
     de: {
@@ -1923,9 +1920,8 @@
       'chat.sponsorNoThanks': 'Kein Interesse',
       'chat.sponsorNo': 'Verstanden, kein Problem. Wir sind da, falls sich etwas ändert — und beim Rennen bist du sowieso willkommen!',
       'chat.sponsorAskName': 'Super. Welcher Name soll auf dem Wagen stehen?',
-      'chat.sponsorAskPhone': 'Danke. Unter welcher Nummer erreichen wir dich? Schreib «überspringen», wenn du magst.',
-      'chat.sponsorAskEmail': 'Und deine E-Mail? Einer der beiden Kontakte reicht.',
-      'chat.sponsorNeedContact': 'Ich brauche mindestens einen Kontakt: Nummer oder E-Mail.',
+      'chat.sponsorAskPhone': 'Unter welcher Nummer erreichen wir dich? Die Nummer ist nicht nötig — du kannst diesen Schritt überspringen.',
+      'chat.sponsorAskEmail': 'Jetzt deine E-Mail: die brauche ich, denn ich schicke dir dorthin einen Code zur Bestätigung.',
       'chat.sponsorThanks': 'Danke! Ich habe alles an die Organisatoren weitergegeben — sie melden sich. Wenn es eilt: info@carruleddhishow.com oder +39 328 498 1574.'
     },
     es: {
@@ -1959,9 +1955,8 @@
       'chat.sponsorNoThanks': 'Lo dejo',
       'chat.sponsorNo': 'Entendido, sin problema. Estamos aquí si algo cambia, y te esperamos en la carrera de todos modos.',
       'chat.sponsorAskName': 'Genial. ¿Qué nombre quieres en el carro?',
-      'chat.sponsorAskPhone': 'Gracias. ¿A qué número podemos llamarte? Escribe «omitir» si lo prefieres.',
-      'chat.sponsorAskEmail': '¿Y tu correo? Basta con uno de los dos contactos.',
-      'chat.sponsorNeedContact': 'Necesito al menos un contacto: un número o un correo.',
+      'chat.sponsorAskPhone': '¿A qué número podemos llamarte? El número no es obligatorio: puedes omitir este paso.',
+      'chat.sponsorAskEmail': 'Ahora tu correo: este sí hace falta, porque te envío un código para confirmar la dirección.',
       'chat.sponsorThanks': '¡Gracias! Se lo he pasado a los organizadores: te contactarán. Si tienes prisa, escribe a info@carruleddhishow.com o llama al +39 328 498 1574.'
     },
     fr: {
@@ -1995,10 +1990,245 @@
       'chat.sponsorNoThanks': 'Je renonce',
       'chat.sponsorNo': 'Compris, pas de souci. Nous restons disponibles si quelque chose change — et vous êtes bienvenu à la course de toute façon !',
       'chat.sponsorAskName': 'Parfait. Quel nom doit porter le chariot ?',
-      'chat.sponsorAskPhone': 'Merci. À quel numéro pouvons-nous vous appeler ? Écrivez « passer » si vous préférez.',
-      'chat.sponsorAskEmail': 'Et votre e-mail ? Un des deux contacts suffit.',
-      'chat.sponsorNeedContact': 'Il me faut au moins un contact : un numéro ou un e-mail.',
+      'chat.sponsorAskPhone': 'À quel numéro pouvons-nous vous appeler ? Le numéro n’est pas obligatoire : vous pouvez passer cette étape.',
+      'chat.sponsorAskEmail': 'Maintenant votre e-mail : celui-ci est nécessaire, car je vous y envoie un code pour confirmer l’adresse.',
       'chat.sponsorThanks': 'Merci ! J’ai transmis le tout aux organisateurs : ils vous contacteront. Si c’est urgent, écrivez à info@carruleddhishow.com ou appelez le +39 328 498 1574.'
+    }
+  };
+
+  /**
+   * Bramka weryfikacyjna w rozmowie — teksty wspólne dla wszystkich spraw.
+   *
+   * PO CO OSOBNA RODZINA KLUCZY
+   *   `chat.data*` opisuje jedną sprawę: wypisanie z powiadomień. Bramka obsługuje cztery
+   *   (sponsor, zmiana danych, rezygnacja, powiadomienia), więc jej zdania nie mogą mówić
+   *   o newsletterze ani o zgłoszeniu. Stąd `chat.gate*` — jedna kopia tekstu na wszystkie
+   *   cele, zamiast czterech kopii, które rozjadą się przy pierwszej poprawce.
+   *
+   * PODSTAWIENIA
+   *   `%EMAIL%` to adres ZAMASKOWANY przez Workera (`ma•••••@example.com`) i tylko taki tu
+   *   trafia — pełny adres w wątku czytanym w panelu byłby ujawnieniem bez powodu.
+   *   `%N%` to liczba pozostałych prób, którą podaje odpowiedź `verify-code`.
+   *   Konwencja `%TOKEN%` jest ta sama co w `wall.votes` i `minor.intro`, żeby podstawianie
+   *   przez `.replace()` wyglądało wszędzie jednakowo.
+   *
+   * TRZECIA PASTYLKA
+   *   Są trzy: `chat.gateResend`, `chat.gateChangeEmail` i istniejący `chat.dataCancel`.
+   *   „Rezygnuję" znaczy w bramce dokładnie to, co znaczyło przy zmianie danych, więc drugi
+   *   napis o tym samym byłby tylko drugim miejscem do przetłumaczenia.
+   *
+   * KWADRANS
+   *   Ważność kodu i okno sufitu wysyłki są w bazie i wynoszą piętnaście minut. Wpisane
+   *   słowem, bez podstawienia: liczba, której nikt nie zmienia, nie potrzebuje miejsca
+   *   w tekście, a puste `%MIN%` na ekranie jest gorsze od zdania, które trzeba poprawić
+   *   razem z migracją.
+   */
+  const chatGateExtras = {
+    it: {
+      'chat.gateCodeSent': 'Ho mandato un codice di sei cifre a %EMAIL%. Scrivilo qui sotto.',
+      'chat.gateConfirmed': 'Indirizzo confermato. Possiamo andare avanti.',
+      'chat.gateWrong': 'Codice errato. Tentativi rimasti: %N%.',
+      'chat.gateExpired': 'Il codice è scaduto: vale un quarto d’ora. Posso mandarne uno nuovo.',
+      'chat.gateNoCode': 'Per questo indirizzo non ho nessun codice in attesa. Posso mandarne uno.',
+      'chat.gateBurnt': 'Troppi tentativi su questo codice. Per sicurezza serve un codice nuovo.',
+      'chat.gateTooOften': 'Ho già mandato tre codici a questo indirizzo. Aspetta un quarto d’ora e riprova.',
+      'chat.gateResend': 'Manda un altro codice',
+      'chat.gateChangeEmail': 'Cambia indirizzo'
+    },
+    pl: {
+      'chat.gateCodeSent': 'Wysłałem sześciocyfrowy kod na %EMAIL%. Wpisz go poniżej.',
+      'chat.gateConfirmed': 'Adres potwierdzony. Możemy iść dalej.',
+      'chat.gateWrong': 'Kod się nie zgadza. Pozostałe próby: %N%.',
+      'chat.gateExpired': 'Kod stracił ważność — działa kwadrans. Mogę wysłać nowy.',
+      'chat.gateNoCode': 'Dla tego adresu nie mam żadnego oczekującego kodu. Mogę wysłać nowy.',
+      'chat.gateBurnt': 'Za dużo prób z tym kodem. Dla bezpieczeństwa potrzebny jest nowy.',
+      'chat.gateTooOften': 'Na ten adres poszły już trzy kody. Odczekaj kwadrans i spróbuj ponownie.',
+      'chat.gateResend': 'Wyślij kod ponownie',
+      'chat.gateChangeEmail': 'Zmień adres'
+    },
+    en: {
+      'chat.gateCodeSent': 'I have sent a six-digit code to %EMAIL%. Type it below.',
+      'chat.gateConfirmed': 'Address confirmed. We can carry on.',
+      'chat.gateWrong': 'That code does not match. Tries left: %N%.',
+      'chat.gateExpired': 'The code has expired — it lasts a quarter of an hour. I can send a new one.',
+      'chat.gateNoCode': 'I have no code waiting for this address. I can send one.',
+      'chat.gateBurnt': 'Too many tries on this code. For safety a new one is needed.',
+      'chat.gateTooOften': 'Three codes have already gone to this address. Wait a quarter of an hour and try again.',
+      'chat.gateResend': 'Send another code',
+      'chat.gateChangeEmail': 'Change the address'
+    },
+    de: {
+      'chat.gateCodeSent': 'Ich habe einen sechsstelligen Code an %EMAIL% geschickt. Schreib ihn hier unten.',
+      'chat.gateConfirmed': 'Adresse bestätigt. Wir können weitermachen.',
+      'chat.gateWrong': 'Der Code passt nicht. Verbleibende Versuche: %N%.',
+      'chat.gateExpired': 'Der Code ist abgelaufen — er gilt eine Viertelstunde. Ich kann einen neuen schicken.',
+      'chat.gateNoCode': 'Für diese Adresse habe ich keinen wartenden Code. Ich kann einen schicken.',
+      'chat.gateBurnt': 'Zu viele Versuche mit diesem Code. Zur Sicherheit braucht es einen neuen.',
+      'chat.gateTooOften': 'An diese Adresse sind schon drei Codes gegangen. Warte eine Viertelstunde und versuch es erneut.',
+      'chat.gateResend': 'Neuen Code schicken',
+      'chat.gateChangeEmail': 'Adresse ändern'
+    },
+    es: {
+      'chat.gateCodeSent': 'Te he enviado un código de seis cifras a %EMAIL%. Escríbelo aquí abajo.',
+      'chat.gateConfirmed': 'Dirección confirmada. Podemos seguir.',
+      'chat.gateWrong': 'El código no coincide. Intentos restantes: %N%.',
+      'chat.gateExpired': 'El código ha caducado: vale un cuarto de hora. Puedo enviarte uno nuevo.',
+      'chat.gateNoCode': 'Para esta dirección no tengo ningún código pendiente. Puedo enviarte uno.',
+      'chat.gateBurnt': 'Demasiados intentos con este código. Por seguridad hace falta uno nuevo.',
+      'chat.gateTooOften': 'A esta dirección ya han ido tres códigos. Espera un cuarto de hora e inténtalo otra vez.',
+      'chat.gateResend': 'Enviar otro código',
+      'chat.gateChangeEmail': 'Cambiar la dirección'
+    },
+    fr: {
+      'chat.gateCodeSent': 'J’ai envoyé un code à six chiffres à %EMAIL%. Écrivez-le ci-dessous.',
+      'chat.gateConfirmed': 'Adresse confirmée. On peut continuer.',
+      'chat.gateWrong': 'Ce code ne correspond pas. Essais restants : %N%.',
+      'chat.gateExpired': 'Le code a expiré : il vaut un quart d’heure. Je peux en envoyer un nouveau.',
+      'chat.gateNoCode': 'Pour cette adresse je n’ai aucun code en attente. Je peux en envoyer un.',
+      'chat.gateBurnt': 'Trop d’essais sur ce code. Par sécurité, il en faut un nouveau.',
+      'chat.gateTooOften': 'Trois codes sont déjà partis vers cette adresse. Attendez un quart d’heure et réessayez.',
+      'chat.gateResend': 'Envoyer un autre code',
+      'chat.gateChangeEmail': 'Changer d’adresse'
+    }
+  };
+
+  /**
+   * ZGODA W ZGŁOSZENIU SPONSORA — KROK MIĘDZY NAZWĄ A KONTAKTAMI
+   * ===========================================================================
+   * Osobny blok, a nie dosypanie do `chat.sponsor*` w `chatEndExtras`: te zdania nie należą
+   * do oferty ani do pytań, tylko do jednego kroku, który stoi między nimi, i przy poprawce
+   * lepiej widzieć wszystkie sześć języków tej samej rzeczy obok siebie.
+   *
+   * DWA NAPISY NA ODSYŁACZE
+   *   `chat.sponsorConsentPrivacy` i `chat.sponsorConsentRules` są nazwami dokumentów, nie
+   *   zdaniami — te same napisy co w stopce i w listach. Adresy dokleja `consentDocs()`
+   *   razem z `?lang=`, bo język jest stanem strony, a nie treścią słownika.
+   *
+   * DLACZEGO ZDANIE MÓWI, ŻE ROZMOWA ZOSTAJE
+   *   Odsyłacz otwiera nową kartę, ale nikt tego nie wie z góry, a kreator trzyma odpowiedzi
+   *   wyłącznie w pamięci karty. Zdanie mówi wprost, że naciśnięcie nie kosztuje rozmowy —
+   *   inaczej ostrożny gość nie otworzy dokumentu, na który ma się zgodzić.
+   *
+   * ODMOWA
+   *   `chat.sponsorConsentNoted` mówi trzy rzeczy: rozumiemy, nie pytamy o dane i nic nie
+   *   wysyłamy. Trzecia jest najważniejsza — bez niej odmowa zostawia gościa z pytaniem,
+   *   czy nazwa carruleddhi już gdzieś poszła.
+   */
+  const chatConsentExtras = {
+    it: {
+      'chat.sponsorConsentAsk': 'Prima dei contatti una cosa sola: per andare avanti mi serve il tuo consenso alla privacy e al regolamento. Puoi aprire i due documenti qui sotto, la conversazione resta aperta.',
+      'chat.sponsorConsentPrivacy': 'Privacy policy',
+      'chat.sponsorConsentRules': 'Regolamento',
+      'chat.sponsorConsentYes': 'Accetto',
+      'chat.sponsorConsentNo': 'Rinuncio',
+      'chat.sponsorConsentNoted': 'Capito, e lo rispettiamo: senza consenso non ti chiedo nessun dato e non mando niente agli organizzatori. Se cambi idea siamo qui.'
+    },
+    pl: {
+      'chat.sponsorConsentAsk': 'Przed pytaniami o kontakt jedna rzecz: żeby iść dalej, potrzebuję Twojej zgody na politykę prywatności i regulamin. Oba dokumenty otworzysz poniżej — rozmowa zostaje otwarta.',
+      'chat.sponsorConsentPrivacy': 'Polityka prywatności',
+      'chat.sponsorConsentRules': 'Regulamin',
+      'chat.sponsorConsentYes': 'Zgadzam się',
+      'chat.sponsorConsentNo': 'Rezygnuję',
+      'chat.sponsorConsentNoted': 'Rozumiemy i szanujemy to: bez zgody nie pytam o żadne dane i nie wysyłam niczego do organizatorów. Jeśli zmienisz zdanie, jesteśmy tu.'
+    },
+    en: {
+      'chat.sponsorConsentAsk': 'One thing before the contact details: to carry on I need your consent to the privacy policy and the rules. You can open both documents below — this conversation stays open.',
+      'chat.sponsorConsentPrivacy': 'Privacy policy',
+      'chat.sponsorConsentRules': 'Race rules',
+      'chat.sponsorConsentYes': 'I agree',
+      'chat.sponsorConsentNo': 'I would rather not',
+      'chat.sponsorConsentNoted': 'Understood, and we respect it: without consent I ask for no details and send nothing to the organisers. We are here if you change your mind.'
+    },
+    de: {
+      'chat.sponsorConsentAsk': 'Eine Sache vor den Kontaktdaten: um weiterzumachen, brauche ich deine Zustimmung zur Datenschutzerklärung und zum Reglement. Beide Dokumente kannst du unten öffnen — das Gespräch bleibt offen.',
+      'chat.sponsorConsentPrivacy': 'Datenschutzerklärung',
+      'chat.sponsorConsentRules': 'Reglement',
+      'chat.sponsorConsentYes': 'Ich stimme zu',
+      'chat.sponsorConsentNo': 'Ich lasse es',
+      'chat.sponsorConsentNoted': 'Verstanden, und wir respektieren das: ohne Zustimmung frage ich nach keinen Daten und schicke nichts an die Organisatoren. Wenn du es dir anders überlegst, sind wir da.'
+    },
+    es: {
+      'chat.sponsorConsentAsk': 'Una cosa antes de los contactos: para seguir necesito tu consentimiento a la política de privacidad y al reglamento. Puedes abrir los dos documentos aquí abajo, la conversación se queda abierta.',
+      'chat.sponsorConsentPrivacy': 'Política de privacidad',
+      'chat.sponsorConsentRules': 'Reglamento',
+      'chat.sponsorConsentYes': 'Acepto',
+      'chat.sponsorConsentNo': 'Lo dejo',
+      'chat.sponsorConsentNoted': 'Entendido, y lo respetamos: sin consentimiento no te pido ningún dato y no envío nada a los organizadores. Si cambias de idea, estamos aquí.'
+    },
+    fr: {
+      'chat.sponsorConsentAsk': 'Une chose avant les coordonnées : pour continuer, il me faut votre consentement à la politique de confidentialité et au règlement. Vous pouvez ouvrir les deux documents ci-dessous, la conversation reste ouverte.',
+      'chat.sponsorConsentPrivacy': 'Politique de confidentialité',
+      'chat.sponsorConsentRules': 'Règlement',
+      'chat.sponsorConsentYes': 'J’accepte',
+      'chat.sponsorConsentNo': 'Je renonce',
+      'chat.sponsorConsentNoted': 'Compris, et nous le respectons : sans consentement je ne demande aucune donnée et n’envoie rien aux organisateurs. Si vous changez d’avis, nous sommes là.'
+    }
+  };
+
+  /**
+   * ZBIERANIE DANYCH SPONSORA — IMIĘ, TELEFON DO POMINIĘCIA
+   * ===========================================================================
+   * Cztery zdania dokładające krok, którego wcześniej nie było, i jedno naciśnięcie zamiast
+   * słowa do napisania.
+   *
+   * IMIĘ I NAZWISKO W JEDNYM PYTANIU
+   *   Dwa pytania po sobie („imię?", „nazwisko?") są w rozmowie dwoma razy dłuższe niż jedno
+   *   i dają dokładnie tyle samo. `chat.sponsorNeedPerson` prosi jeszcze raz wtedy, gdy padło
+   *   samo imię — bo zgłoszenie z jednym słowem w polu osoby jest zgłoszeniem, na które da się
+   *   odpowiedzieć tylko „dzień dobry".
+   *
+   * POMINIĘCIE JEST PRZYCISKIEM
+   *   `chat.sponsorPhoneSkip` to napis na pastylce, więc jest krótki i w trybie rozkazującym,
+   *   jak pozostałe pastylki. Dotąd pominięcie trzeba było NAPISAĆ słowem („salta", „pomiń",
+   *   „skip") — czyli trafić w jedno słowo w swoim języku, a wszystko inne bez cyfr było po
+   *   cichu brane za brak numeru.
+   *
+   * ZŁY NUMER NIE JEST PUSTYM NUMEREM
+   *   `chat.sponsorBadPhone` mówi o dwóch wyjściach: wpisz jeszcze raz albo pomiń. Bez tego
+   *   literówka w prefiksie kończyłaby się zgłoszeniem bez telefonu i nikt by tego nie
+   *   zobaczył — ani gość, ani organizator.
+   *
+   * ADRESU NIE MA W TEJ RODZINIE
+   *   Niepoprawny adres mówi `chat.dataBadEmail`, ten sam co przy wypisaniu z powiadomień
+   *   i w bramce. Zdanie jest dosłownie to samo, a druga kopia w sześciu językach to pierwsze
+   *   miejsce, w którym te napisy się rozjadą.
+   */
+  const chatSponsorFormExtras = {
+    it: {
+      'chat.sponsorAskPerson': 'Grazie. Come ti chiami? Scrivi nome e cognome.',
+      'chat.sponsorNeedPerson': 'Mi servono nome e cognome, tutti e due insieme.',
+      'chat.sponsorPhoneSkip': 'Salta il numero',
+      'chat.sponsorBadPhone': 'Questo numero non sembra completo. Riscrivilo, oppure salta il passaggio.'
+    },
+    pl: {
+      'chat.sponsorAskPerson': 'Dziękuję. Jak się nazywasz? Podaj imię i nazwisko.',
+      'chat.sponsorNeedPerson': 'Potrzebuję imienia i nazwiska — obu naraz.',
+      'chat.sponsorPhoneSkip': 'Pomiń numer',
+      'chat.sponsorBadPhone': 'Ten numer nie wygląda na pełny. Wpisz go jeszcze raz albo pomiń ten krok.'
+    },
+    en: {
+      'chat.sponsorAskPerson': 'Thank you. What is your name? First name and surname.',
+      'chat.sponsorNeedPerson': 'I need both a first name and a surname, together.',
+      'chat.sponsorPhoneSkip': 'Skip the number',
+      'chat.sponsorBadPhone': 'That number does not look complete. Type it again, or skip this step.'
+    },
+    de: {
+      'chat.sponsorAskPerson': 'Danke. Wie heißt du? Schreib Vor- und Nachnamen.',
+      'chat.sponsorNeedPerson': 'Ich brauche Vor- und Nachnamen, beide zusammen.',
+      'chat.sponsorPhoneSkip': 'Nummer überspringen',
+      'chat.sponsorBadPhone': 'Diese Nummer sieht nicht vollständig aus. Schreib sie nochmal, oder überspring den Schritt.'
+    },
+    es: {
+      'chat.sponsorAskPerson': 'Gracias. ¿Cómo te llamas? Escribe nombre y apellido.',
+      'chat.sponsorNeedPerson': 'Necesito nombre y apellido, los dos juntos.',
+      'chat.sponsorPhoneSkip': 'Omitir el número',
+      'chat.sponsorBadPhone': 'Ese número no parece completo. Escríbelo otra vez, u omite este paso.'
+    },
+    fr: {
+      'chat.sponsorAskPerson': 'Merci. Comment vous appelez-vous ? Écrivez prénom et nom.',
+      'chat.sponsorNeedPerson': 'Il me faut le prénom et le nom, les deux ensemble.',
+      'chat.sponsorPhoneSkip': 'Passer le numéro',
+      'chat.sponsorBadPhone': 'Ce numéro ne semble pas complet. Réécrivez-le, ou passez cette étape.'
     }
   };
 
@@ -2009,6 +2239,9 @@
   Object.keys(samePersonExtras).forEach((locale) => Object.assign(extras[locale], samePersonExtras[locale]));
   Object.keys(votingExtras).forEach((locale) => Object.assign(extras[locale], votingExtras[locale]));
   Object.keys(chatEndExtras).forEach((locale) => Object.assign(extras[locale], chatEndExtras[locale]));
+  Object.keys(chatGateExtras).forEach((locale) => Object.assign(extras[locale], chatGateExtras[locale]));
+  Object.keys(chatConsentExtras).forEach((locale) => Object.assign(extras[locale], chatConsentExtras[locale]));
+  Object.keys(chatSponsorFormExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorFormExtras[locale]));
 
   Object.assign(it, extras.it);
   Object.assign(pl, extras.pl);

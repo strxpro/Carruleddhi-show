@@ -387,7 +387,7 @@ import {
        `hidden`, więc wypadają też z kolejności tabulacji i z czytnika ekranu. */
     $$('[data-race-hide]').forEach((element) => { element.hidden = voting; });
 
-    paintSignupLock(voting);
+    paintSignupLock(voting, closed);
   }
 
   /**
@@ -400,18 +400,57 @@ import {
    * Warunkiem jest wyłącznie faza `voting` odczytana z serwera. Nieudany odczyt daje
    * `scheduled` i nie blokuje niczego — awaria tej sekcji nie ma prawa zamknąć zapisów.
    */
-  function paintSignupLock(locked) {
+  function paintSignupLock(locked, closed = false) {
     const section = $('#signup');
     if (section) {
-      section.classList.toggle('is-race-locked', locked);
+      section.classList.toggle('is-race-locked', locked || closed);
       const notice = $('[data-signup-locked]', section);
       if (notice) notice.hidden = !locked;
+      /* Dwie różne wiadomości, nigdy obie naraz: „trwa wyścig, wróć po dekoracji" to co
+         innego niż „ta edycja się skończyła, zostaw adres na przyszły rok". */
+      const done = $('[data-signup-closed]', section);
+      if (done) done.hidden = !closed;
     }
 
     const submit = $('[data-registration-form] button[type="submit"]');
     if (submit) {
-      submit.disabled = locked;
-      submit.setAttribute('aria-disabled', String(locked));
+      submit.disabled = locked || closed;
+      submit.setAttribute('aria-disabled', String(locked || closed));
+    }
+
+    /* POLA NAPRAWDĘ ZABLOKOWANE, NIE TYLKO PRZYCISK.
+       ---------------------------------------------------------------------------
+       Blokada była wcześniej „miękka" z premedytacją: wstążka i wyłączona wysyłka, a pola
+       zostawały do pisania, żeby nie skasować tego, co ktoś już wpisał. Zgłoszone jako
+       usterka — i słusznie, bo formularz, w który wolno pisać, obiecuje wysyłkę, której
+       nie będzie. Człowiek wypełnia osiem pól i dopiero na końcu odbija się od szarego
+       przycisku.
+
+       `readOnly`, nie `disabled`, dla pól tekstowych: readonly ZACHOWUJE wpisaną treść i
+       zostawia pole w kolejności tabulacji oraz do zaznaczenia, więc powód pierwotnej
+       decyzji jest nadal spełniony. Pola, które readonly nie obsługują — wybory, haczyki,
+       pliki — dostają `disabled`, bo innej drogi nie ma.
+
+       Zapamiętujemy TYLKO to, co sami ustawiliśmy (`dataset.raceLocked`). Bez tego
+       odblokowanie włączyłoby z powrotem pola wyłączone przez inną logikę formularza. */
+    const form = $('[data-registration-form]');
+    if (form) {
+      const hard = 'input[type="checkbox"], input[type="radio"], input[type="file"], select';
+      $$('input, textarea, select', form).forEach((field) => {
+        if (field.type === 'submit' || field.type === 'button') return;
+        if (locked || closed) {
+          if (field.matches(hard)) {
+            if (!field.disabled) { field.dataset.raceLocked = 'disabled'; field.disabled = true; }
+          } else if (!field.readOnly) {
+            field.dataset.raceLocked = 'readonly';
+            field.readOnly = true;
+          }
+        } else if (field.dataset.raceLocked) {
+          if (field.dataset.raceLocked === 'disabled') field.disabled = false;
+          else field.readOnly = false;
+          delete field.dataset.raceLocked;
+        }
+      });
     }
 
     /* Odsyłacze „Zapisz się" w menu i w stopce — te, których nie schowaliśmy.
