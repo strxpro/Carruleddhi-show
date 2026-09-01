@@ -761,6 +761,40 @@ function detectLocale(text, fallback = 'it') {
   return best;
 }
 
+/* Nazwy języków po polsku, bo instrukcja systemowa jest po polsku i to w niej ta nazwa
+   ma stanąć jako WARTOŚĆ — patrz chatSystemPrompt(). Zestaw kluczy jest ten sam co
+   w LOCALE_HINTS, LOCALES i w ograniczeniu CHECK na chat_threads.locale; rozjazd tutaj to
+   instrukcja mówiąca „odpowiadaj po włosku" na wiadomość napisaną po niemiecku. */
+const LOCALE_NAMES = {
+  it: { name: 'włoski', in: 'po włosku' },
+  pl: { name: 'polski', in: 'po polsku' },
+  en: { name: 'angielski', in: 'po angielsku' },
+  de: { name: 'niemiecki', in: 'po niemiecku' },
+  es: { name: 'hiszpański', in: 'po hiszpańsku' },
+  fr: { name: 'francuski', in: 'po francusku' }
+};
+
+/**
+ * Rozpoznanie języka razem z informacją, czy było PEWNE.
+ *
+ * Po co osobno: `chat_threads.locale` wolno nadpisać tylko przy pewnym rozpoznaniu. Zapis
+ * fallbacku wyglądałby w bazie identycznie jak rozpoznanie — i „ok" wysłane w polskim wątku
+ * zamieniałoby język wątku na ten z przełącznika strony, czyli na cudzy.
+ *
+ * Dlaczego dwa wywołania, a nie druga wartość zwracana z `detectLocale`: ta funkcja jest
+ * czystym wejściem checkera i ma zostać funkcją oddającą kod języka. Dwa wywołania z RÓŻNYM
+ * fallbackiem odpowiadają na pytanie o pewność bez zmiany jej kontraktu — zgodny wynik znaczy,
+ * że nie pochodzi z fallbacku, bo fallbacki były różne. Funkcja jest czysta i tabelaryczna,
+ * więc drugie wywołanie nie kosztuje ani zapytania, ani sieci.
+ */
+function detectLocaleSure(text, fallback) {
+  const safe = LOCALE_HINTS[fallback] ? fallback : 'it';
+  const first = detectLocale(text, 'it');
+  const second = detectLocale(text, 'pl');
+  if (first === second) return { locale: first, sure: true };
+  return { locale: safe, sure: false };
+}
+
 /** Loads a thread by its browser token, creating it on first contact. */
 async function chatThread(env, request, payload, create = false) {
   const token = String(payload.token || '').trim();
@@ -838,8 +872,19 @@ function setThreadMode(env, threadId, mode, extra = {}) {
  * looks like a hedge. Null means "a person should take this", which is the safe
  * direction to fail in when the subject is who may race and what they must wear.
  */
-function chatSystemPrompt(deck) {
+function chatSystemPrompt(deck, locale = 'it') {
   const ev = COPY_DECK._event || {};
+  /* Język jako wartość, nie jako polecenie do domyślenia się.
+     ---------------------------------------------------------------------------
+     Stało tu samo „Odpowiadaj w tym samym języku, w którym napisał gość". Model musiał więc
+     rozpoznać język sam, a rozpoznawał go z całego kontekstu: z historii wątku, z tej
+     instrukcji napisanej po polsku, z faktów po polsku. Włoskie pytanie w polskim otoczeniu
+     dostawało polską odpowiedź, i nie było w tym żadnej awarii do zobaczenia w logach.
+
+     Teraz język jest rozpoznany po naszej stronie (detectLocale) i wpisany tutaj jako jedna
+     konkretna wartość. Zdanie o rozpoznawaniu zostaje jako zapasowe, ale nie jest już jedyną
+     rzeczą, na której to stoi. */
+  const lang = LOCALE_NAMES[locale] || LOCALE_NAMES.it;
   /* The facts come from the copy deck and the event block rather than being typed out
      here. Two copies of the date is one date that can be wrong, and the wrong one would
      be the one the chat tells people. */
@@ -908,8 +953,13 @@ function chatSystemPrompt(deck) {
     'budowanych wózków bez napędu w Santa Teresa Gallura na Sardynii.',
     '',
     'JĘZYK',
-    'Odpowiadaj w tym samym języku, w którym napisał gość. Obsługiwane: włoski, polski,',
-    'angielski, niemiecki, hiszpański, francuski. Jeśli nie rozpoznasz języka — po włosku.',
+    `Język gościa został już rozpoznany: ${lang.name} (${locale}).`,
+    `Całą odpowiedź piszesz ${lang.in}. Nie tłumacz tej instrukcji ani faktów niżej — są po`,
+    'polsku wyłącznie dla Ciebie, a gość ich nie widzi.',
+    'Nie zmieniaj języka odpowiedzi, nawet jeśli wcześniejsze wypowiedzi w tym wątku są',
+    'w innym języku i nawet jeśli gość wtrącił obce słowo. Jeśli mimo wszystko uznasz, że',
+    'gość napisał w innym z obsługiwanych języków (włoski, polski, angielski, niemiecki,',
+    'hiszpański, francuski), odpowiedz w tym, w którym napisał.',
     '',
     'TON',
     'Krótko. Dwa, maksymalnie trzy zdania. Ciepło, bez korporacyjnego żargonu, bez',
@@ -1024,7 +1074,7 @@ function noteWhatsappFailure(reason) {
  *   `chatVisitor` przekazuje ją człowiekowi. To jest właściwa odpowiedź: lepiej, żeby zdjęcie
  *   koła zobaczył organizator, niż żeby model tekstowy odpowiedział na nie z niczego.
  */
-async function askModel(env, deck, history, question, imageUrl = '') {
+async function askModel(env, deck, history, question, imageUrl = '', locale = 'it') {
   if (!env.AI_API_KEY) {
     noteModelFailure('brak AI_API_KEY');
     return null;
@@ -1035,7 +1085,9 @@ async function askModel(env, deck, history, question, imageUrl = '') {
     noteModelFailure('zdjecie w wiadomosci, a brak AI_VISION_MODEL — oddaje czlowiekowi');
     return null;
   }
-  const system = chatSystemPrompt(deck);
+  /* Język podany, nie zgadywany. `deck` niesie już teksty w tym języku, ale sam nie mówi
+     modelowi, w czym pisać — instrukcja i fakty w niej są po polsku niezależnie od gościa. */
+  const system = chatSystemPrompt(deck, locale);
   try {
     /* AI_API_URL is the name in START-TUTAJ.md and in make/PROMPT-PELNY.md, so it is the
        name that wins. AI_BASE_URL is still read because it is what the first version of
@@ -1238,7 +1290,16 @@ async function translateForAlert(env, text, target) {
   }
 }
 
-async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) {
+/**
+ * `locale` to język ROZPOZNANY z tej wiadomości, a nie tylko zapisany w wątku.
+ *
+ * Wątek trzyma język z pierwszego kontaktu, a `chat_threads.locale` jest nadpisywane wyłącznie
+ * przy pewnym rozpoznaniu — więc gość, który zaczął po włosku i dopisał jedno zdanie po
+ * niemiecku, ma w bazie nadal `it`. Organizator dostaje wiersz „Język gościa", żeby wiedzieć,
+ * w czym odpisać, i ma to być język OSTATNIEJ wiadomości. Puste znaczy „nie mam nic lepszego
+ * niż wątek" — tak wołają tę funkcję ścieżki, które nie rozpoznają języka (patrz chatInbound).
+ */
+async function alertOrganisers(env, thread, body, handedOver, viaEmail = false, locale = '') {
   /* Wyciszenie dotyczy TYLKO wątków już prowadzonych przez człowieka.
 
      Przekazanie rozmowy dzwoni zawsze, i to nie jest wyjątek dla wygody — bez tego
@@ -1257,6 +1318,7 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
 
   const who = thread.display_name || thread.email || 'gość';
   const excerpt = body.length > 300 ? `${body.slice(0, 300)}…` : body;
+  const guestLocale = String(locale || thread.locale || 'it').toUpperCase();
   const lead = viaEmail
     ? 'Klient odpisał na e-maila — wiadomość jest w wątku na czacie.'
     : handedOver
@@ -1323,7 +1385,7 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
       '',
       `👤 ${who}`,
       thread.email ? `✉️ ${thread.email}` : '',
-      `${w.lang}: ${String(thread.locale || 'it').toUpperCase()}`,
+      `${w.lang}: ${guestLocale}`,
       '',
       said,
       '',
@@ -1370,7 +1432,7 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
     `<h1 style="margin:0 0 16px;font-size:20px;">${escapeHtml(who)} czeka na czacie</h1>`,
     `<p style="margin:0 0 16px;padding:12px 14px;background:#f4f7fc;border-radius:8px;white-space:pre-wrap;">${escapeHtml(excerpt)}</p>`,
     thread.email ? `<p style="margin:0 0 4px;font-size:14px;">E-mail: ${escapeHtml(thread.email)}</p>` : '',
-    `<p style="margin:0 0 20px;font-size:14px;">Język: ${escapeHtml(String(thread.locale || 'it').toUpperCase())}</p>`,
+    `<p style="margin:0 0 20px;font-size:14px;">Język: ${escapeHtml(guestLocale)}</p>`,
     '<a href="https://www.carruleddhishow.com/admin" style="display:inline-block;padding:12px 20px;background:#12233d;color:#fff;text-decoration:none;border-radius:8px;">Odpowiedz w panelu</a>',
     '</td></tr></table></body></html>'
   ].filter(Boolean).join('');
@@ -1680,11 +1742,39 @@ async function chatVisitor(env, request, payload, cors, ctx) {
     image: imageUrl
   };
 
+  /* JĘZYK TEJ WIADOMOŚCI.
+     ---------------------------------------------------------------------------
+     Rozpoznawany raz, tutaj, i używany dalej w trzech miejscach: przy wyborze bloku
+     językowego dla słownika FAQ, w instrukcji dla modelu i w powiadomieniu dla
+     organizatorów. Trzy osobne rozpoznania byłyby trzema odpowiedziami na to samo pytanie,
+     a rozjazd między nimi znaczyłby gotową odpowiedź po włosku w wątku prowadzonym po
+     niemiecku.
+
+     KOLEJNOŚĆ FALLBACKU: język wątku, potem język strony, na końcu włoski.
+     Raz ustalony język rozmowy waży więcej niż przełącznik na stronie — gość mógł go nigdy
+     nie ruszyć, a pisze po włosku. `chat_threads.locale` jest `not null default 'it'`, więc
+     dla świeżego wątku ta wartość i tak pochodzi z `payload.locale` (patrz chatThread);
+     jawny łańcuch jest tu na wypadek wartości, której baza nie zna.
+
+     Wiadomość bez treści (samo zdjęcie) nie ma czego rozpoznawać, więc zostaje fallback. */
+  const fallbackLocale = LOCALES.has(String(thread.locale || '').toLowerCase())
+    ? String(thread.locale).toLowerCase()
+    : localeOf(payload.locale);
+  const detected = body
+    ? detectLocaleSure(body, fallbackLocale)
+    : { locale: fallbackLocale, sure: false };
+  const locale = detected.locale;
+
   // A name or an address given mid-conversation is worth keeping, so the organiser
   // knows who they are talking to without asking twice.
   const details = {};
   if (payload.name && !thread.display_name) details.display_name = trimmed(payload.name);
   if (payload.email && !thread.email) details.email = String(payload.email).trim().toLowerCase();
+  /* Zapis języka TYLKO przy pewnym rozpoznaniu. Zapisany fallback byłby w bazie
+     nieodróżnialny od rozpoznania, a „ok" w niemieckim wątku przestawiłoby wątek na język
+     z przełącznika strony — czyli na cudzy. Przy niepewnym rozpoznaniu wątek zostaje przy
+     swoim języku i to jest właściwa odpowiedź, nie brak zapisu. */
+  if (detected.sure && locale !== thread.locale) details.locale = locale;
   if (Object.keys(details).length) await setThreadMode(env, thread.id, thread.mode, details);
 
   /**
@@ -1734,11 +1824,14 @@ async function chatVisitor(env, request, payload, cors, ctx) {
        (patrz api/intake.js) — porzucony promise po prostu ginie razem z funkcją, więc
        „wyślemy w tle" znaczyłoby „czasem wyślemy". Ta gałąź nie woła modelu, więc nie ma
        tu żadnego budżetu na opóźnienie do przekroczenia, a każdy kanał ma swój timeout. */
-    await alertOrganisers(env, thread, body, false);
+    await alertOrganisers(env, thread, body, false, false, locale);
     return json({ ok: true, mode: 'human', reply: null, ...echo }, 200, cors);
   }
 
-  const deck = COPY_DECK[localeOf(thread.locale)] || COPY_DECK.it;
+  /* Blok językowy słownika po JĘZYKU TEJ WIADOMOŚCI, nie po języku wątku.
+     Stąd bierze odpowiedź `faqAnswer` niżej, więc gotowa odpowiedź o kasku wraca w tym
+     języku, w którym o kask zapytano — także wtedy, gdy wątek zaczął się w innym. */
+  const deck = COPY_DECK[locale] || COPY_DECK.it;
   /* Słownik pytań pomijany, gdy jest zdjęcie.
      ---------------------------------------------------------------------------
      faqAnswer dopasowuje po słowach kluczowych w treści, a „czy takie koło przejdzie?" trafi w
@@ -1779,7 +1872,7 @@ async function chatVisitor(env, request, payload, cors, ctx) {
        rząd to dla modelu sygnał, że gość się powtarza. Odsiewany po identyfikatorze. */
     const history = (await chatMessages(env, thread.id) || [])
       .filter((row) => row.id !== stored.row?.id);
-    reply = await askModel(env, deck, history, body, imageUrl);
+    reply = await askModel(env, deck, history, body, imageUrl, locale);
   }
 
   if (!reply) {
@@ -1826,7 +1919,7 @@ async function chatVisitor(env, request, payload, cors, ctx) {
        jednym wątku, `true` znaczyłoby jeden WhatsApp na każde pytanie bez odpowiedzi, także
        do skrzynki, w którą nikt jeszcze nie zajrzał. Kolejne przechodzą przez zwykły warunek
        „licznik nieprzeczytanych jest na zerze". */
-    await alertOrganisers(env, thread, body, !waiting);
+    await alertOrganisers(env, thread, body, !waiting, false, locale);
     return json({
       ok: true,
       mode: 'human',
@@ -3692,20 +3785,39 @@ async function entryCode(env, payload, cors) {
 }
 
 /**
- * Checks a code and consumes it, or explains why not.
+ * Checks a six-digit code against the newest unspent row for (email, purpose, entry).
  *
  * Lifted out of unsubConfirm rather than copied: attempts, expiry and single use are the
  * three things that make a six-digit code worth anything, and two copies of that is one
  * copy that will eventually be missing one of them.
  *
- * @returns {{ok: true}|{ok: false, code: string, status: number, left?: number}}
+ * `options.consume` says what the caller intends to do with a valid code, not what this
+ * function writes — nothing here ever stamps `consumed_at`, that is `spendCode`. What the flag
+ * changes is whether the row id comes back:
+ *
+ * - `consume: true` (the default, today's behaviour) returns `id`, so the caller can spend the
+ *   row once the action it authorises has actually landed. Rows already carrying `consumed_at`
+ *   are filtered out, so a spent code never checks out twice.
+ * - `consume: false` returns no `id`, so a mere check has nothing to spend the row with. This is
+ *   the path `verify-code` uses: it confirms the address inside the conversation and leaves the
+ *   code alive for the request that does the work and carries (email, code) again.
+ *
+ * A wrong code raises `attempts` on **both** paths. Five tries is the whole defence against
+ * guessing six digits, and a check that did not count would hand that defence away.
+ *
+ * `entryId` is null for purposes with no entry behind them (`sponsor`), and the filter follows:
+ * `is.null` rather than `eq.null`, because PostgREST treats those differently and the second one
+ * matches nothing.
+ *
+ * @returns {{ok: true, id?: string}|{ok: false, code: string, status: number, left?: number}}
  */
-async function consumeCode(env, email, purpose, code, entryId) {
+async function checkCode(env, email, purpose, code, entryId, options = {}) {
+  const consume = options.consume !== false;
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/verification_codes`);
   url.searchParams.set('select', 'id,code_hash,expires_at,attempts');
   url.searchParams.set('email', `eq.${email}`);
   url.searchParams.set('purpose', `eq.${purpose}`);
-  url.searchParams.set('entry_id', `eq.${entryId}`);
+  url.searchParams.set('entry_id', entryId ? `eq.${entryId}` : 'is.null');
   url.searchParams.set('consumed_at', 'is.null');
   url.searchParams.set('order', 'created_at.desc');
   url.searchParams.set('limit', '1');
@@ -3734,7 +3846,15 @@ async function consumeCode(env, email, purpose, code, entryId) {
     };
   }
 
-  return { ok: true, id: row.id };
+  return consume ? { ok: true, id: row.id } : { ok: true };
+}
+
+/**
+ * Checks a code on behalf of an action that may spend it. Thin wrapper over `checkCode`, kept
+ * because every existing caller reads as "I am about to do the thing this code was issued for".
+ */
+function consumeCode(env, email, purpose, code, entryId) {
+  return checkCode(env, email, purpose, code, entryId, { consume: true });
 }
 
 /** Marks a code used. Separate call, because `view` must not spend it. */

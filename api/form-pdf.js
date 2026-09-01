@@ -5,10 +5,10 @@
  *   GET /api/form-pdf?id=<uuid>&t=<token>[&lang=it]
  *
  * DLACZEGO OSOBNA FUNKCJA, A NIE TRASA W api/intake.js
- *   Tamta stoi na runtime Edge (`config.runtime = 'edge'`), a tutaj trzeba przeczytać z dysku
- *   krój pisma i uruchomić pdf-lib. Edge nie ma `node:fs`, a limit pakietu liczy się tam w
- *   megabajtach. Node ich nie ma — i nie ma też Chrome, ale Chrome nie jest tu potrzebny:
- *   układ jest już złożony w pustym formularzu, dokładamy na nim wyłącznie napisy.
+ *   Tamta stoi na runtime Edge (`config.runtime = 'edge'`), gdzie limit pakietu liczy się w
+ *   megabajtach — a tu jedzie pdf-lib i cały krój pisma. Node tego limitu nie ma. Chrome'a
+ *   nie ma nigdzie i nie jest potrzebny: układ jest już złożony w pustym formularzu,
+ *   dokładamy na nim wyłącznie napisy.
  *
  * CO SIĘ DZIEJE, GDY COKOLWIEK PÓJDZIE NIE TAK
  *   Wraca PUSTY formularz ze statusem 200. Nigdy błąd.
@@ -24,22 +24,31 @@
  *   Ten plik niesie czyjeś nazwisko, adres i telefon. `no-store` i `noindex`, dokładnie jak
  *   strona do druku pod tym samym tokenem.
  */
-import { readFileSync } from 'node:fs';
 import { fillForm } from '../worker/fill-form.js';
 import { formValues, formStem, printToken } from '../worker/form-values.js';
 import { COPY_DECK } from '../worker/copy-deck.js';
+import { DEJAVU_SANS_BASE64 } from './dejavu-sans.js';
 
-export const config = { runtime: 'nodejs' };
+/* ANI JEDNEJ NIETYPOWEJ RZECZY W TYM PLIKU — I TO JEST CELOWE.
+   ---------------------------------------------------------------------------
+   Pierwsza wersja miała `export const config = { runtime: 'nodejs' }` i wskazywała Vercelowi
+   plik z krojem przez `includeFiles` w vercel.json. Zbudowało się zielono, strona weszła z
+   nowego builda — a funkcja NIE POWSTAŁA: `/api/form-pdf` odpowiadał 404 z `X-Vercel-Error:
+   NOT_FOUND`, czyli platforma w ogóle jej nie widziała. Nie da się tego zobaczyć w logu builda,
+   bo build się udał.
+
+   Więc ten plik jest teraz tak zwyczajny, jak `api/intake.js`, o którym wiadomo, że działa:
+   domyślny runtime (Node jest domyślny dla `api/*.js`, deklarowanie go niczego nie dodaje) i
+   zero plików towarzyszących. Kroj jedzie importem js-a, bo import albo jest w pakiecie, albo
+   funkcja się nie zbuduje — a to jest awaria widoczna od razu, nie po tygodniu. */
 
 const SITE = (COPY_DECK._event?.site || 'https://www.carruleddhishow.com').replace(/\/+$/, '');
 const LOCALES = new Set(['it', 'pl', 'en', 'de', 'es', 'fr']);
 
-/* Wczytany raz na proces, nie na żądanie: 757 kB z dysku przy każdym pobraniu załącznika to
-   koszt, którego nie trzeba płacić. `new URL(..., import.meta.url)` zamiast ścieżki względnej,
-   bo katalog roboczy funkcji na Vercelu nie jest katalogiem tego pliku. */
+/* Rozkodowany raz na proces, nie na żądanie. */
 let fontCache = null;
 function font() {
-  if (!fontCache) fontCache = readFileSync(new URL('./DejaVuSans.ttf', import.meta.url));
+  if (!fontCache) fontCache = Buffer.from(DEJAVU_SANS_BASE64, 'base64');
   return fontCache;
 }
 

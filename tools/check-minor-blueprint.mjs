@@ -456,6 +456,102 @@ for (const question of [
   check(`slownik NIE zgaduje: ${question}`, faqAnswer(faqDeck, question) === null, faqAnswer(faqDeck, question));
 }
 
+/* --- rozpoznawanie jezyka rozmowy ----------------------------------------
+   Ta funkcja jest jedynym powodem, dla ktorego wybrano heurystyke zamiast pytania do
+   modelu: jest czysta, wiec da sie ja sprawdzic tutaj, bez sieci i bez bazy. Bez tego
+   testu rozpoznawanie moze cicho zwracac ten sam kod na wszystko — objawem bylaby
+   odpowiedz po wlosku na polskie pytanie, czyli dokladnie to, co mielismy wczesniej.
+
+   Wycinane od `const LOCALE_HINTS = {` do konca SAMEJ `detectLocale`: tablice stoja tuz
+   nad funkcja wlasnie po to, zeby to ciecie bylo jednym ciagiem. Koniec liczony od
+   podpisu funkcji, nie od pierwszego `\n}` po tablicach — miedzy nimi jest zamkniecie
+   `LOCALE_HINTS` i `LOCALE_WORD_RE`. */
+const localeStart = worker.indexOf('const LOCALE_HINTS = {');
+const localeDeclaration = worker.indexOf('function detectLocale', localeStart);
+const localeSource = worker.slice(
+  localeStart,
+  worker.indexOf('\n}', localeDeclaration) + 2
+);
+const { detectLocale, LOCALE_HINTS } = new Function(
+  `${localeSource}; return { detectLocale, LOCALE_HINTS };`
+)();
+
+/* Po dwa-trzy zdania na jezyk, w ksztalcie, w jakim gosc naprawde pisze na czacie:
+   krotkie pytanie, pytanie z odmiana i zdanie z akcentami. Fallback jest tu celowo
+   ROZNY od oczekiwanego kodu — inaczej zdanie przechodzace przez sam fallback wygladaloby
+   na rozpoznane. */
+for (const [expected, sentence] of [
+  ['it', 'Dove e quando comincia la corsa?'],
+  ['it', "Non so quanto costa l'iscrizione, posso pagare dopo?"],
+  ['it', 'Vorrei sapere se questo casco è sufficiente.'],
+  ['pl', 'Czy kask rowerowy wystarczy?'],
+  ['pl', 'Gdzie jest start i kiedy trzeba być na miejscu?'],
+  ['pl', 'Nie mogę znaleźć mojego numeru startowego.'],
+  ['en', 'Where is the start and how can I join?'],
+  ['en', 'What do I need to bring for my child?'],
+  ['en', 'Could you please tell me the entry fee?'],
+  ['de', 'Wo ist der Start und wann beginnt das Rennen?'],
+  ['de', 'Ich möchte wissen, ob ein Helm nötig ist.'],
+  ['de', 'Können wir auch mit dem Auto kommen?'],
+  ['es', '¿Dónde está la salida y cuándo empieza?'],
+  ['es', 'Quiero saber si necesito casco para participar.'],
+  ['es', 'No tengo el número de inscripción, ¿qué hago?'],
+  ['fr', 'Où est le départ et à quelle heure ?'],
+  ['fr', 'Je voudrais savoir si le casque est obligatoire.'],
+  ['fr', "Pouvez-vous nous dire le prix de l'inscription ?"]
+]) {
+  const fallback = expected === 'pl' ? 'it' : 'pl';
+  const got = detectLocale(sentence, fallback);
+  check(`jezyk rozpoznany (${expected}): ${sentence}`, got === expected, got);
+}
+
+/* A te MUSZA oddac fallback. „ok", „grazie" i „no" nie naleza do zadnego jezyka na
+   wylacznosc, a jedno takie slowo dawaloby pewne rozpoznanie z niczego — i przeskok
+   jezyka przy kazdym potwierdzeniu. */
+for (const [label, text, fallback] of [
+  ['ok', 'ok', 'pl'],
+  ['grazie', 'grazie', 'de'],
+  ['no', 'no', 'en'],
+  ['dziekuje bez ogonkow', 'dziekuje', 'fr'],
+  ['tylko cyfry i znaki', '123 456 !!! ---', 'fr'],
+  ['pusty tekst', '', 'es'],
+  ['slowo wieloznaczne it/en', 'Come?', 'pl'],
+  ['znak wspolny bez slowa funkcyjnego', 'è', 'pl'],
+  ['znak wspolny bez slowa funkcyjnego (fr/es)', 'é à', 'en']
+]) {
+  const got = detectLocale(text, fallback);
+  check(`wieloznaczne oddaje fallback (${label})`, got === fallback, got);
+}
+
+check('brak drugiego argumentu daje wloski', detectLocale('ok') === 'it', detectLocale('ok'));
+check(
+  'fallback poza zestawem jezykow daje wloski, nie surowa wartosc',
+  detectLocale('ok', 'xx') === 'it',
+  detectLocale('ok', 'xx')
+);
+
+/* JEDEN ZESTAW JEZYKOW W PIECIU MIEJSCACH.
+   `chat_threads.locale` ma ograniczenie `CHECK` na szesc kodow. Kod rozpoznany przez
+   detectLocale jest zapisywany do tej kolumny, wiec siodmy jezyk dopisany do
+   LOCALE_HINTS bez migracji to zapis watku odrzucony przez baze — bez bledu widocznego
+   dla goscia i bez sladu w rozmowie. */
+const chatSql = read('supabase/migrations/0005_chat.sql');
+const localeCheck = chatSql.match(/locale\s+text[^,]*?check\s*\(\s*locale\s+in\s*\(([^)]*)\)/i);
+const sqlLocales = [...(localeCheck?.[1] || '').matchAll(/'([a-z]{2})'/g)].map((m) => m[1]);
+const hintLocales = Object.keys(LOCALE_HINTS);
+
+check('0005_chat.sql nadal ma CHECK na chat_threads.locale', sqlLocales.length > 0, localeCheck?.[0] || 'nie znaleziono');
+check(
+  'zestaw jezykow detectLocale zgodny z CHECK na chat_threads.locale',
+  sqlLocales.length === hintLocales.length && hintLocales.every((code) => sqlLocales.includes(code)),
+  `detectLocale: ${hintLocales.join(',')} | sql: ${sqlLocales.join(',')}`
+);
+check(
+  'zestaw jezykow detectLocale zgodny z jezykami tekstow (LANGS)',
+  LANGS.length === hintLocales.length && hintLocales.every((code) => LANGS.includes(code)),
+  `detectLocale: ${hintLocales.join(',')} | teksty: ${LANGS.join(',')}`
+);
+
 /* Repozytorium jest publiczne. Klucz CallMeBota nie ma prawa stac w kodzie funkcji —
    generator czyta go z WHATSAPP_ALERTS, patrz komentarz w build-make-blueprints.mjs. */
 check(

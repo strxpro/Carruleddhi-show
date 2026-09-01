@@ -3,12 +3,6 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
-  "functions": {
-    "api/form-pdf.js": {
-      "//": "Krój pisma leży obok funkcji i jest czytany z dysku w czasie działania. Bez tego wpisu Vercel może go nie zapakować, a wtedy wypełniacz nie ma czym pisać i kazdy zalacznik schodzi do pustego blankietu.",
-      "includeFiles": "api/DejaVuSans.ttf"
-    }
-  },
   "rewrites": [
     { "source": "/api/carruleddhi/:type", "destination": "/api/intake?type=:type" }
   ],

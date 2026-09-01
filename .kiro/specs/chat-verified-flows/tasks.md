@@ -117,7 +117,7 @@ Grupa 2 (język) nie zależy od niczego w grupach 1 i 3, więc może iść równ
   - komplet pięciu wartości w nowym `CHECK`
   - _Requirements: O2_
 
-- [ ] 2. Rozpoznawanie języka rozmowy
+- [x] 2. Rozpoznawanie języka rozmowy
 - [x] 2.1 Napisz `detectLocale(text, fallback)` w `worker/index.js`
   - Tabela słów funkcyjnych dla sześciu języków, waga 2, dopasowanie na granicy wyrazu
   - Tabela znaków wyłącznych dla języka, waga 3; znaki wspólne (`à è é ì ò ù`) punktują tylko
@@ -127,7 +127,7 @@ Grupa 2 (język) nie zależy od niczego w grupach 1 i 3, więc może iść równ
   - Komentarz musi wyjaśniać, dlaczego heurystyka, a nie zapytanie do modelu
   - _Requirements: 1.1, 1.2_
 
-- [-] 2.2 Wepnij rozpoznany język w `chatVisitor`
+- [x] 2.2 Wepnij rozpoznany język w `chatVisitor`
   - Przekaż język do `chatSystemPrompt()` jako wartość, nie jako ogólne zdanie „odpowiadaj
     w języku gościa"
   - Wybierz blok językowy dla `faqAnswer()` po rozpoznanym języku
@@ -136,20 +136,20 @@ Grupa 2 (język) nie zależy od niczego w grupach 1 i 3, więc może iść równ
   - Dołóż rozpoznany język do powiadomienia dla organizatorów przy przekazaniu rozmowy
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [-] 2.3 Dopisz asercje `detectLocale` do `tools/check-minor-blueprint.mjs`
+- [x] 2.3 Dopisz asercje `detectLocale` do `tools/check-minor-blueprint.mjs`
   - Po dwa–trzy zdania na każdy z sześciu języków
   - Przypadki wieloznaczne (`ok`, `grazie`, `no`, tekst bez liter) zwracają `fallback`
   - Zestaw kodów `detectLocale` zgodny z `CHECK` na `chat_threads.locale`
   - _Requirements: 1.1, 1.2, O1_
 
 - [ ] 3. Wspólna weryfikacja po stronie Workera
-- [~] 3.1 Wydziel `checkCode(env, email, purpose, code, entryId, options)` z `consumeCode`
+- [x] 3.1 Wydziel `checkCode(env, email, purpose, code, entryId, options)` z `consumeCode`
   - `options.consume === true` zachowuje dzisiejsze zachowanie łącznie z `consumed_at`
   - `options.consume === false` sprawdza i liczy nieudane próby, ale nie zużywa wiersza
   - Przepisz `consumeCode` na cienką nakładkę i zostaw wszystkie istniejące wywołania bez zmian
   - _Requirements: 2.5, 2.7, O5_
 
-- [~] 3.2 Dodaj końcówkę `verify-start`
+- [-] 3.2 Dodaj końcówkę `verify-start`
   - Wspólna wewnętrzna funkcja wysyłki kodu, z której korzystają też `notify-code` i `entry-code`
   - Sufit z `overCodeSendLimit` z zakresem celów: `sponsor` osobno, `unsubscribe` osobno,
     `edit-entry` i `cancel-entry` razem
