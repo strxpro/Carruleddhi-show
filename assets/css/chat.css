@@ -85,8 +85,32 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 180px;
-  max-height: calc(var(--screen-h, 100svh) * 0.42);
+  /* DWIE POPRAWKI NA KLAWIATURĘ NA TELEFONIE. ZMIERZONE, NIE ZGADNIĘTE.
+     ---------------------------------------------------------------------------
+     Zgłoszone jako „na telefonie, gdy piszę wiadomość, pastylka na wiadomość się rozjeżdża".
+     Zmierzone na 390x844 z oknem skróconym do 444 px, czyli tyle, ile zostaje po otwarciu
+     klawiatury (CDP, `Emulation.setDeviceMetricsOverride`):
+
+       `--screen-h`   844 px -> 444 px
+       sufit dziennika (max-height)   320,72 px -> 168,72 px
+       RZECZYWISTA wysokość dziennika    180 px -> 180 px   <-- sufit zignorowany
+       cały czat (dziennik + podpowiedzi + kompozytor + notka)   469 px przy 444 px okna
+
+     1. `min-height` WYGRYWA z `max-height` — tak mówi kaskada i tak to działało: sufit
+        schodził do 168 px, a pudełko zostawało na 180 px. Dziennik nie kurczył się więc ani
+        o piksel, a wszystko pod nim — rząd pastylek i kompozytor z przyciskiem wysyłki —
+        było wypychane poza widoczny obszar. Stąd „pastylka się rozjeżdża": jest, tylko pod
+        klawiaturą. Dlatego minimum też jest liczone od wysokości ekranu.
+
+     2. Sam ułamek wysokości ekranu nie wystarcza: 42% z 444 px to 186 px, a pod dziennikiem
+        musi się jeszcze zmieścić rząd pastylek, kompozytor i notka. Drugi sufit mówi wprost,
+        ile miejsca zostawić NA RESZTĘ PANELU — i na normalnym ekranie nie zmienia niczego
+        (przy 844 px pierwszy sufit to 354 px, drugi 584 px, więc wygrywa ten sam co dotąd). */
+  min-height: min(180px, calc(var(--screen-h, 100svh) * 0.22));
+  max-height: min(
+    calc(var(--screen-h, 100svh) * 0.42),
+    calc(var(--screen-h, 100svh) - 260px)
+  );
   padding: 4px 2px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -201,7 +225,12 @@
      wierszu każde dłuższe zdanie zaczynało się od przewijania w środku pola. Sufit też wyżej,
      bo skoro pole rośnie z tekstem, to niech naprawdę ma gdzie rosnąć. */
   height: 58px;
-  max-height: 190px;
+  /* Sufit rośnięcia pola. Liczony też od wysokości ekranu, bo przy otwartej klawiaturze na
+     ekran zostaje niecałe 450 px — a pole, które w tym urośnie do 190 px, wypycha przycisk
+     wysyłki pod klawiaturę razem z sobą. `sizeInput()` w app.js CZYTA tę wartość zamiast
+     nosić własną kopię liczby: dwie liczby to albo pasek przewijania w polu, które ma jeszcze
+     miejsce, albo pole rosnące poza swój kadr. */
+  max-height: min(190px, calc(var(--screen-h, 100svh) * 0.24));
   padding: 14px 16px;
   border: 2px solid rgb(7 26 61 / 0.16);
   border-radius: 16px;
@@ -380,7 +409,14 @@
   opacity: 0;
   transition: max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s;
 }
-.chat__chips.is-open .chat__chips-list { max-height: 220px; opacity: 1; }
+/* Rozwinięty rząd też ma sufit liczony od ekranu: na 380 px wysokości trzy podpowiedzi po dwie
+   linijki zajmowałyby tyle, ile cały widoczny obszar nad klawiaturą. Przewijanie w rzędzie jest
+   tu właściwą ceną — nieprzewijalny rząd wypycha kompozytor z ekranu. */
+.chat__chips.is-open .chat__chips-list {
+  max-height: min(220px, calc(var(--screen-h, 100svh) * 0.28));
+  overflow-y: auto;
+  opacity: 1;
+}
 
 /* Chips wrap instead of being cut off. They were on one row with the text clipped, which is
    how a suggested question ends up unreadable. */
@@ -432,8 +468,45 @@
    stamtąd, więc przycisk kończący rozmowę w statycznym znaczniku byłby widoczny u kogoś, kto nie
    ma czym go obsłużyć. */
 
-.chat__tools { display: flex; justify-content: flex-end; margin: 0 0 4px; }
+.chat__tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin: 0 0 4px; }
 .chat__tools[hidden] { display: none; }
+
+/* „Chcę porozmawiać z automatem" — wyjście ze stanu „rozmowa przekazana człowiekowi".
+   ---------------------------------------------------------------------------
+   Ten sam kształt i ta sama wysokość co „zakończ rozmowę", bo to sąsiad w tym samym pasku, ale
+   żółty zamiast białego: to jest czynność, która coś WŁĄCZA, a nie zamyka. Widoczny wyłącznie
+   wtedy, gdy wątek naprawdę czeka na człowieka — app.js trzyma go pod `hidden`, a nie pod
+   `display: none` z klasy, żeby nie został w kolejności tabulacji, gdy nie ma znaczenia.
+
+   Bez ikony `×` z `.chat__end`: krzyżyk przy przycisku, który przywraca automat, czytałby się
+   jak „wyłącz automat", czyli dokładnie na odwrót. */
+.chat__tobot {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 2px solid rgb(255 201 40 / 0.85);
+  border-radius: 999px;
+  background: #fff8e1;
+  /* 12,5 px na #5a4200 przy tle #fff8e1 to 8,1:1 — powyżej progu 4,5:1 z zapasem. */
+  color: #5a4200;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.chat__tobot[hidden] { display: none; }
+.chat__tobot:hover { border-color: #071a3d; background: #fff; color: #071a3d; }
+.chat__tobot:focus-visible { outline: 3px solid #071a3d; outline-offset: 3px; }
+.chat__tobot:disabled { border-color: rgb(7 26 61 / 0.16); background: #eef3fb; color: #6b7c9c; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat__tobot { transition: none; }
+}
 
 /* Pigułka z krzyżykiem, nie podkreślony napis 11,5 px.
    ---------------------------------------------------------------------------

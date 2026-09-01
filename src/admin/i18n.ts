@@ -188,6 +188,20 @@ export const pl = {
   'set.eventDate': 'Data i godzina',
   'set.eventLocation': 'Miejsce',
   'set.eventSave': 'Zapisz wydarzenie',
+
+  /* Karta wydarzenia zapisuje się sama, więc guzik musi mieć napis na każdy stan, a nie
+     tylko wyblakłe tło. Zgłoszenie brzmiało „nie ma tam guzika zapisz albo jest gdzieś
+     ukryty" — bo `disabled:opacity-40` na przycisku, który jest wyłączony dopóki nic nie
+     zmieniono, wygląda jak ozdoba, a nie jak przycisk. Te napisy mówią wprost, co się
+     dzieje i dlaczego nie da się kliknąć. */
+  'set.eventSaving': 'Zapisywanie…',
+  'set.eventSaved': 'Zapisano',
+  'set.eventAutosaveNote': 'Ta karta zapisuje się sama, chwilę po tym, jak przestaniesz pisać. Guzik obok zapisuje od razu, bez czekania.',
+  'set.eventAutosavePending': 'Zapisuję za moment…',
+  'set.eventSaveNothing': 'Nie ma czego zapisywać — wszystko jest już zapisane.',
+  'set.eventSaveIncomplete': 'Uzupełnij nazwę, datę i miejsce — dopiero wtedy da się zapisać.',
+  'set.eventSaveBadYear': 'Rok wygląda na niedokończony. Wpisz datę między 2020 a 2100.',
+
   'set.announce': 'Ogłoś i rozpocznij nową edycję',
   'set.announceConfirm': 'Czy na pewno? Obecne podium, ranking, uczestnicy i zdjęcia zostaną zapisane w archiwum sezonu. Bieżące głosy i lista zostaną wyzerowane, prywatne zgody na wynik trafią do kolejki wysyłki, nowa edycja dostanie zapisany termin i odliczanie, a ogłoszenie trafi wyłącznie do aktywnych subskrybentów newslettera.',
   'set.announceQueued': 'Nowa edycja jest gotowa, a ogłoszenie jest w kolejce do bezpiecznej wysyłki partiami.',
@@ -503,6 +517,17 @@ export const it: Dict = {
   'set.eventDate': 'Data e ora',
   'set.eventLocation': 'Luogo',
   'set.eventSave': 'Salva l’evento',
+
+  /* Vedi il commento nella sezione polacca: la scheda si salva da sola, quindi il pulsante
+     deve avere un testo per ogni stato invece del solo sfondo sbiadito. */
+  'set.eventSaving': 'Salvataggio…',
+  'set.eventSaved': 'Salvato',
+  'set.eventAutosaveNote': 'Questa scheda si salva da sola, un istante dopo che hai smesso di scrivere. Il pulsante accanto salva subito, senza attendere.',
+  'set.eventAutosavePending': 'Salvo tra un istante…',
+  'set.eventSaveNothing': 'Non c’è nulla da salvare: è già tutto salvato.',
+  'set.eventSaveIncomplete': 'Completa nome, data e luogo: solo allora si può salvare.',
+  'set.eventSaveBadYear': 'L’anno sembra incompleto. Inserisci una data tra il 2020 e il 2100.',
+
   'set.announce': 'Annuncia e avvia la nuova edizione',
   'set.announceConfirm': 'Confermi? Podio, classifica, partecipanti e foto attuali saranno archiviati. I voti e la lista live saranno azzerati, i consensi privati al risultato entreranno nella coda di invio, la nuova edizione userà la data salvata per il conto alla rovescia e l’annuncio sarà inviato solo agli iscritti attivi alla newsletter.',
   'set.announceQueued': 'La nuova edizione è pronta e l’annuncio è in coda per l’invio sicuro a blocchi.',

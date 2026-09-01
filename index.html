@@ -108,6 +108,36 @@
         </span>
       </div>
 
+      <!-- Odliczanie zadokowane w pasku.
+           ==========================================================================
+           Duży licznik stoi w hero i wyjeżdża z ekranu po pierwszym przewinięciu — a to
+           jest jedyna liczba na tej stronie, po którą ktoś wraca na górę. Wracał ręcznie.
+           Ta kopia wjeżdża w pasek dokładnie wtedy, gdy tamten schodzi pod pasek, i tam
+           zostaje: pasek jest `position: fixed`, więc „przyklejenie" nie kosztuje ani
+           jednego nasłuchu przewijania.
+
+           Stoi w tym samym miejscu co `.nav-current` (środek paska, `position: absolute`),
+           bo obie rzeczy są tym samym rodzajem informacji „gdzie/ile jesteśmy" i obie
+           należą do środka. Dwie nie mogą tam stać naraz, więc gdy licznik jest
+           zadokowany, chip z procentem gaśnie — patrz `[data-clock-docked]` w
+           experience.css.
+
+           `aria-hidden="true"` z rozmysłu: te same cztery liczby są już opisane przy
+           liczniku w hero (`aria-label` na `[data-countdown]`), a tutaj tykają co sekundę.
+           Czytnik ekranu dostałby tę samą treść dwa razy, w tym raz jako nieustanny
+           strumień zmian. Dostępny opis zostaje jeden, w hero.
+
+           Skróty jednostek przez i18n, a nie wpisane na stałe: godzina to po włosku „o",
+           po polsku „g", a po francusku dzień to „j". Cztery litery, które w sześciu
+           językach znaczą co innego, to dokładnie ten rodzaj napisu, który zostaje
+           włoski, jeśli go nie przetłumaczyć. -->
+      <div class="nav-clock" data-nav-clock aria-hidden="true">
+        <span class="nav-clock__unit"><strong class="nav-clock__number" data-days>00</strong><small class="nav-clock__label" data-i18n="count.daysShort">g</small></span>
+        <span class="nav-clock__unit"><strong class="nav-clock__number" data-hours>00</strong><small class="nav-clock__label" data-i18n="count.hoursShort">o</small></span>
+        <span class="nav-clock__unit"><strong class="nav-clock__number" data-minutes>00</strong><small class="nav-clock__label" data-i18n="count.minutesShort">m</small></span>
+        <span class="nav-clock__unit"><strong class="nav-clock__number" data-seconds>00</strong><small class="nav-clock__label" data-i18n="count.secondsShort">s</small></span>
+      </div>
+
       <div class="nav-actions">
         <div class="language-picker" data-language-picker>
           <button class="language-picker__trigger" type="button" data-language-trigger aria-haspopup="listbox" aria-expanded="false" aria-controls="language-options" aria-label="Lingua / Language">

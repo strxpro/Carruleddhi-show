@@ -506,6 +506,156 @@
 }
 .site-header.is-compact.is-menu-open .menu-toggle__label { display: inline; }
 
+
+/* ODLICZANIE ZADOKOWANE W PASKU.
+   ===========================================================================
+   Wjeżdża w środek paska w chwili, gdy duży licznik z hero schodzi pod pasek, i tam
+   zostaje. Nie ma tu ani jednego nasłuchu przewijania: pasek jest `position: fixed`, więc
+   „przyklejone" jest wszystko, co w nim stoi. O tym, KIEDY się pojawia, decyduje
+   `IntersectionObserver` w app.js (`setupNavClock`) i tylko on dopisuje
+   `[data-clock-docked]` na nagłówku.
+
+   POZYCJONOWANIE ABSOLUTNE, DOKŁADNIE JAK `.nav-current`.
+   Wersja z `flex` liczyłaby środek z tego, co zostało między marką a przyciskami, a te
+   strony nigdy nie są równe — ten sam błąd jest opisany kilkadziesiąt linii wyżej przy
+   chipie z nazwą sekcji i skończył się przesunięciem o 29 px w jednym ze stanów paska.
+   Liczone od krawędzi paska, środek jest środkiem z konstrukcji, w każdym stanie i przy
+   każdej szerokości okna.
+
+   `pointer-events: none`, bo to napis, nie kontrolka — i bo przy najwęższym pasku wolno mu
+   podejść blisko sąsiadów, ale nie wolno mu odebrać im kliknięcia. */
+.nav-clock {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  /* Ta sama rezerwa co przy chipie z nazwą sekcji i z tego samego powodu: 2 x 150 px to
+     szerokość marki, czyli szerszej z dwóch stron w stanie zwiniętym. */
+  max-width: min(260px, calc(100% - 300px));
+  color: var(--white);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -10px);
+  transition:
+    opacity .34s ease,
+    transform .34s var(--ease-out),
+    visibility .34s;
+  white-space: nowrap;
+}
+.nav-clock__unit { display: inline-flex; align-items: baseline; gap: 2px; }
+/* `tabular-nums` to nie ozdoba. Bez niej sekundy zmieniają szerokość przy każdym tyknięciu
+   (jedynka jest węższa od zera w większości krojów), a licznik wyśrodkowany absolutnie
+   drgałby w lewo i w prawo raz na sekundę przez cały czas czytania strony. */
+.nav-clock__number {
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.nav-clock__label {
+  color: var(--blue-200);
+  font-family: var(--font-meta);
+  font-size: 9px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* Stan zadokowany. Wygaszanie i `visibility`, nigdy `display` — licznik jest
+   pozycjonowany absolutnie, więc nie zajmuje miejsca w układzie, ale gdyby ktoś kiedyś
+   sięgnął tu po `display: none`, pasek dostałby przy każdym dokowaniu przeliczenie
+   układu w środku animacji. */
+.site-header[data-clock-docked] .nav-clock {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+/* Chip z nazwą sekcji ustępuje — tym samym mechanizmem, którym gasi go `[data-nav-at-top]`
+   na samej górze strony. Ta reguła musi stać PO `.site-header.is-compact .nav-current`,
+   które przywraca `opacity: 1`; obie mają tę samą wagę, więc rozstrzyga kolejność. */
+.site-header[data-clock-docked] .nav-current {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* ROZWINIĘTY PASEK (`is-peeked`) LICZNIKA NIE RUSZA — I TO JEST WYNIK POMIARU.
+   ---------------------------------------------------------------------------
+   Stała tu reguła gasząca licznik przy każdym rozwinięciu paska, napisana na szacunku, że
+   przy 720 px zadokowany licznik wejdzie 37 px pod „Będę tam". Sonda mówi inaczej: w stanie
+   `is-compact is-peeked` na 1440x900 pasek zajmuje 355–1075 px, licznik 642–788 px, a
+   `.nav-actions` zaczyna się na 897 px. Zapasu jest 109 px, nie deficyt.
+
+   Więc licznik zostaje. „Wjeżdża i tam zostaje" ma znaczyć dokładnie to, a `is-peeked`
+   włącza się przy każdym świadomym ruchu w górę — gaszenie licznika przy każdym takim ruchu
+   byłoby migotaniem tej jednej liczby, po którą ktoś tu wraca.
+
+   Ustępuje tylko przy OTWARTYM MENU, i nie z powodu miejsca: `is-compact.is-menu-open`
+   przywraca chip z nazwą sekcji, a dwie rzeczy nie mogą stać na tym samym środku paska. Przy
+   otwartym menu wybiera się, gdzie iść, więc pierwszeństwo ma nazwa sekcji. */
+.site-header.is-menu-open .nav-clock {
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -10px);
+}
+.site-header[data-clock-docked].is-menu-open .nav-current {
+  opacity: 1;
+  visibility: visible;
+}
+/* Ale na samej górze strony chip nadal się nie pokazuje, cokolwiek robi pasek — patrz
+   `setCurrentSection` w app.js. Na górze licznik i tak nie jest zadokowany, więc ta reguła
+   pilnuje tylko tego, żeby powyższe przywrócenie nie obudziło chipu w hero. */
+.site-header[data-nav-at-top][data-clock-docked] .nav-current {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Ograniczenie ruchu: licznik nie wjeżdża, tylko się pojawia.
+   Klasę dopina app.js z `reducedMotion`, a nie osobne `@media` w tym pliku — pytanie
+   „czy wolno animować" ma na tej stronie jedną odpowiedź i jedno miejsce. */
+.nav-clock.nav-clock--still {
+  transform: translate(-50%, 0);
+  transition: opacity .2s ease, visibility .2s;
+}
+
+@media (max-width: 760px) {
+  .nav-clock { gap: 7px; max-width: calc(100% - 190px); }
+  .nav-clock__number { font-size: 14px; }
+  .nav-clock__label { font-size: 8px; }
+}
+
+/* TELEFON: CZTERY JEDNOSTKI W DWÓCH RZĘDACH, BO W JEDNYM SIĘ NIE MIESZCZĄ.
+   ---------------------------------------------------------------------------
+   Zmierzone sondą na 390x844, pasek zwinięty (szerokość 322 px): napis „Carruleddhi" kończy
+   się na 162 px, flaga z „Menu" zaczyna na 247 px. Wolnego miejsca jest 85 px, a jego środek
+   (204 px) NIE jest środkiem paska (195 px) — więc licznik wyśrodkowany w pasku może mieć
+   najwyżej 2 x (195 - 162) = 66 px, żeby nie dotknąć marki. Rząd czterech jednostek miał
+   126 px i wchodził 30 px na napis marki oraz 11 px na przyciski.
+
+   Wyjścia były trzy. Zwężenie marki albo przesunięcie licznika z środka to zmiana rzeczy,
+   które działają, pod jedną nową; wyrzucenie sekund albo podpisów to mniej informacji niż w
+   hero. Dwa rzędy po dwie jednostki zajmują około 60 px i nie zabierają niczego: te same
+   cztery liczby, te same podpisy, ten sam środek paska. Pasek ma na telefonie 60 px
+   wysokości, więc dwa rzędy po 13 px mieszczą się bez ruszania jego wysokości.
+
+   Kolumny `auto`, nie `1fr`: po niemiecku i francusku podpis minut to „min", trzy znaki
+   zamiast jednego, i kolumna ma się pod to poszerzyć, a nie obciąć. */
+@media (max-width: 470px) {
+  .nav-clock {
+    display: grid;
+    align-items: baseline;
+    justify-items: start;
+    gap: 1px 6px;
+    grid-template-columns: auto auto;
+    max-width: calc(100% - 190px);
+  }
+  .nav-clock__number { font-size: 13px; }
+  .nav-clock__label { font-size: 7.5px; letter-spacing: .04em; }
+}
+
 /* Flag language listbox. */
 .language-picker {
   position: relative;

@@ -11,7 +11,7 @@
  *   node tools/cdp.mjs shot out.png [--w 1440] [--h 900] [--url /] [--y 2400]
  *                                   [--full] [--wait 1500]
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -159,9 +159,86 @@ async function withPage(fn) {
 
     await call('Page.navigate', { url: origin + path });
     await sleep(waitMs);
+
+    /**
+     * PRAWDZIWE DOTKNIĘCIE, DOSTĘPNE Z WNĘTRZA SONDY: `await window.__tap(x, y)`.
+     * =========================================================================
+     *
+     * DLACZEGO NIE WYSTARCZA `element.click()` ANI `dispatchEvent`
+     *   Jedno i drugie to wywołanie funkcji na WSKAZANYM elemencie. Trafia w niego zawsze:
+     *   także wtedy, gdy leży pod nakładką, pod przyklejonym paskiem, poza ekranem albo ma
+     *   zerową wysokość. Sonda zbudowana na `click()` jest zielona na stronie, na której nie
+     *   da się nic dotknąć — i dokładnie to się stało: dwie sondy głosowania przechodziły,
+     *   a na telefonie nie dało się oddać głosu.
+     *
+     *   Zdarzenia budowane w skrypcie mają jeszcze drugą wadę: `isTrusted: false` i brak
+     *   trafiania (hit-testu) przeglądarki. Nie ustawiają fokusu, nie wyzwalają zachowań
+     *   domyślnych zastrzeżonych dla gestu i nie sprawdzają, KTO leży w danym punkcie.
+     *
+     * CO ROBI TA ZAŚLEPKA
+     *   `Input.dispatchTouchEvent` to dotknięcie wysłane przez protokół, czyli ta sama droga,
+     *   którą wchodzi palec: przeglądarka sama trafia w element pod punktem, sama dokłada
+     *   `pointerdown`/`mousedown`/`click`, sama ustawia fokus i sama decyduje, że nakładka
+     *   przechwyciła dotknięcie zamiast przycisku pod nią.
+     *
+     * DLACZEGO PRZEZ WIĄZANIE, A NIE FLAGĄ Z WIERSZA POLECEŃ
+     *   Droga do głosu ma pięć dotknięć, a każde następne jest w miejscu policzonym PO
+     *   poprzednim (przycisk wyrasta tam, gdzie stał inny). Lista selektorów podana z zewnątrz
+     *   nie umie tego wyrazić — sonda musi móc dotknąć, zmierzyć i dotknąć znowu.
+     *
+     * Wiązanie dokładane KAŻDEJ sondzie, nie tylko tej jednej: nic nie kosztuje, gdy nikt go
+     * nie woła, a sonda, która chce mierzyć dotknięcia, nie musi zmieniać harnessu.
+     */
+    await call('Runtime.addBinding', { name: '__tapNative' });
+    await evaluate(call, `(() => {
+      const waiting = new Map();
+      let seq = 0;
+      window.__tapDone = (id) => { const done = waiting.get(id); waiting.delete(id); if (done) done(true); };
+      window.__tap = (x, y) => new Promise((done) => {
+        seq += 1;
+        waiting.set(seq, done);
+        window.__tapNative(JSON.stringify({ id: seq, x: Math.round(x), y: Math.round(y) }));
+      });
+      return 1;
+    })()`);
+    cdp.ws.addEventListener('message', async (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.method !== 'Runtime.bindingCalled' || msg.params.name !== '__tapNative') return;
+      const { id, x, y } = JSON.parse(msg.params.payload);
+      const point = [{ x, y, radiusX: 12, radiusY: 12, force: 1, id: 1 }];
+      try {
+        await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: point });
+        /* Sześćdziesiąt milisekund między przyłożeniem i podniesieniem palca: krótsze bywa
+           odczytane jako drgnięcie, dłuższe jako przytrzymanie z menu kontekstowym. */
+        await sleep(60);
+        await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      } catch (error) {
+        logs.push('TAP ' + error.message);
+      }
+      await evaluate(call, `window.__tapDone(${id})`);
+    });
+
     return await fn(call, logs);
   } finally {
     try { cdp.ws.close(); } catch { /* closing anyway */ }
+    /**
+     * Cała gałąź procesów Chrome, nie sam proces uruchomiony przez `spawn`.
+     * =========================================================================
+     * `child.kill()` zabijał proces nadrzędny, a przeglądarka zostawała i DALEJ NASŁUCHIWAŁA na
+     * porcie 9333. Kolejne uruchomienie sondy pytało `\json\version`, dostawało odpowiedź od tej
+     * starej przeglądarki i podłączało się do NIEJ — razem z jej `localStorage`.
+     *
+     * ZMIERZONE: dwa przebiegi tej samej sondy pod rząd dawały różne wyniki, bo w drugim
+     * `savedVoter()` widział adres wpisany w pierwszym i okno oceny pokazywało „zagłosuj tym
+     * adresem" zamiast pól. Znaleziony proces chrome.exe słuchał na 9333 od kilku godzin, mimo
+     * że wszystkie sondy dawno się zakończyły. Sonda, której wynik zależy od poprzedniego
+     * uruchomienia, nie mierzy strony, tylko historię własnych uruchomień.
+     *
+     * `/T` zabija drzewo (Chrome to kilkanaście procesów), `/F` bez pytania.
+     */
+    try {
+      spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+    } catch { /* Chrome mógł się już zamknąć sam */ }
     child.kill();
   }
 }

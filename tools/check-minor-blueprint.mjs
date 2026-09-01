@@ -424,7 +424,12 @@ const faqSource = worker.slice(
   faqStart,
   worker.indexOf('\n}', worker.indexOf('return null;', faqDeclaration)) + 2
 );
-const faqAnswer = new Function(`${faqSource}; return faqAnswer;`)();
+/* Trzy funkcje z tego samego ciecia, bo rozstrzygaja jedno pytanie razem: czym jest ta
+   wiadomosc. `dataIntent` idzie PRZED slownikiem w chatVisitor, a `wantsHuman` przed oboma —
+   testowanie samego slownika pokazywalo wiec zachowanie, ktorego w produkcji nie ma. */
+const { faqAnswer, dataIntent, wantsHuman } = new Function(
+  `${faqSource}; return { faqAnswer, dataIntent, wantsHuman };`
+)();
 const faqDeck = {
   faqHelmet: 'KASK', faqCost: 'KOSZT', faqEngine: 'SILNIK',
   faqWho: 'KTO', faqNumber: 'NUMER', faqWhen: 'KIEDY'
@@ -454,6 +459,76 @@ for (const question of [
   'Czy latarnia bedzie wlaczona?'
 ]) {
   check(`slownik NIE zgaduje: ${question}`, faqAnswer(faqDeck, question) === null, faqAnswer(faqDeck, question));
+}
+
+/* --- zawezenie slownika: zdania, na ktorych zmierzono falszywe trafienia --
+   Kazde z tych zdan dostawalo GOTOWA odpowiedz nie na swoje pytanie. Zmierzone przed
+   poprawka na worker/index.js:
+
+     "Chce zmienic numer telefonu w moim zgloszeniu."  -> NUMER (jak przychodzi numer startowy)
+     "Gdzie jest ten plac, na ktorym stoi prezentacja?" -> KOSZT (rdzen `plac` od „placic")
+     "Czy moge przyjechac motorem i gdzie go zostawic?" -> SILNIK (rdzen `motor`)
+     "Ile kosztuje kask z atestem?"                     -> KASK (dwa tematy, wygrywal pierwszy)
+
+   Regula, ktora te asercje pilnuja: lepiej przekazac pytanie czlowiekowi niz odpowiedziec
+   na inne pytanie. Zdanie bez trafienia idzie do modelu albo do organizatorow, czyli konczy
+   sie odpowiedzia; zdanie z falszywym trafieniem konczy sie pewna siebie pomylka, o ktorej
+   nikt sie nie dowie. */
+for (const question of [
+  'Chce zmienic numer telefonu w moim zgloszeniu.',
+  'Czy moge przyjechac motorem i gdzie go zostawic?',
+  'Ile kosztuje kask z atestem, jesli trzeba go kupic?'
+]) {
+  check(`slownik nie odpowiada na inne pytanie: ${question}`,
+    faqAnswer(faqDeck, question) === null, faqAnswer(faqDeck, question));
+}
+check(
+  'pytanie o plac nie jest pytaniem o wpisowe',
+  faqAnswer(faqDeck, 'Gdzie jest ten plac, na ktorym stoi prezentacja?') !== 'KOSZT',
+  faqAnswer(faqDeck, 'Gdzie jest ten plac, na ktorym stoi prezentacja?')
+);
+/* Numer startowy nadal ma trafiac — zawezenie zdjelo samo „numer", nie caly temat.
+   To jest tresc podpowiedzi „Jak dostane numer startowy?", wiec musi odpowiadac natychmiast. */
+check('numer startowy nadal trafia', faqAnswer(faqDeck, 'Jak dostane numer startowy?') === 'NUMER',
+  faqAnswer(faqDeck, 'Jak dostane numer startowy?'));
+
+/* --- rozpoznanie rezygnacji: zdanie ze zrzutu ----------------------------
+   „chce zrezygnowac z wyscigu" nie trafialo w NIC: lista miala „rezygnuje" i „rezygnacja",
+   ale nie bezokolicznik, a drugim sygnalem musialo byc wskazanie siebie („moje", „mnie"),
+   ktorego w tym zdaniu nie ma. Pytanie szlo wiec do modelu, a model odpowiedzial najblizszym
+   faktem, jaki mial: cena sponsoringu 100 euro. To jest ten zrzut.
+
+   Druga asercja pilnuje ceny tej zmiany: „wyscig" jako drugi sygnal wolno tylko REZYGNACJI.
+   Pytanie o zmiane czegokolwiek przed wyscigiem jest pytaniem o regulamin i nie ma prawa
+   otwierac weryfikacji adresu. */
+for (const [question, expected] of [
+  ['chce zrezygnowac z wyscigu', 'withdraw'],
+  ['Chcę zrezygnować z wyścigu, nie dam rady przyjechać.', 'withdraw'],
+  ['Rezygnuje ze startu, prosze usunac moje zgloszenie.', 'withdraw'],
+  ['Chce zmienic numer telefonu w moim zgloszeniu.', 'edit'],
+  ['Nie chce wiecej newslettera.', 'notifications'],
+  ['Czy moge zmienic kola w wozku przed wyscigiem?', null],
+  ['Gdzie i kiedy jest start?', null]
+]) {
+  const got = dataIntent(question);
+  check(`sprawa rozpoznana (${expected || 'zadna'}): ${question}`, got === expected, String(got));
+}
+
+/* --- prosba o czlowieka --------------------------------------------------
+   Odkad przekazanie rozmowy WYCISZA automat do nacisniecia przycisku, falszywe rozpoznanie
+   tej prosby ma cene: uciszony czat do konca rozmowy. Dlatego rzeczowniki wieloznaczne
+   („osoba", „person") wymagaja drugiego sygnalu — slowa o rozmowie. */
+for (const [question, expected] of [
+  ['Chcialbym porozmawiac z czlowiekiem.', true],
+  ['Wolalbym rozmawiac z organizatorem.', true],
+  ['Vorrei parlare con un operatore.', true],
+  ['Can I talk to a human, please?', true],
+  ['Ile osob miesci sie w wozku?', false],
+  ['Czy jedna osoba moze zbudowac wozek?', false],
+  ['Quante persone possono stare nel carretto?', false]
+]) {
+  const got = wantsHuman(question);
+  check(`prosba o czlowieka rozpoznana jako ${expected}: ${question}`, got === expected, String(got));
 }
 
 /* --- rozpoznawanie jezyka rozmowy ----------------------------------------

@@ -27,6 +27,15 @@
     'count.hours': 'ore',
     'count.minutes': 'minuti',
     'count.seconds': 'secondi',
+    /* Skróty dla licznika zadokowanego w pasku — jedna, dwie litery, bo między marką a
+       przyciskami zostaje około 150 px i pełne słowa („secondi") tam nie wchodzą.
+       Osobne klucze, a nie obcięte `count.*`: skrót godziny to po włosku „o", po polsku
+       „g", a po francusku dzień to „j" — obcinanie do pierwszej litery dałoby po polsku
+       „d/g/m/s" przez przypadek, a po niemiecku „T/S/M/S" na pewno źle. */
+    'count.daysShort': 'g',
+    'count.hoursShort': 'o',
+    'count.minutesShort': 'm',
+    'count.secondsShort': 's',
     'marquee': 'Costruisci · Sali · Scendi · Frena · Sorridi',
     'story.kicker': 'Una tradizione che corre',
     'story.title': 'Un paese intero in discesa.',
@@ -206,7 +215,9 @@
     'a11y.skip': 'Przejdź do treści', 'a11y.menu': 'Otwórz menu', 'a11y.close': 'Zamknij',
     'nav.race': 'Wyścig', 'nav.categories': 'Kategorie', 'nav.route': 'Trasa', 'nav.program': 'Program', 'nav.prizes': 'Nagrody', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Zapisz się', 'nav.attend': 'Będę tam',
     'hero.kicker': '17 października 2026 · Santa Teresa Gallura', 'hero.tagline': 'Bez silnika. Tylko w dół.', 'hero.signup': 'Zapisz się do wyścigu', 'hero.attend': 'Będę tam', 'hero.pilots': 'zapisanych zawodników', 'hero.people': 'osób będzie na miejscu', 'hero.scroll': 'Poznaj wyścig',
-    'count.days': 'dni', 'count.hours': 'godzin', 'count.minutes': 'minut', 'count.seconds': 'sekund', 'marquee': 'Zbuduj · Wejdź · Zjedź · Hamuj · Uśmiechnij się',
+    'count.days': 'dni', 'count.hours': 'godzin', 'count.minutes': 'minut', 'count.seconds': 'sekund',
+    'count.daysShort': 'd', 'count.hoursShort': 'g', 'count.minutesShort': 'm', 'count.secondsShort': 's',
+    'marquee': 'Zbuduj · Wejdź · Zjedź · Hamuj · Uśmiechnij się',
     'story.kicker': 'Tradycja, która nabiera prędkości', 'story.title': 'Całe miasteczko jedzie w dół.',
     'story.p1': 'Carruleddhi to ręcznie budowane pojazdy: drewno, łożyska i mnóstwo wyobraźni. Bez silnika i napędu — tylko grawitacja, odwaga oraz dźwięk kół na drodze.',
     'story.p2': 'Jedni ścigają się o czas, inni dla widowiska. Tutaj wygrywa szybkość, ale także najbardziej szalony pomysł.', 'story.stat1': 'silników', 'story.stat2': 'kategorie', 'story.stat3': 'nagród',
@@ -301,7 +312,9 @@
     'a11y.skip': 'Ir al contenido', 'a11y.menu': 'Abrir menú', 'a11y.close': 'Cerrar',
     'nav.race': 'La carrera', 'nav.categories': 'Categorías', 'nav.route': 'Recorrido', 'nav.program': 'Programa', 'nav.prizes': 'Premios', 'nav.faq': 'FAQ', 'nav.contact': 'Contacto', 'nav.signup': 'Inscríbete', 'nav.attend': 'Estaré allí',
     'hero.kicker': '17 de octubre de 2026 · Santa Teresa Gallura', 'hero.tagline': 'Sin motor. Solo cuesta abajo.', 'hero.signup': 'Inscríbete en la carrera', 'hero.attend': 'Estaré allí', 'hero.pilots': 'pilotos inscritos', 'hero.people': 'personas asistirán', 'hero.scroll': 'Descubre la carrera',
-    'count.days': 'días', 'count.hours': 'horas', 'count.minutes': 'minutos', 'count.seconds': 'segundos', 'marquee': 'Construye · Sube · Baja · Frena · Sonríe',
+    'count.days': 'días', 'count.hours': 'horas', 'count.minutes': 'minutos', 'count.seconds': 'segundos',
+    'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
+    'marquee': 'Construye · Sube · Baja · Frena · Sonríe',
     'story.kicker': 'Una tradición en movimiento', 'story.title': 'Todo un pueblo cuesta abajo.', 'story.p1': 'Los Carruleddhi son carros hechos a mano: madera, rodamientos y mucha imaginación. Sin motor ni propulsión — solo gravedad, valor y ruedas sobre el asfalto.', 'story.p2': 'Unos compiten por tiempo y otros por el espectáculo. Aquí ganan la velocidad y la idea más loca.', 'story.stat1': 'motores', 'story.stat2': 'categorías', 'story.stat3': 'premios',
     'category.kicker': 'Vehículos admitidos', 'category.title': 'Las cartas se superponen. Sube la emoción.', 'category.intro': 'Sigue desplazándote: cada carta muestra lo necesario para participar.',
     'category.classic.kicker': 'Categoría A · Tradición', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Chasis artesanal de madera, cuatro ruedas macizas o con rodamientos. Dirección con pies o cuerda; freno de pie o palanca.', 'category.classic.tag1': '4 ruedas', 'category.classic.tag2': 'Chasis de madera', 'category.classic.tag3': 'Sin motor',
@@ -328,7 +341,11 @@
     'a11y.skip': 'Aller au contenu', 'a11y.menu': 'Ouvrir le menu', 'a11y.close': 'Fermer',
     'nav.race': 'La course', 'nav.categories': 'Catégories', 'nav.route': 'Parcours', 'nav.program': 'Programme', 'nav.prizes': 'Prix', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': "S'inscrire", 'nav.attend': 'Je serai là',
     'hero.kicker': '17 octobre 2026 · Santa Teresa Gallura', 'hero.tagline': 'Aucun moteur. Seulement la descente.', 'hero.signup': "S'inscrire à la course", 'hero.attend': 'Je serai là', 'hero.pilots': 'pilotes inscrits', 'hero.people': 'personnes seront là', 'hero.scroll': 'Découvrir la course',
-    'count.days': 'jours', 'count.hours': 'heures', 'count.minutes': 'minutes', 'count.seconds': 'secondes', 'marquee': 'Construire · Monter · Descendre · Freiner · Sourire',
+    'count.days': 'jours', 'count.hours': 'heures', 'count.minutes': 'minutes', 'count.seconds': 'secondes',
+    /* „j" dla dnia, nie „d" — po francusku dzień to `jour`. Ta jedna litera jest powodem,
+       dla którego skróty są kluczami i18n, a nie obcięciem pełnej nazwy w JavaScripcie. */
+    'count.daysShort': 'j', 'count.hoursShort': 'h', 'count.minutesShort': 'min', 'count.secondsShort': 's',
+    'marquee': 'Construire · Monter · Descendre · Freiner · Sourire',
     'story.kicker': 'Une tradition en mouvement', 'story.title': 'Tout un village en descente.', 'story.p1': "Les Carruleddhi sont des chariots faits main : bois, roulements et beaucoup d'imagination. Aucun moteur — seulement la gravité, le courage et les roues sur la route.", 'story.p2': "Certains courent pour le chrono, d'autres pour le spectacle. Ici gagnent la vitesse et l'idée la plus folle.", 'story.stat1': 'moteurs', 'story.stat2': 'catégories', 'story.stat3': 'prix',
     'category.kicker': 'Véhicules admis', 'category.title': "Les cartes se superposent. L'émotion monte.", 'category.intro': 'Continuez à défiler : chaque carte montre ce qui est nécessaire pour participer.',
     'category.classic.kicker': 'Catégorie A · Tradition', 'category.classic.title': 'Carruleddhi Classic', 'category.classic.body': 'Châssis artisanal en bois, quatre roues pleines ou à roulements. Direction aux pieds ou à la corde ; frein au pied ou à levier.', 'category.classic.tag1': '4 roues', 'category.classic.tag2': 'Châssis en bois', 'category.classic.tag3': 'Sans moteur',
@@ -2238,6 +2255,62 @@
     }
   };
 
+  /**
+   * ROZMOWA PRZEKAZANA CZŁOWIEKOWI — TRZY NAPISY I JEDEN PRZYCISK
+   * ===========================================================================
+   * PO CO TO ISTNIEJE
+   *   Gość, który napisał „chcę rozmawiać z człowiekiem", dostawał dotąd zdanie o przekazaniu
+   *   — i zaraz po nim kolejne odpowiedzi automatu, bo wątek oznaczony jako czekający na
+   *   człowieka nie zamykał automatowi ust. Poproszenie o człowieka nie znaczyło więc nic:
+   *   automat dalej się wtrącał, a gość widział, że go nie słuchano.
+   *
+   *   Teraz stan „przekazana człowiekowi" jest jawny i trzyma go WĄTEK PO STRONIE SERWERA
+   *   (`chat_threads.mode = 'human'`), a nie przeglądarka: gość odświeża stronę na telefonie,
+   *   wraca za godzinę, otwiera z innej karty — i cisza automatu trwa. Wyjściem jest jeden
+   *   widoczny przycisk, nie zgadywanie ze słów.
+   *
+   * DLACZEGO PRZYCISK, A NIE SŁOWA
+   *   Wcześniej wyjście z kolejki rozpoznawało się listą słów („automat", „bot"). To znaczyło,
+   *   że zdanie „wolę człowieka niż automat" wyprowadzało z kolejki, do której właśnie się
+   *   ustawiono — bo zawiera słowo „automat". Naciśnięcie przycisku jest jednoznaczne i nie
+   *   ma odmiany przez przypadki.
+   *
+   * `chat.toBotDone` jest wierszem systemowym, nie wypowiedzią automatu: mówi o stanie
+   * strony („od teraz odpowiadam znowu ja"), a nie odpowiada na pytanie.
+   */
+  const chatHandoverExtras = {
+    it: {
+      'chat.toBot': 'Voglio parlare con l’automatico',
+      'chat.handedOver': 'La conversazione è passata agli organizzatori. L’automatico non si intromette più.',
+      'chat.toBotDone': 'Bene: da adesso rispondo di nuovo io. Chiedi quello che ti serve.'
+    },
+    pl: {
+      'chat.toBot': 'Chcę porozmawiać z automatem',
+      'chat.handedOver': 'Rozmowę przejęli organizatorzy. Automat już się nie wtrąca.',
+      'chat.toBotDone': 'Dobrze — od teraz znowu odpowiadam ja. Pytaj, o co potrzebujesz.'
+    },
+    en: {
+      'chat.toBot': 'I want to talk to the automatic chat',
+      'chat.handedOver': 'The conversation has been passed to the organisers. The automatic chat stays out of it.',
+      'chat.toBotDone': 'All right — from now on I answer again. Ask away.'
+    },
+    de: {
+      'chat.toBot': 'Ich möchte mit dem Automaten sprechen',
+      'chat.handedOver': 'Das Gespräch haben die Organisatoren übernommen. Der Automat mischt sich nicht mehr ein.',
+      'chat.toBotDone': 'Gut — ab jetzt antworte ich wieder. Frag einfach.'
+    },
+    es: {
+      'chat.toBot': 'Quiero hablar con el automático',
+      'chat.handedOver': 'La conversación ha pasado a los organizadores. El automático ya no se mete.',
+      'chat.toBotDone': 'Bien: desde ahora vuelvo a responder yo. Pregunta lo que quieras.'
+    },
+    fr: {
+      'chat.toBot': 'Je veux parler à l’automatique',
+      'chat.handedOver': 'La conversation est passée aux organisateurs. L’automatique ne s’en mêle plus.',
+      'chat.toBotDone': 'Très bien : à partir de maintenant, c’est moi qui réponds. Posez votre question.'
+    }
+  };
+
   Object.keys(interactionExtras).forEach((locale) => Object.assign(extras[locale], interactionExtras[locale]));
   Object.keys(consentExtras).forEach((locale) => Object.assign(extras[locale], consentExtras[locale]));
   Object.keys(miscExtras).forEach((locale) => Object.assign(extras[locale], miscExtras[locale]));
@@ -2248,6 +2321,7 @@
   Object.keys(chatGateExtras).forEach((locale) => Object.assign(extras[locale], chatGateExtras[locale]));
   Object.keys(chatConsentExtras).forEach((locale) => Object.assign(extras[locale], chatConsentExtras[locale]));
   Object.keys(chatSponsorFormExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorFormExtras[locale]));
+  Object.keys(chatHandoverExtras).forEach((locale) => Object.assign(extras[locale], chatHandoverExtras[locale]));
 
   Object.assign(it, extras.it);
   Object.assign(pl, extras.pl);

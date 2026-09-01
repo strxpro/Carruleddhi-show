@@ -462,6 +462,124 @@ export const mailWinners = (key: string) =>
     { action: 'winners' }
   );
 
+/* ------------------------------------------------- roczniki i podsumowanie
+
+   DLACZEGO TO SIĘGA DO DWÓCH KOŃCÓWEK, A NIE DO JEDNEJ
+     `voting-admin` (action `state`) NIE ODDAJE listy roczników. Sprawdzone w Workerze:
+     votingAdminState() zwraca fazę, uczestników i sumę głosów z ŻYWYCH tabel i ani słowem
+     nie wspomina o `voting_editions`. Roczniki i zamrożone wyniki oddaje tylko publiczna
+     końcówka `voting` (votingState), która przyjmuje `edition` i po tym kluczu wchodzi do
+     archiwum. Panel musi więc pytać obie: publiczną o LISTĘ i o ARCHIWUM, panelową o
+     liczby TRWAJĄCEJ edycji.
+
+     Odwrotnie się nie da i to jest sedno: publiczny odczyt świadomie ukrywa oceny, dopóki
+     głosowanie jest otwarte (`const ranking = closed ? … : []` w Workerze), żeby nikt nie
+     dopisywał się do prowadzącego. Podsumowanie na żywo zbudowane z tamtej odpowiedzi
+     pokazywałoby w dniu zawodów zero głosów i puste podium — czyli kłamałoby.
+
+   CZEGO TU NIE MA I DLACZEGO NIE DODAJEMY
+     Nie ma odczytu odwiedzin ani zgłoszeń „za rocznik 2026". `site_stats` liczy okno
+     kończące się TERAZ (window_hours, sufit 8760), a `public_counts` to dwa liczniki
+     bieżące bez kolumny z rokiem. Do rozbicia tego na roczniki brakuje końcówki, a jej
+     dodanie należy do Workera, nie do panelu — patrz raport. */
+
+/**
+ * Jeden rocznik z `voting_editions`.
+ *
+ * `participantCount` i `voteCount` są opcjonalne, bo przychodzą tylko w LIŚCIE roczników.
+ * Odpowiedź archiwalna składa `selectedEdition` z sześciu pól i tych dwóch w niej nie ma —
+ * wpisanie ich tu jako wymaganych znaczyłoby, że TypeScript obiecuje liczbę, której w tej
+ * gałęzi nikt nie przysłał, a widok pokazałby `undefined` sformatowane jako „NaN".
+ */
+export interface VotingEdition {
+  id: string;
+  /** Rok, cztery cyfry. To jest klucz archiwum — patrz migracja 0030. */
+  key: string;
+  name: string;
+  /** ISO. Data wydarzenia tego rocznika. */
+  date: string;
+  location: string;
+  /** Baza pilnuje tego więzem CHECK (migracja 0030), więc te dwie wartości to całość. */
+  status: 'active' | 'archived';
+  participantCount?: number;
+  voteCount?: number;
+}
+
+/**
+ * Wiersz wyniku: albo policzony na żywo, albo odczytany ze zamrożonego `results`.
+ *
+ * Osobny typ, a nie `VotingParticipant`, bo archiwum nie ma `registrationId`, `imagePath`
+ * ani `active` — snapshot zapisuje wynik, nie stan edycji. Wspólny typ z polami wymaganymi
+ * kazałby je tu dorabiać z powietrza.
+ */
+export interface EditionResultRow {
+  id: string;
+  category: string;
+  startNumber: number;
+  firstName: string;
+  lastName: string;
+  projectName: string;
+  photo: string;
+  voteCount: number;
+  averageScore: number;
+  totalScore: number;
+}
+
+/**
+ * Publiczny odczyt głosowania — tu używany wyłącznie po roczniki i archiwum.
+ *
+ * Prawie wszystko opcjonalne, bo to jest kształt Z DRUTU, a nie z tego repozytorium:
+ * `editions`, `selectedEdition`, `isArchive` i `podium` doszły w migracji 0030 i wdrożona
+ * funkcja może być starsza od tego panelu. Pola wymagane w typie zamieniłyby taki rozjazd
+ * w `Cannot read properties of undefined (reading 'map')` na białym ekranie; opcjonalne
+ * zmuszają widok do napisania, co pokazać, gdy ich nie ma.
+ */
+export interface EditionsState {
+  ok: true;
+  phase: VotingPhase;
+  isArchive?: boolean;
+  editions?: VotingEdition[];
+  selectedEdition?: VotingEdition | null;
+  raceStartsAt?: string | null;
+  votingEndsAt?: string | null;
+  participants?: EditionResultRow[];
+  podium?: EditionResultRow[];
+}
+
+/**
+ * Roczniki, a przy podanym kluczu — zamrożony wynik tego rocznika.
+ *
+ * Bez `edition` odpowiada stanem trwającej edycji razem z listą roczników. Z `edition`
+ * równym zarchiwizowanemu rokowi odpowiada snapshotem i `isArchive: true`. Klucz inny niż
+ * cztery cyfry Worker ignoruje, więc filtrujemy go już tutaj — inaczej „2026x" wracałoby
+ * jako stan bieżący udający archiwum.
+ *
+ * Hasło leci w nagłówku jak wszędzie, choć ta końcówka go nie wymaga: `call` dokłada go
+ * bezwarunkowo, a wyjątek od tej reguły byłby pierwszym miejscem, w którym ktoś zapomni.
+ */
+export const fetchEditions = (key: string, edition = '') =>
+  call<EditionsState>('voting', key, {
+    action: 'state',
+    ...(/^\d{4}$/.test(edition) ? { edition } : {})
+  });
+
+/**
+ * Dwa liczniki bieżące: kliknięcia „będę tam" i zgłoszenia zawodników.
+ *
+ * Widok `public_counts` (migracja 0013) i nic poza nim — same sumy, ani jednego nazwiska.
+ * `initials` odpuszczone w typie: podsumowanie sezonu liczy ludzi, a nie rysuje awatarów,
+ * a pole, którego nikt nie czyta, jest tylko obietnicą do utrzymywania.
+ */
+export interface PublicCounts {
+  ok: true;
+  /** Kliknięcia „będę tam”. Jeden wiersz na urządzenie, nie licznik — patrz migracja 0002. */
+  attendees: number;
+  /** Zgłoszenia zawodników bez wycofanych. */
+  pilots: number;
+}
+
+export const fetchCounts = (key: string) => call<PublicCounts>('counts', key, {});
+
 /* ------------------------------------------------------------------- purge */
 
 /** `voting` clears the candidate list and the votes cast on it; the schedule stays. */

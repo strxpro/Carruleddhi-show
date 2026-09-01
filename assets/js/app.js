@@ -274,6 +274,40 @@ import {
     '.g3d__caption', '.story-number span', '.schedule-row strong'
   ].join(',');
 
+  /**
+   * Które napisy były na ekranie, gdy zaczynało się tłumaczenie.
+   * ===========================================================================
+   * WSZYSTKIE ODCZYTY PRZED PIERWSZYM ZAPISEM — I TO JEST NAJWIĘKSZA CZĘŚĆ NAPRAWY
+   * ZACINANIA SIĘ PRZY ZMIANIE JĘZYKA.
+   *
+   * `setTranslatedText` pytał o `getBoundingClientRect()` KAŻDEGO elementu, w pętli, w której
+   * co drugi krok był zapisem (`replaceChildren` z setką nowych `<span>`). Odczyt położenia po
+   * zapisie zmusza przeglądarkę do przeliczenia układu, zanim odda liczbę — a tu takich par
+   * jest 354, na dokumencie o trzynastu tysiącach pikseli i czternastu przypiętych panelach.
+   * To jest layout thrashing w czystej postaci, ten sam wzorzec, który ma już własny akapit
+   * przy `measure()` w setupPanels i przy `updateCardStack`.
+   *
+   * Zmierzone na 390x844 przy dławieniu CPU 4x: `getBoundingClientRect` zjadał 229 ms jednego
+   * kliknięcia w zmianę języka.
+   *
+   * Teraz widoczność rozstrzyga się RAZ, przed tłumaczeniem: jeden przebieg samych odczytów,
+   * czyli jedno przeliczenie układu zamiast trzystu pięćdziesięciu. Zbiór jest ważny tylko na
+   * czas jednego przełączenia — po nim wraca `null`, więc pojedyncze późniejsze wywołanie
+   * (a takich jest kilka, przy odświeżaniu etykiet) mierzy się samo, jak dotąd.
+   */
+  let flipVisible = null;
+
+  function markVisibleForFlip() {
+    const height = window.innerHeight;
+    const seen = new WeakSet();
+    for (const element of $$('[data-i18n]')) {
+      if (!element.matches(FLIP_SELECTOR)) continue;
+      const box = element.getBoundingClientRect();
+      if (box.bottom > 0 && box.top < height && box.width > 0) seen.add(element);
+    }
+    flipVisible = seen;
+  }
+
   function setTranslatedText(element, value) {
     if (element.textContent === value) return;
 
@@ -282,8 +316,15 @@ import {
       element.textContent = value;
       return;
     }
-    const box = element.getBoundingClientRect();
-    const onScreen = box.bottom > 0 && box.top < window.innerHeight && box.width > 0;
+    /* Z gotowego zbioru, gdy trwa przełączanie języka; własnym pomiarem, gdy to pojedyncze
+       wywołanie spoza tamtej pętli. */
+    let onScreen;
+    if (flipVisible) {
+      onScreen = flipVisible.has(element);
+    } else {
+      const box = element.getBoundingClientRect();
+      onScreen = box.bottom > 0 && box.top < window.innerHeight && box.width > 0;
+    }
     if (!onScreen) {
       element.textContent = value;
       return;
@@ -365,34 +406,95 @@ import {
    * actually lives.
    */
   function fitOne(element) {
-    // Remember the size the stylesheet wants, so repeated runs never ratchet down.
-    if (!element.dataset.fitBase) {
-      element.style.removeProperty('font-size');
+    fitMany([element]);
+  }
+
+  /**
+   * Kolejka nagłówków do dopasowania, opróżniana raz na klatkę.
+   * ===========================================================================
+   * Obserwatory rozmiaru i widoczności przynoszą nagłówki POJEDYNCZO, a przy zmianie języka
+   * przynoszą ich kilkadziesiąt w jednej chwili: zmienia się każdy napis, więc zmienia się
+   * wysokość wszystkiego, więc wszystko przesuwa się przez próg widoczności naraz.
+   *
+   * Dopasowanie każdego z osobna to zapis `font-size`, po którym natychmiast pada pytanie o
+   * `scrollWidth` — a takie pytanie zmusza przeglądarkę do PRZELICZENIA STYLÓW CAŁEGO
+   * DOKUMENTU, zanim odpowie. Zmierzone na 390x844 przy dławieniu CPU 4x: jedno kliknięcie
+   * w przełącznik języka wywoływało 108 przeliczeń stylów i 1100 ms samego przeliczania,
+   * przy zaledwie 313 ms właściwego układania. Przeliczeń, nie układania — to była ta zwłoka.
+   *
+   * Zebrane w paczkę i puszczone raz na klatkę liczą się tyle razy, ile jest rund bisekcji,
+   * a nie tyle razy ile rund razy nagłówków.
+   */
+  const fitQueue = new Set();
+  let fitFrame = 0;
+
+  function fitLater(element) {
+    fitQueue.add(element);
+    if (fitFrame) return;
+    fitFrame = requestAnimationFrame(() => {
+      fitFrame = 0;
+      const batch = [...fitQueue];
+      fitQueue.clear();
+      fitMany(batch);
+    });
+  }
+
+  /**
+   * Dopasowuje paczkę nagłówków. Zawsze mierzy — bez skrótów.
+   *
+   * Wcześniejsza wersja pomijała element, którego pudełko nie zmieniło szerokości od ostatniego
+   * przebiegu. Wyglądało to na rozsądną oszczędność i było błędem: szerokość TREŚCI zmienia się
+   * i wtedy, gdy pudełko stoi w miejscu. Kiedy doszedł webfont, szersze glify Bungee wypchnęły
+   * "Carruleddhi Classic" 139 px poza jego pudełko — a pudełko miało tę samą szerokość co
+   * przedtem, więc skrót je przepuścił.
+   *
+   * Bisekcja idzie WSZERZ, nie w głąb: najpierw wszystkie zapisy jednej rundy, potem wszystkie
+   * odczyty tej rundy. Wynik jest co do piksela ten sam co przy dopasowywaniu pojedynczo, bo
+   * każdy nagłówek ma własny przedział `low`/`high` i te same osiem połowień. Różnica jest
+   * wyłącznie w liczbie przeliczeń stylów — patrz komentarz przy `fitLater`.
+   */
+  function fitMany(elements) {
+    // Rozmiar, którego chcą style, zapamiętywany raz, żeby kolejne przebiegi nie schodziły
+    // coraz niżej. Zdjęcie inline'a i odczyt rozdzielone, by `getComputedStyle` nie przeplatał
+    // się z zapisami.
+    const fresh = elements.filter((element) => !element.dataset.fitBase);
+    for (const element of fresh) element.style.removeProperty('font-size');
+    for (const element of fresh) {
       element.dataset.fitBase = String(parseFloat(getComputedStyle(element).fontSize) || 0);
     }
-    const base = Number(element.dataset.fitBase);
-    if (!base) return;
-    if (element.clientWidth < 8) return;
 
-    element.style.fontSize = `${base}px`;
-    if (element.scrollWidth <= element.clientWidth + 1) return;
-
-    // Bisect between 45% and 100% of the intended size. Eight rounds lands within a
-    // fraction of a pixel, and stopping at 45% means a pathological string makes the
-    // heading small rather than making it silently unreadable.
-    let low = base * 0.45;
-    let high = base;
-    for (let round = 0; round < 8; round += 1) {
-      const middle = (low + high) / 2;
-      element.style.fontSize = `${middle}px`;
-      if (element.scrollWidth <= element.clientWidth + 1) low = middle;
-      else high = middle;
+    // Nagłówki bez pudełka są pomijane — jeszcze się nie ułożyły, każda ich miara byłaby
+    // zmyślona. Odczyt idzie przed jakimkolwiek zapisem rozmiaru.
+    const jobs = [];
+    for (const element of elements) {
+      const base = Number(element.dataset.fitBase);
+      if (base && element.clientWidth >= 8) jobs.push({ element, low: base * 0.45, high: base, middle: base });
     }
-    element.style.fontSize = `${low.toFixed(2)}px`;
+    if (!jobs.length) return;
+
+    for (const job of jobs) job.element.style.fontSize = `${job.high}px`;
+    const tight = jobs.filter(({ element }) => element.scrollWidth > element.clientWidth + 1);
+    if (!tight.length) return;
+
+    // Połowienie między 45% a 100% rozmiaru ze stylów. Osiem rund trafia z dokładnością do
+    // ułamka piksela, a zatrzymanie się na 45% sprawia, że napis wyjątkowo długi robi się mały,
+    // a nie po cichu nieczytelny.
+    for (let round = 0; round < 8; round += 1) {
+      for (const job of tight) {
+        job.middle = (job.low + job.high) / 2;
+        job.element.style.fontSize = `${job.middle}px`;
+      }
+      for (const job of tight) {
+        if (job.element.scrollWidth <= job.element.clientWidth + 1) job.low = job.middle;
+        else job.high = job.middle;
+      }
+    }
+
+    for (const job of tight) job.element.style.fontSize = `${job.low.toFixed(2)}px`;
   }
 
   function fitHeadings() {
-    for (const element of $$(FIT_SELECTOR)) fitOne(element);
+    fitMany($$(FIT_SELECTOR));
   }
 
   function setupHeadingFit() {
@@ -420,7 +522,7 @@ import {
           const width = Math.round(entry.contentRect.width);
           if (entry.target.dataset.fitWidth === String(width)) continue;
           entry.target.dataset.fitWidth = String(width);
-          fitOne(entry.target);
+          fitLater(entry.target);
         }
       });
       $$(FIT_SELECTOR).forEach((element) => observer.observe(element));
@@ -440,7 +542,7 @@ import {
       const seen = new IntersectionObserver((entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
-          fitOne(entry.target);
+          fitLater(entry.target);
         }
       }, { rootMargin: '200px 0px' });
       $$(FIT_SELECTOR).forEach((element) => seen.observe(element));
@@ -494,7 +596,11 @@ import {
     /* Przelot po znacznikach jest wspólny z podstroną głosowania; różni się tylko sposób
        wpisania napisu. Tu z przelotem liter (`setTranslatedText`), tam zwykłym podstawieniem —
        na podstronie nie ma efektów tekstowych, bo nie ma nagłówków, które by je nosiły. */
+    /* Jeden przebieg odczytów przed pierwszym zapisem — patrz markVisibleForFlip(). Zbiór
+       zwalniany zaraz po, żeby pojedyncze późniejsze wywołania mierzyły się same. */
+    markVisibleForFlip();
     translateDom(dict, { setText: setTranslatedText });
+    flipVisible = null;
 
     document.documentElement.lang = lang;
     document.title = dict['meta.title'] || config.eventName;
@@ -630,7 +736,20 @@ import {
       const option = event.target.closest('[data-language-option]');
       if (!option) return;
       changeLanguage(option.dataset.languageOption);
-      setPickerOpen(false, true);
+      /* Fokus wraca na przycisk W NASTĘPNEJ KLATCE, nie natychmiast.
+         ---------------------------------------------------------------------------
+         `changeLanguage()` przed chwilą wymieniło tekst w 354 elementach, wstawiając w
+         kilkadziesiąt z nich po kilkanaście `<span>` z animacją. `focus()` wywołane zaraz po
+         tym musi PRZELICZYĆ CAŁY ten układ synchronicznie, zanim ustawi ognisko — przeglądarka
+         nie ma jak go ustawić, nie wiedząc, gdzie co leży.
+
+         Zmierzone na 390x844 przy dławieniu CPU 4x: samo `focus` kosztowało 508 ms, czyli
+         więcej niż jakakolwiek inna pojedyncza rzecz w tym kliknięciu. Przełożone o klatkę
+         trafia na układ, który przeglądarka i tak już policzyła — dla niej samej, raz.
+
+         Ognisko musi wrócić, nie jest opcjonalne: lista dostaje `inert`, więc zostawione
+         w niej byłoby ogniskiem na elemencie wyjętym z obsługi klawiatury. */
+      requestAnimationFrame(() => setPickerOpen(false, true));
     });
     menu.addEventListener('keydown', (event) => {
       const current = Math.max(0, options.indexOf(document.activeElement));
@@ -1480,25 +1599,192 @@ import {
     layout();
   }
 
+  /**
+   * Odliczanie do wydarzenia — JEDEN timer na wszystkie widoki licznika.
+   * ===========================================================================
+   * Było `$('[data-days]')`, czyli PIERWSZY element z tym atrybutem. Odliczanie jest teraz
+   * w dwóch miejscach: duże w hero i zadokowane w pasku (`[data-nav-clock]`), a jutro może
+   * dojść trzecie — w stopce albo w oknie przypomnienia. Przy zapisie do pierwszego
+   * znalezionego elementu każdy nowy widok wymagałby własnego `setInterval`, a dwa
+   * niezależne interwały liczące to samo NIE TYKAJĄ RÓWNO: startują w innej milisekundzie,
+   * `setInterval` dryfuje pod obciążeniem, a przeglądarka dławi timery inaczej w każdej
+   * karcie w tle. Skończyłoby się tym, że w pasku stoi 20:41:03, a w hero 20:41:02 — na tej
+   * samej stronie, w jednym spojrzeniu. Tego nie da się naprawić inaczej niż jednym źródłem.
+   *
+   * Był tu jeszcze drugi, cichszy błąd tej samej natury: pasek stoi w dokumencie PRZED hero,
+   * więc `$('[data-days]')` po dodaniu kopii wskazywałby kopię, a duży licznik w hero
+   * zostałby na „00" na zawsze. Zapis do wszystkich elementów usuwa całą tę klasę pomyłek.
+   *
+   * Lista jest zbierana raz: oba widoki stoją w `index.html` od początku i żaden nie jest
+   * dobudowywany w trakcie życia strony.
+   */
   function setupCountdown() {
     const units = {
-      days: $('[data-days]'), hours: $('[data-hours]'),
-      minutes: $('[data-minutes]'), seconds: $('[data-seconds]')
+      days: $$('[data-days]'), hours: $$('[data-hours]'),
+      minutes: $$('[data-minutes]'), seconds: $$('[data-seconds]')
+    };
+    /* Zapis tylko wtedy, gdy liczba naprawdę się zmieniła. Dni zmieniają się raz na dobę, a
+       bezwarunkowe `textContent` unieważnia układ tekstu w każdym z ośmiu elementów co
+       sekundę. Sekundy i tak przechodzą przez ten warunek, więc nic tu nie tracimy. */
+    const paint = (nodes, value) => {
+      const digits = String(value).padStart(2, '0');
+      nodes.forEach((node) => { if (node.textContent !== digits) node.textContent = digits; });
     };
     function update() {
       const target = new Date(config.eventDate).getTime();
       const difference = Number.isNaN(target) ? 0 : Math.max(0, target - Date.now());
-      const days = Math.floor(difference / 86400000);
-      const hours = Math.floor((difference % 86400000) / 3600000);
-      const minutes = Math.floor((difference % 3600000) / 60000);
-      const seconds = Math.floor((difference % 60000) / 1000);
-      if (units.days) units.days.textContent = String(days).padStart(2, '0');
-      if (units.hours) units.hours.textContent = String(hours).padStart(2, '0');
-      if (units.minutes) units.minutes.textContent = String(minutes).padStart(2, '0');
-      if (units.seconds) units.seconds.textContent = String(seconds).padStart(2, '0');
+      paint(units.days, Math.floor(difference / 86400000));
+      paint(units.hours, Math.floor((difference % 86400000) / 3600000));
+      paint(units.minutes, Math.floor((difference % 3600000) / 60000));
+      paint(units.seconds, Math.floor((difference % 60000) / 1000));
     }
     update();
     window.setInterval(update, 1000);
+  }
+
+  /**
+   * Dokowanie odliczania w pasku nawigacji.
+   * ===========================================================================
+   * Pasek jest `position: fixed`, więc kopia licznika, która w nim stoi, jest przyklejona do
+   * ekranu za darmo — nie ma tu ani jednej linii przeliczającej pozycję. Cała robota polega
+   * na jednym pytaniu: czy duży licznik z hero jest jeszcze widoczny.
+   *
+   * DLACZEGO `IntersectionObserver`, A NIE NASŁUCH `scroll`
+   * Wersja na `scroll` musiałaby przy każdym zdarzeniu wołać `getBoundingClientRect()` na
+   * liczniku w hero, czyli wymuszać przeliczenie układu w trakcie przewijania — na stronie z
+   * czternastoma przypiętymi panelami i stosem kart, które robią to samo. Ten błąd ma tu
+   * własny akapit przy `measure()` w setupPanels. Obserwator odpowiada na to samo pytanie
+   * bez ani jednego pomiaru w naszym kodzie.
+   *
+   * DLACZEGO `rootMargin` UJEMNY OD GÓRY
+   * Pasek zasłania górne ~80 px ekranu. Bez tej poprawki licznik z hero „jest widoczny"
+   * jeszcze wtedy, gdy w rzeczywistości leży pod paskiem, i kopia wjeżdżałaby osiemdziesiąt
+   * pikseli za późno — z przerwą, w której odliczania nie ma nigdzie.
+   *
+   * DLACZEGO `boundingClientRect.top < 0`
+   * Sam brak przecięcia nie mówi, z której strony ekranu licznik wyszedł. Bez tego warunku
+   * kopia dokowałaby się także wtedy, gdy hero jest PONIŻEJ widoku — czyli w chwili powrotu
+   * na górę strony, gdzie zostawałaby zadokowana kopia nad widocznym dużym licznikiem.
+   *
+   * DLACZEGO DWA OBSERWATORY — I TO JEST NAJWAŻNIEJSZA CZĘŚĆ TEJ FUNKCJI
+   * Jeden obserwator na `[data-countdown]` wystarcza tylko tam, gdzie sekcje przewijają się
+   * normalnie. Zmierzone sondą na 1440x900: licznik w hero ma
+   * `getBoundingClientRect().top === 364` przy KAŻDEJ pozycji przewinięcia — 0, 400, 900,
+   * 1600, 2600, 4200. Pomiar jest dobry, to układ jest inny, niż się wydaje: hero to panel
+   * `position: sticky; top: 0` przypięty na całą długość `#main` (patrz komentarz przy
+   * `#main > section.section-card` w experience.css), więc geometrycznie nigdy nie wychodzi z
+   * ekranu — po prostu następny panel WJEŻDŻA NA NIEGO. Dla obserwatora przecięć licznik
+   * jest wtedy widoczny, choć na ekranie nie ma go od dawna, i kopia nie zadokowałaby się
+   * nigdy. Ta sama sonda na 390x844 daje `top: -337` przy 900 px przewinięcia, bo tam
+   * setupPanels wypuszcza hero w przepływ. Ten sam kod potrzebuje więc obu odpowiedzi.
+   *
+   * Przesłonięcia `IntersectionObserver` nie widzi (v2 `trackVisibility` widzi, ale tylko w
+   * Chrome — na Firefoksie i Safari kopia nie pojawiłaby się wcale), więc drugi obserwator
+   * patrzy na PANEL, KTÓRY PRZYKRYWA hero, i pyta, czy jego górna krawędź doszła już do
+   * wysokości licznika. To ta sama informacja powiedziana od drugiej strony, nadal bez
+   * jednego nasłuchu przewijania. Warunki są łączone przez „lub": wystarczy, że którykolwiek
+   * z dwóch układów powie „tego licznika już nie widać".
+   */
+  function setupNavClock() {
+    const header = $('[data-header]');
+    const clock = $('[data-nav-clock]');
+    const hero = $('[data-countdown]');
+    if (!header || !clock) return;
+
+    /* Ograniczony ruch: bez wjeżdżania, samo pojawienie się. Klasa dopięta tutaj, a nie
+       osobne `@media` w arkuszu, bo `reducedMotion` jest na tej stronie jedynym miejscem, w
+       którym pyta się o zgodę na animację, i ma nim zostać. */
+    if (reducedMotion) clock.classList.add('nav-clock--still');
+
+    /**
+     * W dniu zjazdu odliczanie do wydarzenia przestaje istnieć: voting.js ustawia
+     * `[data-countdown].hidden` i na jego miejsce wchodzi zegar głosowania (patrz komentarz
+     * przy `hero__aside` w index.html). Kopia w pasku pokazywałaby wtedy 00/00/00/00 przez
+     * cały dzień wydarzenia, w najbardziej widocznym miejscu strony. Licznik na zerach jest
+     * gorszy niż brak licznika, więc kopia znika razem z oryginałem.
+     */
+    const heroUsable = () => Boolean(hero) && !hero.hidden && hero.getClientRects().length > 0;
+
+    let heroAbove = false;    // wyszedł górą z widoku — układ przepływowy (telefon)
+    let heroCovered = false;  // przykryty następnym panelem — układ przypięty (desktop)
+    const sync = () => {
+      const usable = heroUsable();
+      /* `hidden`, a nie wygaszenie: to nie jest stan przejściowy, który ma się ładnie
+         zamknąć, to „tego licznika dzisiaj nie ma". */
+      clock.hidden = !usable;
+      header.toggleAttribute('data-clock-docked', usable && (heroAbove || heroCovered));
+    };
+
+    if (!hero || !('IntersectionObserver' in window)) {
+      /* Bez oryginału albo bez obserwatora nie ma czym rozstrzygnąć, kiedy kopia ma się
+         pokazać. Kopia stojąca w pasku zawsze — także nad widocznym dużym licznikiem — to ta
+         sama liczba dwa razy na jednym ekranie. Więc nie ma jej wcale. */
+      clock.hidden = true;
+      header.removeAttribute('data-clock-docked');
+      return;
+    }
+
+    /* Wysokość paska liczona z paska, nie wpisana. Pasek zwija się o kilka pikseli, ale to
+       jest margines wykrywania, a nie pozycja czegokolwiek. */
+    const barLine = () => Math.round(header.getBoundingClientRect().bottom) + 8;
+
+    const flowObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        heroAbove = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+      });
+      sync();
+    }, { root: null, rootMargin: `-${barLine()}px 0px 0px 0px`, threshold: 0 });
+    flowObserver.observe(hero);
+
+    /* Panel, który przykrywa hero. Pierwsza NIEUKRYTA sekcja za hero, a nie po prostu
+       następna: zaraz za hero stoi `#podium`, które przez jedenaście miesięcy w roku ma
+       atrybut `hidden` i nigdy nie przykryje niczego. Obserwowanie go znaczyłoby brak
+       dokowania przez cały ten czas. */
+    const heroSection = hero.closest('section');
+    let cover = heroSection?.nextElementSibling || null;
+    while (cover && (cover.tagName !== 'SECTION' || cover.hidden)) cover = cover.nextElementSibling;
+
+    let coverObserver = null;
+    const watchCover = () => {
+      coverObserver?.disconnect();
+      coverObserver = null;
+      if (!cover || !heroUsable()) return;
+      /* Linia, na której duży licznik przestaje być widoczny: jego własna górna krawędź.
+         Kopia pojawia się dokładnie wtedy, gdy oryginał znika pod nadjeżdżającym panelem —
+         przekazanie bez przerwy i bez dwóch liczników naraz.
+
+         Dolne obcięcie korzenia zamienia widok na wąski pas [pasek, licznik]. Panel wchodzi
+         w ten pas w tej samej chwili, w której jego krawędź dochodzi do licznika.
+
+         Zabezpieczenie na wypadek układu, w którym licznik leży poza ekranem albo pod samym
+         paskiem: pas musi mieć dodatnią wysokość, inaczej obserwator nie zgłosi nigdy
+         niczego (albo, co gorsze, zgłosi natychmiast). */
+      const line = clamp(Math.round(hero.getBoundingClientRect().top), barLine() + 24, window.innerHeight);
+      const bottomInset = Math.max(0, window.innerHeight - line);
+      coverObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => { heroCovered = entry.isIntersecting; });
+        sync();
+      }, { root: null, rootMargin: `-${barLine()}px 0px -${bottomInset}px 0px`, threshold: 0 });
+      coverObserver.observe(cover);
+    };
+    watchCover();
+
+    /* Zmiana `hidden` nie jest zdarzeniem, na które da się nasłuchiwać, a voting.js ustawia
+       je asynchronicznie — po odczycie fazy z serwera, czyli długo po tym, jak ten kod się
+       wykonał. Bez tego obserwatora kopia zostałaby w pasku w dniu wydarzenia. */
+    new MutationObserver(() => { watchCover(); sync(); })
+      .observe(hero, { attributes: true, attributeFilter: ['hidden', 'class', 'style'] });
+
+    /* Pas obserwacji jest policzony z pozycji licznika, więc każda zmiana układu go
+       unieważnia. `carruleddhi:relayout` to sygnał, który setupPanels już wysyła po
+       rozstrzygnięciu `pinned`/`flow` — a to właśnie ono decyduje, który z dwóch
+       obserwatorów w ogóle ma coś do powiedzenia. */
+    const relayout = () => { watchCover(); sync(); };
+    window.addEventListener('resize', relayout, { passive: true });
+    window.addEventListener('orientationchange', relayout, { passive: true });
+    window.addEventListener('carruleddhi:relayout', relayout);
+
+    sync();
   }
 
   function formatNumber(number) {
@@ -6607,6 +6893,19 @@ import {
     let mode = 'ai';
     /** Rozmowa zakończona przez gościa. Trzeci stan panelu, obok bramy i rozmowy. */
     let ended = false;
+    /**
+     * ROZMOWA PRZEKAZANA CZŁOWIEKOWI — STAN WĄTKU, NIE STAN TEJ KARTY.
+     * ---------------------------------------------------------------------------
+     * Ta zmienna jest wyłącznie ODBICIEM `mode` z serwera (`chat_threads.mode === 'human'`),
+     * a nie zapisem po stronie strony — i to jest cała różnica. Gość, który poprosił
+     * o człowieka, odświeża stronę, zamyka kartę, wraca wieczorem z tym samym tokenem: stan
+     * musi przeżyć każdą z tych rzeczy. W `localStorage` przeżyłby tylko w tej jednej
+     * przeglądarce i rozjechałby się z tym, co widzi organizator w panelu.
+     *
+     * Dopóki trwa, automat MILCZY (decyduje o tym Worker, patrz `chatVisitor`), a wyjściem
+     * jest jeden przycisk: „chcę porozmawiać z automatem".
+     */
+    let handedOver = false;
     const seen = new Set();
 
     /* Who we are talking to.
@@ -6671,7 +6970,32 @@ import {
     endButton.type = 'button';
     endButton.className = 'chat__end';
     endButton.dataset.chatEnd = '';
-    tools.append(endButton);
+
+    /**
+     * „Chcę porozmawiać z automatem" — jedyne wyjście ze stanu „przekazana człowiekowi".
+     *
+     * DLACZEGO PRZYCISK, A NIE SŁOWA W WIADOMOŚCI
+     *   Wcześniej wyjście rozpoznawała lista słów po stronie Workera („automat", „bot",
+     *   „asystent"). Znaczyło to, że zdanie „nie chcę automatu, poproszę człowieka" —
+     *   najczęstsze zdanie w tej sytuacji — wyprowadzało z kolejki, do której właśnie się
+     *   ustawiono, bo zawiera słowo „automat". Rozpoznawanie zamiaru z pojedynczych słów
+     *   działa w jedną stronę (wejście do kolejki jest łagodne w skutkach), a w drugą nie.
+     *
+     * DLACZEGO OBOK „ZAKOŃCZ ROZMOWĘ", A NIE W RZĘDZIE PASTYLEK
+     *   Rząd pastylek jest przemalowywany po każdej odpowiedzi i przez kreator, więc przycisk
+     *   wyjścia ze stanu wątku ginąłby tam przy pierwszym kroku sprawy. Pasek narzędzi stoi
+     *   nad dziennikiem i nie zależy od tego, co się w rozmowie dzieje.
+     *
+     * Widoczny TYLKO w tym stanie: przycisk „wróć do automatu" w rozmowie, którą i tak
+     * prowadzi automat, jest przyciskiem bez znaczenia.
+     */
+    const botButton = document.createElement('button');
+    botButton.type = 'button';
+    botButton.className = 'chat__tobot';
+    botButton.dataset.chatToBot = '';
+    botButton.hidden = true;
+
+    tools.append(botButton, endButton);
 
     const endedCard = document.createElement('div');
     endedCard.className = 'chat-ended';
@@ -6691,6 +7015,7 @@ import {
       // rozbroić bez wiedzy człowieka, który właśnie na nie patrzy.
       if (endButton.classList.contains('is-armed')) endButton.textContent = text('chat.endConfirm');
       else endButton.textContent = text('chat.end');
+      botButton.textContent = text('chat.toBot');
       endedTitle.textContent = text('chat.endedTitle');
       endedLead.textContent = text('chat.endedLead');
       restartButton.textContent = text('chat.restart');
@@ -6716,6 +7041,9 @@ import {
       if (form) form.hidden = !live;
       if (chips) chips.hidden = !live;
       tools.hidden = !live;
+      /* Przycisk powrotu do automatu należy do stanu wątku, nie do stanu panelu — ale nie ma
+         go po co pokazywać nad kartą z imieniem ani nad kartą „rozmowa zakończona". */
+      botButton.hidden = !live || !handedOver;
       endedCard.hidden = !ended;
       panel.dataset.chatReady = ended ? 'ended' : (done ? 'yes' : 'no');
     }
@@ -6737,6 +7065,10 @@ import {
         console.warn('Chat close failed; ending locally anyway:', error);
       }
       ended = true;
+      /* Kolejka zdań automatu unieważniona: zadanie, które w niej stoi, dorysowałoby zdanie
+         z zamkniętej rozmowy do karty „rozmowa zakończona". Patrz `sayLater`. */
+      sayEpoch += 1;
+      hideTyping();
       /* Sprawa w toku kończy się razem z rozmową: kod i potwierdzenie nie mają po co przeżywać
          dziennika, który właśnie schodzi z ekranu. */
       endFlow();
@@ -6764,8 +7096,14 @@ import {
       ended = false;
       opened = false;
       lastAt = '';
-      mode = 'ai';
       seen.clear();
+      /* Nowa rozmowa to nowy wątek, więc i nowy tryb: stan „przekazana człowiekowi" należał do
+         tokenu, którego już nie ma. Kolejka zdań unieważniona razem z dziennikiem. */
+      sayEpoch += 1;
+      hideTyping();
+      handedOver = false;
+      mode = 'ai';
+      panel.dataset.chatMode = 'ai';
       // Załącznik wybrany, ale niewysłany, należał do poprzedniej rozmowy.
       dropAttachment();
       /* Kreator i bramka też należały do poprzedniej rozmowy. Bez tego nowa rozmowa startuje
@@ -6814,6 +7152,57 @@ import {
       armedTimer = window.setTimeout(disarm, 5000);
     });
     restartButton.addEventListener('click', startFresh);
+
+    /**
+     * Jedno miejsce, w którym tryb wątku z serwera zamienia się w stan panelu.
+     *
+     * Wołane po `open`, po `send` i po każdym odczycie — bo tryb potrafi się zmienić bez
+     * naszego udziału: wystarczy, że organizator odpisze w panelu. Bez tego przycisk
+     * „chcę porozmawiać z automatem" pojawiałby się dopiero po odświeżeniu strony, czyli
+     * dokładnie wtedy, gdy nikt go już nie szuka.
+     *
+     * `chat.handedOver` mówione RAZ, na przejściu. Przy każdym odczycie byłoby to zdanie
+     * powtarzane co cztery sekundy — czyli automat wtrącający się w rozmowę, z której właśnie
+     * się wycofał.
+     */
+    function setMode(next) {
+      const value = next || mode;
+      const was = handedOver;
+      mode = value;
+      handedOver = value === 'human';
+      panel.dataset.chatMode = handedOver ? 'human' : 'ai';
+      botButton.hidden = !handedOver || ended;
+      if (handedOver && !was) noteLine(text('chat.handedOver') || '');
+    }
+
+    /**
+     * Powrót do automatu: jedno żądanie, które zmienia stan WĄTKU.
+     *
+     * Idzie na serwer, a nie tylko do tej karty, bo stan „przekazana człowiekowi" mieszka
+     * w wątku — patrz komentarz przy `handedOver`. Odmowa nie zmienia niczego po stronie
+     * strony: udawany powrót do automatu skończyłby się ciszą przy następnym pytaniu, a to
+     * jest dokładnie ten objaw, od którego cała ta zmiana się zaczęła.
+     *
+     * `unread_for_admin` zostaje nietknięte (decyduje o tym Worker): gość mógł zapytać
+     * o coś, na co człowiek wciąż ma odpowiedzieć, a powrót do automatu nie jest
+     * odpowiedzią na jego pytanie.
+     */
+    botButton.addEventListener('click', async () => {
+      keepFocus();
+      botButton.disabled = true;
+      try {
+        const result = await postJSON(endpoint, eventPayload('chat', { action: 'bot', token }));
+        if (!result || result.ok === false) throw new Error(result?.code || 'chat');
+        setMode(result.mode || 'ai');
+        noteLine(text('chat.toBotDone') || '');
+        paintChips();
+      } catch (error) {
+        console.warn('Chat handover could not be lifted:', error);
+        note('chat.dataFailed');
+      } finally {
+        botButton.disabled = false;
+      }
+    });
 
     gateForm?.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -6950,13 +7339,20 @@ import {
       try {
         const result = await postJSON(endpoint, eventPayload('chat', { action: 'open', token }));
         if (!result || result.ok === false) throw new Error(result?.code || 'chat');
-        mode = result.mode || 'ai';
         (result.messages || []).forEach((message) => append(message, false));
         // A thread with no history opens with a greeting rather than a blank box: an empty
         // chat looks broken, and nobody types the first message into a void.
+        /* Powitanie przez kolejkę — z kropkami. Wiadomość automatu, która stoi na ekranie
+           w tej samej milisekundzie, w której odsłania się panel, wygląda jak nagłówek, a nie
+           jak pierwsze zdanie rozmowy. */
         if (!(result.messages || []).length) {
-          append({ author: 'ai', body: text('chat.greeting') || '', at: '' }, false);
+          sayLater(() => append({ author: 'ai', body: text('chat.greeting') || '', at: '' }, false));
         }
+        /* Tryb ustawiany PO wypisaniu historii: `setMode` dokłada wiersz o przekazaniu rozmowy
+           i ma on stanąć pod wątkiem, a nie nad nim. Przy wejściu w wątek już przekazany to
+           jedyne zdanie, które tłumaczy ciszę automatu i pokazuje przycisk powrotu — czyli
+           właśnie to, co ma przeżyć odświeżenie strony. */
+        setMode(result.mode || 'ai');
         toBottom();
       } catch (_) {
         opened = false;
@@ -6990,6 +7386,82 @@ import {
     const hideTyping = () => {
       typingRow?.remove();
       typingRow = null;
+    };
+
+    /* ========================================================================
+       KROPKI PRZY KAŻDEJ ODPOWIEDZI AUTOMATU — TAKŻE PRZY TEJ Z PAMIĘCI
+       ========================================================================
+       CO BYŁO
+         `showTyping()` stało w jednym miejscu: w `send()`, przed żądaniem do serwera. Czyli
+         kropki widział tylko ten, kto NAPISAŁ wiadomość i czekał na model. Wszystko, co
+         automat mówi z pamięci strony — kroki kreatora, komunikaty bramki, odpowiedzi po
+         naciśnięciu pastylki — pojawiało się w tej samej milisekundzie, w której się kliknęło.
+         Trzy zdania automatu wskakujące naraz nie czytają się jak rozmowa, tylko jak wydruk.
+
+       CO JEST TERAZ
+         Każda wypowiedź automatu przechodzi przez `sayLater`: kropki, krótka chwila, dopiero
+         potem bąbelek. Kolejka jest JEDNA i szeregowa, więc dwa zdania pod rząd (pytanie
+         o zgodę i odsyłacze do dokumentów) nie wyprzedzają się wzajemnie — a to jest cały
+         powód, dla którego to jest kolejka, a nie `setTimeout` przy każdym wywołaniu.
+
+       DLACZEGO 280 ms, A NIE SEKUNDA
+         Tyle, żeby dało się zauważyć, że ktoś „pisze", i nie tyle, żeby czekać. Rozmowa
+         z kreatorem ma kilkanaście kroków; przy sekundzie na krok samo przeklikanie sprawy
+         sponsora kosztowałoby kwadrans cierpliwości. Ta liczba jest też sufitem dla sond:
+         `tools/probe-chat-gate.mjs` odczytuje dziennik po 450 ms od naciśnięcia, więc jedno
+         zadanie kolejki musi się w tym zmieścić — i dlatego zdanie z odsyłaczami maluje się
+         w TYM SAMYM zadaniu co pytanie o zgodę, a nie w następnym.
+
+       EPOKA
+         „Nowa rozmowa" i „zakończ rozmowę" czyszczą dziennik. Zadanie, które czekało w
+         kolejce, dorysowałoby wtedy zdanie z poprzedniej rozmowy do pustej karty — licznik
+         epok jest po to, żeby takie zadanie po prostu nic nie zrobiło.
+       ====================================================================== */
+    const THINK_MS = 280;
+    let sayEpoch = 0;
+    let sayChain = Promise.resolve();
+
+    function sayLater(paint) {
+      const epoch = sayEpoch;
+      sayChain = sayChain.then(async () => {
+        if (epoch !== sayEpoch) return;
+        showTyping();
+        await new Promise((done) => window.setTimeout(done, THINK_MS));
+        /* Kropki gasną także wtedy, gdy rozmowa zmieniła się w trakcie czekania: wiersz
+           wskaźnika nie należy do żadnej wiadomości i nikt inny go nie zdejmie. */
+        hideTyping();
+        if (epoch !== sayEpoch) return;
+        paint();
+      });
+      return sayChain;
+    }
+
+    /**
+     * FOKUS NIGDY NIE SPADA NA `<body>`.
+     * ---------------------------------------------------------------------------
+     * To jest naprawa zgłoszenia „kliknięcie czegokolwiek w czacie przewija stronę".
+     *
+     * Zmierzone prawdziwymi dotknięciami przez CDP (390x844, `document.activeElement` po
+     * kliknięciu): przy dwóch kontrolkach fokus lądował na `<body>` — po naciśnięciu pastylki,
+     * bo `flowChoices`/`paintChips` podmieniają cały rząd i USUWAJĄ z drzewa przycisk, który
+     * właśnie ma fokus, oraz po naciśnięciu „wyślij", bo `sendButton.disabled = true` odbiera
+     * fokus wciśniętemu przyciskowi. Element z fokusem zabrany z drzewa albo zablokowany to
+     * jedyny mechanizm w tym panelu, który potrafi ruszyć stronę: przeglądarka na telefonie
+     * zwija wtedy klawiaturę, a zwinięcie klawiatury zmienia wysokość dokumentu, którego
+     * sekcje mają wysokość liczoną od wysokości ekranu.
+     *
+     * Dlatego fokus jest PRZEKŁADANY na pole wiadomości, zanim kontrolka zniknie — a nie
+     * przywracany potem przewijaniem. `preventScroll`, bo cała reszta tego pliku robi to samo
+     * i z tego samego powodu: fokus ma ustawić kursor, nie ruszać strony.
+     */
+    const keepFocus = () => {
+      if (!input || input.hidden) return;
+      const active = document.activeElement;
+      if (active === input) return;
+      // Fokus przekładamy tylko z wnętrza czatu: kliknięcie w czacie nie ma prawa zabierać
+      // kursora z pola w innej sekcji strony.
+      if (active && active !== document.body && !panel.contains(active)) return;
+      input.focus({ preventScroll: true });
     };
 
     /* ---------------------------------------------------------------- send */
@@ -7160,10 +7632,16 @@ import {
       ...extra
     });
 
-    const flowSay = (key) => {
+    /** Zdanie automatu OD RAZU. Używane wewnątrz jednego zadania kolejki (patrz `sayLater`). */
+    const sayNow = (key) => {
       const line = text(key);
       if (line) append({ author: 'ai', body: line, at: '' }, false);
     };
+
+    /* Zdanie kreatora przez kolejkę: najpierw kropki, potem bąbelek. Kreator odpowiada
+       z pamięci strony, więc bez tego jego zdania pojawiały się w tej samej milisekundzie,
+       w której gość kliknął — patrz komentarz przy `sayLater`. */
+    const flowSay = (key) => sayLater(() => sayNow(key));
 
     /* Koniec kreatora zabiera ze sobą bramkę: pole na kod, adres, potwierdzenie i sam kod.
        Bez tego „rezygnuję" zostawiałoby na ekranie pole, które wysyła cyfry do sprawy, której
@@ -7184,7 +7662,35 @@ import {
         chip.type = 'button';
         chip.className = variant ? `chat__chip ${variant}` : 'chat__chip';
         chip.textContent = text(label) || label;
-        chip.addEventListener('click', () => { void run(); });
+        chip.addEventListener('click', () => {
+          /* NACIŚNIĘTA PASTYLKA ZOSTAWIA ŚLAD — BĄBELEK GOŚCIA, TAK JAK PISANIE
+             ---------------------------------------------------------------------------
+             Pastylki działały, ale w zapisie rozmowy nie zostawało po nich nic: gość widział
+             ciąg zdań automatu bez ani jednej swojej odpowiedzi, a po przewinięciu w górę nie
+             dawało się przeczytać, co właściwie wybrał. Naciśnięcie „Chcę zostać sponsorem"
+             jest wypowiedzią w tej rozmowie i ma wyglądać jak wypowiedź.
+
+             CO Z PASTYLKAMI BRAMKI — ROZSTRZYGNIĘTE TUTAJ
+               „Wyślij ponownie", „zmień adres" i „rezygnuję" TEŻ zostawiają bąbelek. To są
+               decyzje gościa, nie stany strony, i ich brak w zapisie był dokładnie tym samym
+               brakiem co wyżej. Wolno im, bo pastylka nosi swoją etykietę ze słownika i nigdy
+               nie nosi kodu — a jedyne, czego w tym dzienniku być nie może, to sześć cyfr.
+
+             CZEGO TA GAŁĄŹ NIE ROBI I ROBIĆ NIE BĘDZIE
+               Kod z bramki NIE przechodzi tędy. Sześciocyfrowy kod wpisuje się w osobne pole
+               (`codeField`), które celowo nie tworzy bąbelka i nie dopisuje wiersza do wątku —
+               patrz asercja „wpisanie kodu nie tworzy bąbelka ani wiersza w wątku" w
+               `tools/probe-chat-gate.mjs`. Kod do cudzej skrzynki w historii czytanej przez
+               organizatora to kod w bazie w miejscu, w którym nie ma prawa być.
+
+             Bąbelek jest LOKALNY — nie leci przez `send()` do wątku. Odpowiedzi kreatorowi są
+             interfejsem, nie treścią rozmowy; tak samo lokalne są jego własne zdania
+             (`flowSay`), więc jedno i drugie znika razem z kartą i nie zaśmieca historii. */
+          append({ author: 'visitor', body: chip.textContent || '', at: '' }, false);
+          // Fokus przekładany PRZED podmianą rzędu: patrz `keepFocus`.
+          keepFocus();
+          void run();
+        });
         return chip;
       }));
       if (chips) chips.hidden = options.length === 0;
@@ -7393,7 +7899,11 @@ import {
       if (subs) {
         for (const token of Object.keys(subs)) line = line.replace(token, String(subs[token]));
       }
-      noteLine(line);
+      /* Przez kolejkę, jak zdania kreatora: komunikat bramki jest odpowiedzią automatu na to,
+         co gość właśnie zrobił, więc też ma się poprzedzić kropkami. Zwracana obietnica jest
+         po to, żeby wywołujący mógł POCZEKAĆ — `gateStart` czeka, bo pole na kod nie może
+         stanąć nad zdaniem, które o nim mówi. */
+      return sayLater(() => noteLine(line));
     }
 
     /**
@@ -7579,7 +8089,11 @@ import {
         /* „Kod poszedł" mówione niezależnie od tego, czy adres jest gdziekolwiek znany: Worker
            odpowiada tak samo w obu przypadkach (O6). Inaczej rozmowa odpowiadałaby na pytanie
            „czy ten człowiek jest u Was zapisany". */
-        gateSystem('chat.gateCodeSent', { '%EMAIL%': result.email || gateMask(address) });
+        /* Czekamy na zdanie o wysłanym kodzie, dopiero potem stawiamy pole: inaczej pole
+           stanęłoby nad komunikatem, który o nim mówi, i palec trafiałby w nie, zanim gość
+           przeczyta, na jaki adres poszedł kod. */
+        await gateSystem('chat.gateCodeSent', { '%EMAIL%': result.email || gateMask(address) });
+        if (!gateState || !flow) return;
         gateState.field = codeField((code) => gateCheck(code));
         gateChoices();
       } catch (problem) {
@@ -7947,6 +8461,9 @@ import {
      */
     function consentDocs() {
       if (!log) return null;
+      /* Malowane BEZ własnego zadania kolejki, bo woła je `sayLater` razem z pytaniem o zgodę
+         — dwa zadania znaczyłyby dwie porcje kropek na jedno pytanie i odsyłacze pokazane
+         o 280 ms po zdaniu, które o nich mówi. */
       const row = document.createElement('p');
       row.className = 'chat__docs';
       row.dataset.chatDocs = '';
@@ -7987,8 +8504,12 @@ import {
       if (!flow) return;
       flow.step = 'consent';
       flow.consent = false;
-      flowSay('chat.sponsorConsentAsk');
-      consentDocs();
+      /* Pytanie i oba odsyłacze w JEDNYM zadaniu kolejki: zgoda bez dokumentów pod ręką nie
+         jest zgodą, więc te trzy wiersze mają wejść razem, po jednej porcji kropek. */
+      sayLater(() => {
+        sayNow('chat.sponsorConsentAsk');
+        consentDocs();
+      });
       flowChoices([
         ['chat.sponsorConsentYes', async () => {
           if (!flow) return;
@@ -8269,6 +8790,15 @@ import {
       const pending = append({ author: 'visitor', body: message, at: '', image: photo || '' }, true);
       if (input) input.value = '';
       sizeInput();
+      /* Fokus wraca do pola PRZED zablokowaniem przycisku.
+         ---------------------------------------------------------------------------
+         `disabled` odbiera fokus wciśniętemu przyciskowi, a fokus nie ma gdzie pójść — więc
+         ląduje na `<body>`. Zmierzone dotknięciem przez CDP: po naciśnięciu „wyślij"
+         `document.activeElement` był `<body>`. Na telefonie znaczy to zwiniętą klawiaturę
+         w połowie rozmowy, a zwinięcie klawiatury zmienia wysokość dokumentu złożonego
+         z sekcji mierzonych od wysokości ekranu — czyli stronę, która ucieka pod palcem.
+         Pole wiadomości jest miejscem, w którym ten fokus i tak ma być: zaraz piszemy dalej. */
+      keepFocus();
       if (sendButton) sendButton.disabled = true;
       showTyping();
 
@@ -8306,7 +8836,7 @@ import {
           if (at && at > lastAt) lastAt = at;
         }
 
-        mode = result.mode || mode;
+        setMode(result.mode || mode);
         /* Odpowiedź z identyfikatorem, nie bez niego: gdyby odczyt zdążył ją dorysować
            pierwszy, kopia bez identyfikatora przeszłaby przez każdy filtr. */
         if (result.reply) {
@@ -8318,7 +8848,6 @@ import {
           await startFlow(result.selfService);
           return;
         }
-        if (mode === 'human') panel.dataset.chatMode = 'human';
         // Fresh suggestions after every answer, so the chips follow the conversation instead
         // of offering the same six openers for ever.
         paintChips();
@@ -8355,6 +8884,21 @@ import {
 
     /* The composer grows with the text instead of scrolling inside three lines. */
     let lastInputHeight = 0;
+    /** Sufit wysokości pola, wzięty z arkusza. Odświeżany tylko przy zmianie układu. */
+    let inputCap = 190;
+    function measureInputCap() {
+      if (!input) return;
+      const cap = Number.parseFloat(getComputedStyle(input).maxHeight);
+      /* `none` albo wartość, której nie da się odczytać, znaczy „bez sufitu z arkusza" —
+         wtedy zostaje ostatnia znana liczba, a nie NaN, po którym pole przestałoby rosnąć. */
+      if (Number.isFinite(cap) && cap > 40) inputCap = cap;
+    }
+    measureInputCap();
+    /* Ta sama trójka zdarzeń, na którą reaguje reszta strony: `--screen-h` zmienia się przy
+       obrocie i przy prawdziwej zmianie okna, a sufit jest z niej liczony. */
+    window.addEventListener('resize', measureInputCap, { passive: true });
+    window.addEventListener('orientationchange', measureInputCap, { passive: true });
+    window.addEventListener('carruleddhi:relayout', measureInputCap);
     function sizeInput() {
       if (!input) return;
       /* Measured before anything is written, and written only when it changed.
@@ -8369,9 +8913,15 @@ import {
          `auto` is still needed to let the box shrink when text is deleted; it just is not
          committed unless the answer differs from what is already there. */
       input.style.height = 'auto';
-      /* Sufit ten sam co `max-height` w chat.css. Dwie różne liczby znaczyłyby albo pasek
-         przewijania przy polu, które ma jeszcze miejsce, albo pole rosnące poza swój kadr. */
-      const next = Math.min(input.scrollHeight, 190);
+      /* Sufit CZYTANY z `max-height` w chat.css, a nie wpisany tu drugi raz.
+         ---------------------------------------------------------------------------
+         Stała 190 była kopią liczby z arkusza i przestała być prawdą w chwili, gdy sufit
+         w CSS zaczął zależeć od wysokości ekranu (patrz komentarz przy `.chat__composer
+         textarea`): przy otwartej klawiaturze arkusz mówił 106 px, a ten kod nadal 190 px —
+         czyli pole rosło ponad swój kadr i wypychało przycisk wysyłki pod klawiaturę.
+         Odczyt jest buforowany i odświeżany przy zmianie układu, bo `getComputedStyle`
+         w obsłudze każdego naciśnięcia klawisza to wymuszone przeliczenie stylu na znak. */
+      const next = Math.min(input.scrollHeight, inputCap);
       if (next !== lastInputHeight) {
         lastInputHeight = next;
         input.style.height = `${next}px`;
@@ -8415,6 +8965,10 @@ import {
         chip.textContent = text(key) || '';
         chip.addEventListener('click', async () => {
           askedKeys.add(key);
+          /* Fokus przekładany, zanim rząd podpowiedzi zostanie przemalowany: ten przycisk
+             zaraz zniknie z drzewa, a fokus na usuniętym elemencie spada na `<body>`.
+             Patrz `keepFocus` — to jest naprawa „kliknięcie przewija stronę". */
+          keepFocus();
           setChipsOpen(false);
           if ((key === 'chat.askChange' || key === 'chat.askCancel') && openEntryManager) {
             /* Ta sama droga, co po napisaniu „chcę zmienić dane" — jedna, nie dwie. Naciśnięta
@@ -8425,6 +8979,10 @@ import {
 
                Adres z karty czatu nadal nie jest uwierzytelnieniem: żadna czynność nie dzieje
                się bez kodu ze skrzynki. */
+            /* Bąbelek gościa także tutaj. Ta gałąź NIE idzie przez `send()`, więc bez tego
+               naciśnięcie „chcę zmienić dane" nie zostawiało w rozmowie żadnego śladu, choć
+               napisanie tego samego zdania zostawiało. Jedna prośba, jeden wygląd. */
+            append({ author: 'visitor', body: chip.textContent || '', at: '' }, false);
             await startFlow(key === 'chat.askChange' ? 'edit' : 'withdraw');
             return;
           }
@@ -8469,8 +9027,10 @@ import {
             since: lastAt
           }));
           if (!result || result.ok === false) return;
-          mode = result.mode || mode;
           (result.messages || []).forEach((message) => append(message, false));
+          /* Tryb po wiadomościach: przekazanie rozmowy widać dopiero pod tym, co organizator
+             właśnie napisał, a nie nad tym. */
+          setMode(result.mode || mode);
           /* Dots while a person is writing an answer.
              They already appear while the model is thinking, which is a second at most. This is
              the case where they matter: the question went to a human, somebody is typing three
@@ -8755,6 +9315,9 @@ import {
       ['cardStack', setupCardStack],
       ['prizeDeck', setupPrizeDeck],
       ['countdown', setupCountdown],
+      /* Po `countdown`, bo dokowanie ma sens tylko wtedy, gdy liczby w kopii są już
+         przepisane — inaczej pierwsza zadokowana klatka pokazałaby „00" z HTML-a. */
+      ['navClock', setupNavClock],
       ['footerGlow', setupFooterGlow],
       ['headingFit', setupHeadingFit],
       ['wall', setupWall],

@@ -197,9 +197,21 @@ check(v.mineNoteShown, 'panel tlumaczy, ze zmiana idzie odsylaczem z maila');
 check(v.votedCards === 1, `dokladnie jeden kafelek oznaczony jako oceniony: ${v.votedCards}`);
 check(v.mineBadges === 1, `plakietka „twoj glos" na jednym zdjeciu: ${v.mineBadges}`);
 check(v.yourScore.includes('8'), `kafelek pokazuje wlasna ocene: „${v.yourScore}"`);
-check(v.usedOnOthers > 0, `pozostale kafelki mowia, ze glos jest juz oddany (${v.usedOnOthers})`);
-/* Jeden glos na urzadzenie, wiec po oddaniu nie ma juz czego dotknac NIGDZIE na stronie. */
-check(v.hitsLeft === 0, `zadne zdjecie nie zaprasza juz do glosowania: ${v.hitsLeft}`);
+/* GLOS PODPISANY ADRESEM WOLNO RAZ ZMIENIC, WIEC KAFELKI NIE MOWIA „NIE".
+   ---------------------------------------------------------------------------
+   Stalo tu odwrotnie: „pozostale kafelki mowia, ze glos jest juz oddany" i „zadne zdjecie nie
+   zaprasza juz do glosowania". Oba przechodzily, ale mierzyly USTERKE TRYBU DEMO, a nie strone.
+
+   Demo zapisywalo glos jako `{ participantId, score }` bez `canChange`, czyli z `undefined`,
+   czyli falszem — a wtedy kafelek nie dostaje nakladki i pokazuje zdanie o zuzytej zmianie.
+   Prawdziwy Worker oddaje `canChange: identified && editsLeft > 0`, a ta sonda wpisuje w okno
+   imie i adres, wiec na produkcji glos JEST podpisany i jedna zmiana przysluguje: wlasny kafelek
+   zaprasza do poprawienia oceny, pozostale do przeniesienia glosu.
+
+   Po zrownaniu demo z serwerem (patrz `demoDriven` w send() w voting-page.js) asercje musialy
+   sie odwrocic. Stan „nie ma juz czego dotknac" nalezy do glosu ANONIMOWEGO i ma wlasna sonde. */
+check(v.usedOnOthers === 0, `kafelki nie mowia „nie", bo glos podpisany wolno raz zmienic (${v.usedOnOthers})`);
+check(v.hitsLeft > 0, `zdjecia dalej przyjmuja dotkniecie, zeby dalo sie przeniesc glos: ${v.hitsLeft}`);
 check(v.armedLeft === 0, `zaden kafelek nie zostal odslony: ${v.armedLeft}`);
 check(v.toastTone === 'success', `pasek w odmianie potwierdzenia: ${v.toastTone}`);
 

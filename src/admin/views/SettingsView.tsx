@@ -37,9 +37,16 @@ import { PurgePanel } from './PurgePanel';
  * confirms by phone the week before. They are switches now, stored in Supabase and read
  * by the middleware and the public page.
  *
- * Nothing here saves as you type. Sponsors are edited locally and written on one press,
- * because a list you are halfway through reordering is not a list to publish; the
- * switches save immediately, because a switch has no halfway.
+ * Sponsors are edited locally and written on one press, because a list you are halfway
+ * through reordering is not a list to publish; the switches save immediately, because a
+ * switch has no halfway.
+ *
+ * Karta wydarzenia jest trzecim przypadkiem i zachowuje się jak przełączniki, tylko z
+ * odczekaniem. Trzy pola — nazwa, termin, miejsce — zapisują się same po EVENT_AUTOSAVE_MS
+ * od ostatniego uderzenia w klawiaturę. Powód jest ze zgłoszenia: guzik zapisu był wyłączony
+ * dopóki nic nie zmieniono i wyblakły po zapisie, więc wyglądał jak ozdoba, a nie jak
+ * przycisk — data zmieniona i porzucona bez kliknięcia po prostu nie trafiała do bazy.
+ * Guzik został, bo pozwala nie czekać na odliczanie, ale nie jest już jedyną drogą.
  */
 
 const MAX_LOGO_EDGE = 480;
@@ -131,6 +138,49 @@ function toLocalInput(iso: string): string {
     + `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/* ------------------------------------------------ autozapis karty wydarzenia */
+
+/**
+ * Ile czekać od ostatniej zmiany, zanim poleci zapis.
+ *
+ * Sekunda z małym zapasem. Krócej i pole „Nazwa edycji" wysyłałoby po żądaniu na literę —
+ * przy dwudziestoznakowej nazwie to dwadzieścia zapisów do Supabase, z których dziewiętnaście
+ * zapisuje ucięty tekst. Dłużej i ktoś zdąży zamknąć kartę przed zapisem, czyli wracamy do
+ * błędu, który to naprawia.
+ */
+const EVENT_AUTOSAVE_MS = 1100;
+
+/* Rozsądny przedział roku. Natywny wybierak `datetime-local` w Chrome oddaje wartość po
+   każdym wpisanym znaku, więc w drodze do „2027" przechodzi przez „0002" i „0202" —
+   a `new Date('0002-10-17T12:30')` jest poprawną datą, nie błędem. Bez tego zakresu
+   autozapis wysłałby rok 0002, Worker by go przyjął (waliduje tylko parsowalność) i licznik
+   na stronie głównej stanąłby na zerach, bo termin wypadłby dwa tysiące lat temu. */
+const EVENT_YEAR_MIN = 2020;
+const EVENT_YEAR_MAX = 2100;
+
+/**
+ * ISO obcięte do minuty, do porównywania wersji roboczej z zapisaną.
+ *
+ * `input[type="datetime-local"]` bez atrybutu `step` nie ma pola sekund, więc `toLocalInput`
+ * je gubi, a droga powrotna wstawia zera: zapisane `12:30:45.000Z` wraca jako `12:30:00.000Z`.
+ * Przy porównaniu pełnych ISO obieg nie jest wierny i `eventDirty` byłby prawdziwy od razu po
+ * `fetchSettings`, bez niczyjej zmiany. Autozapis wystrzeliłby wtedy przy każdym wejściu na
+ * ekran ustawień i po cichu wyzerował sekundy — a to nie jest kosmetyka: Worker uznaje edycję
+ * za ogłoszoną przez `announcementEventDate === eventDate`, porównując napisy dokładnie, więc
+ * przepisanie terminu o 45 sekund kasuje ślad ogłoszenia i „Ogłoś…" znów staje się klikalne
+ * dla tej samej edycji.
+ *
+ * Dlatego równość liczona jest do minuty — dokładnie tyle, ile potrafi wyrazić to pole.
+ * Sekundy niezerowe (mogły trafić do bazy z EVENT_DATE albo z SQL-a) zostają w spokoju,
+ * dopóki ktoś naprawdę nie zmieni terminu.
+ */
+function toMinuteKey(iso: string): string {
+  /* `toISOString()` daje stałe `YYYY-MM-DDTHH:mm:ss.sssZ`, więc szesnaście znaków to data
+     z godziną i minutą. Puste wejście (data nieparsowalna) zostaje puste i nadal różni się
+     od każdej prawdziwej daty. */
+  return iso.slice(0, 16);
+}
+
 export function SettingsView({
   t,
   locale,
@@ -157,7 +207,7 @@ export function SettingsView({
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
-  const [galleryBusy, setGalleryBusy] = useState<number | null>(null);
+  const [galleryBusy, setGalleryBusy] = useState<Set<number>>(new Set());
   const [announcement, setAnnouncement] = useState<
     'idle' | 'queued' | 'already' | 'pendingResults' | 'votingOpen' | 'failed'
   >('idle');
@@ -173,6 +223,9 @@ export function SettingsView({
     eventDate: toLocalInput(EMPTY.eventDate),
     eventLocation: EMPTY.eventLocation
   });
+  /* Odcisk wersji roboczej, na której autozapis się wywrócił. Trzymany, żeby nie ponawiać tej
+     samej nieudanej próby w kółko — pełne uzasadnienie przy `eventAutosavePending`. */
+  const [eventAutosaveFailedFor, setEventAutosaveFailedFor] = useState<string | null>(null);
 
   /* The saved list, kept beside the edited one so the "unsaved changes" note is a fact
      rather than a flag somebody has to remember to set. */
@@ -181,6 +234,8 @@ export function SettingsView({
   const galleryInput = useRef<HTMLInputElement>(null);
   const pendingLogoFor = useRef<number | null>(null);
   const pendingGalleryFor = useRef<number | null>(null);
+  const galleryImagesRef = useRef(EMPTY.galleryImages);
+  const gallerySaveChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let alive = true;
@@ -189,6 +244,7 @@ export function SettingsView({
         if (!alive) return;
         setSettings(response.settings);
         setSavedSponsors(response.settings.sponsors);
+        galleryImagesRef.current = response.settings.galleryImages;
         setEventDraft({
           eventName: response.settings.eventName,
           eventDate: toLocalInput(response.settings.eventDate),
@@ -297,19 +353,44 @@ export function SettingsView({
     const index = pendingGalleryFor.current;
     event.target.value = '';
     if (!file || index === null) return;
-    setGalleryBusy(index);
+    pendingGalleryFor.current = null;
+
+    setGalleryBusy((prev) => new Set(prev).add(index));
     setUploadError(false);
     try {
       const uploaded = await uploadGalleryImage(apiKey, await downscaleGallery(file));
       setPreview((current) => ({ ...current, [uploaded.imagePath]: uploaded.url }));
-      const next = settings.galleryImages.map((image, at) => (at === index ? uploaded.imagePath : image));
-      const saved = await push({ galleryImages: next });
-      if (!saved) setUploadError(true);
+
+      /* Update the ref and local state together so the tile shows the new image
+         immediately while the save runs in the background. */
+      galleryImagesRef.current = galleryImagesRef.current.map((img, at) =>
+        at === index ? uploaded.imagePath : img
+      );
+      setSettings((current) => ({
+        ...current,
+        galleryImages: current.galleryImages.map((img, at) =>
+          at === index ? uploaded.imagePath : img
+        )
+      }));
+
+      /* Saves are serialised: each one reads the ref, which by then includes every
+         upload that finished before it. Two saves in a row with the same array are
+         harmless — the server merges, so the second is a no-op. */
+      gallerySaveChain.current = gallerySaveChain.current.catch(() => {}).then(async () => {
+        try {
+          await saveSettings(apiKey, { galleryImages: galleryImagesRef.current });
+        } catch (_) {
+          setUploadError(true);
+        }
+      });
     } catch (_) {
       setUploadError(true);
     } finally {
-      setGalleryBusy(null);
-      pendingGalleryFor.current = null;
+      setGalleryBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
     }
   };
 
@@ -338,13 +419,27 @@ export function SettingsView({
   const savedDate = new Date(settings.eventDate);
   const savedIso = Number.isNaN(savedDate.getTime()) ? '' : savedDate.toISOString();
   const eventReady = Boolean(eventDraft.eventName.trim() && eventDraft.eventLocation.trim() && draftIso);
+
+  /* Rok czytany z wersji roboczej, nie z ISO — `getFullYear()` jest lokalny, tak samo jak
+     wartość w polu, więc nie ma tu przesunięcia strefowego, które o północy przenosi datę
+     na sąsiedni rok. Sprawdzane osobno od `eventReady`, bo to nie brak danych, tylko dane
+     w połowie wpisywania: pole jest wypełnione i wygląda poprawnie, a rok ma dwie cyfry. */
+  const draftYear = Number.isNaN(draftDate.getTime()) ? 0 : draftDate.getFullYear();
+  const eventYearSane = draftYear >= EVENT_YEAR_MIN && draftYear <= EVENT_YEAR_MAX;
+
   const eventDirty = eventDraft.eventName.trim() !== settings.eventName
     || eventDraft.eventLocation.trim() !== settings.eventLocation
-    || draftIso !== savedIso;
+    /* Do minuty, nie do milisekundy — patrz `toMinuteKey`. Inaczej sam wejście na ten ekran
+       byłoby „zmianą" i autozapis strzelałby bez powodu. */
+    || toMinuteKey(draftIso) !== toMinuteKey(savedIso);
   const alreadyAnnounced = settings.announcementEventDate === settings.eventDate;
 
-  const saveEvent = async () => {
-    if (!eventReady) {
+  /* Odcisk wersji roboczej: trzy pola sprowadzone do jednego napisu. Służy tylko do tego, by
+     autozapis nie ponawiał w pętli tej samej nieudanej próby — patrz `eventAutosaveFailedFor`. */
+  const eventSignature = `${eventDraft.eventName.trim()}|${draftIso}|${eventDraft.eventLocation.trim()}`;
+
+  const saveEvent = useCallback(async () => {
+    if (!eventReady || !eventYearSane) {
       setStatus('failed');
       return;
     }
@@ -358,17 +453,93 @@ export function SettingsView({
       });
       setSettings(response.settings);
       setSavedSponsors(response.settings.sponsors);
+      /* Wersja robocza przepisana z odpowiedzi, a nie zostawiona taka, jaka była. Worker
+         przycina i normalizuje nazwę oraz miejsce, więc bez tego pole pokazywałoby tekst
+         z podwójną spacją, którego w bazie nie ma — i karta zostałaby „brudna" na zawsze,
+         a przy autozapisie oznaczałoby to pętlę zapisów co sekundę. */
       setEventDraft({
         eventName: response.settings.eventName,
         eventDate: toLocalInput(response.settings.eventDate),
         eventLocation: response.settings.eventLocation
       });
+      setEventAutosaveFailedFor(null);
       setStatus('saved');
       window.setTimeout(() => setStatus('idle'), 2200);
     } catch (_) {
+      setEventAutosaveFailedFor(eventSignature);
       setStatus('failed');
     }
-  };
+  }, [
+    apiKey,
+    draftIso,
+    eventDraft.eventLocation,
+    eventDraft.eventName,
+    eventReady,
+    eventSignature,
+    eventYearSane
+  ]);
+
+  /**
+   * Czy w tej chwili jest zaplanowany autozapis.
+   *
+   * Cztery warunki naraz, każdy przed innym błędem:
+   *   `loaded`        — przed pierwszym `fetchSettings` wersją roboczą jest EMPTY, czyli data
+   *                     z kodu; zapis w tym momencie nadpisałby prawdziwy termin atrapą,
+   *                     zanim ktokolwiek zobaczy ekran.
+   *   `eventDirty`    — bez tego wejście na ustawienia wysyłałoby żądanie za każdym razem.
+   *   `eventReady`    — `datetime-local` w trakcie edycji oddaje pusty łańcuch, a pusta nazwa
+   *                     albo miejsce to i tak odmowa po stronie Workera.
+   *   `eventYearSane` — rok w drodze do „2027" przechodzi przez „0002"; zapis takiej daty
+   *                     zatrzymuje licznik na stronie głównej.
+   * Do tego `status !== 'saving'`: gdy zapis jest w locie, nie planujemy drugiego. Po jego
+   * końcu `status` się zmienia, efekt liczy się od nowa i jeśli w międzyczasie ktoś dopisał
+   * literę, autozapis planuje się ponownie.
+   *
+   * I ostatni warunek, najmniej oczywisty: ta sama wersja robocza nie jest wysyłana drugi raz
+   * po nieudanym zapisie. Bez tego przy zerwanym łączu robi się pętla — `status` idzie
+   * 'failed' → 'saving' → 'failed', każda zmiana przelicza efekt, efekt planuje kolejną próbę
+   * i panel dobija Workera co sekundę, dopóki ekran jest otwarty. Zmiana któregokolwiek pola
+   * daje nowy odcisk i próba rusza od nowa; kto chce ponowić bez zmiany, ma guzik, który
+   * pozostaje aktywny właśnie na ten wypadek.
+   */
+  const eventAutosavePending = loaded
+    && eventDirty
+    && eventReady
+    && eventYearSane
+    && status !== 'saving'
+    && eventAutosaveFailedFor !== eventSignature;
+
+  useEffect(() => {
+    if (!eventAutosavePending) return;
+    const timer = window.setTimeout(() => {
+      void saveEvent();
+    }, EVENT_AUTOSAVE_MS);
+    /* Sprzątanie robi tu obie rzeczy naraz: kasuje odliczanie przy odmontowaniu widoku i
+       kasuje je przy kolejnym uderzeniu w klawiaturę, bo zmiana któregokolwiek z pól zmienia
+       zależności i efekt startuje od zera. To jest cały mechanizm odczekania — nie ma osobnego
+       `useRef` na uchwyt timera, bo byłby drugą kopią tego samego stanu. Bez tego zamknięcie
+       ustawień w trakcie odliczania wysłałoby zapis do ekranu, którego już nie ma. */
+    return () => window.clearTimeout(timer);
+  }, [eventAutosavePending, eventDraft.eventName, eventDraft.eventDate, eventDraft.eventLocation, saveEvent]);
+
+  /* Guzik zapisu: wyłączony tylko wtedy, gdy naprawdę nie ma czego zapisać albo zapis trwa —
+     i wtedy z podpisem, który mówi, co jest nie tak. Wcześniej jedynym sygnałem była
+     przezroczystość, a wyblakły przycisk czyta się jak brak przycisku. */
+  const eventSaveDisabled = status === 'saving' || !eventDirty || !eventReady || !eventYearSane;
+  const eventSaveLabel = status === 'saving'
+    ? t('set.eventSaving')
+    : status === 'saved' && !eventDirty
+      ? t('set.eventSaved')
+      : t('set.eventSave');
+  const eventSaveHint = status === 'saving' || status === 'saved'
+    ? ''
+    : !eventReady
+      ? t('set.eventSaveIncomplete')
+      : !eventYearSane
+        ? t('set.eventSaveBadYear')
+        : !eventDirty
+          ? t('set.eventSaveNothing')
+          : '';
 
   if (!loaded) {
     /* The heading and lead are real, not placeholders — they are the same two lines whether
@@ -514,17 +685,31 @@ export function SettingsView({
           </label>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2.5">
+        {/* Powiedziane wprost, bo autozapisu nie widać. Bez tej linijki jedynym sygnałem, że
+            zmiana została zapisana, jest zielony napis, który gaśnie po dwóch sekundach — i
+            ktoś, kto w tym momencie patrzył na pole daty, znów nie ma pewności. */}
+        <p className="mt-3 text-[12px] leading-relaxed text-white/45">{t('set.eventAutosaveNote')}</p>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            disabled={!eventReady || !eventDirty || status === 'saving'}
+            disabled={eventSaveDisabled}
             onClick={() => void saveEvent()}
-            className="rounded-full bg-yellow px-4 py-2 text-xs font-bold text-navy-950 disabled:opacity-40"
+            /* Bez `disabled:opacity-40`. Stan wyłączony ma własne, widoczne tło i pełny napis —
+               tak przycisk dalej wygląda jak przycisk, a powód jest w podpisie obok. */
+            className={
+              eventSaveDisabled
+                ? 'rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white/75'
+                : 'rounded-full bg-yellow px-4 py-2 text-xs font-bold text-navy-950 hover:bg-white'
+            }
           >
-            {status === 'saving' ? t('set.saving') : t('set.eventSave')}
+            {eventSaveLabel}
           </button>
           <button
             type="button"
+            /* Warunek zostaje odwrotny: ogłaszać można tylko termin, który jest już w bazie.
+               Autozapis sam gasi `eventDirty` po sekundzie, więc ten guzik odblokowuje się
+               bez klikania czegokolwiek — wcześniej wymagał wciśnięcia zapisu. */
             disabled={!eventReady || eventDirty || status === 'saving'}
             onClick={() => void announce()}
             className="inline-flex items-center gap-2 rounded-full bg-coral px-4 py-2 text-xs font-bold text-white hover:bg-white hover:text-navy-950 disabled:opacity-40"
@@ -532,7 +717,12 @@ export function SettingsView({
             <Megaphone className="size-3.5" />
             {t('set.announce')}
           </button>
-          {eventDirty ? <span className="text-[12px] text-yellow">{t('set.dirty')}</span> : null}
+          {/* Wzajemnie się wykluczają: gdy autozapis odlicza, guzik jest aktywny i podpowiedzi
+              nie ma; gdy guzik jest wyłączony, nie ma czego odliczać. */}
+          {eventAutosavePending ? (
+            <span role="status" className="text-[12px] text-yellow">{t('set.eventAutosavePending')}</span>
+          ) : null}
+          {eventSaveHint ? <span className="text-[12px] text-white/50">{eventSaveHint}</span> : null}
           {status === 'saved' ? <span className="text-[12px] text-emerald-300">{t('set.saved')}</span> : null}
           {status === 'failed' ? <span className="text-[12px] text-coral">{t('set.saveFailed')}</span> : null}
         </div>
@@ -585,20 +775,33 @@ export function SettingsView({
             <button
               key={`${image}-${index}`}
               type="button"
-              disabled={galleryBusy !== null || status === 'saving'}
+              disabled={galleryBusy.has(index)}
               onClick={() => pickGallery(index)}
               aria-label={`${t('set.galleryPhoto')} ${index + 1}`}
               className="group relative aspect-[4/3] overflow-hidden rounded-2xl border-2 border-white/10 bg-navy-950/60 text-white/50 transition hover:-translate-y-1 hover:border-yellow focus-visible:outline-2 focus-visible:outline-yellow disabled:opacity-55"
             >
-              {gallerySrc(image, index) ? (
+              {galleryBusy.has(index) ? (
+                <>
+                  {gallerySrc(image, index) ? (
+                    <img src={gallerySrc(image, index)} alt="" className="size-full object-cover opacity-30" />
+                  ) : null}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                    <div className="absolute inset-0 animate-skeleton bg-white/5" />
+                    <div className="relative size-7 animate-spin rounded-full border-2 border-white/20 border-t-yellow" />
+                    <span className="relative text-[10px] font-bold uppercase tracking-wider text-yellow">{t('set.uploading')}</span>
+                  </div>
+                </>
+              ) : gallerySrc(image, index) ? (
                 <img src={gallerySrc(image, index)} alt="" className="size-full object-cover transition duration-300 group-hover:scale-105" />
               ) : (
                 <ImagePlus className="absolute inset-0 m-auto size-6" />
               )}
               <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-navy-950/80 text-[11px] font-extrabold text-yellow">{index + 1}</span>
-              <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/90 to-transparent px-2 pb-2 pt-6 text-[10px] font-bold uppercase tracking-wider text-white">
-                {galleryBusy === index ? t('set.uploading') : t('set.galleryPhoto')}
-              </span>
+              {!galleryBusy.has(index) && (
+                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/90 to-transparent px-2 pb-2 pt-6 text-[10px] font-bold uppercase tracking-wider text-white">
+                  {t('set.galleryPhoto')}
+                </span>
+              )}
             </button>
           ))}
         </div>

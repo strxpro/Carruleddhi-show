@@ -46,6 +46,34 @@ import {
     participants: [],
     /** Mój głos albo `null`. Jeden na urządzenie, na cały konkurs. */
     myVote: null,
+    /**
+     * Kafelek, na którym stoi otwarty wybór: `{ id, picking, score }` albo `null`.
+     *
+     * TU MIESZKA NAPRAWA „KLIKAM W ZAGŁOSUJ I NIC SIĘ NIE ROBI".
+     * ---------------------------------------------------------------------------
+     * Do tej pory ten stan istniał WYŁĄCZNIE w drzewie: klasa `is-armed` na węźle, `hidden` na
+     * przycisku i fokus na „Zagłosuj". Wszystkie trzy giną przy przerysowaniu siatki, a siatka
+     * przerysowuje się częściej, niż to wygląda:
+     *
+     *   — doczytanie kolejnej porcji, wywołane SAMYM PRZEWINIĘCIEM (czujka z zapasem 400 px),
+     *   — „pokaż więcej", filtr kategorii, litera w polu szukania,
+     *   — odczyt z serwera co trzydzieści sekund, gdy cokolwiek na kafelku się zmieniło,
+     *   — dopisanie uczestnika w panelu w trakcie wyścigu.
+     *
+     * `replaceChildren` przenosi węzły, więc fokus z „Zagłosuj" leci na `body`, `focusout` na
+     * nakładce składa kafelek i nakładka gaśnie. ZMIERZONE sondą probe-voting-touch.js na
+     * 390×844: po doczytaniu porcji `is-armed` znika ze wszystkich kafelków, a w punkcie, w
+     * którym stał „Zagłosuj", leży znowu przezroczysty `.vote-card__hit` — czyli następne
+     * dotknięcie tylko odsłania nakładkę na nowo, zamiast rozwinąć oceny. Z ekranu wygląda to
+     * dokładnie tak, jak w zgłoszeniu: naciskam „Zagłosuj" i nic się nie dzieje.
+     *
+     * Na myszy tego nie widać, bo tam nakładkę odsłania `:hover`, a nie klasa: kursor nadal
+     * stoi na kafelku, więc przycisk wraca na ekran sam i kolejny klik działa.
+     *
+     * Stan trzymany więc TUTAJ, a drzewo jest jego odbiciem — `restoreOpen()` po każdym
+     * przerysowaniu odtwarza i klasy, i wybraną ocenę.
+     */
+    open: null,
     /** Filtr kategorii pojazdu. Pusty znaczy „wszystkie". */
     category: '',
     /** Szukana fraza: numer startowy, nazwa wózka, imię, nazwisko albo kategoria. */
@@ -126,6 +154,79 @@ import {
 
   /** Wypełniane przy każdym przerysowaniu siatki — patrz paintGrid(). */
   let badgeByParticipant = new Map();
+
+  /**
+   * Złożenie kafelka: nakładka gaśnie, przezroczysty cel wraca na zdjęcie.
+   *
+   * Jedna funkcja, bo składanie zdarza się w trzech miejscach i za każdym razem musi zdjąć
+   * DOKŁADNIE te same cztery rzeczy: dwie klasy, `hidden` na suwaku, stan przycisku i `hidden`
+   * na celu dotknięcia. Wcześniej ten sam kod stał w trzech kopiach (przy odsłanianiu innego
+   * kafelka, przy wyjściu z bieżącego i w nasłuchu na dokumencie), a piąta rzecz — zapisany
+   * stan otwartego kafelka — była tylko w jednej z nich.
+   *
+   * Zdjęcie `state.open` należy TU, a nie u wywołujących: kafelek złożony bez wyczyszczenia
+   * stanu zostałby odsłonięty na nowo przy najbliższym przerysowaniu siatki, czyli sam by się
+   * otworzył pod palcem, który go właśnie zamknął.
+   */
+  function collapseCard(node) {
+    if (!node) return;
+    node.classList.remove('is-armed', 'is-picking');
+    const pick = $('.vote-veil__pick', node);
+    if (pick) pick.hidden = true;
+    const cta = $('.vote-veil__cta', node);
+    if (cta) cta.setAttribute('aria-expanded', 'false');
+    const hit = $('.vote-card__hit', node);
+    if (hit) hit.hidden = false;
+    if (state.open && state.open.id === node.dataset.participant) state.open = null;
+  }
+
+  /**
+   * Odtworzenie otwartego wyboru po przerysowaniu siatki.
+   *
+   * Wołane na końcu `paintGrid()`, bo dopiero wtedy węzły stoją na swoich miejscach. Odtwarza
+   * też WYBRANĄ OCENĘ: bez tego doczytanie porcji w trakcie ustawiania suwaka cofało go na
+   * środek skali, czyli zabierało człowiekowi decyzję, którą właśnie podjął.
+   *
+   * Kafelek wypadnięty z listy (filtr kategorii, szukanie, wóz zdjęty w panelu) nie ma czego
+   * odtwarzać — wtedy stan jest zerowany, bo wybór dotyczył pojazdu, którego już nie widać.
+   */
+  function restoreOpen() {
+    const open = state.open;
+    if (!open) return;
+    const node = $$('[data-vote-grid] .vote-card')
+      .find((card) => card.dataset.participant === open.id);
+    if (!node) {
+      state.open = null;
+      return;
+    }
+    const pick = $('.vote-veil__pick', node);
+    const cta = $('.vote-veil__cta', node);
+    const hit = $('.vote-card__hit', node);
+    /* Kafelek bez nakładki to kafelek, który o nic nie prosi — po oddaniu głosu bez adresu albo
+       po zużyciu jedynej zmiany. Wtedy nie ma czego odsłaniać i stan idzie do kosza. */
+    if (!pick || !cta || !hit) {
+      state.open = null;
+      return;
+    }
+    node.classList.add('is-armed');
+    node.classList.toggle('is-picking', Boolean(open.picking));
+    hit.hidden = true;
+    pick.hidden = !open.picking;
+    cta.setAttribute('aria-expanded', String(Boolean(open.picking)));
+    const slider = $('.vote-slider', node);
+    if (slider && open.score) {
+      slider.value = String(open.score);
+      /* Przez zdarzenie, nie przez ustawienie napisu obok: wypełnienie toru i wielka liczba są
+         przeliczane w nasłuchu `input` przy suwaku (patrz `paintValue` w voteOverlay), więc to
+         jest jedyny sposób, żeby nie mieć dwóch miejsc liczących to samo. */
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    /* Fokus wraca TYLKO wtedy, gdy przerysowanie go zgubiło, czyli gdy nie ma go nikt inny.
+       Bez tego warunku odczyt z serwera zabierałby kursor z pola szukania w połowie wyrazu. */
+    if (document.activeElement === document.body || document.activeElement === null) {
+      (open.picking ? slider : cta)?.focus({ preventScroll: true });
+    }
+  }
 
   /**
    * Narysowane kafelki, po identyfikatorze uczestnika: `id -> { key, node }`.
@@ -745,6 +846,10 @@ import {
     if (state.phase === 'closed') {
       grid.replaceChildren();
       if (empty) empty.hidden = true;
+      /* Zamknięcie głosowania w trakcie wybierania oceny — zdarza się, bo okno ma koniec
+         wyznaczony zegarem. Zapisany wybór nie ma już czego dotyczyć i musi zniknąć razem z
+         siatką, inaczej odżyłby przy powrocie do fazy głosowania. */
+      state.open = null;
       paintMore(0);
       return;
     }
@@ -802,6 +907,12 @@ import {
 
     grid.replaceChildren(...nodes);
     paintMore(all.length);
+    /* Otwarty wybór odtwarzany PO wstawieniu węzłów i PO przycisku „pokaż więcej": jedno i
+       drugie gubi fokus (`replaceChildren` przenosi węzły, a przycisk potrafi się schować, gdy
+       nie ma już czego doczytać), więc odtwarzanie musi być ostatnie — inaczej przywrócony fokus
+       zniknąłby o dwie linijki później. Bez tego wywołania każde doczytanie porcji, także to
+       wywołane samym przewinięciem, zamykało nakładkę pod palcem. */
+    restoreOpen();
   }
 
   /**
@@ -1131,7 +1242,13 @@ import {
       slider.style.setProperty('--at', Math.round(at * 100) + '%');
     };
     paintValue();
-    slider.addEventListener('input', paintValue);
+    slider.addEventListener('input', () => {
+      paintValue();
+      /* Ocena zapamiętana od razu, przy każdym drgnięciu uchwytu: gdy siatka przerysuje się w
+         trakcie wybierania — a wystarczy do tego przewinięcie doczytujące kolejną porcję —
+         suwak ma wrócić na wybraną wartość, nie na środek skali. */
+      if (state.open && state.open.id === row.id) state.open.score = Number(slider.value);
+    });
 
     const scale = document.createElement('div');
     scale.className = 'vote-slider__scale';
@@ -1186,23 +1303,17 @@ import {
     const closeOthers = () => {
       $$('.vote-card.is-armed, .vote-card.is-picking').forEach((other) => {
         if (other === card()) return;
-        other.classList.remove('is-armed', 'is-picking');
-        const otherPick = $('.vote-veil__pick', other);
-        if (otherPick) otherPick.hidden = true;
-        const otherCta = $('.vote-veil__cta', other);
-        if (otherCta) otherCta.setAttribute('aria-expanded', 'false');
-        const otherHit = $('.vote-card__hit', other);
-        if (otherHit) otherHit.hidden = false;
+        collapseCard(other);
       });
     };
 
     const disarm = () => {
       const node = card();
       if (!node) return;
-      node.classList.remove('is-armed', 'is-picking');
-      picker.hidden = true;
-      cta.setAttribute('aria-expanded', 'false');
-      hit.hidden = false;
+      collapseCard(node);
+      /* Węzeł mógł być właśnie zbudowany od nowa, więc `state.open` bywa opisem innego niż ten
+         obiektu — a wybór i tak jest zamknięty. Zerowane wprost, bez oglądania `dataset`. */
+      if (state.open && state.open.id === row.id) state.open = null;
     };
 
     const arm = () => {
@@ -1211,6 +1322,9 @@ import {
       if (node) node.classList.add('is-armed');
       // Przycisk dotknięcia schodzi z drogi, żeby następne dotknięcie trafiło w „Zagłosuj".
       hit.hidden = true;
+      /* Zapisane w stanie, nie tylko w klasie: przerysowanie siatki (doczytana porcja, odczyt z
+         serwera) buduje kafelki od nowa i klasa by przepadła — patrz `state.open`. */
+      state.open = { id: row.id, picking: false, score: Number(slider.value) };
       cta.focus({ preventScroll: true });
     };
 
@@ -1221,6 +1335,7 @@ import {
       hit.hidden = true;
       picker.hidden = false;
       cta.setAttribute('aria-expanded', 'true');
+      state.open = { id: row.id, picking: true, score: Number(slider.value) };
       slider.focus({ preventScroll: true });
     };
 
@@ -1244,8 +1359,19 @@ import {
     });
 
     /* Zejście fokusem poza kafelek składa go z powrotem. Bez tego na klawiaturze zostawał
-       otwarty suwak na kafelku, którego już nie widać. */
+       otwarty suwak na kafelku, którego już nie widać.
+       ---------------------------------------------------------------------------
+       WYŁĄCZNIE gdy fokus poszedł na COŚ KONKRETNEGO. Brak `relatedTarget` znaczy, że fokus nie
+       przeszedł dalej, tylko przepadł — a to na tej stronie zdarza się bez udziału człowieka:
+       `replaceChildren` w `paintGrid()` przenosi węzły, przeniesiony przycisk traci fokus i
+       zdarzenie przychodzi z `relatedTarget === null`. Wcześniej składało to kafelek w trakcie
+       wybierania oceny, na oczach kogoś, kto właśnie na niego patrzył, i to była właśnie usterka
+       „naciskam Zagłosuj i nic się nie dzieje" — patrz `state.open`.
+
+       Kliknięcie palcem albo myszą poza kafelkiem nadal go składa: tym zajmuje się nasłuch na
+       dokumencie w `start()`, a nie ten warunek. */
     veil.addEventListener('focusout', (event) => {
+      if (!event.relatedTarget) return;
       if (veil.contains(event.relatedTarget)) return;
       if (!picker.hidden) return;
       disarm();
@@ -1278,7 +1404,15 @@ import {
 
   async function changeVote(row, score) {
     if (demoDriven) {
-      state.myVote = { participantId: row.id, score };
+      /* Zmiana jest jedna, więc w demo też jest jedna: po niej kafelki przestają zapraszać do
+         kolejnej, dokładnie tak jak po odmowie `VOTING_EDIT_USED` z serwera. */
+      state.myVote = {
+        participantId: row.id,
+        score,
+        identified: state.myVote?.identified ?? true,
+        editsLeft: 0,
+        canChange: false
+      };
       toast(text('voting.changed'), 'success');
       paint();
       return;
@@ -1438,7 +1572,18 @@ import {
        głosujący po wysłaniu: panel „Twój głos" na górze, plakietka na kafelku i pozostałe
        kafelki bez przycisku. Odczyt z serwera odtworzyłby stan wyjściowy i głos by zniknął. */
     if (demoDriven) {
-      state.myVote = { participantId: pending.participantId, score: pending.score };
+      /* `canChange` i `identified` podawane wprost, bo demo ma zachowywać się jak serwer.
+         Bez nich `mine.canChange` wychodziło `undefined`, czyli fałsz, i po oddaniu głosu w demo
+         WSZYSTKIE kafelki traciły nakładkę: zamiast „przenieś tu swój głos" pokazywały zdanie o
+         zużytej zmianie. Pokaz kończył się więc na ekranie, z którego nie da się już nic zrobić —
+         a na produkcji jedna zmiana przysługuje (patrz `votingEdit` w Workerze). */
+      state.myVote = {
+        participantId: pending.participantId,
+        score: pending.score,
+        identified: Boolean(email),
+        editsLeft: 1,
+        canChange: true
+      };
       if (email) rememberVoter(name, email);
       closeDialog();
       toast(text('voting.thanks'), 'success');
@@ -1653,13 +1798,7 @@ import {
       const inside = event.target.closest?.('.vote-card');
       $$('.vote-card.is-armed, .vote-card.is-picking').forEach((card) => {
         if (card === inside) return;
-        card.classList.remove('is-armed', 'is-picking');
-        const pick = $('.vote-veil__pick', card);
-        if (pick) pick.hidden = true;
-        const cta = $('.vote-veil__cta', card);
-        if (cta) cta.setAttribute('aria-expanded', 'false');
-        const hit = $('.vote-card__hit', card);
-        if (hit) hit.hidden = false;
+        collapseCard(card);
       });
     });
 

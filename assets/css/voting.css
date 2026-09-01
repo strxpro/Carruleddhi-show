@@ -64,13 +64,18 @@
 }
 .vote-dialog__note { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 .vote-dialog__status { margin: 0; min-height: 18px; color: var(--coral, #ee625f); font: 800 12px/1.4 var(--font-meta); }
+/* 44 px, nie 38: to jest cel dla kciuka, a nie dla kursora.
+   ZMIERZONE sondą probe-voting-touch.js na 390×844: przycisk zamknięcia okna miał 38×38 px, czyli
+   sześć pikseli mniej niż zalecane minimum w obu kierunkach. Okno zasłania cały ekran telefonu i
+   ten przycisk jest w nim JEDYNĄ drogą wyjścia bez oddania głosu — chybienie w niego znaczy
+   dotknięcie tła, na którym nic nie ma. */
 .vote-dialog__close {
-  position: absolute; top: 12px; right: 12px; z-index: 2;
-  width: 38px; height: 38px; border: 0; border-radius: 50%;
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 44px; height: 44px; border: 0; border-radius: 50%;
   background: var(--white); cursor: pointer; box-shadow: var(--shadow-sm);
 }
 .vote-dialog__close::before, .vote-dialog__close::after {
-  content: ''; position: absolute; inset: 50% 11px auto; height: 2px; background: var(--navy-950);
+  content: ''; position: absolute; inset: 50% 14px auto; height: 2px; background: var(--navy-950);
 }
 .vote-dialog__close::before { transform: rotate(45deg); }
 .vote-dialog__close::after { transform: rotate(-45deg); }
@@ -1219,9 +1224,22 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 /* Przezroczysty przycisk na całym zdjęciu. Leży nad przyciemnieniem i podpisem, więc trafia
    w niego każde dotknięcie zdjęcia — a plakietki są `pointer-events: none`, żeby nie zjadały
-   dotknięcia w swoim rogu. */
+   dotknięcia w swoim rogu.
+
+   `z-index: 3` — I TO JEST POŁOWA NAPRAWY „NIE DA SIĘ ZAGŁOSOWAĆ NA TELEFONIE".
+   ---------------------------------------------------------------------------
+   Stało tu `z-index: auto`, czyli zero. Wystarczyła jedna warstwa dekoracyjna z `z-index: 1`,
+   żeby przykryć jedyny cel dotknięcia na kafelku — i taka warstwa tu jest: połysk szkieletu
+   zdjęcia (`.vote-card__photo.is-loading::after`). ZMIERZONE sondą probe-voting-touch.js na
+   390×844: dopóki zdjęcie leciało z sieci, `elementFromPoint` w środku kafelka zwracał
+   `figure.vote-card__photo`, a nie przycisk, i dotknięcie nie robiło NIC. Na komputerze tego
+   nie widać, bo nakładkę odsłania tam `:hover`, który nie wymaga trafienia w przycisk.
+
+   Trzy, nie osiem: nakładka z oceną ma `z-index: 4` i musi zostać NAD przyciskiem, bo po
+   odsłonięciu dotknięcia mają trafiać w „Zagłosuj". Trzy jest wyżej niż każda dekoracja na
+   zdjęciu i niżej niż nakładka — czyli dokładnie tam, gdzie ten przycisk należy. */
 .vote-card__hit {
-  position: absolute; inset: 0;
+  position: absolute; inset: 0; z-index: 3;
   border: 0; padding: 0; background: transparent; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1994,6 +2012,18 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   position: absolute;
   inset: 0;
   z-index: 1;
+  /* NIE ŁAPIE WSKAŹNIKA — bez tego połysk zjadał dotknięcia całego kafelka.
+     ---------------------------------------------------------------------------
+     Pseudo-element jest trafialny jak każde tło, a `elementFromPoint` zwraca wtedy element,
+     do którego należy — czyli `figure`, a nie leżący pod spodem przezroczysty przycisk. Efekt
+     zmierzony sondą probe-voting-touch.js na 390×844: przez cały czas wczytywania zdjęcia
+     dotknięcie kafelka nie odsłaniało nakładki i strona wyglądała na zepsutą. Na placu, przy
+     zdjęciach z prywatnego bucketa i sieci obciążonej przez cały tłum, ten „czas wczytywania"
+     to kilka sekund na każdy kafelek — czyli dokładnie ta chwila, w której ludzie głosują.
+
+     Sam `z-index` przy przycisku by wystarczył; to jest drugi zamek na tych samych drzwiach,
+     bo warstwa dekoracyjna nie ma żadnego powodu, żeby cokolwiek przechwytywać. */
+  pointer-events: none;
   background:
     linear-gradient(100deg, transparent 18%, rgb(255 255 255 / .16) 42%, rgb(255 255 255 / .16) 56%, transparent 78%),
     var(--navy-900);
@@ -2106,10 +2136,92 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 .vote-card.is-armed { border-color: var(--yellow); box-shadow: 6px 6px 0 rgb(255 201 40 / .55); }
 .vote-card.is-picking { z-index: 3; }
 
+/* ===========================================================================
+   OCENA POD PALCEM: WYBÓR MUSI SIĘ ZMIEŚCIĆ W ZDJĘCIU
+   ===========================================================================
+   ZMIERZONE sondą probe-voting-touch.js na 390×844, PRZED tą zmianą:
+
+     zdjęcie kafelka   335 → 508 px   (173 px, kwadrat, `overflow: hidden`)
+     okno oceny        342 → 542 px   (200 px, czyli 34 px WIĘCEJ niż kadr)
+     „zamknij"         495 → 529 px   — w całości poza dolną krawędzią zdjęcia
+     `elementFromPoint` w środku „zamknij" → `div.vote-grid`
+
+   Czyli: jedyna droga wyjścia z wybierania oceny była obcięta przez `overflow: hidden` na
+   zdjęciu i nie dało się jej dotknąć. Suwak miał przy tym 61×40 px — 40 px wysokości przy
+   zalecanym minimum 44 i DZIEWIĘĆ pikseli na jeden stopień oceny, więc różnica między ósemką
+   a dziewiątką była grubością połowy paznokcia.
+
+   Na monitorze nic z tego nie było widać: kafelek jest tam trzy razy szerszy, okno oceny mieści
+   się w kadrze z zapasem, a wyjściem jest klawisz Escape albo klik obok.
+
+   Układ na telefonie jest więc inny, i to jest zmiana układu, nie kosmetyka:
+
+     — wielka liczba idzie NA GÓRĘ, obok podpisu, a suwak dostaje CAŁĄ szerokość kafelka
+       (137 px zamiast 61, czyli 19 px na stopień zamiast 9);
+     — suwak ma 44 px wysokości;
+     — końce skali (3 i 10) schodzą z ekranu: wybrana ocena stoi obok wielką liczbą, a dwie
+       dziesięciopikselowe cyferki w narożnikach kosztowały 18 px wysokości, których zabrakło;
+     — „zamknij" przenosi się do narożnika zdjęcia jako okrągły cel 44×44 px, więc nie
+       zabiera już wysokości wierszowi z przyciskiem wysyłki.
+
+   Po zmianie okno oceny ma 158 px w kadrze 173 px — mieści się w całości, bez obcinania.
+   `display: contents` na wierszu suwaka: to on trzymał suwak i liczbę obok siebie, a tutaj oba
+   mają stanąć w innych miejscach siatki. Znika z układu, nie z drzewa — więc żadna zmiana
+   w JavaScripcie nie jest do tego potrzebna. */
 @media (max-width: 700px) {
-  .vote-veil__pick { max-width: none; padding: 10px; }
-  .vote-veil__cta { min-height: 44px; padding: 0 16px; font-size: 11.5px; }
   .vote-veil { padding: 7px; }
+  .vote-veil__cta { min-height: 44px; padding: 0 16px; font-size: 11.5px; }
+
+  /* Trzy rzędy: [zamknij] [ocena] / [suwak] / [wyślij]. Wiersz suwaka i rząd przycisków tracą
+     własny układ (`display: contents`) i ich zawartość wchodzi wprost w tę siatkę — inaczej
+     wielkiej liczby nie da się przenieść nad suwak bez przebudowy znacznika w JavaScripcie. */
+  .vote-veil__pick {
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 8px;
+  }
+  /* Podpis „wybierz ocenę" znika, a jego miejsce zajmuje wyjście. Dziesięciopikselowy napis
+     wersalikami obok trzydziestopikselowej liczby i tak nie był tym, co mówi, co zrobić — a
+     `aria-label` na suwaku niesie to zdanie dalej dla czytnika ekranu. */
+  .vote-veil__pick .vote-picker__label { display: none; }
+  .vote-veil__pick .vote-slider__scale { display: none; }
+  .vote-veil__pick .vote-slider__row,
+  .vote-veil__pick .vote-veil__actions { display: contents; }
+  .vote-veil__pick .vote-slider__value { grid-area: 1 / 2; }
+  .vote-veil__pick .vote-slider { grid-area: 2 / 1 / 2 / -1; }
+  .vote-veil__pick .vote-veil__send { grid-area: 3 / 1 / 3 / -1; }
+
+  /* Wyjście z wybierania jako okrągły cel 44×44 w pierwszym rzędzie. Napis zostaje w drzewie —
+     czytnik ekranu nadal mówi „zamknij" — tylko wyjeżdża z widoku, a jego miejsce zajmuje
+     krzyżyk. Wcześniej był to podkreślony napis 133×34 px stojący POD przyciskiem wysyłki,
+     czyli 21 px poza dolną krawędzią zdjęcia i pod `overflow: hidden`. */
+  .vote-veil__pick .vote-veil__cancel {
+    grid-area: 1 / 1;
+    position: relative;
+    width: 44px; height: 44px; min-height: 44px; padding: 0;
+    overflow: hidden;
+    border: 3px solid var(--navy-950); border-radius: 50%;
+    background: #fff;
+    text-indent: -200px; text-decoration: none;
+  }
+  .vote-veil__pick .vote-veil__cancel::before {
+    content: '✕';
+    position: absolute; inset: 0;
+    color: var(--navy-950); font: 900 15px/38px var(--font-meta);
+    text-align: center; text-indent: 0;
+  }
+
+  /* Zdjęcie przestaje obcinać DOKŁADNIE w chwili, gdy stoi na nim wybór oceny.
+     Układ wyżej mieści się w kadrze z zapasem (zmierzone: 168 px w 173 px), ale zapas jest
+     mały, a napis na przycisku wysyłki bywa dłuższy w innym języku. Bez tego zabezpieczenia
+     jedno zawinięcie wyrazu wystarczyłoby, żeby wysyłka znowu wyjechała pod krawędź i przestała
+     przyjmować dotknięcia — czyli żeby wróciła naprawiana tu usterka.
+     Obwódka zdjęcia wędruje na sam obrazek, bo do tej pory zaokrąglenie robiło właśnie
+     obcinanie. Tylko pod palcem: na myszy zdjęcie powiększa się przy najechaniu i tam
+     obcinanie nadal ma co robić. */
+  .vote-card.is-picking .vote-card__photo { overflow: visible; }
+  .vote-card__photo img { border-radius: inherit; }
 }
 
 /* Bez animacji nakładka po prostu jest albo jej nie ma — cała droga do oceny zostaje ta sama. */
@@ -2133,7 +2245,11 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   font-size: clamp(22px, 5vw, 30px);
 }
 .vote-veil__pick .vote-slider__row { gap: 10px; }
-.vote-veil__pick .vote-slider { height: 40px; min-height: 40px; }
+/* 44 px, nie 40: suwak jest celem dotykowym jak każdy przycisk na tej drodze, a ZMIERZONE na
+   390×844 miał 40 px wysokości — cztery piksele pod zalecanym minimum. Reguła stoi za blokiem
+   `@media (max-width: 700px)`, więc obowiązuje w obu układach; wysokość jest tam potrzebna
+   bardziej, ale na myszy nie przeszkadza. */
+.vote-veil__pick .vote-slider { height: 44px; min-height: 44px; }
 
 /* ============================================================ cokół w jednym ekranie */
 /* ZMIEŚCIĆ WYNIK NA JEDNYM EKRANIE.
