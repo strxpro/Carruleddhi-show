@@ -38,6 +38,22 @@ run_worker_first = ["/api/carruleddhi/*"]
 [triggers]
 crons = ["0 * * * *"]
 
+# Logi wlaczone na stale.
+# ---------------------------------------------------------------------------
+# Wlaczone klikiem w panelu, ale panel sam ostrzega: ustawienie zrobione recznie moze zostac
+# nadpisane przy nastepnym `wrangler deploy`. Zapisane tutaj przezywa kazde wdrozenie.
+#
+# Bez logow widac tylko, ze budzik zadzwonil — nie widac, czy wysylka sie udala. Gdyby
+# ROSTER_KEY rozjechal sie z Vercelem choc o litere, cron chodzilby co godzine, licznik by
+# rosl, a maile nie wychodzilyby wcale. Dokladnie ta cicha awaria kosztowala juz tydzien
+# przypomnien; console.log w scheduled() wypisuje status odpowiedzi wlasnie po to.
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 [vars]
 # Comma separated. Leave empty during local development.
 ALLOWED_ORIGINS = ""

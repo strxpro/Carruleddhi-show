@@ -1023,6 +1023,64 @@ function whatsappTargets(env) {
  *   to, że organizatorowi nie doszedł WhatsApp, jest problemem organizatora, nie
  *   powodem, żeby pokazać gościowi błąd.
  */
+/**
+ * Tlumaczenie wiadomosci goscia na jezyk numeru, ktory dostaje powiadomienie.
+ * ===========================================================================
+ * Wczesniej tresc szla doslownie, a komentarz nizej tlumaczyl dlaczego: model na tej
+ * sciezce to dodatkowy punkt awarii, a „cudze slowa zmienione przez model wygladaja jak
+ * oryginal". Pierwszy zarzut zostaje w mocy i jest tu obsluzony; drugi znika, bo ORYGINAL
+ * IDZIE RAZEM Z TLUMACZENIEM, w nawiasie pod spodem. Kto zna jezyk goscia, widzi jego
+ * wlasne slowa i sam wylapie bledne tlumaczenie.
+ *
+ * NIGDY NIE BLOKUJE POWIADOMIENIA
+ *   Sześć sekund limitu, a kazdy blad — brak klucza, timeout, 500 od dostawcy, dziwna
+ *   odpowiedz — konczy sie pustym wynikiem i wyslaniem samego oryginalu. Powiadomienie o
+ *   czekajacym goscie jest wazniejsze niz jego tlumaczenie i nie ma prawa zginac przez to,
+ *   ze model akurat nie odpowiada.
+ *
+ * „SAME" ZAMIAST DRUGIEJ KOPII
+ *   Gdy wiadomosc juz jest w docelowym jezyku, model ma oddac samo slowo SAME. Wtedy tekst
+ *   pokazuje sie RAZ. Bez tego Wloch dostawalby wloskie zdanie, a pod nim to samo wloskie
+ *   zdanie w nawiasie.
+ */
+async function translateForAlert(env, text, target) {
+  const names = { pl: 'Polish', it: 'Italian' };
+  const want = names[target];
+  const key = String(env.AI_API_KEY || '').trim();
+  if (!want || !key || !text) return '';
+  const endpoint = env.AI_API_URL || env.AI_BASE_URL || 'https://api.openai.com/v1/chat/completions';
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: env.AI_MODEL || 'gpt-4o-mini',
+        max_tokens: 400,
+        /* Zero, nie 0.2 jak w czacie: to jest tlumaczenie, a nie rozmowa — kazda swoboda
+           modelu jest tu wylacznie okazja do przekrecenia cudzego zdania. */
+        temperature: 0,
+        messages: [
+          {
+            role: 'system',
+            content: `Translate the user message into ${want}. Reply with the translation only`
+              + ` — no quotes, no explanation, no notes. If the message is already written in`
+              + ` ${want}, reply with exactly: SAME`
+          },
+          { role: 'user', content: text }
+        ]
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!response.ok) return '';
+    const data = await response.json().catch(() => null);
+    const out = String(data?.choices?.[0]?.message?.content || '').trim();
+    if (!out || out.toUpperCase() === 'SAME') return '';
+    return out;
+  } catch (_) {
+    return '';
+  }
+}
+
 async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) {
   /* Wyciszenie dotyczy TYLKO wątków już prowadzonych przez człowieka.
 
@@ -1085,8 +1143,23 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
         ? "L'IA non conosceva la risposta e ha passato la conversazione."
         : 'Nuovo messaggio in una conversazione seguita da una persona.'
   };
+  /* Jedno wywolanie modelu na JEZYK, nie na numer. Przy dwoch polskich telefonach i jednym
+     wloskim sa dwa tlumaczenia, a nie trzy — a gdy wszystkie numery sa polskie i gosc pisze
+     po polsku, model odda SAME i nie doklada sie nic. */
+  const alertLocales = [...new Set(whatsappTargets(env).map((target) => target.locale))];
+  const translated = new Map();
+  await Promise.all(alertLocales.map(async (locale) => {
+    translated.set(locale, await translateForAlert(env, excerpt, locale));
+  }));
+
   const messageFor = (locale) => {
     const w = wording[locale] || wording.pl;
+    /* Tlumaczenie u gory, oryginal w nawiasie pod spodem. Gdy tlumaczenia nie ma — bo jezyk
+       sie zgadza albo model nie odpowiedzial — zostaje sam oryginal, raz. */
+    const mine = translated.get(locale) || '';
+    const said = mine ? `${mine}
+
+(${excerpt})` : excerpt;
     return [
       w.head,
       leadFor[locale] || leadFor.pl,
@@ -1095,7 +1168,7 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false) 
       thread.email ? `✉️ ${thread.email}` : '',
       `${w.lang}: ${String(thread.locale || 'it').toUpperCase()}`,
       '',
-      excerpt,
+      said,
       '',
       `${w.reply}: https://www.carruleddhishow.com/admin`
     ].filter(Boolean).join('\n');
