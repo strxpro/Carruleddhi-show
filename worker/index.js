@@ -24,6 +24,9 @@ import { PRINT_TEMPLATES, PRINT_WORDING, PRINT_DATA_KEYS } from './print-templat
 
 const ALLOWED_TYPES = new Set([
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
+  /* Statystyki odwiedzin. `visit` to sonda ze strony — publiczna, bo wysyła ją przeglądarka
+     zwiedzającego; `stats` to odczyt dla panelu, za tym samym hasłem co reszta panelu. */
+  'visit', 'stats',
   // Listy przypomnień i newslettera dla panelu. Za passphrase, jak roster.
   'subscribers',
   // Public wall. `wall` reads approved messages, `wall-post` adds one,
@@ -66,8 +69,25 @@ const ALLOWED_TYPES = new Set([
      wygląda jak działająca końcówka — dokładnie ta pomyłka opisana wyżej przy `roster`. */
   'notify-code', 'notify-off',
 
-  /* Zgłoszenie sponsora z czatu. Bez passphrase, bo to publiczny formularz w rozmowie — i bez
-     kodu na skrzynkę, bo tu ktoś zostawia WŁASNY kontakt, a nie rusza cudzych danych. */
+  /* Bramka weryfikacyjna dla rozmowy: `verify-start` wysyła kod na podany adres, `verify-code`
+     sprawdza wpisany kod bez zużywania wiersza. Jedna para dla wszystkich spraw prowadzonych
+     w czacie — sponsor, wypisanie z powiadomień, zmiana danych, rezygnacja — więc pomyłka
+     w rejestracji psuje nie jedną sprawę, a wszystkie cztery naraz.
+
+     To te same CZTERY miejsca, o których mówi komentarz wyżej przy `notify-code`, i tu warto
+     je wymienić po imieniu, bo żadne z nich nie krzyczy, gdy zostanie pominięte:
+       ALLOWED_TYPES     bez tego żądanie odbija się o UNKNOWN_TYPE przed handlerem,
+       SUPABASE_TYPES    bez tego leci do Make, który odpowiada „Accepted" i nie robi nic,
+       FIELD_WHITELIST   bez tego `email`, `purpose` i `code` giną w sanitizacji, a handler
+                         widzi puste pola i odmawia tak, jakby gość podał śmieci,
+       router w fetch()  bez tego wpada w `wallAdmin` na końcu łańcucha `if`-ów.
+     Trzy pierwsze awarie wyglądają jak działająca końcówka, która po prostu zawsze odmawia. */
+  'verify-start', 'verify-code',
+
+  /* Zgłoszenie sponsora z czatu. Bez passphrase, bo to publiczny formularz w rozmowie — ale
+     za bramką z `verify-start` / `verify-code`: adres jest tu jedynym kontaktem, na który
+     organizator odpowie, więc niepotwierdzony adres znaczy zgłoszenie, na które nie da się
+     odpowiedzieć, i telefon wykręcony po cudzym numerze. */
   'sponsor-lead',
 
   /* Zawodnik, który już jest na liście i wpisuje swój adres w formularzu.
@@ -85,9 +105,11 @@ const ALLOWED_TYPES = new Set([
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
 const SUPABASE_TYPES = new Set([
+  'visit', 'stats',
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
   'unsub-start', 'unsub-confirm', 'notify-code', 'notify-off', 'sponsor-lead',
+  'verify-start', 'verify-code',
   'chat', 'chat-admin', 'chat-inbound', 'inbox',
   'entry-lookup', 'entry-code', 'entry-manage',
   /* `roster` belongs here and did not, which is why the entries screen in the panel showed
@@ -130,7 +152,11 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
 const PROTECTED_TYPES = new Set([
   'roster', 'subscribers',
   'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge',
-  'voting-admin'
+  'voting-admin',
+  /* `stats` tak, `visit` NIE. Sondę wysyła przeglądarka każdego zwiedzającego, więc hasło
+     musiałoby stać w kodzie strony — czyli nie byłoby hasłem. Odczyt statystyk to co innego:
+     to są liczby organizatora i nikt poza nim nie ma powodu ich widzieć. */
+  'stats'
 ]);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
@@ -143,7 +169,13 @@ const FIELD_WHITELIST = {
     // Riders under 18 on the day of the event. `isMinor` and `riderAge` always
     // travel; the rest only when the rider is a minor. See validate().
     'isMinor', 'riderAge', 'childKind', 'guardianRelation', 'guardianName',
-    'guardianEmail', 'guardianPhone', 'motherName', 'fatherName', 'guardianConsent'
+    'guardianEmail', 'guardianPhone', 'motherName', 'fatherName', 'guardianConsent',
+    /* PIERWSZE dotknięcie tej przeglądarki, nie ostatnie — zapamiętane przez sondę odwiedzin
+       i przekazane dopiero tutaj. Odpowiada na pytanie, dla którego cała ta statystyka
+       powstała: nie „ile osób weszło z Instagrama", tylko „ile z nich się zapisało".
+       Klasyfikacji kanału NIE robi przeglądarka: przysyła surowy host i utm, a nazwę kanału
+       liczy classifySource() — jedna reguła, ta sama co przy zliczaniu wejść. */
+    'refHost', 'utmSource', 'utmCampaign'
   ],
   reminder: ['name', 'email', 'consent', 'reminderSchedule'],
   attendance: ['attendeeId'],
@@ -186,6 +218,13 @@ const FIELD_WHITELIST = {
      a niósłby numer startowy w każdej linijce. */
   'chat-inbound': ['from', 'name', 'text', 'messageId', 'locale'],
   inbox: ['action'],
+  /* Sonda odwiedzin. `ref` to `document.referrer` — surowy adres, z którego przeglądarka
+     przyszła; kanał liczy z niego serwer, a nie strona, bo reguła „l.instagram.com to
+     Instagram" ma mieszkać w jednym miejscu. `q` to ciąg zapytania z adresu, z którego
+     serwer bierze utm_*. Ani jednego pola, które mogłoby kogokolwiek zidentyfikować. */
+  visit: ['path', 'ref', 'q', 'lang', 'width'],
+  // Odczyt statystyk: jedna liczba, ile godzin wstecz.
+  stats: ['hours'],
   // A public read takes no input at all, which is the shortest possible answer to
   // "what can a visitor ask this endpoint to do".
   settings: [],
@@ -215,9 +254,24 @@ const FIELD_WHITELIST = {
   'notify-code': ['email', 'locale'],
   'notify-off': ['email', 'code'],
 
+  /* Bramka w rozmowie. `purpose` mówi, na którą sprawę kod jest wystawiany, i jest sprawdzany
+     przez `VERIFY_PURPOSES` — kod na jedną sprawę nie działa na inną. `entryId` nazywa
+     zawodnika, gdy na jednym adresie jest ich kilku; przy celach `sponsor` i `unsubscribe`
+     nie ma czego nazywać i pole jest pomijane.
+     `locale` tylko przy wysyłce, bo decyduje o języku listu — przy sprawdzaniu kodu nie ma
+     żadnej treści do złożenia. Odwrotnie z `code`: przy wysyłce nie ma jeszcze czego
+     sprawdzać. `locale` przeszłoby i przez `common`, tak jak przy `notify-code`, ale stoi tu
+     wymienione po imieniu, żeby kontrakt końcówki dał się przeczytać w jednym miejscu. */
+  'verify-start': ['email', 'purpose', 'entryId', 'locale'],
+  'verify-code': ['email', 'purpose', 'code', 'entryId'],
+
   /* Nazwa na carruleddhi bywa nazwą restauracji z apostrofem albo znakiem `&`, więc jedzie
-     przez zwykłą sanitizację tekstu; telefon i mail tak jak wszędzie. */
-  'sponsor-lead': ['cartName', 'phone', 'email', 'locale'],
+     przez zwykłą sanitizację tekstu; telefon i mail tak jak wszędzie.
+     `code` i `consent` doszły razem z bramką: to żądanie jest czynnością, więc niesie parę
+     (adres, kod) przy sobie (O5), a zgoda jest sprawdzana po stronie serwera — pastylka
+     w przeglądarce jest sugestią, nie dowodem. `consent` jest wartością logiczną i przechodzi
+     przez `sanitizeScalar` nietknięte, tak jak `dryRun` przy przypomnieniach. */
+  'sponsor-lead': ['cartName', 'firstName', 'lastName', 'phone', 'email', 'code', 'consent', 'locale'],
 
   /* Zgłoszenie widziane oczami zawodnika.
      `entry-lookup` bierze adres, a od niedawna także imię i nazwisko — oba opcjonalne.
@@ -1055,6 +1109,27 @@ function noteWhatsappFailure(reason) {
   lastWhatsappFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
 }
 
+/* I to samo dla listów, które wolno zgubić.
+   ---------------------------------------------------------------------------
+   `sendThroughOutbox` zwraca `false` i nic więcej się nie dzieje. Dla większości listów to
+   jest w porządku, bo obok jest odpowiedź dla gościa, która się nie udała razem z nimi. Są
+   jednak wysyłki, po których gość dostaje „dziękujemy" NIEZALEŻNIE od tego, czy list
+   wyszedł — potwierdzenie zgłoszenia sponsora jest pierwszą z nich (7.5): organizatorzy
+   mają już zgłoszenie WhatsAppem i mailem, więc odmowa dla zgłaszającego byłaby karą za
+   awarię, której nie wywołał. Bez tego zapisu taka awaria nie zostawia śladu nigdzie.
+
+   `console.error` obok zmiennej, z tego samego powodu co przy modelu: zmienna żyje w jednym
+   isolate i panel prawie nigdy nie czyta tego, w którym coś padło.
+
+   CZEGO TU NIE MA
+     Pełnego adresu. Powód wystarcza do rozpoznania awarii kanału, a to jest okno
+     diagnostyczne, nie rejestr korespondencji — adres jedzie zamaskowany. */
+let lastMailFailure = '';
+function noteMailFailure(reason) {
+  lastMailFailure = reason ? `${new Date().toISOString().slice(11, 19)}Z ${reason}` : '';
+  if (reason) console.error(`[mail] ${reason}`);
+}
+
 /**
  * Pytanie do modelu, opcjonalnie ze zdjęciem.
  *
@@ -1200,6 +1275,158 @@ function whatsappTargets(env) {
       return phone && apikey ? { phone, apikey, locale: locale === 'it' ? 'it' : 'pl' } : null;
     })
     .filter(Boolean);
+}
+
+/**
+ * Jedna wysyłka na WhatsApp na każdy skonfigurowany numer.
+ *
+ * `textFor(locale)` dostaje język TEGO numeru i oddaje gotową treść — czyli ta funkcja nie
+ * wie nic o tym, co wysyła, a wołający nie wie nic o CallMeBocie. Zwraca TABLICĘ obietnic,
+ * nie jedną: `alertOrganisers` dokłada do tej samej tablicy wysyłkę maila i czeka na całość
+ * jednym `allSettled`.
+ *
+ * DLACZEGO TO STOI W JEDNYM MIEJSCU
+ *   Bo poniżej jest warunek, który przy kopiowaniu ginie pierwszy.
+ *
+ *   CallMeBot ODMAWIA ZE STATUSEM 200. Wyczerpany darmowy limit wygląda tak:
+ *
+ *     HTTP 200  "You have 0 messages left. (...) Message not sent"
+ *
+ *   Czyli sukces po kodzie, brak wiadomości w rzeczywistości. Zmierzone na numerze
+ *   48665626101 dnia 29.08.2026: przebiegi w Make były zielone przez cały czas, a telefon
+ *   milczał, bo moduł HTTP patrzy wyłącznie na status.
+ *
+ *   Sprawdzamy więc TREŚĆ odpowiedzi i zapisujemy powód przez `noteWhatsappFailure` — tam,
+ *   gdzie panel pokazuje ciche awarie kanałów, jedno miejsce na wszystkie.
+ *
+ * NIGDY NIE RZUCA
+ *   Każdy numer ma własny try/catch i własny timeout. Nieudane powiadomienie jest zapisywane,
+ *   a nie zamieniane w odmowę dla gościa (O7) — gość zrobił swoje i nie ma nic do naprawienia.
+ */
+function sendWhatsapp(env, textFor) {
+  return whatsappTargets(env).map(async ({ phone, apikey, locale }) => {
+    // Ostatnie cztery cyfry wystarczą, żeby rozpoznać telefon; całego numeru tu nie trzymamy.
+    const tail = phone.slice(-4);
+    const url = new URL('https://api.callmebot.com/whatsapp.php');
+    url.searchParams.set('phone', phone);
+    url.searchParams.set('apikey', apikey);
+    url.searchParams.set('text', textFor(locale));
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const body = (await response.text().catch(() => '')).replace(/<[^>]*>/g, ' ');
+      if (!response.ok) {
+        noteWhatsappFailure(`...${tail}: HTTP ${response.status}`);
+      } else if (/not sent|0 messages left|APIKey is not valid|not registered/i.test(body)) {
+        noteWhatsappFailure(`...${tail}: ${body.replace(/\s+/g, ' ').trim().slice(0, 160)}`);
+      }
+    } catch (error) {
+      noteWhatsappFailure(`...${tail}: ${error?.name || 'Error'}`);
+    }
+  });
+}
+
+/* ============================================================================
+   Ramki powiadomienia o sponsorze
+   ============================================================================
+   SZEŚĆ JĘZYKÓW, CHOĆ NUMERY SĄ DZIŚ DWA
+     Lista numerów siedzi w `WHATSAPP_ALERTS`, czyli jest konfiguracją, a nie kodem. Trzeci
+     numer z trzecim językiem ma być wpisem w zmiennej środowiskowej, a nie powodem do
+     otwierania tego pliku. Komplet sześciu kodów jest ten sam, co w `detectLocale`, w
+     `i18n.js` i w `copy.json` — rozjazd w którymkolwiek z tych miejsc daje surowy klucz
+     albo pustą ramkę.
+
+   TŁUMACZONA JEST RAMKA, DANE NIE
+     Etykiety i zdanie końcowe są napisane w każdym języku i wybierane po języku numeru.
+     Nazwa carruleddhi oraz imię i nazwisko idą DOSŁOWNIE, tak jak je ktoś wpisał (6.4).
+     Przetłumaczona nazwa własna to najkrótsza droga do zgłoszenia, którego organizator nie
+     skojarzy z osobą, która za chwilę odbierze telefon.
+
+   ŻADNYCH MIEJSC NA DANE W RAMCE
+     Nie ma tu `%NAME%` ani innego zastępnika. Dane są DOKŁADANE do etykiety przy składaniu
+     wiadomości, nie podstawiane w środek zdania — inaczej każdy nowy język byłby okazją do
+     zgubienia jednego zastępnika i wysłania organizatorowi surowego wzorca.
+   ========================================================================== */
+const SPONSOR_FRAMES = {
+  it: {
+    head: '🤝 *CARRULEDDHI — SPONSOR*',
+    cart: '🛒 Nome sulla carruleddhi',
+    who: '👤 Persona',
+    phone: '📞 Telefono',
+    email: '✉️ E-mail',
+    note: 'Vuole collaborare. Richiama.'
+  },
+  pl: {
+    head: '🤝 *CARRULEDDHI — SPONSOR*',
+    cart: '🛒 Nazwa na carruleddhi',
+    who: '👤 Osoba',
+    phone: '📞 Telefon',
+    email: '✉️ E-mail',
+    note: 'Chętny do współpracy. Oddzwoń.'
+  },
+  en: {
+    head: '🤝 *CARRULEDDHI — SPONSOR*',
+    cart: '🛒 Name on the carruleddhi',
+    who: '👤 Person',
+    phone: '📞 Phone',
+    email: '✉️ E-mail',
+    note: 'Wants to work with us. Call back.'
+  },
+  de: {
+    head: '🤝 *CARRULEDDHI — SPONSOR*',
+    cart: '🛒 Name auf der carruleddhi',
+    who: '👤 Person',
+    phone: '📞 Telefon',
+    email: '✉️ E-Mail',
+    note: 'Möchte zusammenarbeiten. Bitte zurückrufen.'
+  },
+  es: {
+    head: '🤝 *CARRULEDDHI — SPONSOR*',
+    cart: '🛒 Nombre en la carruleddhi',
+    who: '👤 Persona',
+    phone: '📞 Teléfono',
+    email: '✉️ Correo',
+    note: 'Quiere colaborar. Devuelve la llamada.'
+  },
+  fr: {
+    head: '🤝 *CARRULEDDHI — SPONSOR*',
+    cart: '🛒 Nom sur la carruleddhi',
+    who: '👤 Personne',
+    phone: '📞 Téléphone',
+    email: '✉️ E-mail',
+    note: 'Souhaite collaborer. Rappelle.'
+  }
+};
+
+/**
+ * Powiadomienie o zgłoszeniu sponsora, każdy numer w swoim języku (6.1, 6.2).
+ *
+ * `lead` to `{ cartName, person, email, phone, locale }`, gdzie `locale` jest językiem
+ * ROZMOWY, nie językiem numeru. Idzie w wiadomości jako sam kod przy globusie, bez
+ * etykiety: organizator ma wiedzieć, w czym odpisać, a dwuliterowy kod nie wymaga
+ * tłumaczenia, więc nie ma powodu trzymać na niego siódmego pola w ramce.
+ *
+ * Nie rzuca i nie zwraca niczego do sprawdzenia. Awaria kanału jest zapisana przez
+ * `sendWhatsapp`, a zgłoszenie i tak jedzie drugą drogą — mailem (6.6).
+ */
+async function alertSponsor(env, lead) {
+  const guestLocale = String(lead.locale || 'it').toUpperCase();
+  const textFor = (locale) => {
+    const frame = SPONSOR_FRAMES[locale] || SPONSOR_FRAMES.pl;
+    return [
+      frame.head,
+      '',
+      `${frame.cart}: ${lead.cartName}`,
+      `${frame.who}: ${lead.person}`,
+      lead.phone ? `${frame.phone}: ${lead.phone}` : '',
+      `${frame.email}: ${lead.email}`,
+      `🌐 ${guestLocale}`,
+      '',
+      frame.note
+    ].filter(Boolean).join('\n');
+  };
+
+  // allSettled: jeden padnięty numer nie może zabrać pozostałych.
+  try { await Promise.allSettled(sendWhatsapp(env, textFor)); } catch (_) { /* sygnał, nie transakcja */ }
 }
 
 /**
@@ -1393,37 +1620,10 @@ async function alertOrganisers(env, thread, body, handedOver, viaEmail = false, 
     ].filter(Boolean).join('\n');
   };
 
-  /* CallMeBot ODMAWIA ZE STATUSEM 200 — dlatego trzeba czytać treść, nie kod.
-     ---------------------------------------------------------------------------
-     Wyczerpany darmowy limit wygląda tak:
-
-       HTTP 200  "You have 0 messages left. (...) Message not sent"
-
-     Czyli sukces po kodzie, brak wiadomości w rzeczywistości. Zmierzone na numerze
-     48665626101 dnia 29.08.2026: przebiegi w Make były zielone przez cały czas, a telefon
-     milczał, bo moduł HTTP patrzy wyłącznie na status.
-
-     Sprawdzamy więc treść i zapisujemy powód tam, gdzie widać powód nieodpowiadającego
-     modelu — jedno miejsce w panelu na wszystkie ciche awarie kanałów. */
-  const tasks = whatsappTargets(env).map(async ({ phone, apikey, locale }) => {
-    const url = new URL('https://api.callmebot.com/whatsapp.php');
-    url.searchParams.set('phone', phone);
-    url.searchParams.set('apikey', apikey);
-    url.searchParams.set('text', messageFor(locale));
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
-      const body = (await response.text().catch(() => '')).replace(/<[^>]*>/g, ' ');
-      // Ostatnie cztery cyfry wystarczą, żeby rozpoznać telefon; całego numeru tu nie trzymamy.
-      const tail = phone.slice(-4);
-      if (!response.ok) {
-        noteWhatsappFailure(`...${tail}: HTTP ${response.status}`);
-      } else if (/not sent|0 messages left|APIKey is not valid|not registered/i.test(body)) {
-        noteWhatsappFailure(`...${tail}: ${body.replace(/\s+/g, ' ').trim().slice(0, 160)}`);
-      }
-    } catch (error) {
-      noteWhatsappFailure(`...${phone.slice(-4)}: ${error?.name || 'Error'}`);
-    }
-  });
+  /* Wysyłka i czytanie odmowy ze statusem 200 są we wspólnym `sendWhatsapp` — razem z
+     powodem, dla którego ten warunek musi stać w jednym miejscu. Tutaj zostaje tylko
+     to, co jest naprawdę o powiadomieniu z czatu: treść na język numeru. */
+  const tasks = sendWhatsapp(env, messageFor);
 
   const html = [
     '<!doctype html><html><body style="margin:0;padding:24px;background:#e9f1ff;font-family:system-ui,sans-serif;color:#12233d;">',
@@ -2136,7 +2336,10 @@ async function inbox(env, payload, cors) {
     /* Ostatnia cicha odmowa CallMeBota — puste znaczy „ostatnia wysyłka przeszła".
        Osobno od `ai`, bo to inny kanał, ale w tym samym miejscu, żeby panel miał jedno
        okno na wszystkie awarie, które nie zgłaszają się same. */
-    whatsapp: { lastFailure: lastWhatsappFailure }
+    whatsapp: { lastFailure: lastWhatsappFailure },
+    /* Trzeci kanał w tym samym oknie: list, po którym gość i tak usłyszał „dziękujemy".
+       Puste znaczy „ostatnia taka wysyłka przeszła albo jeszcze żadnej nie było". */
+    mail: { lastFailure: lastMailFailure }
   }, 200, cors);
 }
 
@@ -2230,6 +2433,180 @@ async function inboxItems(env, since) {
 
   items.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return items.slice(0, 20);
+}
+
+/* ============================================================================
+   Statystyki odwiedzin
+   ============================================================================
+   Skąd przychodzą ludzie i ilu ich jest — policzone tak, żeby dało się z tego prowadzić
+   kampanię, i tak, żeby nie dało się z tego nikogo śledzić.
+
+   TRZY DECYZJE, KTÓRE TU RZĄDZĄ
+
+   1. KANAŁ ROZSTRZYGA SIĘ PRZY ZAPISIE, NIE PRZY ODCZYCIE.
+      `l.instagram.com`, `instagram.com` i `www.instagram.com` to jeden Instagram, a
+      `com.google.android.googlequicksearchbox` to Google. Ta wiedza mieszka w jednym
+      miejscu — w `classifySource()` niżej — a wykresy tylko sumują gotową kolumnę. Gdyby
+      klasyfikować przy odczycie, każdy nowy wykres byłby nowym miejscem, w którym Instagram
+      może zostać policzony dwa razy.
+
+   2. TOŻSAMOŚCI NIE MA. SĄ DWA SKRÓTY, KTÓRE SAME WYGASAJĄ.
+      `visitor` to HMAC z adresu IP, przeglądarki i DATY. Po północy ta sama osoba daje inny
+      skrót, więc da się policzyć „ilu ludzi dzisiaj" i nie da się połączyć jej wczoraj
+      z dzisiaj. `session` to to samo z półgodzinnym oknem, żeby przejście na trzecią
+      podstronę nie liczyło się jako trzy osoby. Adres IP nie jest nigdzie zapisywany.
+
+   3. BEZ ZGODY NIE MA ANI JEDNEGO ŻĄDANIA.
+      Baner obiecuje „analityczne wyłącznie za Twoją zgodą" i sonda w przeglądarce tego
+      pilnuje (patrz setupVisitBeacon w assets/js/app.js). Serwer nie ma jak tego sprawdzić,
+      więc go nie udaje — liczby są z natury niższe od prawdziwego ruchu i panel mówi o tym
+      wprost. Statystyka opisana i zaniżona jest uczciwa; statystyka udająca komplet nie.
+   ========================================================================== */
+
+/** Hosty, które są tym samym kanałem pod kilkoma adresami. Kolejność nie ma znaczenia. */
+const SOURCE_HOSTS = [
+  ['google', ['google.', 'googleadservices.', 'googlesyndication.', 'googlequicksearchbox']],
+  ['facebook', ['facebook.', 'fb.com', 'fb.me', 'm.facebook', 'l.facebook', 'lm.facebook']],
+  ['instagram', ['instagram.', 'l.instagram', 'ig.me']],
+  ['tiktok', ['tiktok.', 'vm.tiktok']],
+  ['youtube', ['youtube.', 'youtu.be']],
+  ['whatsapp', ['whatsapp.', 'wa.me', 'chat.whatsapp']],
+  ['messenger', ['messenger.']],
+  ['telegram', ['telegram.', 't.me']],
+  ['email', ['mail.google', 'outlook.', 'mail.yahoo', 'poczta.', 'wp.pl', 'onet.', 'interia.']],
+  ['bing', ['bing.']],
+  ['x', ['twitter.', 'x.com', 't.co']],
+  ['linkedin', ['linkedin.', 'lnkd.in']]
+];
+
+/**
+ * Który to kanał.
+ *
+ * `utm_source` wygrywa z odsyłaczem, bo jest deklaracją tego, kto wystawił link, i to on
+ * odróżnia dwie reklamy prowadzone na tym samym Facebooku. Bez niego decyduje host
+ * odsyłający. Bez jednego i drugiego zostaje „direct" — wpisany adres, zakładka, kod QR
+ * z plakatu albo aplikacja, która odsyłacza nie podaje.
+ */
+function classifySource(referrerHost, utmSource) {
+  const declared = String(utmSource || '').trim().toLowerCase();
+  if (declared) {
+    const known = SOURCE_HOSTS.find(([name]) => declared === name || declared.startsWith(name));
+    return known ? known[0] : declared.slice(0, 40);
+  }
+  const host = String(referrerHost || '').toLowerCase();
+  if (!host) return 'direct';
+  const match = SOURCE_HOSTS.find(([, hints]) => hints.some((hint) => host.includes(hint)));
+  return match ? match[0] : 'other';
+}
+
+/** Telefon, tablet czy komputer — z szerokości okna, bo user-agenta tu nie zapisujemy. */
+function deviceFromWidth(width) {
+  const value = Number(width) || 0;
+  if (value > 0 && value < 768) return 'mobile';
+  if (value >= 768 && value < 1100) return 'tablet';
+  return 'desktop';
+}
+
+/**
+ * Skrót, który sam wygasa.
+ *
+ * `slot` to numer okna czasowego: doba dla `visitor`, pół godziny dla `session`. Wchodzi do
+ * HMAC-a razem z adresem i przeglądarką, więc po zamknięciu okna ten sam człowiek daje inny
+ * skrót i nie ma jak zestawić jednego z drugim. Sól jest ta sama, co przy pozostałych
+ * skrótach na tej stronie.
+ */
+async function rollingHash(env, request, slot) {
+  const raw = [
+    env.WALL_SALT || 'carruleddhi',
+    clientIp(request) || '',
+    request.headers.get('User-Agent') || '',
+    slot
+  ].join(':');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+/**
+ * Jedno wejście na stronę.
+ *
+ * Odpowiada 204 zawsze — także gdy zapis się nie uda. To jest sonda w tle, a nie czynność
+ * zwiedzającego: błąd w konsoli u kogoś, kto przyszedł przeczytać o wyścigu, nie jest
+ * informacją dla nikogo, a licznik odwiedzin nie ma prawa niczego zepsuć.
+ */
+async function recordVisit(env, request, payload, cors) {
+  const nothing = () => new Response(null, { status: 204, headers: cors });
+  if (!wallReady(env)) return nothing();
+
+  try {
+    const now = Date.now();
+    const [visitor, session] = await Promise.all([
+      rollingHash(env, request, `d${Math.floor(now / 86_400_000)}`),
+      rollingHash(env, request, `s${Math.floor(now / 1_800_000)}`)
+    ]);
+
+    /* Odsyłacz z tej samej domeny nie jest kanałem, tylko przejściem między podstronami —
+       inaczej każdy klik w menu meldowałby się jako „ruch z carruleddhishow.com". */
+    let referrerHost = '';
+    try {
+      const parsed = new URL(String(payload.ref || ''));
+      const own = new URL(request.url).hostname.replace(/^www\./, '');
+      const host = parsed.hostname.replace(/^www\./, '');
+      if (host && host !== own) referrerHost = host.slice(0, 120);
+    } catch { /* pusty albo niepoprawny odsyłacz to po prostu brak odsyłacza */ }
+
+    const params = new URLSearchParams(String(payload.q || '').replace(/^\?/, ''));
+    const utm = (key) => (params.get(key) || '').trim().slice(0, 60) || null;
+
+    const row = {
+      source: classifySource(referrerHost, utm('utm_source')),
+      referrer_host: referrerHost || null,
+      utm_source: utm('utm_source'),
+      utm_medium: utm('utm_medium'),
+      utm_campaign: utm('utm_campaign'),
+      path: String(payload.path || '/').slice(0, 200),
+      /* Kraj podaje platforma z własnego rozpoznania adresu — my tego adresu nie zapisujemy
+         ani nie odpytujemy o niego nikogo z zewnątrz. */
+      country: (request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || '')
+        .slice(0, 2).toUpperCase() || null,
+      device: deviceFromWidth(payload.width),
+      lang: String(payload.lang || '').slice(0, 5) || null,
+      visitor,
+      session
+    };
+
+    await fetch(`${env.SUPABASE_URL}/rest/v1/site_visits`, {
+      method: 'POST',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify(row)
+    });
+  } catch (problem) {
+    console.warn('visit: nie zapisano —', problem?.message || problem);
+  }
+  return nothing();
+}
+
+/**
+ * Cały ekran statystyk, jednym zapytaniem.
+ *
+ * Liczenie siedzi w bazie (funkcja `site_stats`, migracja 0033), nie tutaj: osiem wykresów
+ * to osiem agregatów, a przeciąganie surowych wierszy przez tę funkcję po to, żeby je tu
+ * zsumować, znaczyłoby megabajty na każde odświeżenie panelu.
+ */
+async function siteStats(env, payload, cors) {
+  if (!wallReady(env)) return json({ ok: false, code: 'STATS_DISABLED' }, 503, cors);
+  const hours = Math.min(Math.max(Number.parseInt(payload.hours, 10) || 168, 1), 8760);
+
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/site_stats`, {
+    method: 'POST',
+    headers: supabaseHeaders(env, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ window_hours: hours })
+  });
+  if (!response.ok) {
+    return json({ ok: false, code: 'STATS_FAILED', detail: await response.text() }, 502, cors);
+  }
+  const stats = await response.json().catch(() => null);
+  if (!stats) return json({ ok: false, code: 'STATS_FAILED' }, 502, cors);
+  return json({ ok: true, stats }, 200, cors);
 }
 
 /* ============================================================================
@@ -3005,6 +3382,272 @@ async function overCodeSendLimit(env, email, purposes) {
   return Array.isArray(rows) && rows.length >= CODE_SEND_MAX;
 }
 
+/* ============================================================================
+   WYSYŁKA KODU: JEDNO MIEJSCE NA WSZYSTKIE SPRAWY
+   ============================================================================
+   Wystawienie kodu to trzy czynności, które muszą chodzić razem: wylosowanie sześciu cyfr,
+   zapisanie ich skrótu z celem i adresem, wysłanie listu. Ta sekwencja stała dotąd w trzech
+   kopiach (`unsub-start`, `notify-code`, `entry-code`) i każda nowa sprawa dokładała czwartą.
+   Kopie nie rozjechały się jeszcze, ale rozjazd w kopii tej konkretnej sekwencji jest cichy:
+   wiersz zapisany bez wysłanego listu to gość czekający na kod, którego nie ma, a list wysłany
+   bez wiersza to kod, którego nie da się użyć.
+
+   Tutaj chodzą trzy z czterech: `verify-start`, `notify-code` i `entry-code`. `unsub-start`
+   zostaje przy swojej kopii, bo wchodzi żetonem z listu i po drodze robi jeszcze sprzątanie
+   wygasłych kodów — jego przepisywanie należy do tamtej ścieżki, nie do bramki w czacie.
+
+   Wołający zostaje z tym, co jest jego sprawą: kto ma prawo dostać kod, co zdradza odpowiedź
+   i jaki sufit obowiązuje. Tutaj jest tylko „jak wygląda list i co ląduje w tabeli".
+   ========================================================================== */
+
+/**
+ * Klucze `COPY_DECK` na list dla każdego celu. Nazwy kluczy, nie gotowe zdania — treść żyje
+ * w `emails/copy.json` w sześciu językach i to ona jest tłumaczona (O1).
+ */
+const CODE_LETTERS = {
+  unsubscribe: {
+    subject: 'unsubSubject', title: 'unsubCodeTitle', lead: 'unsubCodeLead', note: 'unsubCodeNote'
+  },
+  'edit-entry': {
+    subject: 'entrySubject', title: 'entryCodeTitle', lead: 'entryCodeLead', note: 'entryCodeNote'
+  },
+  /* Osobny list, nie ten sam z innym nagłówkiem: jedna z tych dwóch spraw wypisuje kogoś
+     z wyścigu, a kod wpisywany bez wiedzy, co potwierdza, jest kodem wpisanym na oślep. */
+  'cancel-entry': {
+    subject: 'quitSubject', title: 'quitCodeTitle', lead: 'quitCodeLead', note: 'quitCodeNote'
+  },
+  /* Cel `sponsor` nie ma jeszcze własnych zdań w `copy.json`, więc bierze te, które są prawdziwe
+     dla każdego celu: „Twój kod: %CODE%", „Oto kod" i zdanie o zignorowaniu listu, którego się
+     nie zamawiało. Zapożyczenie `entryCodeLead` byłoby napisaniem sponsorowi o jego zgłoszeniu
+     do wyścigu, czyli zdaniem nieprawdziwym — a puste `lead` niczego nie kłamie. Własne zdania
+     dochodzą razem z pozostałymi tekstami sponsora. */
+  sponsor: {
+    subject: 'entrySubject', title: 'entryCodeTitle', lead: '', note: 'unsubCodeNote'
+  }
+};
+
+/**
+ * Wystawia kod na parę (adres, cel) i wysyła go listem.
+ *
+ * Nie sprawdza ani sufitu, ani tego, komu wolno ten kod dostać — jedno i drugie zależy od
+ * sprawy i zostaje u wołającego. Nie zwraca też samych cyfr: kod ma opuścić tę funkcję
+ * wyłącznie skrzynką odbiorcy i skrótem w bazie.
+ *
+ * @param {object} env
+ * @param {{email: string, purpose: string, entryId?: string|null, locale?: string}} what
+ * @returns {Promise<{ok: true}|{ok: false, code: 'CODE_STORE_FAILED'|'CODE_MAIL_FAILED'}>}
+ */
+async function sendCodeLetter(env, { email, purpose, entryId = null, locale }) {
+  const loc = localeOf(locale);
+  const deck = COPY_DECK[loc] || COPY_DECK.it;
+  const letter = CODE_LETTERS[purpose] || CODE_LETTERS.unsubscribe;
+  const code = newVerificationCode();
+
+  /* `entry_id` dokładane tylko wtedy, gdy jest: cele bez zgłoszenia za sobą (`sponsor`,
+     `unsubscribe`) zostawiają kolumnę pustą, a `checkCode` szuka ich przez `is.null`. */
+  const row = { purpose, email, code_hash: await hashCode(env, email, code) };
+  if (entryId) row.entry_id = entryId;
+
+  const stored = await insertRow(env, 'verification_codes', row);
+  if (!stored.ok) return { ok: false, code: 'CODE_STORE_FAILED' };
+
+  const delivered = await sendThroughOutbox(env, {
+    to: email,
+    subject: fill(deck[letter.subject], { CODE: code }),
+    html: renderTemplate(EMAIL_TEMPLATES.code, {
+      copy: deck,
+      ev: COPY_DECK._event || {},
+      loc,
+      codeTitle: deck[letter.title],
+      codeLead: letter.lead ? deck[letter.lead] : '',
+      code,
+      codeNote: deck[letter.note]
+    })
+  });
+  if (!delivered) return { ok: false, code: 'CODE_MAIL_FAILED' };
+
+  return { ok: true };
+}
+
+/* ============================================================================
+   `verify-start`: bramka weryfikacyjna dla rozmowy
+   ============================================================================
+   Jedna końcówka dla wszystkich spraw prowadzonych w czacie. `notify-code` i `entry-code`
+   zostają, bo wchodzi się w nie z odsyłacza w liście i z formularza zarządzania zgłoszeniem —
+   przepisywanie działających wejść to ryzyko bez zysku. Wspólna jest funkcja pod nimi
+   (`sendCodeLetter`), a nie adres, więc reguły listu i zapisu są jedne.
+
+   Ta końcówka NICZEGO NIE AUTORYZUJE. Wysłanie kodu to zaproszenie do udowodnienia dostępu do
+   skrzynki; dowód sprawdza `verify-code`, a czynność i tak dostaje parę (adres, kod) w swoim
+   własnym żądaniu (O5).
+   ========================================================================== */
+
+/** Cele, na które wolno prosić o kod z rozmowy. `manage-entry` jest historyczny i nie wchodzi. */
+const VERIFY_PURPOSES = new Set(['sponsor', 'unsubscribe', 'edit-entry', 'cancel-entry']);
+
+/**
+ * Zakres sufitu wysyłki dla każdej sprawy (O4).
+ *
+ * `sponsor` osobno i `unsubscribe` osobno, bo to trzy różne rozmowy i jedna nie ma zjadać
+ * limitu drugiej. `edit-entry` z `cancel-entry` razem, bo idą na tę samą skrzynkę i z punktu
+ * widzenia tej skrzynki trzy listy w kwadrans to trzy listy, niezależnie od tego, o co ktoś
+ * prosił. Liczone w `verification_codes`, czyli w tej samej tabeli co przy `notify-code`
+ * i `entry-code` — dwie drogi do tego samego celu nie dają razem sześciu kodów.
+ */
+const VERIFY_SEND_SCOPE = {
+  sponsor: ['sponsor'],
+  unsubscribe: ['unsubscribe'],
+  'edit-entry': ['edit-entry', 'cancel-entry'],
+  'cancel-entry': ['edit-entry', 'cancel-entry']
+};
+
+async function verifyStart(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  const purpose = String(payload.purpose || '');
+
+  /* Nieznany cel to pomyłka po naszej stronie, nie czynność gościa: kreator zna cztery i wysyła
+     jeden z nich. Dlatego 400 i osobny kod, a nie doklejanie tego przypadku do odmowy, którą
+     rozmowa tłumaczy jako „popraw adres". */
+  if (!VERIFY_PURPOSES.has(purpose)) return json({ ok: false, code: 'VERIFY_BAD_PURPOSE' }, 400, cors);
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'VERIFY_BAD_EMAIL' }, 422, cors);
+
+  /* Sufit PRZED jakimkolwiek odczytem: zalew nie ma kosztować nawet zapytania o listę. */
+  if (await overCodeSendLimit(env, email, VERIFY_SEND_SCOPE[purpose])) {
+    return json({ ok: false, code: 'VERIFY_TOO_OFTEN' }, 429, {
+      ...cors,
+      'Retry-After': String(CODE_SEND_WINDOW_SECONDS)
+    });
+  }
+
+  /* Jedna odpowiedź na wszystkie przypadki poza sufitem i błędnym adresem.
+     ------------------------------------------------------------------------
+     `sent` jest w kontrakcie i jest stałe na tej ścieżce, i to nie jest przeoczenie: `false`
+     mówiłoby „tego adresu nie ma na naszej liście", czyli odpowiadałoby na pytanie, na które
+     wolno odpowiadać wyłącznie skrzynce (O6). Gość, który podał obcy adres, czeka na list,
+     którego nie będzie — i wychodzi z bramki tymi samymi trzema pastylkami co po wygasłym
+     kodzie. */
+  const uniform = () => json({ ok: true, email: maskEmail(email), sent: true }, 200, cors);
+
+  /* Do kogo ten kod ma prawo pójść, i w jakim języku ma być list. Cel `sponsor` nie ma tu nic
+     do sprawdzania: nie istnieje lista, na której można by być, więc nie ma czego ujawnić. */
+  let entryId = null;
+  let locale = payload.locale;
+
+  if (purpose === 'unsubscribe') {
+    const active = (await findSubscriptionsByEmail(env, email))
+      .filter((entry) => entry.row.status !== 'unsubscribed');
+    if (!active.length) return uniform();
+    locale = active[0].row.locale || payload.locale;
+  } else if (purpose === 'edit-entry' || purpose === 'cancel-entry') {
+    const rows = await findEntries(env, email);
+    /* Kod na zgłoszenie nosi `entry_id` i musi go nosić: `entryManage` sprawdza kod pod
+       konkretnym zawodnikiem, więc kod bez wiązania nie otworzyłby niczego.
+       Przy kilku zawodnikach na jednym adresie bierzemy tego, którego nazwał kreator, a bez
+       nazwania — najnowszego. `entry-code` odpowiada w tej sytuacji `ENTRY_ID_REQUIRED`, ale
+       tutaj taka odpowiedź mówiłaby „na tym adresie jest więcej niż jedno zgłoszenie", czyli
+       zdradzałaby dokładnie to, czego ta końcówka nie zdradza. Pomyłka jest odwracalna:
+       niezgodne wiązanie zatrzymuje się później, na sprawdzeniu kodu. */
+    const asked = String(payload.entryId || '');
+    const row = (asked && rows.find((entry) => entry.id === asked)) || rows[0];
+    if (!row) return uniform();
+    entryId = row.id;
+    locale = row.locale || payload.locale;
+  }
+
+  const sent = await sendCodeLetter(env, { email, purpose, entryId, locale });
+
+  /* Awaria wysyłki widziana przez gościa tylko przy celu `sponsor`.
+     ------------------------------------------------------------------------
+     Przy pozostałych celach 502 dla adresu znanego i 200 dla nieznanego byłoby tą samą
+     różnicą, której zabrania O6 — tylko okazyjną, na czas awarii skrzynki wyjściowej. Ślad
+     awarii zostaje tam, gdzie zostaje każdy inny: w skrzynce wyjściowej. Cel `sponsor` nie ma
+     czego ukrywać, więc tam mówimy wprost, że list nie wyszedł. */
+  if (!sent.ok && purpose === 'sponsor') {
+    return json({ ok: false, code: 'VERIFY_SEND_FAILED' }, 502, cors);
+  }
+
+  return uniform();
+}
+
+/* ==========================================================================
+   verify-code — sprawdzenie kodu bez zużycia wiersza
+   --------------------------------------------------------------------------
+   Ta końcówka odpowiada na jedno pytanie: „czy ten ktoś czyta tę skrzynkę". Odpowiedź jest
+   stanem rozmowy, nie poświadczeniem — dlatego `consume: false` i dlatego `consumed_at`
+   zostaje puste. Kod dożywa żądania, które naprawdę wykonuje czynność, a to żądanie i tak
+   niesie parę (adres, kod) i i tak ją sprawdza (O5). Gdyby było odwrotnie, „potwierdzone"
+   po stronie przeglądarki byłoby jedynym dowodem, a przeglądarka nie jest niczym chroniona.
+
+   Nieudana próba liczy się do tych samych pięciu, które widzi końcowa czynność — licznik
+   siedzi w wierszu, nie w wywołaniu. Sprawdzanie „na próbę", bez skutków, oddawałoby całą
+   obronę przed zgadywaniem sześciu cyfr.
+   ========================================================================== */
+
+/**
+ * Kody odmowy `checkCode` przełożone na słownik rozmowy, razem ze statusem.
+ *
+ * `checkCode` mówi językiem zgłoszenia (`ENTRY_*`), bo wyrósł z zarządzania zgłoszeniem.
+ * Bramka mówi językiem bramki i ma własne cztery zdania w `i18n.js`. Brak kodu i kod wygasły
+ * dostają tu 422, a nie 410 z zarządzania zgłoszeniem: dla rozmowy to jedna klasa sytuacji —
+ * „popraw albo poproś o nowy" — i jeden status po stronie klienta upraszcza rozgałęzienie
+ * w kreatorze do czytania samego pola `code`.
+ */
+const VERIFY_REFUSALS = {
+  ENTRY_NO_CODE: { code: 'VERIFY_NO_CODE', status: 422 },
+  ENTRY_CODE_EXPIRED: { code: 'VERIFY_EXPIRED', status: 422 },
+  ENTRY_TOO_MANY_TRIES: { code: 'VERIFY_TOO_MANY_TRIES', status: 429 },
+  ENTRY_CODE_WRONG: { code: 'VERIFY_WRONG', status: 422 }
+};
+
+async function verifyCode(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  const purpose = String(payload.purpose || '');
+  const code = String(payload.code || '').replace(/\D/g, '');
+
+  /* Te same dwie odmowy co w `verify-start`, ten sam powód: nieznany cel to pomyłka po naszej
+     stronie, a nie czynność gościa. */
+  if (!VERIFY_PURPOSES.has(purpose)) return json({ ok: false, code: 'VERIFY_BAD_PURPOSE' }, 400, cors);
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'VERIFY_BAD_EMAIL' }, 422, cors);
+
+  /* Kod nie o sześciu cyfrach nie jest zgadywaniem, tylko żądaniem złożonym obok pola, które
+     wysyła dopiero na szóstej cyfrze. Odsyłamy go bez podnoszenia licznika prób i nie jest to
+     luka: taki kod nie mógłby trafić, więc darowanie próby nie kupuje pytającemu niczego. */
+  if (code.length !== 6) return json({ ok: false, code: 'VERIFY_BAD_CODE' }, 400, cors);
+
+  /* Do którego zawodnika kod należy — rozwiązywane tak samo jak w `verify-start`, bo inaczej
+     szukalibyśmy wiersza pod innym wiązaniem, niż został zapisany, i każdy poprawny kod na
+     zmianę danych wyglądałby jak nieistniejący. */
+  let entryId = null;
+  if (purpose === 'edit-entry' || purpose === 'cancel-entry') {
+    const rows = await findEntries(env, email);
+    const asked = String(payload.entryId || '');
+    const row = (asked && rows.find((entry) => entry.id === asked)) || rows[0];
+    /* Adres bez zgłoszenia nie ma kodu do sprawdzenia, i to jest ta sama odpowiedź, którą
+       dostałby adres znany, dla którego kod wygasł albo nigdy nie powstał (O6). */
+    if (!row) return json({ ok: false, code: 'VERIFY_NO_CODE' }, 422, cors);
+    entryId = row.id;
+  }
+
+  const checked = await checkCode(env, email, purpose, code, entryId, { consume: false });
+
+  if (!checked.ok) {
+    const refusal = VERIFY_REFUSALS[checked.code] || { code: 'VERIFY_NO_CODE', status: 422 };
+    const body = { ok: false, code: refusal.code };
+    /* Liczba pozostałych prób tylko przy błędnym kodzie: przy wygasłym i przy wyczerpanych
+       próbach nie ma czego liczyć, a `left: 0` w tych dwóch przypadkach czytałoby się jako
+       „jeszcze zero prób do zablokowania", czyli mówiłoby coś nieprawdziwego. */
+    if (typeof checked.left === 'number') body.left = checked.left;
+    /* Bez `Retry-After` przy 429, choć pozostałe nasze 429 je noszą: tu nie ma czego odczekać.
+       Wyczerpane próby znaczą „potrzebny nowy kod", a o nowy kod można poprosić od razu —
+       jedyne, co go opóźnia, to sufit wysyłki, i to `verify-start` mówi, ile czekać. */
+    return json(body, refusal.status, cors);
+  }
+
+  /* Bez `id` w odpowiedzi i bez `consumed_at` w bazie: rozmowa dostaje zgodę na kolejne pytania,
+     a nie bilet, którym mogłaby zapłacić za czynność. */
+  return json({ ok: true, confirmed: true }, 200, cors);
+}
+
 async function notifyCode(env, payload, cors) {
   const email = String(payload.email || '').trim().toLowerCase();
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'NOTIFY_BAD_EMAIL' }, 422, cors);
@@ -3024,31 +3667,16 @@ async function notifyCode(env, payload, cors) {
      z trzech przypadków dotyczy. */
   if (!active.length) return json({ ok: true, email: maskEmail(email), sent: false }, 200, cors);
 
-  const locale = localeOf(active[0].row.locale || payload.locale);
-  const deck = COPY_DECK[locale] || COPY_DECK.it;
-  const code = newVerificationCode();
-
-  const stored = await insertRow(env, 'verification_codes', {
-    purpose: 'unsubscribe',
+  const sent = await sendCodeLetter(env, {
     email,
-    code_hash: await hashCode(env, email, code)
+    purpose: 'unsubscribe',
+    locale: active[0].row.locale || payload.locale
   });
-  if (!stored.ok) return json({ ok: false, code: 'NOTIFY_CODE_FAILED' }, 502, cors);
-
-  const delivered = await sendThroughOutbox(env, {
-    to: email,
-    subject: fill(deck.unsubSubject, { CODE: code }),
-    html: renderTemplate(EMAIL_TEMPLATES.code, {
-      copy: deck,
-      ev: COPY_DECK._event || {},
-      loc: locale,
-      codeTitle: deck.unsubCodeTitle,
-      codeLead: deck.unsubCodeLead,
-      code,
-      codeNote: deck.unsubCodeNote
-    })
-  });
-  if (!delivered) return json({ ok: false, code: 'NOTIFY_MAIL_FAILED' }, 502, cors);
+  if (!sent.ok) {
+    // Te same dwa kody odmowy co dotąd, tylko powód przychodzi teraz ze wspólnej wysyłki.
+    const failure = sent.code === 'CODE_STORE_FAILED' ? 'NOTIFY_CODE_FAILED' : 'NOTIFY_MAIL_FAILED';
+    return json({ ok: false, code: failure }, 502, cors);
+  }
 
   return json({ ok: true, email: maskEmail(email), sent: true }, 200, cors);
 }
@@ -3122,61 +3750,79 @@ async function notifyOff(env, payload, cors) {
    WhatsAppem, bo organizatorzy trzymają telefon w ręku, i mailem, bo WhatsApp przez
    CallMeBota ma darmowy limit i potrafi odmówić ze statusem 200.
 
-   Nie ma tu weryfikacji kodem i to jest świadome. Kod na skrzynkę chroni CZYJEŚ DANE od
-   obcego; tutaj ktoś zostawia własny kontakt i chce, żeby ktoś zadzwonił. Bramka
-   z sześciocyfrowym kodem między firmą a rozmową z organizatorem odsiałaby zainteresowanych,
-   nie nadużycia — a najgorszy przypadek to jedno fałszywe zgłoszenie do odrzucenia telefonem.
+   WERYFIKACJA KODEM JEST TERAZ WARUNKIEM, I DLACZEGO SIĘ TO ZMIENIŁO
+     Przedtem tej bramki tu nie było, z rozmysłu: kod na skrzynkę chroni CZYJEŚ DANE od
+     obcego, a tutaj ktoś zostawia własny kontakt. Cena tej decyzji jest jednak po drugiej
+     stronie: adres jest jedynym kanałem, którym organizator odpowie, a niepotwierdzony adres
+     znaczy zgłoszenie bez adresata — i, przy cudzym adresie wpisanym z rozmysłu, telefon
+     wykręcony do kogoś, kto o niczym nie wie. Stąd wymaganie 5.6: żadna wysyłka na zewnątrz
+     przed zużyciem kodu.
+
+   KOLEJNOŚĆ WEWNĄTRZ TEJ FUNKCJI JEST CZĘŚCIĄ KONTRAKTU
+     `consumeCode` i `spendCode` idą PRZED pierwszym `fetch` do CallMeBota i przed pierwszym
+     `sendThroughOutbox`. Odwrotna kolejność znaczyłaby, że kod zużyty w połowie wysyłek albo
+     nieudany zapis zostawia zgłoszenie już wysłane, a kod dalej żywy — czyli jeden kod
+     zamieniony w dowolną liczbę powiadomień.
+
+   ZGODA SPRAWDZANA TUTAJ, NIE W PRZEGLĄDARCE
+     `consent !== true` to odmowa. Pastylka w czacie jest sugestią stanu, nie dowodem: stan
+     kreatora żyje w przeglądarce i nikt go nie pilnuje (O5). Z naszej strony ten przypadek
+     nie powinien się zdarzyć, więc gość dostaje ogólne zdanie o niepowodzeniu.
 
    Nic nie jest zapisywane w bazie: to nie jest lista, którą ktokolwiek będzie przeglądał, a
-   dodanie tabeli znaczyłoby dane osobowe firmy leżące bez powodu. Wiadomość dochodzi do
-   ludzi, którzy odpowiadają, i tam żyje.
+   dodanie tabeli znaczyłoby dane osobowe firmy leżące bez powodu (O3). Jedynym wierszem jest
+   kod, który właśnie wygasł przez zużycie. Wiadomość dochodzi do ludzi, którzy odpowiadają,
+   i tam żyje.
    ========================================================================== */
 async function sponsorLead(env, payload, cors) {
   const cartName = trimmed(payload.cartName, '');
+  const firstName = trimmed(payload.firstName, '');
+  const lastName = trimmed(payload.lastName, '');
   const phone = trimmed(payload.phone, '');
   const email = String(payload.email || '').trim().toLowerCase();
+  const code = String(payload.code || '').replace(/\D/g, '');
+
   if (!cartName || cartName.length > 120) return json({ ok: false, code: 'SPONSOR_BAD_NAME' }, 422, cors);
-  /* Telefon ALBO mail — jeden z dwóch wystarczy, żeby oddzwonić. Wymaganie obu odsiewałoby
-     kogoś, kto nie chce podawać numeru, a to jest zgłoszenie, nie formularz urzędowy. */
-  if (!phone && !email) return json({ ok: false, code: 'SPONSOR_NO_CONTACT' }, 422, cors);
-  if (email && !EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'SPONSOR_BAD_EMAIL' }, 422, cors);
+  /* Imię i nazwisko osobno, oba wymagane: „na kogo mam pytać" jest pierwszą rzeczą, której
+     brakowało w zgłoszeniach z samą nazwą wózka. Dzieli je przeglądarka, na pierwszym
+     odstępie, więc tutaj wystarczy sprawdzić, że przyszły oba. Sufit ten sam co na nazwie
+     wózka: przeglądarka przycina całość do 120 znaków, więc 120 na część nie odrzuci niczego,
+     co stąd przyszło, a odsieje wklejony akapit od kogoś, kto woła końcówkę wprost. */
+  if (!firstName || !lastName || firstName.length > 120 || lastName.length > 120) {
+    return json({ ok: false, code: 'SPONSOR_BAD_PERSON' }, 422, cors);
+  }
+  /* Adres OBOWIĄZKOWY (5.2). `SPONSOR_NO_CONTACT` zniknęło razem z przypadkiem „żadnego
+     kontaktu": bez adresu nie ma czego potwierdzać kodem, a bez potwierdzenia nie ma wysyłki. */
+  if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'SPONSOR_BAD_EMAIL' }, 422, cors);
   if (phone.length > 40) return json({ ok: false, code: 'SPONSOR_BAD_PHONE' }, 422, cors);
+  if (payload.consent !== true) return json({ ok: false, code: 'SPONSOR_NO_CONSENT' }, 422, cors);
+  if (code.length !== 6) return json({ ok: false, code: 'SPONSOR_BAD_CODE' }, 422, cors);
+
+  /* TU jest granica: powyżej nic nie wyszło na zewnątrz, poniżej kod jest już zużyty.
+     `entryId` to `null`, bo za celem `sponsor` nie stoi żadne zgłoszenie do wyścigu —
+     `checkCode` szuka takich wierszy przez `is.null`.
+     Powód odmowy jedzie w `reason` obok jednego kodu z kontraktu: gość przeszedł już bramkę,
+     więc to jest ścieżka wyjątkowa, a nie stan, dla którego czat ma osobne zdanie. */
+  const checked = await consumeCode(env, email, 'sponsor', code, null);
+  if (!checked.ok) {
+    return json({ ok: false, code: 'SPONSOR_BAD_CODE', reason: checked.code }, 422, cors);
+  }
+  await spendCode(env, checked.id);
 
   const locale = localeOf(payload.locale);
-  const lines = [
-    '🏁 CARRULEDDHI — SPONSOR',
-    '',
-    `🛒 ${cartName}`,
-    phone ? `📞 ${phone}` : '',
-    email ? `✉️ ${email}` : '',
-    `🌐 ${locale.toUpperCase()}`,
-    '',
-    'Zainteresowany sponsoringiem (100 EUR + wozek z nazwa). Oddzwon.'
-  ].filter(Boolean).join('\n');
+  const person = `${firstName} ${lastName}`;
 
-  /* WhatsApp do wszystkich numerów z konfiguracji, tą samą drogą co powiadomienia z czatu —
-     razem z tym samym czytaniem treści odpowiedzi, bo CallMeBot odmawia ze statusem 200. */
-  await Promise.all(whatsappTargets(env).map(async ({ phone: number, apikey }) => {
-    const url = new URL('https://api.callmebot.com/whatsapp.php');
-    url.searchParams.set('phone', number);
-    url.searchParams.set('apikey', apikey);
-    url.searchParams.set('text', lines);
-    try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
-      const body = (await response.text().catch(() => '')).replace(/<[^>]*>/g, ' ');
-      const tail = number.slice(-4);
-      if (!response.ok) noteWhatsappFailure(`...${tail}: HTTP ${response.status}`);
-      else if (/not sent|0 messages left|APIKey is not valid|not registered/i.test(body)) {
-        noteWhatsappFailure(`...${tail}: ${body.replace(/\s+/g, ' ').trim().slice(0, 160)}`);
-      }
-    } catch (error) {
-      noteWhatsappFailure(`...${number.slice(-4)}: ${error?.name || 'Error'}`);
-    }
-  }));
+  /* WhatsApp do wszystkich numerów z konfiguracji, każdy w języku swojego numeru (6.2).
+     Pętla po numerach wyszła stąd do `alertSponsor`, bo była bliźniacza do tej z
+     `alertOrganisers` — dwie kopie tego samego czytania odmowy ze statusem 200 to jedna
+     kopia za dużo. Awaria kanału jest tam zapisywana i NIE wraca tu jako odmowa (6.6):
+     kod jest już zużyty, a zgłoszenie jedzie także mailem. */
+  await alertSponsor(env, { cartName, person, email, phone, locale });
 
   /* Mail do organizatorów, na ten sam adres co wiadomości z formularza. Drugi kanał, bo
      pierwszy potrafi zniknąć bez śladu — a to jest zgłoszenie, którego nie wolno zgubić. */
-  const to = env.ORGANISER_EMAIL || COPY_DECK._event?.email || '';
+  const ev = COPY_DECK._event || {};
+  const to = env.ORGANISER_EMAIL || ev.email || '';
   if (to) {
     await sendThroughOutbox(env, {
       to,
@@ -3187,14 +3833,63 @@ async function sponsorLead(env, payload, cors) {
         + 'background:#fff;border-radius:16px;padding:24px"><tr><td>'
         + '<h1 style="margin:0 0 14px;font-size:20px">Zgłoszenie sponsora z czatu</h1>'
         + `<p style="margin:0 0 8px"><b>Nazwa na carruleddhi:</b> ${escapeHtml(cartName)}</p>`
+        + `<p style="margin:0 0 8px"><b>Osoba:</b> ${escapeHtml(person)}</p>`
         + (phone ? `<p style="margin:0 0 8px"><b>Telefon:</b> ${escapeHtml(phone)}</p>` : '')
-        + (email ? `<p style="margin:0 0 8px"><b>E-mail:</b> ${escapeHtml(email)}</p>` : '')
+        + `<p style="margin:0 0 8px"><b>E-mail:</b> ${escapeHtml(email)}</p>`
         + `<p style="margin:0 0 8px"><b>Język:</b> ${escapeHtml(locale.toUpperCase())}</p>`
         + '<p style="margin:16px 0 0;color:#65718b;font-size:13px">Pakiet: 100 EUR — logo na '
         + 'stronie plus carruleddhi z nazwą sponsora.</p>'
         + '</td></tr></table></body></html>'
     });
   }
+
+  /* ---- Trzeci list: potwierdzenie dla zgłaszającego (wymaganie 7) ----------
+     Przedtem tej wysyłki nie było i to była najbardziej jednostronna rozmowa na tej
+     stronie: ktoś zostawiał nazwę wózka, imię, telefon i adres, i nie dostawał niczego —
+     ani dowodu, że zgłoszenie doszło, ani informacji, kiedy się odezwiemy. Zdanie w czacie
+     zamyka się razem z kartą przeglądarki.
+
+     W JĘZYKU ROZMOWY, NIE W JĘZYKU STRONY
+       `locale` przyszło z `payload.locale`, a tam włożył je czat po rozpoznaniu języka
+       wiadomości gościa (zadanie 2.2). Dlatego to samo `locale` wybiera ramkę WhatsAppa dla
+       zgłaszającego i blok tego listu: jedno rozpoznanie, dwa kanały.
+
+     REPLY-TO NA ADRES ORGANIZATORÓW (7.4)
+       List wychodzi ze skrzynki wysyłkowej, więc „Odpowiedz" bez tego pola prowadziłoby
+       tam, gdzie nikt nie czyta. Pole jedzie w payloadzie do trasy `outbox`; moduł w Make
+       ma dziś Reply-To ustawione na adres organizatorów na sztywno, więc żywy scenariusz
+       już zachowuje się poprawnie — a gdy ktoś zechce mapować pole, jest czym.
+       Zdanie `sponsorAckSoon` podaje ten adres także w treści, bo przycisk „Odpowiedz"
+       nie jest widoczny w każdym kliencie poczty.
+
+     AWARIA NIE ODRZUCA ZGŁOSZENIA (7.5)
+       Kod jest zużyty, WhatsApp poszedł, organizatorzy mają maila. Nieudany list do
+       zgłaszającego jest zapisywany przez `noteMailFailure` i na tym się kończy —
+       odpowiedź to nadal 200, bo zgłoszenie jest przyjęte. */
+  const deck = deckFor(locale);
+  const label = (key, value) =>
+    `<p style="margin:0 0 8px"><b>${escapeHtml(deck.labels?.[key] || key)}:</b> ${escapeHtml(value)}</p>`;
+  const ackSent = await sendThroughOutbox(env, {
+    to: email,
+    replyTo: to,
+    subject: deck.sponsorAckSubject,
+    html: '<!doctype html><html><body style="margin:0;padding:24px;background:#eef5ff;'
+      + 'font-family:system-ui,sans-serif;color:#071a3d">'
+      + '<table role="presentation" width="100%" style="max-width:520px;margin:0 auto;'
+      + 'background:#fff;border-radius:16px;padding:24px"><tr><td>'
+      + `<h1 style="margin:0 0 14px;font-size:20px">${escapeHtml(deck.sponsorAckHeading)}</h1>`
+      + `<p style="margin:0 0 16px">${escapeHtml(fill(deck.sponsorAckLead, { FIRSTNAME: firstName }))}</p>`
+      + `<h2 style="margin:0 0 10px;font-size:15px">${escapeHtml(deck.sponsorAckSummary)}</h2>`
+      /* Podsumowanie z etykietami z `labels`, które istnieją w sześciu językach — dane
+         wpisane przez człowieka przechodzą dosłownie, tak samo jak w ramce WhatsAppa. */
+      + label('cartName', cartName)
+      + label('fullName', person)
+      + label('email', email)
+      + (phone ? label('phone', phone) : '')
+      + `<p style="margin:16px 0 0;color:#65718b;font-size:13px">${escapeHtml(fill(deck.sponsorAckSoon, { ORGEMAIL: to }))}</p>`
+      + '</td></tr></table></body></html>'
+  });
+  if (!ackSent) noteMailFailure(`sponsor-ack ${maskEmail(email)}: nie wyszedł`);
 
   return json({ ok: true }, 200, cors);
 }
@@ -3750,36 +4445,20 @@ async function entryCode(env, payload, cors) {
   /* The same answer whether the address is unknown or the selected id does not belong to it. */
   if (!row) return json({ ok: false, code: 'ENTRY_NOT_FOUND' }, 404, cors);
 
-  const locale = localeOf(row.locale);
-  const deck = COPY_DECK[locale] || COPY_DECK.it;
-  const code = newVerificationCode();
-
-  const stored = await insertRow(env, 'verification_codes', {
-    purpose,
+  /* Which of the two the letter is about is decided by `purpose` alone, and `CODE_LETTERS`
+     turns that into the wording. A code that arrives saying only "here is your code" is a code
+     somebody types without knowing what they are about to confirm — and one of the two takes
+     them out of the race. */
+  const sent = await sendCodeLetter(env, {
     email,
-    entry_id: row.id,
-    code_hash: await hashCode(env, email, code)
+    purpose,
+    entryId: row.id,
+    locale: row.locale
   });
-  if (!stored.ok) return json({ ok: false, code: 'ENTRY_CODE_FAILED' }, 502, cors);
-
-  /* The letter says which of the two this code is for.
-     A code that arrives saying only "here is your code" is a code somebody types without
-     knowing what they are about to confirm — and one of the two takes them out of the race. */
-  const withdrawing = intent === 'withdraw';
-  const delivered = await sendThroughOutbox(env, {
-    to: email,
-    subject: fill(withdrawing ? deck.quitSubject : deck.entrySubject, { CODE: code }),
-    html: renderTemplate(EMAIL_TEMPLATES.code, {
-      copy: deck,
-      ev: COPY_DECK._event || {},
-      loc: locale,
-      codeTitle: withdrawing ? deck.quitCodeTitle : deck.entryCodeTitle,
-      codeLead: withdrawing ? deck.quitCodeLead : deck.entryCodeLead,
-      code,
-      codeNote: withdrawing ? deck.quitCodeNote : deck.entryCodeNote
-    })
-  });
-  if (!delivered) return json({ ok: false, code: 'ENTRY_MAIL_FAILED' }, 502, cors);
+  if (!sent.ok) {
+    const failure = sent.code === 'CODE_STORE_FAILED' ? 'ENTRY_CODE_FAILED' : 'ENTRY_MAIL_FAILED';
+    return json({ ok: false, code: failure }, 502, cors);
+  }
 
   return json({ ok: true, email: maskEmail(email), intent }, 200, cors);
 }
@@ -4918,7 +5597,13 @@ async function storeIntake(env, request, type, payload) {
     status: 'new',
     email_status: 'pending',
     is_minor: Boolean(payload.isMinor),
-    rider_age: Number.parseInt(payload.riderAge, 10) || null
+    rider_age: Number.parseInt(payload.riderAge, 10) || null,
+    /* Puste, gdy ktoś nie zgodził się na analitykę — sonda wtedy nic nie zapamiętała.
+       Panel pokazuje takie zgłoszenia jako „nieznane" i nie udaje, że wie. */
+    source: payload.refHost || payload.utmSource
+      ? classifySource(payload.refHost, payload.utmSource)
+      : null,
+    utm_campaign: trimmed(payload.utmCampaign)
   };
 
   // Guardian block only on a minor entry. The handler has already stripped these
@@ -7274,6 +7959,8 @@ export default {
       if (type === 'reminders-due') return remindersDue(env, payload, cors);
       if (type === 'purge') return purge(env, payload, cors);
       if (type === 'sponsor-lead') return sponsorLead(env, payload, cors);
+      if (type === 'verify-start') return verifyStart(env, payload, cors);
+      if (type === 'verify-code') return verifyCode(env, payload, cors);
       if (type === 'notify-code') return notifyCode(env, payload, cors);
       if (type === 'notify-off') return notifyOff(env, payload, cors);
       if (type === 'unsub-start') return unsubStart(env, payload, cors);
@@ -7285,6 +7972,8 @@ export default {
       if (type === 'subscribers') return subscribers(env, payload, cors);
       if (type === 'voting') return voting(env, payload, cors);
       if (type === 'voting-admin') return votingAdmin(env, payload, cors);
+      if (type === 'visit') return recordVisit(env, request, payload, cors);
+      if (type === 'stats') return siteStats(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 

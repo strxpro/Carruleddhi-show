@@ -371,8 +371,16 @@ import {
     const voting = state.phase === 'voting';
     const closed = state.phase === 'closed';
 
+    /* Sekcja pokazuje sie po ZAMKNIECIU, nawet gdy nikt nie zaglosowal — wtedy zamiast
+       cokolu stoi jedno zdanie wyjasniajace. Wczesniej warunek wymagal zwyciezcy, wiec przy
+       zerze glosow „zakoncz turniej" nie zmienialo na stronie NIC i wygladalo na usterke. */
     const podium = $('[data-podium]');
-    if (podium) podium.hidden = !(closed && state.podium.length > 0);
+    const hasWinners = state.podium.length > 0;
+    if (podium) podium.hidden = !closed;
+    const stage = $('[data-podium-stage]');
+    if (stage) stage.hidden = !(closed && hasWinners);
+    const emptyNote = $('[data-podium-empty]');
+    if (emptyNote) emptyNote.hidden = !(closed && !hasWinners);
 
     // Zaproszenie do głosowania — w nagłówku i w hero. Prowadzi na podstronę.
     $$('[data-vote-cta]').forEach((cta) => { cta.hidden = !voting; });

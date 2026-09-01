@@ -627,3 +627,102 @@
 @media (prefers-reduced-motion: reduce) {
   .chat__end.is-armed { animation: none; }
 }
+
+/* ===========================================================================
+   POLE NA KOD W ROZMOWIE (BRAMKA)
+   ===========================================================================
+   Osobny wiersz w dzienniku, nie kompozytor: kod jest poświadczeniem, a nie wiadomością.
+   Wyśrodkowany jak `.chat__system`, bo pochodzi od strony, a nie od automatu ani od gościa. */
+.chat__code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.chat__code input {
+  width: 100%;
+  max-width: 220px;
+  /* 48 px wysokości: cel dotykowy z zapasem nad wymaganymi 44, i to bez powiększania czcionki.
+     Sam rozmiar pisma stoi na 20 px także dlatego, że iOS przybliża stronę przy polu mniejszym
+     niż 16 px — a przybliżenie w przypiętym czacie zostawia rozmowę poza ekranem. */
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 2px solid rgb(7 26 61 / 0.16);
+  border-radius: 14px;
+  background: #fff;
+  color: #071a3d;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  /* Odstęp między cyframi, żeby sześć znaków dało się przeczytać jednym spojrzeniem przy
+     przepisywaniu ze skrzynki. `text-indent` odrabia odstęp, który `letter-spacing` dokłada po
+     ostatniej cyfrze i przesuwa całość w lewo. */
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  text-align: center;
+}
+
+.chat__code input:focus-visible {
+  border-color: #071a3d;
+  outline: 3px solid #ffc928;
+  outline-offset: 2px;
+}
+
+/* Sprawdzanie kodu trwa jedno żądanie. Pole na ten czas jest zablokowane i ma to widać,
+   inaczej brak reakcji na szóstą cyfrę wygląda jak zawieszony czat. */
+.chat__code input:disabled { background: #f4f8ff; color: #2f3f5e; cursor: default; }
+
+.chat__code-hint {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #2f3f5e;
+  text-align: center;
+}
+/* Bez podpowiedzi nie ma pustego wiersza pod polem. */
+.chat__code-hint:empty { display: none; }
+
+/* Trzy wyjścia z bramki: wyślij ponownie, zmień adres, rezygnuję.
+   ---------------------------------------------------------------------------
+   Ten sam kształt co podpowiedzi pytań i ten sam rząd, ale wyższy cel dotykowy — 44 px, tyle
+   samo, ile ma pole na kod obok. Podpowiedź pytania naciska się z namysłem; te trzy naciska
+   ktoś rozdrażniony tym, że kod nie doszedł, jedną ręką, w telefon. Modyfikator zamiast
+   podniesienia wszystkich pastylek: rząd trzech podpowiedzi po 44 px zjadałby w przypiętej
+   karcie tyle miejsca, ile zajmują dwie wiadomości. */
+.chat__chip--gate {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* ===========================================================================
+   ODSYŁACZE DO PRYWATNOŚCI I REGULAMINU (KROK ZGODY)
+   ===========================================================================
+   Wiersz w dzienniku, wyśrodkowany jak `.chat__system`, ale w kolorze tekstu, a nie ostrzeżenia:
+   to nie jest komunikat o stanie, tylko dwa dokumenty do przeczytania przed zgodą.
+
+   Odsyłacze mają `display: inline-block` z pionowym odstępem, bo naciska się je w telefonie,
+   jedną ręką, obok pastylki „Zgadzam się" — dwa napisy w jednej linii wysokiej na 16 px byłyby
+   celem, w który trafia się przypadkiem. */
+.chat__docs {
+  margin: 2px 0 6px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #2f3f5e;
+}
+
+.chat__docs a {
+  display: inline-block;
+  padding: 7px 4px;
+  color: #071a3d;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.chat__docs a:focus-visible {
+  border-radius: 8px;
+  outline: 3px solid #ffc928;
+  outline-offset: 2px;
+}

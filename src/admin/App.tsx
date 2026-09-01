@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  BarChart3,
   // `Bell` is still here as the sidebar icon for the reminders tab. The bell in the header
   // and its `BellRing` variant moved into NotificationBell together with the dropdown.
   Bell,
@@ -33,6 +34,7 @@ import { Gate } from './Gate';
 import { Dashboard } from './views/Dashboard';
 import { Registrations } from './views/Registrations';
 import { Voting } from './views/Voting';
+import { Stats } from './views/Stats';
 import { Chat } from './views/Chat';
 import { Wall } from './views/Wall';
 import { Subscribers } from './views/Subscribers';
@@ -48,6 +50,7 @@ const INBOX_INTERVAL_MS = 10_000;
 
 type TabId =
   | 'dashboard'
+  | 'stats'
   | 'registrations'
   | 'voting'
   | 'chat'
@@ -149,7 +152,11 @@ export default function App() {
       {
         items: [
           { id: 'search', title: t('nav.search'), icon: Search, shortcut: '⌘K' },
-          { id: 'dashboard', title: t('nav.dashboard'), icon: LayoutDashboard }
+          { id: 'dashboard', title: t('nav.dashboard'), icon: LayoutDashboard },
+          /* Nad grupami, obok pulpitu: to jest ekran, na który się WCHODZI, a nie dane
+             wydarzenia, które się prowadzi. Bez plakietki — statystyki nie mają stanu
+             „nowe od ostatniego razu", mają zakres czasu wybierany na miejscu. */
+          { id: 'stats', title: t('nav.stats'), icon: BarChart3 }
         ]
       },
       {
@@ -334,6 +341,7 @@ export default function App() {
           {tab === 'registrations' ? (
             <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} />
           ) : null}
+          {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
           {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
           {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}

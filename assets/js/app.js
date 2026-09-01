@@ -3271,7 +3271,14 @@ import {
       // Always sent, both ways. Make branches on it, and a field that only appears
       // for minors would leave the adult branch guessing from an absence.
       isMinor,
-      riderAge: years === null ? '' : String(years)
+      riderAge: years === null ? '' : String(years),
+      /* Skąd ta osoba przyszła na stronę PIERWSZY raz — zapamiętane przez sondę odwiedzin,
+         więc istnieje tylko wtedy, gdy była zgoda na analitykę. Bez zgody lecą puste napisy
+         i zgłoszenie ląduje w panelu jako „nieznane", zamiast być doliczone byle gdzie.
+         Kanału nie nazywa przeglądarka: to robi serwer, jedną regułą dla wejść i zapisów. */
+      refHost: firstTouch()?.ref || '',
+      utmSource: firstTouch()?.utmSource || '',
+      utmCampaign: firstTouch()?.utmCampaign || ''
     };
 
     if (!isMinor) return base;
@@ -3709,6 +3716,19 @@ import {
     const codeError = $('[data-entry-code-error]', panel);
     const emailOf = () => String(form.elements.namedItem('email')?.value || '').trim().toLowerCase();
 
+    /* POTWIERDZENIE PRZYNIESIONE Z BRAMKI W ROZMOWIE
+       ---------------------------------------------------------------------------
+       `{ intent, email, code, entryId }` albo `null`. Ustawiane przez `openEntryManager`, gdy
+       czat przeprowadził gościa przez bramkę (`verify-start` / `verify-code`) i ma już
+       sprawdzone sześć cyfr dla TEGO adresu i TEGO zawodnika. Panel bierze wtedy ten kod
+       zamiast wysyłać drugi list i prosić o te same cyfry po raz drugi (3.3).
+
+       Cztery pola, nie samo `code`, bo kod jest wystawiony na jedną sprawę i na jedno
+       zgłoszenie: kod na zmianę danych nie wycofuje nikogo z wyścigu, a kod niosący `entry_id`
+       brata nie otworzy zgłoszenia siostry. Niezgodność któregokolwiek pola znaczy „to nie ten
+       kod" i panel wraca do swojej własnej drogi, czyli wysyła kod tak jak zawsze. */
+    let entryPreset = null;
+
     /* A different address is a different question, so the "I know, another rider" answer stops
        counting. Without this, changing the address after clearing the gate once would skip the
        check for the new one — and that is the case where somebody really is entering twice.
@@ -3723,6 +3743,9 @@ import {
         entryGateCleared = false;
         selectedEntryId = '';
         selectedEntry = null;
+        /* Kod z rozmowy dotyczył adresu, który był w tym polu chwilę temu. Po zmianie adresu
+           jest cudzym poświadczeniem leżącym w pamięci karty i nie ma prawa być użyty. */
+        entryPreset = null;
       });
     });
 
@@ -3833,6 +3856,29 @@ import {
       }
       entryIntent = intent;
       const email = emailOf();
+
+      /* KOD JUŻ POTWIERDZONY W ROZMOWIE — ŻADNEGO DRUGIEGO LISTU I ŻADNEGO DRUGIEGO PYTANIA
+         ------------------------------------------------------------------------------------
+         Cztery warunki, wszystkie konieczne: ta sama czynność, ten sam adres, ten sam zawodnik
+         i komplet sześciu cyfr. `verify-code` kodu nie zużyło, więc ten sam wiersz otworzy tu
+         zgłoszenie i dokończy czynność — dokładnie tak, jak kod wpisany w to pole ręcznie (3.3).
+
+         Kod zdejmowany z pamięci przy pierwszym użyciu. Zostawiony przeżyłby swój kwadrans
+         i po „Anuluj" wracałby jako cyfry, które już nie działają — czyli pętla „wygasł,
+         spróbuj jeszcze raz tym samym". Bez niego drugie naciśnięcie wysyła nowy list, tak
+         jak zawsze. */
+      const preset = entryPreset;
+      if (preset && preset.intent === intent && preset.email === email
+        && preset.entryId && preset.entryId === selectedEntryId) {
+        entryPreset = null;
+        if (codeField) codeField.value = preset.code;
+        if (codeError) codeError.textContent = '';
+        say('');
+        show('code');
+        await confirmCode(button);
+        return;
+      }
+
       const original = button.textContent;
       button.disabled = true;
       say('entry.sending');
@@ -3877,8 +3923,12 @@ import {
       show('choices');
     }));
 
-    /* ------------------------------------------------------------- code confirmed */
-    $('[data-entry-confirm]', panel)?.addEventListener('click', async (event) => {
+    /* ------------------------------------------------------------- code confirmed
+       Osobna funkcja, a nie ciało nasłuchu, bo wchodzi się tu z dwóch stron: z przycisku pod
+       polem na kod oraz z kodem przyniesionym z bramki w rozmowie, gdzie te sześć cyfr zostało
+       już wpisane raz. `button` bywa więc przyciskiem „Potwierdź", przyciskiem czynności albo
+       niczym — blokada na czas żądania dotyczy tego, co ktoś nacisnął. */
+    async function confirmCode(button) {
       const code = String(codeField?.value || '').replace(/\D/g, '');
       if (codeError) codeError.textContent = '';
       if (code.length !== 6) {
@@ -3889,8 +3939,7 @@ import {
         return;
       }
 
-      const button = event.currentTarget;
-      button.disabled = true;
+      if (button) button.disabled = true;
       say('entry.checking');
       try {
         /* First verify and read the selected row. `view` does not consume the code, so the
@@ -3950,8 +3999,12 @@ import {
           codeError.textContent = `${text('entry.codeWrong') || ''} ${error.payload.left}`;
         }
       } finally {
-        button.disabled = false;
+        if (button) button.disabled = false;
       }
+    }
+
+    $('[data-entry-confirm]', panel)?.addEventListener('click', (event) => {
+      void confirmCode(event.currentTarget);
     });
 
     /* ------------------------------------------------------------------- save edits */
@@ -3983,11 +4036,33 @@ import {
       }
     });
 
-    openEntryManager = async (email, intent, trigger) => {
+    /**
+     * Otwiera panel zarządzania zgłoszeniem na podanym adresie.
+     *
+     * @param {string} email adres, na którym szukamy zgłoszeń
+     * @param {'edit'|'withdraw'|''} intent czynność, której przycisk dostaje skupienie
+     * @param {HTMLElement|null} trigger przycisk, który tego zażądał — na czas sprawdzania
+     * @param {{ code: string, entryId: string }|null} [confirmed] potwierdzenie z bramki
+     *   w rozmowie: sześć cyfr sprawdzonych przez `verify-code` razem ze zgłoszeniem, do
+     *   którego kod należy. Bez niego panel prosi o kod sam, jak dotąd.
+     */
+    openEntryManager = async (email, intent, trigger, confirmed = null) => {
       const emailField = form.elements.namedItem('email');
       if (!emailField || !email) return false;
       emailField.value = email;
       emailField.dispatchEvent(new Event('input', { bubbles: true }));
+      /* Po zdarzeniu `input`, nie przed: ten nasłuch wyżej czyści właśnie `entryPreset`,
+         bo zmiana adresu unieważnia kod. Tutaj adres nie jest zmieniany przez człowieka,
+         tylko wpisywany razem z kodem, który do niego należy. */
+      const digits = String(confirmed?.code || '').replace(/\D/g, '');
+      entryPreset = digits.length === 6 && confirmed?.entryId
+        ? {
+            intent,
+            email: String(email).trim().toLowerCase(),
+            code: digits,
+            entryId: String(confirmed.entryId)
+          }
+        : null;
       entryGateCleared = false;
       setFormStep(1);
       const signup = $('#signup');
@@ -3995,7 +4070,12 @@ import {
       const stopped = await existingEntryGate(form, trigger || $('[data-form-next]', form));
       if (!stopped) return false;
       /* A single rider is already selected. The visitor still presses the clearly-labelled
-         action button; with several riders they first choose the matching pill. */
+         action button; with several riders they first choose the matching pill.
+
+         Naciśnięcie zostaje także wtedy, gdy kod z rozmowy jest już potwierdzony — zmienia się
+         tylko to, że po nim nie ma pytania o cyfry. Samoczynne uruchomienie czynności
+         otwierałoby czytnik regulaminu, którego nikt nie zażądał, a przy „wycofaj mnie" byłoby
+         to okno wyskakujące przed decyzją, nie po niej. */
       if (intent && selectedEntryId) {
         $('[data-entry-action="' + intent + '"]', panel)?.focus({ preventScroll: true });
       }
@@ -4465,6 +4545,92 @@ import {
         button.setAttribute('aria-expanded', String(!currentlyOpen));
       });
     });
+  }
+
+  /**
+   * Sonda odwiedzin — jedno żądanie na wejście, wyłącznie za zgodą.
+   * ===========================================================================
+   * PO CO
+   *   Żeby dało się odpowiedzieć „ile osób przyszło z Instagrama, a ile z Google", zanim
+   *   ktokolwiek wyda złotówkę na reklamę. Panel rysuje z tego wykresy — patrz zakładka
+   *   Statystyki i migracja 0033.
+   *
+   * ZGODA JEST WARUNKIEM, NIE USTAWIENIEM
+   *   Baner na tej stronie obiecuje „analityczne uruchomimy wyłącznie za Twoją zgodą".
+   *   Dopóki jej nie ma, ta funkcja nie wysyła ANI JEDNEGO żądania — nie „wysyła mniej"
+   *   i nie „wysyła bez identyfikatora". Nic.
+   *
+   *   Kto zgodzi się w trakcie wizyty, zostaje policzony od tej chwili: nasłuch na
+   *   `carruleddhi:consent` istnieje po to, żeby kliknięcie „Akceptuj" działało od razu,
+   *   a nie dopiero przy następnym wejściu.
+   *
+   * CO IDZIE NA SERWER
+   *   Ścieżka, odsyłacz, ciąg zapytania (dla utm_*), język i szerokość okna. Ani adresu
+   *   e-mail, ani niczego wpisanego w formularz, ani ciasteczka. Kto to jest, serwer liczy
+   *   sam jako skrót wygasający po dobie — patrz recordVisit() w worker/index.js.
+   *
+   * PIERWSZE DOTKNIĘCIE ZOSTAJE W PRZEGLĄDARCE
+   *   Ktoś klika reklamę na Instagramie, wraca po trzech dniach z wyszukiwarki i dopiero
+   *   wtedy się zapisuje. Zapisany „google" powiedziałby, że reklama nic nie dała. Dlatego
+   *   pierwszy odsyłacz i pierwsza kampania lądują w `localStorage` i jadą razem ze
+   *   zgłoszeniem — raz zapisane, nigdy nadpisywane.
+   */
+  const FIRST_TOUCH_KEY = 'carruleddhi.firstTouch';
+
+  /** Pierwsze dotknięcie tej przeglądarki, albo `null`. Czytane też przez formularz zapisu. */
+  function firstTouch() {
+    try { return JSON.parse(storage.get(FIRST_TOUCH_KEY, 'null')); } catch (_) { return null; }
+  }
+
+  function setupVisitBeacon() {
+    const consented = () => {
+      try { return JSON.parse(storage.get('carruleddhi.cookies', 'null'))?.analytics === true; }
+      catch (_) { return false; }
+    };
+
+    let sent = false;
+    const send = () => {
+      if (sent || !consented()) return;
+      sent = true;
+
+      const search = window.location.search || '';
+      const params = new URLSearchParams(search);
+
+      /* Zapisywane tylko wtedy, gdy jeszcze nic tam nie stoi. Druga wizyta z innego źródła
+         nie ma prawa nadpisać tego, co przyprowadziło tę osobę pierwszy raz. */
+      if (!firstTouch()) {
+        let host = '';
+        try { host = new URL(document.referrer).hostname; } catch (_) { host = ''; }
+        storage.set(FIRST_TOUCH_KEY, JSON.stringify({
+          ref: host,
+          utmSource: params.get('utm_source') || '',
+          utmCampaign: params.get('utm_campaign') || '',
+          at: new Date().toISOString()
+        }));
+      }
+
+      const body = JSON.stringify({
+        path: window.location.pathname || '/',
+        ref: document.referrer || '',
+        q: search,
+        lang: document.documentElement.lang || '',
+        width: window.innerWidth || 0
+      });
+
+      /* `sendBeacon` przeżywa zamknięcie karty, czego zwykły `fetch` nie gwarantuje — a to
+         jest żądanie, które ma nie opóźnić ani nie zablokować niczego, co robi człowiek.
+         `fetch` z `keepalive` jest zapasem dla przeglądarek bez `sendBeacon`. */
+      const url = `${config.endpoints.counts.replace(/\/counts$/, '')}/visit`;
+      try {
+        if (navigator.sendBeacon?.(url, new Blob([body], { type: 'application/json' }))) return;
+      } catch (_) { /* zablokowane rozszerzeniem albo trybem prywatnym */ }
+      fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
+        .catch(() => { /* licznik odwiedzin nie ma prawa niczego zepsuć */ });
+    };
+
+    send();
+    // Zgoda kliknięta w trakcie wizyty liczy się od razu.
+    window.addEventListener('carruleddhi:consent', send);
   }
 
   function setupCookieConsent() {
@@ -6568,6 +6734,9 @@ import {
         console.warn('Chat close failed; ending locally anyway:', error);
       }
       ended = true;
+      /* Sprawa w toku kończy się razem z rozmową: kod i potwierdzenie nie mają po co przeżywać
+         dziennika, który właśnie schodzi z ekranu. */
+      endFlow();
       applyGate();
       window.dispatchEvent(new Event('carruleddhi:relayout'));
       restartButton.focus({ preventScroll: true });
@@ -6596,6 +6765,10 @@ import {
       seen.clear();
       // Załącznik wybrany, ale niewysłany, należał do poprzedniej rozmowy.
       dropAttachment();
+      /* Kreator i bramka też należały do poprzedniej rozmowy. Bez tego nowa rozmowa startuje
+         z otwartym krokiem cudzej sprawy: wpisana wiadomość byłaby przechwycona jako odpowiedź
+         bramce, a adres i kod z tamtej sprawy zostałyby w pamięci. */
+      endFlow();
       if (log) log.replaceChildren();
       $$('[data-field]', gate).forEach((holder) => {
         holder.classList.remove('is-invalid');
@@ -6747,14 +6920,25 @@ import {
       return node;
     };
 
-    const note = (key) => {
+    /* WIERSZ SYSTEMOWY — OD STRONY, NIE OD AUTOMATU I NIE OD ORGANIZATORA
+       ---------------------------------------------------------------------------
+       `.chat__system` jest wyśrodkowany, mniejszy i bez podpisu autora, więc nie udaje
+       wypowiedzi w rozmowie. Bramka weryfikacyjna mówi wyłącznie tak: „wysłałem kod" nie jest
+       zdaniem automatu, tylko stanem strony, a bąbelek automatu obiecywałby, że po drugiej
+       stronie ktoś to napisał.
+
+       Dwa wejścia, bo bramka podstawia w swoje teksty zamaskowany adres i liczbę pozostałych
+       prób: `noteLine` bierze gotowe zdanie, `note` zostaje dla wywołań z samym kluczem. */
+    const noteLine = (line) => {
       if (!log) return;
-      const line = document.createElement('p');
-      line.className = 'chat__system';
-      line.textContent = text(key) || '';
-      log.appendChild(line);
+      const row = document.createElement('p');
+      row.className = 'chat__system';
+      row.textContent = line || '';
+      log.appendChild(row);
       toBottom();
     };
+
+    const note = (key) => noteLine(text(key) || '');
 
     /* ---------------------------------------------------------------- open */
     async function openThread() {
@@ -6935,9 +7119,10 @@ import {
        nazajutrz: pokaż moje dane, popraw je, wycofaj mnie z wyścigu, przestań pisać.
 
        Kreator NIE jest drugą implementacją niczego. Wywołuje dokładnie te końcówki, których
-       używa formularz „zarządzaj zgłoszeniem": `entry-lookup`, `entry-code`, `entry-manage`
-       oraz `notify-code`/`notify-off` dla powiadomień. Reguły kodu — sześć cyfr, kwadrans
-       ważności, pięć prób, jednorazowość — stoją w bazie i są te same dla obu dróg.
+       używa formularz „zarządzaj zgłoszeniem": `entry-lookup`, `entry-code`, `entry-manage`,
+       a kod ze skrzynki bierze jedną bramką (`verify-start`/`verify-code`) i oddaje go czynności
+       — `notify-off` dla powiadomień, `sponsor-lead` dla sponsora. Reguły kodu — sześć cyfr,
+       kwadrans ważności, pięć prób, jednorazowość — stoją w bazie i są te same dla obu dróg.
 
        KAŻDA CZYNNOŚĆ WYMAGA KODU ZE SKRZYNKI. Sam adres wpisany w czacie nie jest dowodem
        niczego: gdyby wystarczał, każdy mógłby wycofać z wyścigu każdego, znając tylko mail.
@@ -6947,20 +7132,54 @@ import {
        strony nie daje ani jednej czynności więcej. */
     let flow = null;
 
+    /**
+     * Kształt kreatora w jednym miejscu.
+     *
+     * Pięć pól obsługuje bramkę weryfikacyjną, wspólną dla wszystkich spraw:
+     *   `purpose`    cel kodu — kod wystawiony na jedną sprawę nie działa na inną,
+     *   `email`      adres, którego dotyczy bramka,
+     *   `confirmed`  czy kod na ten adres został sprawdzony,
+     *   `code`       te same sześć cyfr, potrzebne końcowemu żądaniu,
+     *   `consent`    zgoda na prywatność i regulamin, zbierana przed pytaniami o kontakt.
+     *
+     * `code` żyje WYŁĄCZNIE tutaj, w pamięci karty. Nie ma na kreatorze ani jednego
+     * `storage.set` i nie ma go mieć: zapamiętany kod przeżywałby zamknięcie karty i leżałby
+     * w pamięci trwałej długo po tym, jak wygasł.
+     */
+    const newFlow = (intent, purpose, extra = {}) => ({
+      intent,
+      step: '',
+      purpose,
+      email: '',
+      confirmed: false,
+      code: '',
+      consent: false,
+      ...extra
+    });
+
     const flowSay = (key) => {
       const line = text(key);
       if (line) append({ author: 'ai', body: line, at: '' }, false);
     };
 
-    const endFlow = () => { flow = null; paintChips(); };
+    /* Koniec kreatora zabiera ze sobą bramkę: pole na kod, adres, potwierdzenie i sam kod.
+       Bez tego „rezygnuję" zostawiałoby na ekranie pole, które wysyła cyfry do sprawy, której
+       już nie ma — i sześć cyfr w pamięci karty bez powodu. */
+    const endFlow = () => { gateForget(); flow = null; paintChips(); };
 
-    /** Przyciski wyboru w rozmowie. Ten sam rząd i ta sama klasa co podpowiedzi pytań. */
-    const flowChoices = (options) => {
+    /**
+     * Przyciski wyboru w rozmowie. Ten sam rząd i ta sama klasa co podpowiedzi pytań.
+     *
+     * `variant` dokłada modyfikator do klasy. Pastylki bramki dostają przez niego wyższy cel
+     * dotykowy: podpowiedź pytania naciska się z namysłem, a wyjście z bramki naciska ktoś
+     * rozdrażniony tym, że kod nie doszedł — i naciska w telefon jedną ręką.
+     */
+    const flowChoices = (options, variant = '') => {
       if (!chipsList) return;
       chipsList.replaceChildren(...options.map(([label, run]) => {
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.className = 'chat__chip';
+        chip.className = variant ? `chat__chip ${variant}` : 'chat__chip';
         chip.textContent = text(label) || label;
         chip.addEventListener('click', () => { void run(); });
         return chip;
@@ -6969,7 +7188,474 @@ import {
       setChipsOpen(options.length > 0);
     };
 
-    const flowPost = (type, data) => postJSON(endpoint, eventPayload(type, data));
+    /**
+     * POLE NA SZEŚCIOCYFROWY KOD — WIERSZ W DZIENNIKU, NIE POLE WIADOMOŚCI
+     * ---------------------------------------------------------------------------
+     * Cztery decyzje, każda z powodem:
+     *
+     * `type="text"` z `inputmode="numeric"`, a nie `type="number"`. Klawiatura na telefonie
+     * jest cyfrowa w obu przypadkach, ale liczba dostaje strzałki, gubi wiodące zera i
+     * przyjmuje `e` oraz `-` — a kod `004512` to nie cztery tysiące pięćset dwanaście.
+     *
+     * `autocomplete="one-time-code"` — system podsuwa kod wprost z powiadomienia, jeśli go
+     * zobaczy. Nic nie kosztuje, a na iOS oszczędza całe przepisywanie z drugiej aplikacji.
+     *
+     * Wysyłka po SZÓSTEJ CYFRZE, bez przycisku. Warunek stoi na długości po odsianiu
+     * nie-cyfr, nie na zdarzeniu klawiatury — dlatego wklejenie sześciu cyfr wysyła tak samo
+     * jak wpisanie ich palcem. Litery i spacje po prostu się nie pojawiają: kto wkleja
+     * „kod: 123456" ze skrzynki, ma dostać potwierdzenie, a nie komunikat o błędzie.
+     *
+     * To pole NIE JEST polem wiadomości czatu i nie tworzy bąbelka gościa. Kod wpisany w
+     * kompozytor poleciałby jako wiadomość do wątku i wylądowałby w historii, którą
+     * organizator czyta w panelu — a sześciocyfrowy kod do cudzej skrzynki nie ma tam czego
+     * robić. Wywołanie zwrotne dostaje same cyfry i nic nie dopisuje do rozmowy.
+     *
+     * @param {(code: string) => (void | Promise<void>)} onCode wołane raz na komplet sześciu cyfr
+     * @returns {{ row: HTMLElement, field: HTMLInputElement, focus: () => void,
+     *   clear: () => void, hint: (key?: string) => void, lock: () => void,
+     *   unlock: () => void, remove: () => void }}
+     */
+    function codeField(onCode) {
+      const row = document.createElement('div');
+      row.className = 'chat__code';
+
+      const field = document.createElement('input');
+      field.type = 'text';
+      field.inputMode = 'numeric';
+      field.autocomplete = 'one-time-code';
+      field.maxLength = 6;
+      field.pattern = '\\d*';
+      field.dataset.chatCode = '';
+      /* Klucz z przestrzeni `entry`, użyty w rozmowie świadomie: „sześciocyfrowy kod" jest
+         dosłownie tym samym napisem co przy formularzu, a druga kopia w sześciu językach to
+         pierwsze miejsce, w którym te dwa teksty się rozjadą. */
+      field.setAttribute('aria-label', text('entry.codeLabel'));
+
+      const hint = document.createElement('span');
+      hint.className = 'chat__code-hint';
+      hint.dataset.chatCodeHint = '';
+
+      row.append(field, hint);
+
+      /* Zamek na czas sprawdzania kodu. Bez niego zdarzenie `input` z podpowiedzi systemowej
+         albo drugie wklejenie wysyłałoby ten sam komplet cyfr po raz drugi — a każda próba
+         liczy się do limitu pięciu po stronie serwera. */
+      let busy = false;
+
+      const handle = {
+        row,
+        field,
+        // preventScroll — wiersz jest w przypiętym dzienniku, a `focus()` bez tej flagi
+        // przerzuca stronę do niego zamiast zostawić rozmowę tam, gdzie stoi.
+        focus: () => field.focus({ preventScroll: true }),
+        clear: () => { field.value = ''; },
+        hint: (key) => { hint.textContent = key ? text(key) : ''; },
+        lock: () => { busy = true; field.disabled = true; },
+        unlock: () => { busy = false; field.disabled = false; },
+        remove: () => row.remove()
+      };
+
+      field.addEventListener('input', () => {
+        const digits = String(field.value || '').replace(/\D/g, '').slice(0, 6);
+        // Odsianie w miejscu, bez zdania o błędzie: znak, którego tu nie ma prawa być, po
+        // prostu się nie pojawia. Podstawienie tylko przy różnicy, żeby nie ruszać karetki
+        // przy każdym poprawnym naciśnięciu.
+        if (field.value !== digits) field.value = digits;
+        if (busy || digits.length < 6) return;
+        handle.lock();
+        void (async () => {
+          try {
+            await onCode(digits);
+          } finally {
+            handle.unlock();
+            /* Puste pole i palec z powrotem w nim, ale tylko dopóki wiersz jest w drzewie:
+               po udanym kodzie bramka go zdejmuje i nie ma czego ustawiać ani gdzie wracać. */
+            if (row.isConnected) {
+              handle.clear();
+              handle.focus();
+            }
+          }
+        })();
+      });
+
+      field.addEventListener('keydown', (event) => {
+        /* Enter nic tu nie robi. Wysyła szósta cyfra, więc naciśnięcie na pięciu jest pomyłką,
+           a nie żądaniem — i nie ma prawa dosięgnąć kompozytora ani wysłać czegokolwiek. */
+        if (event.key === 'Enter') event.preventDefault();
+      });
+
+      const stick = atBottom();
+      log?.appendChild(row);
+      if (stick) toBottom();
+      handle.focus();
+      return handle;
+    }
+
+    /* ========================================================================
+       BRAMKA WERYFIKACYJNA — JEDNA DLA WSZYSTKICH SPRAW
+       ========================================================================
+       Cztery sprawy potrzebują dowodu dostępu do skrzynki: zgłoszenie sponsora, zmiana danych,
+       rezygnacja z wyścigu, wypisanie z powiadomień. Dotąd każda robiła to inaczej — jedna
+       w rozmowie, dwie w osobnym formularzu, czwarta wcale. Trzy zachowania dla tej samej
+       czynności to trzy miejsca, w których teksty i reguły się rozjadą.
+
+       DWIE KOŃCÓWKI, TRZY ŻĄDANIA
+         `verify-start`  wysyła kod na podany adres i nic nie autoryzuje,
+         `verify-code`   sprawdza kod i GO NIE ZUŻYWA — `consumed_at` zostaje puste,
+         czynność       dostaje parę (adres, kod) w SWOIM żądaniu i tam kod jest zużywany.
+       Dopiero to trzecie żądanie autoryzuje. Dwa pierwsze są wygodą rozmowy, nie
+       poświadczeniem — dlatego `flow.confirmed` ustawione ręcznie w konsoli nie wykonuje ani
+       jednej czynności więcej (O5).
+
+       ŚCIEŻKA, NIE `type` W CIELE
+         Router Workera bierze rodzaj ZE ŚCIEŻKI, żeby podrobione `type` w ciele nie przeszło
+         między drogami. Żądanie bramki musi więc pójść na własny adres, a nie na adres czatu
+         z innym rodzajem w środku.
+
+       KOD TYLKO W PAMIĘCI
+         `flow.code` nie idzie do `localStorage` i nie ma tu żadnego `storage.set`. Zapamiętany
+         kod przeżywałby zamknięcie karty i leżałby w pamięci trwałej po tym, jak wygasł —
+         czyli byłby wyłącznie cudzym poświadczeniem do znalezienia. Kończy się razem
+         z kreatorem: patrz `gateForget`.
+       ====================================================================== */
+
+    /** Adres końcówki z tej samej rodziny co czat — rodzaj jest w ścieżce, nie w ciele. */
+    const gateUrl = (name) => (endpoint.includes('/')
+      ? endpoint.replace(/[^/]*$/, name)
+      : `/api/carruleddhi/${name}`);
+
+    const gatePost = (name, data) => postJSON(gateUrl(name), eventPayload(name, data));
+
+    /**
+     * Odmowy bramki przełożone na zdania. Każda ma swoje: „kod wygasł" i „za dużo prób" to dla
+     * gościa dwie różne rzeczy, choć obie znaczą „poproś o nowy".
+     *
+     * `VERIFY_BAD_EMAIL` i `VERIFY_BAD_CODE` sięgają po klucze z rodziny `chat.data*`, bo
+     * zdanie jest dosłownie to samo — druga kopia w sześciu językach byłaby pierwszym miejscem,
+     * w którym te dwa napisy się rozjadą. `VERIFY_BAD_PURPOSE` i `VERIFY_SEND_FAILED` wpadają
+     * w zdanie ogólne: to pomyłki po naszej stronie i gość nie ma na nie żadnego ruchu.
+     */
+    const GATE_REFUSALS = {
+      VERIFY_WRONG: 'chat.gateWrong',
+      VERIFY_EXPIRED: 'chat.gateExpired',
+      VERIFY_NO_CODE: 'chat.gateNoCode',
+      VERIFY_TOO_MANY_TRIES: 'chat.gateBurnt',
+      VERIFY_TOO_OFTEN: 'chat.gateTooOften',
+      VERIFY_BAD_EMAIL: 'chat.dataBadEmail',
+      VERIFY_BAD_CODE: 'chat.dataBadCode'
+    };
+
+    /**
+     * Jedno przejście przez bramkę: adres, cel, wiązanie ze zgłoszeniem i pole na kod.
+     * `null`, dopóki żadna sprawa nie prosi o potwierdzenie.
+     *
+     * `gateState`, a nie `gate`: `gate` w tym zasięgu jest kartą z imieniem i adresem sprzed
+     * rozmowy (`[data-chat-gate]`), czytaną przez `applyGate`. Dwie bramki w jednym pliku to
+     * nie zbieg okoliczności — jedna wpuszcza do rozmowy, druga do czynności.
+     */
+    let gateState = null;
+
+    /**
+     * Zaczepy sprawy stojącej za bramką — co zrobić po potwierdzeniu i gdzie wrócić przy
+     * „zmień adres". Osobno od `gateState`, bo przeżywają zdjęcie pola na kod: „zmień adres"
+     * zdejmuje pole i wraca do pytania o adres, a po nowym adresie ta sama sprawa ma iść dalej.
+     */
+    let gateHooks = null;
+
+    /** Zdejmuje samo pole na kod. Bramka zostaje: pastylka „wyślij ponownie" wie, na jaki adres. */
+    function gateDropField() {
+      gateState?.field?.remove();
+      if (gateState) gateState.field = null;
+    }
+
+    /** Bramki nie ma: ani pola, ani adresu, ani zaczepów, ani kodu w pamięci. */
+    function gateForget() {
+      gateDropField();
+      gateState = null;
+      gateHooks = null;
+      if (flow) {
+        flow.confirmed = false;
+        flow.code = '';
+      }
+    }
+
+    /**
+     * Zdanie bramki jako wiersz systemowy, z podstawieniami.
+     *
+     * `%EMAIL%` to adres ZAMASKOWANY przez Workera i tylko taki tu trafia. Pełny adres
+     * w wątku byłby ujawnieniem bez powodu — ten wątek czyta potem organizator w panelu.
+     */
+    function gateSystem(key, subs = null) {
+      let line = text(key) || '';
+      if (subs) {
+        for (const token of Object.keys(subs)) line = line.replace(token, String(subs[token]));
+      }
+      noteLine(line);
+    }
+
+    /**
+     * Zapasowe maskowanie adresu — ten sam kształt co `maskEmail` w Workerze.
+     *
+     * Używane tylko wtedy, gdy odpowiedź nie przyniosła zamaskowanego adresu: bez Workera
+     * `postJSON` oddaje `{ ok: true, demo: true }`, a zdanie z pustym miejscem w środku
+     * wygląda jak awaria tłumaczenia. Pełny adres nie idzie do wątku nigdy, także tutaj.
+     */
+    const gateMask = (address) => {
+      const at = String(address).indexOf('@');
+      if (at < 1) return '';
+      const name = String(address).slice(0, at);
+      const head = name.slice(0, 1);
+      const tail = name.length > 1 ? name.slice(-1) : '';
+      return `${head}${'*'.repeat(Math.max(name.length - 2, 1))}${tail}${String(address).slice(at)}`;
+    };
+
+    /**
+     * TRZY WYJŚCIA Z BRAMKI, TE SAME PO KAŻDEJ ODMOWIE
+     * ---------------------------------------------------------------------------
+     * Pokazywane także wtedy, gdy kod właśnie poszedł i bramka czeka. „Kod nie doszedł" jest
+     * najczęstszą rzeczą, która się tu zdarza, a dorysowywanie wyjścia dopiero po nieudanej
+     * próbie kazałoby wpisać byle sześć cyfr, żeby zobaczyć przycisk. Sufit trzech kodów na
+     * kwadrans pilnuje, żeby „wyślij ponownie" nie było kranem.
+     */
+    function gateChoices() {
+      flowChoices([
+        ['chat.gateResend', () => gateResend()],
+        ['chat.gateChangeEmail', () => gateChangeEmail()],
+        ['chat.dataCancel', () => { flowSay('chat.dataStopped'); endFlow(); }]
+      ], 'chat__chip--gate');
+    }
+
+    /** „Wyślij ponownie": ten sam adres, ten sam cel, nowy kod (2.8). */
+    async function gateResend() {
+      if (!gateState) return;
+      await gateStart(gateState.email, gateState.purpose);
+    }
+
+    /**
+     * „Zmień adres": z powrotem do pytania o adres i weryfikacja od nowa (2.9).
+     *
+     * Poprzednie odpowiedzi zostają — wraca się o jeden krok, nie na początek. Potwierdzenie
+     * i kod idą do kosza, bo dotyczyły adresu, którego już nie ma w tej sprawie.
+     */
+    function gateChangeEmail() {
+      if (!flow) return;
+      const back = gateHooks?.onChangeEmail || null;
+      gateDropField();
+      gateState = null;
+      flow.confirmed = false;
+      flow.code = '';
+      flow.email = '';
+      flow.step = 'email';
+      if (back) {
+        void back();
+        return;
+      }
+      /* Bez zaczepu: sprawa nie powiedziała, jak pyta o adres, więc pyta bramka. Zdanie jest
+         to samo, którego używa kreator na wejściu w sprawę własnych danych. */
+      flowSay('chat.dataAskEmail');
+      flowChoices([['chat.dataCancel', async () => { flowSay('chat.dataStopped'); endFlow(); }]]);
+    }
+
+    /**
+     * Odmowa: zdanie po ludzku, trzy wyjścia, kreator ZOSTAJE OTWARTY.
+     *
+     * Odmowa nie kończy rozmowy — z każdego stanu kodu jest sensowne wyjście, a zamknięcie
+     * kreatora na wygasłym kodzie znaczyłoby, że gość zaczyna sprawę od początku po tym, jak
+     * przeczytał list piętnaście minut za późno.
+     *
+     * Pole na kod zostaje TYLKO po błędnej próbie, bo tylko tam wpisanie innych cyfr ma sens.
+     * Przy wygasłym, wyczerpanym i nieistniejącym kodzie nie ma czego wpisać — pole, które
+     * zawsze odmówi, jest zaproszeniem do zużycia prób na nic.
+     */
+    function gateRefused(problem) {
+      const code = problem?.payload?.code || problem?.message || '';
+      const left = problem?.payload?.left;
+      if (flow) {
+        flow.confirmed = false;
+        flow.code = '';
+      }
+
+      /* Niepoprawny adres nie jest sprawą kodu: nie ma po co pokazywać pola ani proponować
+         ponownej wysyłki na adres, na który nic nie dojdzie. Wracamy do pytania o adres, nie
+         tracąc odpowiedzi z poprzednich kroków (5.4). */
+      if (code === 'VERIFY_BAD_EMAIL') {
+        gateSystem('chat.dataBadEmail');
+        gateChangeEmail();
+        return;
+      }
+
+      const key = GATE_REFUSALS[code] || 'chat.dataFailed';
+      gateSystem(key, key === 'chat.gateWrong'
+        ? { '%N%': typeof left === 'number' ? left : 0 }
+        : null);
+      if (code !== 'VERIFY_WRONG') gateDropField();
+      /* Pole postawione z powrotem, jeśli błędny kod przyszedł z KOŃCOWEGO żądania: bramka
+         zeszła po udanym `verify-code` (patrz `flowGuard`), a bez pola „kod się nie zgadza"
+         byłoby zdaniem bez ruchu — jedynym wyjściem zostałby nowy list. */
+      else if (gateState && !gateState.field) gateState.field = codeField((digits) => gateCheck(digits));
+      gateChoices();
+    }
+
+    /**
+     * Stawia bramkę z powrotem, żeby uniosła odmowę, która przyszła PO jej zejściu.
+     *
+     * `gateCheck` zdejmuje bramkę zaraz po poprawnym kodzie i dopiero wtedy idzie żądanie, które
+     * czynność wykonuje — a ono odmawia po kodzie, jeśli ten umarł w międzyczasie: wygasł
+     * między sprawdzeniem a użyciem, albo został zużyty w drugiej karcie. Wtedy trzy pastylki
+     * nie mają na czym stać: „wyślij ponownie" czyta adres i cel z `gateState`, którego już
+     * nie ma. Adres i cel są w `flow`, więc bramka odtwarza się z niego — bez pola, bo o tym,
+     * czy pole ma wrócić, decyduje rodzaj odmowy w `gateRefused`.
+     *
+     * @param {string} code kod odmowy w słowniku bramki
+     * @returns {boolean} czy bramka jest w stanie unieść tę odmowę
+     */
+    function gateStandBack(code) {
+      if (gateState) return true;
+      /* Niepoprawny adres nie potrzebuje bramki: `gateRefused` wraca z nim do pytania o adres
+         i weryfikacja zaczyna się od nowa dla adresu, który dopiero powstanie. */
+      if (code === 'VERIFY_BAD_EMAIL') return true;
+      if (!flow?.email || !flow?.purpose) return false;
+      gateState = {
+        email: flow.email,
+        purpose: flow.purpose,
+        entryId: gateHooks?.entryId || null,
+        field: null
+      };
+      return true;
+    }
+
+    /**
+     * Wysyła kod i prosi o niego w rozmowie.
+     *
+     * @param {string} email adres podany przez gościa
+     * @param {'sponsor'|'unsubscribe'|'edit-entry'|'cancel-entry'} purpose cel kodu; kod
+     *   wystawiony na jedną sprawę nie działa na inną
+     * @param {{ onConfirmed?: (code: string) => (void | Promise<void>),
+     *   onChangeEmail?: () => (void | Promise<void>), entryId?: string }} [hooks]
+     *   zapamiętywane na czas bramki; wywołanie z pastylki „wyślij ponownie" ich nie podaje
+     *   i korzysta z zapamiętanych
+     */
+    async function gateStart(email, purpose, hooks = null) {
+      // Bramka jest krokiem kreatora, nie osobnym okienkiem: bez kreatora nie ma czego bramkować.
+      if (!flow) return;
+      const address = String(email || '').trim().toLowerCase();
+      if (hooks) gateHooks = { ...hooks };
+
+      /* Adres już potwierdzony w tej samej sprawie nie jest weryfikowany drugi raz (2.6).
+         Drugi kod na ten sam adres zjadałby sufit wysyłki i kazałby przepisywać cyfry po to,
+         żeby udowodnić rzecz udowodnioną minutę wcześniej. */
+      if (flow.confirmed && flow.email === address && flow.purpose === purpose && flow.code) {
+        const known = gateHooks?.onConfirmed || null;
+        if (known) await known(flow.code);
+        return;
+      }
+
+      gateDropField();
+      gateState = {
+        email: address,
+        purpose,
+        entryId: gateHooks?.entryId || null,
+        field: null
+      };
+      flow.purpose = purpose;
+      flow.email = address;
+      flow.confirmed = false;
+      flow.code = '';
+      flow.step = 'gate';
+
+      try {
+        const result = await gatePost('verify-start', {
+          email: address,
+          purpose,
+          ...(gateState.entryId ? { entryId: gateState.entryId } : {})
+        });
+        if (!result?.ok) throw Object.assign(new Error('verify-start'), { payload: result });
+        /* Kreator mógł się w tym czasie skończyć — „rezygnuję" jest naciskane także w trakcie
+           żądania. Wtedy nie ma czego rysować i nie ma gdzie tego wpisać. */
+        if (!gateState || !flow) return;
+        /* „Kod poszedł" mówione niezależnie od tego, czy adres jest gdziekolwiek znany: Worker
+           odpowiada tak samo w obu przypadkach (O6). Inaczej rozmowa odpowiadałaby na pytanie
+           „czy ten człowiek jest u Was zapisany". */
+        gateSystem('chat.gateCodeSent', { '%EMAIL%': result.email || gateMask(address) });
+        gateState.field = codeField((code) => gateCheck(code));
+        gateChoices();
+      } catch (problem) {
+        gateRefused(problem);
+      }
+    }
+
+    /**
+     * Sprawdza wpisane sześć cyfr.
+     *
+     * Przy powodzeniu adres jest potwierdzony i sprawa idzie dalej. Kod zostaje w pamięci, bo
+     * końcowe żądanie musi go nieść razem z adresem — `verify-code` go nie zużyło i nie miało
+     * prawa: zużycie należy do żądania, które wykonuje czynność.
+     *
+     * @param {string} code cyfry z pola na kod albo z kompozytora
+     * @returns {Promise<boolean>} czy adres został potwierdzony
+     */
+    async function gateCheck(code) {
+      if (!gateState || !flow) return false;
+      const digits = String(code || '').replace(/\D/g, '');
+      if (digits.length !== 6) return false;
+
+      try {
+        const result = await gatePost('verify-code', {
+          email: gateState.email,
+          purpose: gateState.purpose,
+          code: digits,
+          ...(gateState.entryId ? { entryId: gateState.entryId } : {})
+        });
+        if (!result?.ok) throw Object.assign(new Error('verify-code'), { payload: result });
+        if (!gateState || !flow) return false;
+
+        flow.confirmed = true;
+        flow.code = digits;
+        const after = gateHooks?.onConfirmed || null;
+        /* Pole zdjęte PRZED zdaniem o potwierdzeniu, żeby „adres potwierdzony" nie stało pod
+           polem, które właśnie przestało być potrzebne. Zaczepy zostają: sprawa idzie dalej. */
+        gateDropField();
+        gateState = null;
+        gateSystem('chat.gateConfirmed');
+        /* Pastylki bramki schodzą razem z nią. Kolejny krok sprawy ustawi swoje. */
+        flowChoices([]);
+        if (after) await after(digits);
+        return true;
+      } catch (problem) {
+        gateRefused(problem);
+        return false;
+      }
+    }
+
+    /**
+     * Wiadomość napisana w kompozytorze, gdy bramka czeka na kod (2.13).
+     *
+     * Sześć samych cyfr idzie do bramki BEZ bąbelka gościa. Kod wpisany w pole wiadomości
+     * z przyzwyczajenia poleciałby jako wypowiedź do wątku i wylądował w historii, którą
+     * organizator czyta w panelu — a sześciocyfrowy kod do cudzej skrzynki nie ma tam czego
+     * robić. Cokolwiek innego dostaje bąbelek i wskazanie, gdzie ten kod wpisać: to nadal
+     * odpowiedź bramce, a nie nowe pytanie do automatu, więc do modelu nie jedzie nic.
+     */
+    async function gateTyped(message) {
+      const said = String(message || '');
+      const digits = said.replace(/\D/g, '');
+      // Same cyfry, ewentualnie z odstępami albo łącznikami — tak wygląda kod przepisany ręcznie.
+      const bareDigits = digits.length > 0 && !/[^\d\s-]/.test(said);
+      if (input) input.value = '';
+      sizeInput();
+
+      if (bareDigits && digits.length === 6 && gateState?.field) {
+        await gateCheck(digits);
+        return true;
+      }
+
+      append({ author: 'visitor', body: said, at: '' }, false);
+      /* Bez pola nie ma czego wpisywać: po wygasłym albo spalonym kodzie jedyną drogą dalej
+         są trzy pastylki, więc zdanie mówi o nich, a nie o sześciu cyfrach. */
+      gateSystem(gateState?.field ? 'chat.dataBadCode' : 'chat.dataUseButtons');
+      gateState?.field?.focus();
+      return true;
+    }
 
     /**
      * Wypisanie z powiadomień — jedyna z czterech spraw, która NIE ma własnego formularza.
@@ -6982,42 +7668,237 @@ import {
      *
      * „Nie chcę powiadomień" zostaje tutaj, bo to jedno pytanie i jedna czynność, a jedyną
      * dotychczasową drogą był odsyłacz w stopce listu — czyli trzeba było mieć ten list.
+     *
+     * PYTANIE O ADRES, POTEM BRAMKA — ŻADNEJ WŁASNEJ OBSŁUGI KODU
+     * ---------------------------------------------------------------------------
+     * Dotąd ta sprawa miała własne dwa kroki: `notify-code` po adresie i krok `code`, który
+     * czytał sześć cyfr z kompozytora. Robiła więc to samo, co bramka, tylko inaczej — bez
+     * pola z klawiaturą numeryczną, bez wiersza systemowego, bez „wyślij ponownie" i „zmień
+     * adres", i z kodem wpisywanym jako wypowiedź, która lądowała w wątku czytanym potem przez
+     * organizatora. Teraz adres oddaje bramce (`verify-start` / `verify-code`) i nic o kodzie
+     * nie wie (3.1).
      */
-    async function flowFinish(code) {
-      const result = await flowPost('notify-off', { email: flow.email, code });
+    function notifyAskEmail() {
+      if (!flow) return;
+      flow.step = 'email';
+      flowSay('chat.dataAskEmail');
+      flowChoices([['chat.dataCancel', async () => { flowSay('chat.dataStopped'); endFlow(); }]]);
+    }
+
+    /**
+     * Wypisanie po potwierdzeniu adresu — jedyne żądanie, które cokolwiek zmienia.
+     *
+     * `code` jedzie razem z adresem, bo TO żądanie autoryzuje czynność i TO ono zużywa wiersz:
+     * `verify-code` kodu nie zużyło i nie miało prawa (O5). Bramka nie jest poświadczeniem,
+     * więc `flow.confirmed` podrobione w konsoli nie wypisuje nikogo — bez pary (adres, kod)
+     * Worker odmawia tak samo jak przed zmianą.
+     *
+     * Idzie przez `gatePost`, czyli na `/api/carruleddhi/notify-off`, a nie na adres czatu
+     * z rodzajem w ciele. Router Workera bierze rodzaj ZE ŚCIEŻKI (patrz komentarz przy
+     * `gateUrl`), więc dotychczasowe `notify-off` wysłane na `/chat` trafiało do `chatVisitor`:
+     * wypisanie zamieniało się w wiadomość w wątku i nikogo nie wypisywało.
+     */
+    async function notifyOff(code) {
+      const result = await gatePost('notify-off', { email: flow.email, code });
       if (!result?.ok) throw Object.assign(new Error('notify-off'), { payload: result });
       flowSay('chat.dataNotifyOff');
       endFlow();
     }
 
-    /** Jedno miejsce na błędy kreatora: każdy krok mówi to samo zdanie i nie gubi rozmowy. */
+    /* ========================================================================
+       ZMIANA DANYCH I WYCOFANIE — BRAMKA W ROZMOWIE, FORMULARZ DO RESZTY
+       ========================================================================
+       Te dwie sprawy zostają przy formularzu zarządzania zgłoszeniem i to się nie zmienia:
+       kilkanaście pól z walidacją, czytnik regulaminu i podsumowanie z numerem startowym nie
+       mają drugiej, uboższej wersji na wymianę zdań w czacie. Zmienia się jedno — KTO PYTA
+       O KOD. Dotąd czat prowadził do formularza z samym adresem, a formularz zaczynał swoją
+       weryfikację od początku: własny list, własne pole, własne komunikaty. Ktoś, kto poprosił
+       o zmianę w rozmowie, przepisywał sześć cyfr w miejscu, o którym nie wiedział, że jest
+       osobną drogą.
+
+       Teraz kod bierze bramka rozmowy i oddaje go formularzowi razem z adresem (3.3). Formularz
+       nie jest przepisany: dostaje potwierdzenie i pomija JEDEN swój krok — ten, który właśnie
+       się odbył.
+
+       DLACZEGO NAJPIERW `entry-lookup`, A DOPIERO POTEM BRAMKA
+       ---------------------------------------------------------------------------
+       Kod na zmianę danych nosi `entry_id` i musi go nosić: `entryManage` sprawdza go pod
+       konkretnym zawodnikiem, a na jednym adresie bywa ich kilku — tak zapisuje się rodzina
+       z trójką dzieci. Bramka bez wiązania dostałaby od Workera „najnowsze zgłoszenie na tym
+       adresie", czyli kod otwierający kogoś, o kogo nikt nie pytał.
+
+       Dlatego rozmowa pyta o listę tą samą końcówką, którą wola formularz, i rozstrzyga
+       PRZED wysłaniem listu:
+
+         jedno zgłoszenie   bramka wie, czego dotyczy kod → weryfikacja w rozmowie,
+         kilku zawodników   nie ma czego wiązać → formularz, jego lista zawodników i jego kod,
+                            czyli dokładnie to, co było przed tą zmianą,
+         zero zgłoszeń      nie ma czego bramkować; formularz otwiera się z wpisanym adresem.
+
+       Wybór zawodnika NIE wraca do czatu. Panel ma go od dawna, z inicjałami i numerami
+       startowymi, i przepisywanie tego na pastylki dałoby drugą listę tych samych ludzi
+       o innych regułach. Cena jest jedna: przy kilku zawodnikach kod wpisuje się w formularzu.
+       Za to nigdy nie idzie list o kimś, kogo gość nie wskazał.
+       ======================================================================== */
+
+    /**
+     * Adres z rozmowy → lista zgłoszeń → bramka albo od razu formularz.
+     *
+     * @param {string} email adres z karty czatu albo z „zmień adres"
+     */
+    async function entryHandover(email) {
+      if (!flow) return;
+      const intent = flow.intent;
+      const purpose = intent === 'withdraw' ? 'cancel-entry' : 'edit-entry';
+      flow.step = 'lookup';
+      flow.email = email;
+
+      /* Ta sama końcówka i ta sama odpowiedź, którą czyta panel: inicjały, numer startowy,
+         `withdrawn` i `minor`. Adres w rozmowie nie jest tu uwierzytelnieniem i nic nie
+         otwiera — służy do policzenia zgłoszeń, tak samo jak w formularzu, do którego ten
+         adres wpisuje każdy, kto go zna. */
+      const found = await gatePost('entry-lookup', { email });
+      const entries = Array.isArray(found?.entries) ? found.entries : [];
+
+      /* `only.id` w warunku, nie tylko liczba: bez identyfikatora nie ma czym wiązać kodu,
+         a kod bez wiązania nie otworzy w panelu niczego — poszedłby list, po którym formularz
+         i tak poprosiłby o drugi. Wtedy lepiej od razu jego drogą. */
+      if (entries.length === 1 && entries[0].id) {
+        const only = entries[0];
+
+        /* DZISIEJSZA ODMOWA PANELU, POWIEDZIANA O JEDEN LIST WCZEŚNIEJ (3.4)
+           ------------------------------------------------------------------------
+           Zgłoszenie osoby niepełnoletniej zmienia się przez organizatorów, bo za nim stoi
+           podpisana zgoda opiekuna — panel ukrywa oba przyciski i mówi to samo zdanie, tym
+           samym kluczem. Wycofane zgłoszenie nie ma czego wycofywać ani poprawiać.
+
+           Powiedziane tutaj, przed bramką, żeby nie wysyłać kodu na czynność, której i tak
+           odmówimy: gość przepisywałby sześć cyfr po to, by przeczytać „napisz do
+           organizatorów", a jeden z trzech listów na kwadrans byłby zużyty na nic. */
+        if (only.minor || only.withdrawn) {
+          flowSay(only.minor ? 'entry.minorHelp' : 'entry.alreadyOut');
+          endFlow();
+          return;
+        }
+
+        /* Kod wiązany z TYM zawodnikiem. `flowGuard` wokół zaczepu, bo błąd rzucony z niego
+           wpadłby w obsługę odmów bramki i pokazał jej trzy pastylki po tym, jak bramka już
+           zeszła — ta sama ostrożność, co przy sponsorze i przy wypisaniu. */
+        await gateStart(email, purpose, {
+          entryId: only.id,
+          onConfirmed: (code) => flowGuard(() => entryOpenForm(email, intent, {
+            code,
+            entryId: only.id
+          })),
+          /* „Zmień adres" wraca do pytania o adres — to samo zdanie i ta sama pastylka co przy
+             powiadomieniach, a krok `email` rozgałęzia się po `flow.intent`. */
+          onChangeEmail: () => notifyAskEmail()
+        });
+        return;
+      }
+
+      await entryOpenForm(email, intent, null);
+    }
+
+    /**
+     * Oddanie sprawy formularzowi i koniec kreatora.
+     *
+     * Kreator kończy się TUTAJ, a nie po czynności: dalej prowadzi panel, ma własne komunikaty
+     * i własne kroki, a rozmowa, która nadal przechwytywałaby wiadomości, brałaby pytanie
+     * zadane w międzyczasie za odpowiedź krokowi, którego już nie ma.
+     *
+     * `endFlow` zabiera ze sobą kod z pamięci kreatora — panel ma już swoją kopię, wpisaną
+     * w pole, którego i tak potrzebuje do końcowego żądania.
+     */
+    async function entryOpenForm(email, intent, confirmed) {
+      if (typeof openEntryManager !== 'function') {
+        flowSay('chat.dataNeedGate');
+        endFlow();
+        return;
+      }
+      await openEntryManager(email, intent, null, confirmed);
+      endFlow();
+    }
+
+    /**
+     * KOŃCOWE ŻĄDANIA MÓWIĄ WŁASNYM SŁOWNIKIEM ODMÓW — TU JEST PRZEKŁAD NA SŁOWNIK BRAMKI
+     * ---------------------------------------------------------------------------
+     * `notify-off`, `sponsor-lead` i zarządzanie zgłoszeniem odpowiadają kodami ze swoich
+     * rodzin (`NOTIFY_*`, `SPONSOR_*`, `ENTRY_*`), bo są starsze od bramki i mają własnych
+     * klientów poza rozmową. Bramka ma jeden zestaw zdań na stany kodu i to on ma tu zostać:
+     * druga tablica z tymi samymi znaczeniami rozjechałaby się z `GATE_REFUSALS` przy pierwszej
+     * zmianie tekstu. Dlatego tu jest wyłącznie przekład kodu na kod, a zdanie i pastylki
+     * dobiera `gateRefused`.
+     *
+     * `ENTRY_*` są w tablicy nie dla samego `entryManage`, a dla `sponsor-lead`: przy odmowie
+     * kodu oddaje `SPONSOR_BAD_CODE` z dokładniejszym powodem w `reason`, i to `reason` mówi,
+     * czy kod wygasł, czy próby się wyczerpały.
+     */
+    const FLOW_CODE_REFUSALS = {
+      NOTIFY_CODE_WRONG: 'VERIFY_WRONG',
+      NOTIFY_CODE_EXPIRED: 'VERIFY_EXPIRED',
+      NOTIFY_NO_CODE: 'VERIFY_NO_CODE',
+      NOTIFY_TOO_MANY_TRIES: 'VERIFY_TOO_MANY_TRIES',
+      NOTIFY_CODE_TOO_OFTEN: 'VERIFY_TOO_OFTEN',
+      NOTIFY_BAD_EMAIL: 'VERIFY_BAD_EMAIL',
+      NOTIFY_BAD_CODE: 'VERIFY_BAD_CODE',
+      SPONSOR_BAD_EMAIL: 'VERIFY_BAD_EMAIL',
+      SPONSOR_BAD_CODE: 'VERIFY_BAD_CODE',
+      ENTRY_CODE_WRONG: 'VERIFY_WRONG',
+      ENTRY_CODE_EXPIRED: 'VERIFY_EXPIRED',
+      ENTRY_NO_CODE: 'VERIFY_NO_CODE',
+      ENTRY_TOO_MANY_TRIES: 'VERIFY_TOO_MANY_TRIES',
+      ENTRY_CODE_TOO_OFTEN: 'VERIFY_TOO_OFTEN',
+      ENTRY_BAD_EMAIL: 'VERIFY_BAD_EMAIL',
+      ENTRY_BAD_CODE: 'VERIFY_BAD_CODE'
+    };
+
+    /**
+     * Jedno miejsce na błędy kreatora: każdy krok mówi to samo zdanie i nie gubi rozmowy.
+     *
+     * `flowGuard` obejmuje CZYNNOŚĆ, czyli żądanie stojące za bramką — wypisanie, zgłoszenie
+     * sponsora, oddanie sprawy formularzowi. Bramka zeszła chwilę wcześniej, więc odmowa
+     * dotycząca kodu znaczy tu jedno: kod umarł między sprawdzeniem a użyciem. Wygasł na
+     * granicy kwadransa albo został zużyty w drugiej karcie.
+     *
+     * Z każdego takiego stanu jest sensowne wyjście, więc kreator ZOSTAJE OTWARTY przy każdej
+     * odmowie kodu, nie tylko przy błędnym (2.7, 2.11, 2.12). Dotąd kończył się na wszystkim
+     * poza `NOTIFY_CODE_WRONG` — czyli wygaśnięcie kodu tuż przed wysłaniem odsyłało gościa na
+     * początek sprawy, którą przeszedł w całości, i drugi raz zapytałoby go o wszystko.
+     *
+     * Odmowa NIE dotycząca kodu kończy kreator jak dotąd: pusty zapis, brak zgody w żądaniu,
+     * nieudany zapis w bazie to rzeczy, na które gość nie ma w rozmowie żadnego ruchu.
+     */
     async function flowGuard(step) {
       try {
         await step();
       } catch (problem) {
-        const code = problem?.payload?.code || problem?.message || '';
-        const key = {
-          NOTIFY_CODE_EXPIRED: 'chat.dataCodeOld',
-          NOTIFY_NO_CODE: 'chat.dataCodeOld',
-          NOTIFY_CODE_WRONG: 'chat.dataCodeWrong',
-          NOTIFY_TOO_MANY_TRIES: 'chat.dataCodeBurnt',
-          /* Klucz z przestrzeni `entry`, użyty w rozmowie świadomie: zdanie jest dosłownie
-             to samo, a druga kopia tego samego tekstu w sześciu językach to druga rzecz do
-             utrzymania i pierwsze miejsce, w którym te dwa napisy się rozjadą. */
-          NOTIFY_CODE_TOO_OFTEN: 'entry.codeTooOften'
-        }[code];
-        flowSay(key || 'chat.dataFailed');
-        // Zły kod nie kończy rozmowy: zostaje krok z kodem, żeby dało się wpisać poprawny.
-        if (key !== 'chat.dataCodeWrong') endFlow();
+        const payload = problem?.payload || null;
+        const said = payload?.code || problem?.message || '';
+        /* `reason` przed `code`, bo jest dokładniejszy tam, gdzie występuje: `SPONSOR_BAD_CODE`
+           samo w sobie nie mówi, czy kod wygasł, czy zgadywano go pięć razy. */
+        const code = FLOW_CODE_REFUSALS[payload?.reason]
+          || FLOW_CODE_REFUSALS[said]
+          || (GATE_REFUSALS[said] ? said : '');
+
+        if (code && flow && gateStandBack(code)) {
+          gateRefused({ payload: { code, left: payload?.left } });
+          return;
+        }
+
+        flowSay('chat.dataFailed');
+        endFlow();
       }
     }
 
     /**
      * Otwiera właściwą drogę po znaczniku z serwera.
      *
-     * Dwie z trzech intencji prowadzą do istniejącego formularza zarządzania zgłoszeniem —
-     * tego samego, który otwierają podpowiedzi „zmień dane" i „wycofaj mnie". Trzecia zostaje
-     * w rozmowie.
+     * Wszystkie cztery zaczynają się w rozmowie i wszystkie przechodzą przez tę samą bramkę.
+     * Dwie — zmiana danych i wycofanie — kończą się w formularzu zarządzania zgłoszeniem, temu
+     * samemu, który otwierają podpowiedzi „zmień dane" i „wycofaj mnie", i dostają go
+     * z potwierdzeniem w ręku (`entryHandover`). Zgłoszenie sponsora i wypisanie z powiadomień
+     * zostają w rozmowie do końca.
      */
     /**
      * Sponsoring: oferta, dwie pastylki, potem trzy pytania.
@@ -7030,7 +7911,13 @@ import {
      * zamknięcie czatu i nikt nie wie, że ktoś się rozmyślił.
      */
     function sponsorOffer() {
-      flow = { intent: 'sponsor', step: 'decide', cartName: '', phone: '', email: '' };
+      flow = newFlow('sponsor', 'sponsor', {
+        step: 'decide',
+        cartName: '',
+        firstName: '',
+        lastName: '',
+        phone: ''
+      });
       flowSay('chat.sponsorOffer');
       flowChoices([
         ['chat.sponsorYes', async () => {
@@ -7042,42 +7929,203 @@ import {
       ]);
     }
 
-    /** Kolejne odpowiedzi sponsora: nazwa → telefon → e-mail → wysyłka. */
-    async function sponsorStep(message) {
-      if (flow.step === 'name') {
-        flow.cartName = message.trim().slice(0, 120);
-        if (!flow.cartName) { flowSay('chat.sponsorAskName'); return; }
-        flow.step = 'phone';
-        flowSay('chat.sponsorAskPhone');
-        return;
-      }
+    /**
+     * ODSYŁACZE DO PRYWATNOŚCI I REGULAMINU — NOWA KARTA, NIE NAWIGACJA
+     * ---------------------------------------------------------------------------
+     * Kreator żyje w pamięci karty i nie ma go w `localStorage`, więc wyjście z tej strony
+     * kosztowałoby wszystkie dotychczasowe odpowiedzi. `target="_blank"` otwiera dokument
+     * obok, a rozmowa zostaje tam, gdzie stoi — to jest cała treść wymagania „bez utraty
+     * stanu kreatora" (4.2).
+     *
+     * `?lang=` w języku strony: `regolamento.html` czyta ten parametr (`legal-doc.js`) i
+     * pokazuje dokument w tym języku, a taki sam kształt odsyłacza mają linki w mailach.
+     * `rel="noopener noreferrer"` bo `target="_blank"` bez niego oddaje nowej karcie uchwyt
+     * do tej.
+     */
+    function consentDocs() {
+      if (!log) return null;
+      const row = document.createElement('p');
+      row.className = 'chat__docs';
+      row.dataset.chatDocs = '';
+      const links = [
+        ['chat.sponsorConsentPrivacy', `privacy.html?lang=${state.lang}`],
+        ['chat.sponsorConsentRules', `regolamento.html?lang=${state.lang}`]
+      ];
+      links.forEach(([key, href], index) => {
+        if (index) row.append(document.createTextNode(' · '));
+        const link = document.createElement('a');
+        link.href = href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = text(key) || href;
+        row.append(link);
+      });
+      const stick = atBottom();
+      log.appendChild(row);
+      if (stick) toBottom();
+      return row;
+    }
 
-      if (flow.step === 'phone') {
-        /* „Pomiń" jest dozwolone: jeden kanał kontaktu wystarczy, żeby oddzwonić, a upieranie
-           się przy numerze kosztuje zgłoszenia od tych, którzy go nie podają. */
-        const digits = message.replace(/[^\d+]/g, '');
-        flow.phone = digits.length >= 6 ? message.trim().slice(0, 40) : '';
-        flow.step = 'email';
-        flowSay('chat.sponsorAskEmail');
-        return;
-      }
+    /**
+     * ZGODA MIĘDZY NAZWĄ A PYTANIAMI O KONTAKT
+     * ---------------------------------------------------------------------------
+     * Stoi dokładnie tam, gdzie zaczyna się zbieranie danych osobowych, i ani o krok wcześniej:
+     * nazwa na carruleddhi nie jest danymi osobowymi, więc przed nią nie ma na co się zgadzać,
+     * a po niej idą już imię, telefon i adres (4.1, 4.3).
+     *
+     * Dwie pastylki, obie równie widoczne. „Rezygnuję" kończy kreator zdaniem, że rozumiemy,
+     * i NIE WYSYŁA niczego — `sponsor-lead` leci dopiero po bramce, więc odmowa zgody zostawia
+     * po sobie tylko wiersze w wątku (4.5).
+     *
+     * Zgoda z pastylki jest zapamiętana w `flow.consent` i pojedzie z żądaniem, ale nie jest
+     * dowodem: Worker sprawdza ją po swojej stronie i bez `consent === true` odmawia.
+     */
+    function sponsorConsent() {
+      if (!flow) return;
+      flow.step = 'consent';
+      flow.consent = false;
+      flowSay('chat.sponsorConsentAsk');
+      consentDocs();
+      flowChoices([
+        ['chat.sponsorConsentYes', async () => {
+          if (!flow) return;
+          flow.consent = true;
+          sponsorAskPerson();
+        }],
+        ['chat.sponsorConsentNo', async () => { flowSay('chat.sponsorConsentNoted'); endFlow(); }]
+      ]);
+    }
 
-      const email = message.trim().toLowerCase();
-      if (email && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) flow.email = email;
-      if (!flow.phone && !flow.email) {
-        // Bez żadnego kontaktu zgłoszenie jest kartką bez adresu — pytamy jeszcze raz.
-        flowSay('chat.sponsorNeedContact');
-        return;
-      }
+    /** „Rezygnuję" wygląda tak samo w każdym kroku sponsora — jeden opis, nie sześć kopii. */
+    const sponsorQuit = () => ['chat.dataCancel', async () => { flowSay('chat.sponsorNo'); endFlow(); }];
 
-      const result = await flowPost('sponsor-lead', {
+    /**
+     * Imię i nazwisko — pierwsze pytanie po zgodzie (5.1).
+     *
+     * Osobny krok, a nie doklejenie do nazwy carruleddhi: nazwa na wózku to nazwa firmy, a to
+     * jest człowiek, do którego się dzwoni. Zgłoszenie bez nazwiska jest zgłoszeniem, na które
+     * nie da się odpowiedzieć inaczej niż „dzień dobry".
+     */
+    function sponsorAskPerson() {
+      if (!flow) return;
+      flow.step = 'person';
+      flowSay('chat.sponsorAskPerson');
+      flowChoices([sponsorQuit()]);
+    }
+
+    /**
+     * Telefon — opcjonalny, z pastylką „pomiń" obok pytania (5.3).
+     *
+     * Pominięcie jest NACIŚNIĘCIEM, nie słowem do napisania. Dotąd pytanie kończyło się
+     * zdaniem „jeśli wolisz, napisz «pomiń»" — czyli trzeba było trafić w to słowo w swoim
+     * języku, a wszystko inne bez sześciu cyfr było po cichu brane za pominięcie. Widoczna
+     * pastylka mówi to samo bez zgadywania i bez cichej straty numeru z literówką.
+     */
+    function sponsorAskPhone() {
+      if (!flow) return;
+      flow.step = 'phone';
+      flowSay('chat.sponsorAskPhone');
+      flowChoices([
+        ['chat.sponsorPhoneSkip', async () => {
+          if (!flow) return;
+          flow.phone = '';
+          sponsorAskEmail();
+        }],
+        sponsorQuit()
+      ]);
+    }
+
+    /**
+     * Adres — OBOWIĄZKOWY (5.2) i pytany na końcu, bo prowadzi wprost do bramki.
+     *
+     * Osobna funkcja, bo wchodzi się tu z dwóch stron: po telefonie oraz z powrotem z bramki,
+     * gdy gość naciśnie „zmień adres". Za drugim razem pozostałe odpowiedzi zostają w `flow`
+     * i pytanie jest jedno, nie cała rozmowa od początku.
+     */
+    function sponsorAskEmail() {
+      if (!flow) return;
+      flow.step = 'email';
+      flowSay('chat.sponsorAskEmail');
+      flowChoices([sponsorQuit()]);
+    }
+
+    /**
+     * Zgłoszenie po potwierdzeniu adresu — jedyne żądanie, które cokolwiek wysyła.
+     *
+     * ŚCIEŻKA, NIE `type` W CIELE
+     *   Idzie przez `gatePost`, czyli na `/api/carruleddhi/sponsor-lead`, a nie na adres czatu
+     *   z rodzajem w ciele. Router Workera bierze rodzaj ZE ŚCIEŻKI (patrz komentarz przy
+     *   `gateUrl`), więc `sponsor-lead` wysłany na `/chat` trafiał do `chatVisitor` — zgłoszenie
+     *   zamieniało się w wiadomość w wątku i nikt nie dostawał ani WhatsAppa, ani listu.
+     *
+     * `code` jedzie razem z adresem, bo to TO żądanie autoryzuje czynność: `verify-code` kodu
+     * nie zużyło i nie miało prawa. Zgoda też jedzie, choć nie jest dowodem — Worker sprawdza
+     * ją po swojej stronie.
+     */
+    async function sponsorSubmit(code) {
+      const result = await gatePost('sponsor-lead', {
         cartName: flow.cartName,
-        phone: flow.phone,
-        email: flow.email
+        firstName: flow.firstName,
+        lastName: flow.lastName,
+        email: flow.email,
+        code,
+        ...(flow.phone ? { phone: flow.phone } : {}),
+        consent: flow.consent === true
       });
       if (!result?.ok) throw Object.assign(new Error('sponsor'), { payload: result });
       flowSay('chat.sponsorThanks');
       endFlow();
+    }
+
+    /** Kolejne odpowiedzi sponsora: nazwa → zgoda → imię → telefon → adres → bramka. */
+    async function sponsorStep(message) {
+      if (flow.step === 'name') {
+        flow.cartName = message.trim().slice(0, 120);
+        if (!flow.cartName) { flowSay('chat.sponsorAskName'); return; }
+        sponsorConsent();
+        return;
+      }
+
+      if (flow.step === 'person') {
+        /* Podział na pierwszym odstępie: wszystko po nim jest nazwiskiem. Nazwiska dwuczłonowe
+           i przedrostki („de", „van") zostają w całości, bo dzielenie ich po drugim odstępie
+           gubiłoby połowę nazwiska w połowie przypadków, w których w ogóle o coś tu chodzi. */
+        const said = message.trim().replace(/\s+/g, ' ').slice(0, 120);
+        const gap = said.indexOf(' ');
+        if (gap < 1) { flowSay('chat.sponsorNeedPerson'); return; }
+        flow.firstName = said.slice(0, gap);
+        flow.lastName = said.slice(gap + 1);
+        sponsorAskPhone();
+        return;
+      }
+
+      if (flow.step === 'phone') {
+        /* Numer albo wygląda na numer, albo go nie ma. Cicha zamiana byle czego na brak numeru
+           znaczyłaby, że literówka w prefiksie kończy się zgłoszeniem bez telefonu i nikt tego
+           nie widzi — a pominięcie ma tu własną pastylkę i nie trzeba go pisać słowem. */
+        const digits = message.replace(/\D/g, '');
+        if (digits.length < 6) { flowSay('chat.sponsorBadPhone'); return; }
+        flow.phone = message.trim().slice(0, 40);
+        sponsorAskEmail();
+        return;
+      }
+
+      const email = message.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        /* Ponowna prośba o sam adres, bez utraty tego, co już podane (5.4): nazwa, imię,
+           nazwisko i telefon zostają w `flow`, zmienia się tylko odpowiedź na jedno pytanie. */
+        flowSay('chat.dataBadEmail');
+        return;
+      }
+      flow.email = email;
+
+      /* Bramka z celem `sponsor`: kod na ten adres i nic nie wychodzi na zewnątrz, dopóki nie
+         wróci poprawny (5.5, 5.6). `flowGuard` wokół wysyłki, bo błąd rzucony z zaczepu
+         wpadłby w obsługę odmów bramki i pokazał pastylki bramki, której już nie ma. */
+      await gateStart(email, 'sponsor', {
+        onConfirmed: (code) => flowGuard(() => sponsorSubmit(code)),
+        onChangeEmail: () => sponsorAskEmail()
+      });
     }
 
     async function startFlow(intent) {
@@ -7090,17 +8138,21 @@ import {
           flowSay('chat.dataNeedGate');
           return;
         }
+        /* Adres z karty czatu NIE jest uwierzytelnieniem i nadal nim nie jest: dowodem jest
+           kod ze skrzynki, o który prosi bramka niżej, a przy kilku zawodnikach na jednym
+           adresie — formularz. Cel kodu zależy od czynności, bo kod na poprawienie telefonu
+           nie ma prawa nikogo wycofać z wyścigu. */
+        flow = newFlow(intent, intent === 'withdraw' ? 'cancel-entry' : 'edit-entry', {
+          step: 'lookup'
+        });
         flowSay(intent === 'withdraw' ? 'chat.dataAskWithdraw' : 'chat.dataAskEdit');
-        /* Adres z bramki czatu NIE jest tu uwierzytelnieniem — służy tylko do znalezienia
-           zgłoszeń. Formularz i tak żąda kodu ze skrzynki przed każdą czynnością. */
-        await openEntryManager(visitor.email, intent, null);
+        await flowGuard(() => entryHandover(visitor.email));
         return;
       }
 
-      flow = { intent, step: 'email', email: '' };
+      flow = newFlow(intent, 'unsubscribe', { step: 'email' });
       flowSay('chat.dataAskNotify');
-      flowSay('chat.dataAskEmail');
-      flowChoices([['chat.dataCancel', async () => { flowSay('chat.dataStopped'); endFlow(); }]]);
+      notifyAskEmail();
     }
 
     /**
@@ -7109,6 +8161,12 @@ import {
      */
     async function flowHandled(message) {
       if (!flow) return false;
+
+      /* Bramka pierwsza i PRZED bąbelkiem gościa — to nie jest kolejność przypadkowa.
+         Sześć cyfr wpisanych w kompozytor jest kodem, nie wypowiedzią, więc `gateTyped`
+         decyduje o bąbelku sam: kod nie ma trafić do wątku ani do historii w panelu. */
+      if (flow.step === 'gate') return gateTyped(message);
+
       // Bąbelek gościa rysowany tak jak zwykle: to nadal jego wiadomość w rozmowie.
       append({ author: 'visitor', body: message, at: '' }, false);
       if (input) input.value = '';
@@ -7117,8 +8175,10 @@ import {
       /* Sponsoring ma własne kroki i własne pola. Osobna gałąź, nie wspólny „email/code":
          tam adres jest tożsamością do potwierdzenia kodem, tu jest kontaktem do oddzwonienia. */
       if (flow.intent === 'sponsor') {
-        // Pastylkami wybiera się tylko pierwszy krok; potem odpowiada się pisząc.
-        if (flow.step === 'decide') {
+        /* Dwa kroki są wyborem, nie odpowiedzią: oferta na wejściu i zgoda po nazwie. „Tak"
+           napisane w kompozytorze nie jest zgodą — zgoda ma być naciśnięta świadomie, przy
+           odsyłaczach do obu dokumentów pod ręką, więc kreator odsyła do pastylek (4.3). */
+        if (flow.step === 'decide' || flow.step === 'consent') {
           flowSay('chat.dataUseButtons');
           return true;
         }
@@ -7132,25 +8192,32 @@ import {
           flowSay('chat.dataBadEmail');
           return true;
         }
-        flow.email = email;
-        await flowGuard(async () => {
-          const result = await flowPost('notify-code', { email });
-          if (!result?.ok) throw Object.assign(new Error('notify-code'), { payload: result });
-          /* „Kod poszedł" mówione także wtedy, gdy adresu nie ma na żadnej liście — serwer
-             odpowiada tak samo (patrz notifyCode). Inaczej rozmowa odpowiadałaby na pytanie
-             „czy ten człowiek jest u Was zapisany". */
-          flow.step = 'code';
-          flowSay('chat.dataCodeSent');
+
+        /* Zmiana danych i wycofanie zaczynają od listy zgłoszeń na tym adresie, bo od niej
+           zależy, czy bramka ma co wiązać — patrz `entryHandover`. Wchodzi się tu po „zmień
+           adres" w bramce, więc adres jest nowy i lista też jest nowa. */
+        if (flow.intent === 'edit' || flow.intent === 'withdraw') {
+          await flowGuard(() => entryHandover(email));
+          return true;
+        }
+
+        /* Bramka z celem `unsubscribe`: kod na ten adres i nikt nie jest wypisywany, dopóki nie
+           wróci poprawny. „Kod poszedł" mówi bramka i mówi to samo dla adresu znanego i
+           nieznanego (O6) — kreator nie ma tu już własnego zdania na ten temat.
+
+           `flowGuard` wokół samego wypisania, bo błąd rzucony z zaczepu wpadłby w obsługę
+           odmów bramki i pokazał jej trzy pastylki po tym, jak bramka już zeszła. */
+        await gateStart(email, 'unsubscribe', {
+          onConfirmed: (code) => flowGuard(() => notifyOff(code)),
+          onChangeEmail: () => notifyAskEmail()
         });
         return true;
       }
 
-      const code = message.replace(/\D/g, '');
-      if (code.length !== 6) {
-        flowSay('chat.dataBadCode');
-        return true;
-      }
-      await flowGuard(() => flowFinish(code));
+      /* Innych kroków ta sprawa nie ma: adres, bramka, wypisanie. Wiadomość w kroku, którego
+         nie ma, jest pomyłką po naszej stronie — więc kreator wskazuje pastylki, zamiast po
+         cichu brać cokolwiek za kod. */
+      flowSay('chat.dataUseButtons');
       return true;
     }
 
@@ -7347,10 +8414,15 @@ import {
           askedKeys.add(key);
           setChipsOpen(false);
           if ((key === 'chat.askChange' || key === 'chat.askCancel') && openEntryManager) {
-            /* The chat gate supplies the address, but it is not treated as authentication.
-               This opens the same selector and six-digit-code flow as the registration form;
-               no operation is possible until the inbox code is confirmed. */
-            await openEntryManager(visitor.email, key === 'chat.askChange' ? 'edit' : 'withdraw', chip);
+            /* Ta sama droga, co po napisaniu „chcę zmienić dane" — jedna, nie dwie. Naciśnięta
+               podpowiedź jest tą samą prośbą co zdanie w kompozytorze, więc idzie przez
+               `startFlow`: bramka w rozmowie, a potem formularz z gotowym potwierdzeniem (3.2).
+               Wcześniej ta gałąź otwierała formularz z samym adresem i to on zaczynał
+               weryfikację od początku — dwa zachowania dla jednej prośby.
+
+               Adres z karty czatu nadal nie jest uwierzytelnieniem: żadna czynność nie dzieje
+               się bez kodu ze skrzynki. */
+            await startFlow(key === 'chat.askChange' ? 'edit' : 'withdraw');
             return;
           }
           send(chip.textContent.trim());
@@ -7693,6 +8765,7 @@ import {
       ['contactForm', setupContactForm],
       ['accordion', setupAccordion],
       ['cookieConsent', setupCookieConsent],
+      ['visitBeacon', setupVisitBeacon],
       ['cursor', setupCursor],
       ['magneticButtons', setupMagneticButtons],
       ['heroMotion', setupHeroMotion],

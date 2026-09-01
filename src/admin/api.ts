@@ -187,6 +187,36 @@ export interface ChatMessage {
  * indexed count per table and no rows come back. A dedicated "verify" endpoint would be
  * a second thing to keep in step for no gain.
  */
+/* ------------------------------------------------------------- statystyki
+   Jedno wywolanie na caly ekran. Ksztalt odpowiada funkcji `site_stats` w bazie
+   (migracja 0033) — osiem agregatow policzonych jednym zapytaniem, zeby wykresy pod soba
+   nie mogly pochodzic z roznych okien czasowych. */
+export interface StatsBucket { at: string; views: number; visitors: number }
+export interface StatsSource { source: string; views: number; visitors: number }
+export interface StatsCampaign {
+  campaign: string; source: string; medium: string | null; views: number; visitors: number;
+}
+export interface SiteStats {
+  windowHours: number;
+  generatedAt: string;
+  live: number;
+  liveMinutes: number;
+  totals: { views: number; visitors: number; sessions: number };
+  previous: { views: number; visitors: number };
+  sources: StatsSource[];
+  campaigns: StatsCampaign[];
+  pages: { path: string; views: number }[];
+  countries: { country: string; views: number }[];
+  devices: { device: string; views: number }[];
+  series: StatsBucket[];
+  seriesStep: 'hour' | 'day';
+  signups: { source: string; count: number }[];
+  signupTotal: number;
+}
+
+export const fetchStats = (key: string, hours: number) =>
+  call<{ ok: true; stats: SiteStats }>('stats', key, { hours });
+
 export const verifyKey = (key: string) => call<Inbox>('inbox', key, { action: 'counts' });
 
 export const fetchInbox = (key: string) => call<Inbox>('inbox', key, { action: 'counts' });

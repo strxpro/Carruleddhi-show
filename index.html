@@ -319,6 +319,17 @@
           <p class="section-lead" data-i18n="voting.podiumLead">Classifica per punti totali, poi numero di voti e media.</p>
         </header>
 
+        <!-- Zamkniete glosowanie BEZ ANI JEDNEGO GLOSU.
+             ==================================================================
+             Cokol wymaga zwyciezcy, wiec przy zerze glosow cala sekcja znikala i po
+             nacisnieciu „zakoncz turniej" w panelu strona wygladala na zepsuta: nic sie nie
+             pojawialo i nic nie tlumaczylo dlaczego. Zdarzenie „nikt nie zaglosowal" jest
+             rzadkie, ale jest normalnym wynikiem, a nie awaria — wiec ma byc powiedziane
+             wprost, zamiast zostawiac pusta strone do interpretacji. -->
+        <p class="podium__empty" data-podium-empty hidden data-i18n="voting.podiumEmpty">
+          Il voto è chiuso, ma non è arrivato nessun voto: non c’è un podio da mostrare.
+        </p>
+
         <!-- ZDJĘCIA STOJĄ NA COKOLE, NIE OBOK NIEGO.
              ==================================================================
              Był tu rysunek SVG z trzema słupkami i cyframi 2/1/3, a karty zwycięzców leżały

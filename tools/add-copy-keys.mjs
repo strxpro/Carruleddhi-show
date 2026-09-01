@@ -582,7 +582,67 @@ const RECEIPT = {
   }
 };
 
-const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED, WINNER, VOTERESULT, RECEIPT];
+/* ------------------------------------------- Sponsor: potwierdzenie dla zgłaszającego
+   Przedtem zgłoszenie sponsora szło wyłącznie do organizatorów, więc zgłaszający zostawiał
+   nazwę wózka, imię, telefon i adres, i nie dostawał nic — ani dowodu, że doszło, ani
+   informacji, czego się spodziewać. Wymaganie 7 zamyka tę stronę rozmowy.
+
+   PIĘĆ KLUCZY, BO LIST MA PIĘĆ CZĘŚCI
+     temat, nagłówek, akapit wstępny, tytuł podsumowania i zdanie „odezwiemy się". Etykiety
+     samego podsumowania (nazwa wózka, imię i nazwisko, e-mail, telefon) idą z `labels`,
+     które już istnieją w sześciu językach — nowy zestaw etykiet na to samo byłby drugim
+     miejscem, w którym „Telefon" trzeba przetłumaczyć.
+
+   `sponsorAckSoon` MÓWI, GDZIE TRAFI ODPOWIEDŹ
+     List wychodzi z adresu wysyłkowego, a `Reply-To` jest ustawione na adres organizatorów
+     (7.4). Zdanie mówi to wprost i podaje adres przez %ORGEMAIL%, bo przycisk „Odpowiedz"
+     jest niewidoczny dla kogoś, kto czyta list na telefonie i woli skopiować adres. */
+const SPONSORACK = {
+  it: {
+    sponsorAckSubject: 'Abbiamo ricevuto la tua proposta di sponsorizzazione',
+    sponsorAckHeading: 'Grazie, la proposta è arrivata',
+    sponsorAckLead: 'Ciao %FIRSTNAME%, grazie per voler sostenere il Carruleddhi Show. Questo messaggio conferma che la tua proposta è arrivata agli organizzatori.',
+    sponsorAckSummary: 'Riepilogo della proposta',
+    sponsorAckSoon: 'Ti rispondiamo il prima possibile. Se vuoi aggiungere qualcosa, rispondi a questa e-mail: arriva direttamente agli organizzatori, a %ORGEMAIL%.'
+  },
+  pl: {
+    sponsorAckSubject: 'Mamy Twoje zgłoszenie sponsorskie',
+    sponsorAckHeading: 'Dziękujemy, zgłoszenie doszło',
+    sponsorAckLead: 'Cześć %FIRSTNAME%, dziękujemy za chęć wsparcia Carruleddhi Show. Ta wiadomość potwierdza, że Twoje zgłoszenie dotarło do organizatorów.',
+    sponsorAckSummary: 'Podsumowanie zgłoszenia',
+    sponsorAckSoon: 'Odezwiemy się najszybciej, jak to możliwe. Jeśli chcesz coś dopisać, odpowiedz na tego maila — trafi wprost do organizatorów, na %ORGEMAIL%.'
+  },
+  en: {
+    sponsorAckSubject: 'We have your sponsorship proposal',
+    sponsorAckHeading: 'Thank you, your proposal arrived',
+    sponsorAckLead: 'Hello %FIRSTNAME%, thank you for wanting to support the Carruleddhi Show. This message confirms your proposal reached the organisers.',
+    sponsorAckSummary: 'Summary of your proposal',
+    sponsorAckSoon: 'We will get back to you as soon as we can. If you want to add anything, reply to this e-mail: it goes straight to the organisers, at %ORGEMAIL%.'
+  },
+  de: {
+    sponsorAckSubject: 'Wir haben deinen Sponsoring-Vorschlag',
+    sponsorAckHeading: 'Danke, dein Vorschlag ist angekommen',
+    sponsorAckLead: 'Hallo %FIRSTNAME%, danke, dass du Carruleddhi Show unterstützen möchtest. Diese Nachricht bestätigt, dass dein Vorschlag bei den Organisatoren angekommen ist.',
+    sponsorAckSummary: 'Zusammenfassung des Vorschlags',
+    sponsorAckSoon: 'Wir melden uns so schnell wie möglich. Wenn du etwas ergänzen möchtest, antworte einfach auf diese E-Mail: sie geht direkt an die Organisatoren, an %ORGEMAIL%.'
+  },
+  es: {
+    sponsorAckSubject: 'Hemos recibido tu propuesta de patrocinio',
+    sponsorAckHeading: 'Gracias, tu propuesta ha llegado',
+    sponsorAckLead: 'Hola %FIRSTNAME%, gracias por querer apoyar el Carruleddhi Show. Este mensaje confirma que tu propuesta ha llegado a los organizadores.',
+    sponsorAckSummary: 'Resumen de la propuesta',
+    sponsorAckSoon: 'Te respondemos lo antes posible. Si quieres añadir algo, responde a este correo: llega directamente a los organizadores, a %ORGEMAIL%.'
+  },
+  fr: {
+    sponsorAckSubject: 'Nous avons reçu votre proposition de partenariat',
+    sponsorAckHeading: 'Merci, votre proposition est arrivée',
+    sponsorAckLead: 'Bonjour %FIRSTNAME%, merci de vouloir soutenir le Carruleddhi Show. Ce message confirme que votre proposition est bien arrivée aux organisateurs.',
+    sponsorAckSummary: 'Résumé de la proposition',
+    sponsorAckSoon: 'Nous vous répondons dès que possible. Si vous voulez ajouter quelque chose, répondez à cet e-mail, il arrive directement aux organisateurs, à %ORGEMAIL%.'
+  }
+};
+
+const GROUPS = [FAQ, UNSUB, HOURS, ENTRY, QUIT, EDITED, WINNER, VOTERESULT, RECEIPT, SPONSORACK];
 // (Ten plik obsługuje emails/copy.json. Klucze interfejsu strony idą przez
 //  tools/add-i18n-keys.mjs — to dwa różne słowniki i mieszanie ich kończy się kluczem,
 //  którego szuka przeglądarka, a jest tylko w mailach.)
