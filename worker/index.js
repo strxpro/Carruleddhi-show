@@ -486,12 +486,45 @@ function chatOpenNow(now = new Date()) {
  * a nie przy każdej wiadomości.
  */
 const FAQ_TOPICS = [
-  { answer: 'faqHelmet', keys: ['kask', 'casco', 'helmet', 'helm', 'casque'] },
-  { answer: 'faqCost', keys: ['koszt', 'cena', 'płac', 'plac', 'costo', 'quanto costa', 'cost', 'price', 'preis', 'precio', 'prix', 'gratis', 'free'] },
-  { answer: 'faqEngine', keys: ['silnik', 'motore', 'engine', 'motor', 'moteur'] },
-  { answer: 'faqWho', keys: ['kto może', 'kto moze', 'wiek', 'lat', 'chi può', 'chi puo', 'who can', 'age', 'alter', 'edad', 'âge', 'minor', 'nieletni', 'niepełnoletni'] },
-  { answer: 'faqNumber', keys: ['numer startowy', 'numer', 'numero', 'race number', 'startnummer', 'dorsal'] },
-  { answer: 'faqWhen', keys: ['gdzie', 'kiedy', 'dojechać', 'dojechac', 'dove', 'quando', 'where', 'when', 'wann', 'wo', 'cuándo', 'dónde', 'quand', 'où'] }
+  { answer: 'faqHelmet', keys: ['kask', 'casco', 'casque'], exact: ['helmet', 'helm'] },
+  {
+    answer: 'faqCost',
+    /* `plac` ZDJĘTE ze rdzeni i zastąpione przez `placi`. To był rdzeń bez ogonka do
+       „płacić", a po polsku „plac" jest osobnym słowem — i to słowem, które stoi we WŁASNYCH
+       faktach tego czatu („prezentacja na placu"). Zmierzone: „Gdzie jest ten plac, na którym
+       stoi prezentacja?" dostawało gotową odpowiedź o wpisowym. `placi` trafia w „placic"
+       i „placicie", a nie trafia w „placu" ani „placem". */
+    keys: ['koszt', 'cena', 'płac', 'placi', 'costo', 'quanto costa', 'preis', 'precio'],
+    exact: ['cost', 'price', 'prix', 'gratis', 'free']
+  },
+  {
+    answer: 'faqEngine',
+    keys: ['silnik', 'motore', 'moteur'],
+    /* `motor` TYLKO jako całe słowo. Po polsku „motor" to motocykl, nie silnik, więc rdzeń
+       łapał zdania o zupełnie innej sprawie — zmierzone: „Czy mogę przyjechać motorem i gdzie
+       go zostawić?" dostawało regułkę o zakazie napędu. Jako całe słowo zostaje przydatne po
+       niemiecku i po hiszpańsku, gdzie „Motor"/„motor" znaczy silnik. */
+    exact: ['engine', 'motor']
+  },
+  {
+    answer: 'faqWho',
+    keys: ['kto może', 'kto moze', 'wiek', 'chi può', 'chi puo', 'who can', 'minor', 'nieletni', 'niepełnoletni'],
+    exact: ['lat', 'age', 'alter', 'edad', 'âge']
+  },
+  {
+    answer: 'faqNumber',
+    /* Samo „numer" i „numero" ZDJĘTE. To był rdzeń pasujący do każdego numeru na świecie —
+       zmierzone: „Chcę zmienić numer telefonu w moim zgłoszeniu" dostawało gotową odpowiedź
+       o tym, jak przychodzi numer startowy. Numer startowy nazywa się w każdym z tych języków
+       dwoma słowami albo jednym własnym, więc jest czym trafiać bez zgadywania. */
+    keys: ['numer startowy', 'numero di gara', 'numero di partenza', 'race number', 'startnummer', 'pettorale'],
+    exact: ['dorsal']
+  },
+  {
+    answer: 'faqWhen',
+    keys: ['gdzie', 'kiedy', 'dojechać', 'dojechac', 'dove', 'quando', 'cuándo', 'dónde'],
+    exact: ['where', 'when', 'wann', 'wo', 'quand', 'où']
+  }
 ].map((topic) => ({
   answer: topic.answer,
   /* OD POCZĄTKU SŁOWA, NIE ZE ŚRODKA — i to nie jest drobiazg.
@@ -515,11 +548,21 @@ const FAQ_TOPICS = [
        Klucz krótszy to w swoim języku całe słowo („wo", „lat", „age", „où") i musi
        trafiać dokładnie. Przy okazji znika „latarnia" łapana przez „lat".
 
+     TRZECIA REGUŁA, DOPISANA PO POMIARZE: `exact`
+       Rdzeń wolno mieć tylko temu kluczowi, który w SWOIM języku naprawdę jest rdzeniem.
+       „motor" i „plac" po polsku są całymi słowami o innym znaczeniu niż to, którego szukamy
+       (motocykl, placek… właściwie plac przed kościołem), więc dłuższe formy nie należą do
+       tematu. Takie klucze stoją w `exact` i muszą trafić w całe słowo, choć są dłuższe niż
+       cztery znaki. To zawężenie istniejącej reguły, a nie nowy mechanizm dopasowania.
+
      `\p{L}` zamiast `\b`, bo `\b` w JS nie zna liter „ą", „ż", „ó" — przy `\b` słowo
      „wózek" nadal by trafiało, jako że „ó" jest dla `\b` granicą wyrazu. */
-  patterns: topic.keys.map((key) => {
+  patterns: [
+    ...topic.keys.map((key) => [key, key.length >= 4]),
+    ...(topic.exact || []).map((key) => [key, false])
+  ].map(([key, stem]) => {
     const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const suffix = key.length >= 4 ? '' : '(?![\\p{L}\\p{N}])';
+    const suffix = stem ? '' : '(?![\\p{L}\\p{N}])';
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}${suffix}`, 'iu');
   })
 }));
@@ -532,26 +575,71 @@ const FAQ_TOPICS = [
    `faqAnswer is not defined`. Dlatego wszystko, co dochodzi, stoi PO `faqAnswer`. */
 
 /**
- * Czy gość prosi o powrót do automatu.
+ * Czy gość prosi o rozmowę z CZŁOWIEKIEM.
  *
- * Sprawdzane listą słów, nie modelem — i to jest cały powód, dla którego ta funkcja istnieje
- * osobno. Wyjście z kolejki do człowieka nie może zależeć od tej samej rzeczy, która do tej
- * kolejki wtrąciła: gdy model jest niedostępny, wątek idzie na `'human'`, a wtedy „poproszę
- * automat" musi zadziałać tym bardziej, nie mniej.
+ * DLACZEGO LISTA SŁÓW, A NIE MODEL
+ *   To musi działać także wtedy, gdy model milczy — a milczy najczęściej wtedy, gdy ktoś
+ *   właśnie prosi o człowieka, bo jedno wynika z drugiego. Prośba o człowieka nie może
+ *   zależeć od tej samej rzeczy, na którą gość się skarży.
  *
- * Sześć języków w jednej liście, bo to sześć słów, a nie sześć zdań do tłumaczenia. „bot"
- * wymaga całego słowa (patrz granice), inaczej trafiałby w środek innych wyrazów.
+ * DLACZEGO ROZPOZNAJEMY WEJŚCIE, A NIE WYJŚCIE
+ *   Stała tu funkcja odwrotna: `wantsAutomation`, lista słów „automat", „bot", „asystent",
+ *   po których wątek przekazany człowiekowi znów dostawał odpowiedź automatu. Skutek był
+ *   dokładnie odwrotny do zamierzonego, bo najczęstsze zdanie w tej sytuacji brzmi „nie chcę
+ *   automatu, poproszę człowieka" — i zawiera słowo „automat". Prośba o człowieka zdejmowała
+ *   więc wyciszenie automatu.
+ *
+ *   Wyjście ze stanu „przekazana człowiekowi" nie jest już zgadywane ze słów: gość ma na to
+ *   widoczny przycisk „chcę porozmawiać z automatem", który wysyła `action: 'bot'` (patrz
+ *   `chatVisitor`). Rozpoznanie ze słów zostaje tylko po tej stronie, po której pomyłka jest
+ *   tania: najgorsze, co się stanie, to rozmowa oddana człowiekowi, gdy nie było potrzeby.
+ *
+ * Sześć języków w jednej liście, bo to lista słów, nie zdań do tłumaczenia. Granice wyrazu
+ * przez lookaround na `\p{L}`, ta sama konwencja co wszędzie w tym pliku — `\b` nie zna „ł".
  */
-const AUTOMATION_WORDS = [
-  'automat', 'automatu', 'automacie', 'automatico', 'automatique', 'automatisch', 'automatico',
-  'bot', 'chatbot', 'asystent', 'assistente', 'assistant', 'asistente'
-];
-const AUTOMATION_PATTERNS = AUTOMATION_WORDS.map((word) =>
-  new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
+/* DWIE LISTY, BO POMYŁKA W TĘ STRONĘ TEŻ MA CENĘ.
+   ---------------------------------------------------------------------------
+   Odkąd przekazanie rozmowy WYCISZA automat do naciśnięcia przycisku, fałszywe rozpoznanie
+   prośby o człowieka nie jest już darmowe: „Ile osób mieści się w wózku?" nie może uciszyć
+   czatu na resztę rozmowy.
 
-function wantsAutomation(question) {
+   `HUMAN_SURE`  formy, które w swoim języku występują praktycznie tylko w tej prośbie —
+                 „z człowiekiem", „z organizatorem", włoskie „operatore" (żywa obsługa).
+                 Wystarczają same.
+   `HUMAN_MAYBE` rzeczowniki wieloznaczne („człowiek", „persona", „person"). Wymagają
+                 DRUGIEGO sygnału: słowa o rozmowie albo o kontakcie. Ten sam wzorzec dwóch
+                 sygnałów co w `dataIntent` wyżej, gdzie „zmień" wymaga wskazania siebie. */
+const HUMAN_SURE = [
+  'człowiekiem', 'czlowiekiem', 'organizatorem', 'organizatorami', 'organizatorzy',
+  'operatore', 'organizzatore', 'organizzatori',
+  'organiser', 'organizer', 'organisers', 'organizers',
+  'veranstalter', 'organisateur', 'organisateurs', 'organizador', 'organizadores'
+];
+const HUMAN_MAYBE = [
+  'człowiek', 'czlowiek', 'człowieka', 'czlowieka', 'organizator', 'organizatora',
+  'persona', 'umano', 'umana', 'human', 'person', 'someone', 'somebody',
+  'mensch', 'menschen', 'mitarbeiter', 'humano', 'humain', 'humaine', 'personne'
+];
+const TALK_WORDS = [
+  'rozmawiać', 'rozmawiac', 'porozmawiać', 'porozmawiac', 'rozmowa', 'rozmowę', 'rozmowe',
+  'zadzwonić', 'zadzwonic', 'kontakt', 'połączcie', 'poproszę', 'poprosze',
+  'parlare', 'parlo', 'contatto', 'contattare', 'chiamare', 'chiamata',
+  'talk', 'speak', 'contact', 'call',
+  'sprechen', 'reden', 'anrufen', 'kontaktieren',
+  'hablar', 'contactar', 'llamar',
+  'parler', 'contacter', 'appeler'
+];
+const wordRe = (word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu');
+const HUMAN_SURE_PATTERNS = HUMAN_SURE.map(wordRe);
+const HUMAN_MAYBE_PATTERNS = HUMAN_MAYBE.map(wordRe);
+const TALK_PATTERNS = TALK_WORDS.map(wordRe);
+
+function wantsHuman(question) {
   const text = String(question || '');
-  return AUTOMATION_PATTERNS.some((pattern) => pattern.test(text));
+  if (!text.trim()) return false;
+  if (HUMAN_SURE_PATTERNS.some((pattern) => pattern.test(text))) return true;
+  return HUMAN_MAYBE_PATTERNS.some((pattern) => pattern.test(text))
+    && TALK_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -569,6 +657,15 @@ function wantsAutomation(question) {
 const DATA_INTENTS = [
   ['withdraw', [
     'wycofaj', 'wycofac', 'wycofać', 'wycofanie', 'rezygnuje', 'rezygnuję', 'rezygnacja',
+    /* CZTERY FORMY DOPISANE PO POMIARZE — i to one były zgłoszeniem ze zrzutu.
+       ---------------------------------------------------------------------------
+       Lista miała „rezygnuję" i „rezygnacja", ale nie miała bezokolicznika. Zmierzone na
+       zdaniu ze zrzutu: „chcę zrezygnować z wyścigu" nie trafiało w NIC — ani w ten słownik,
+       ani w FAQ — więc szło do modelu. A model ma w faktach cenę sponsoringu i nie ma nic
+       o wycofaniu, więc odpowiadał tym, co miał najbliżej pieniędzy: regułką o 100 euro.
+       Taka odpowiedź nie jest usterką modelu, jest skutkiem pytania, którego nie rozpoznaliśmy
+       my. Teraz to zdanie otwiera kreator wycofania, czyli czynność, o którą gość prosił. */
+    'zrezygnuje', 'zrezygnuję', 'zrezygnować', 'zrezygnowac', 'rezygnować', 'rezygnowac',
     'wypisz', 'wypisac', 'wypisać', 'usun', 'usunac', 'usunąć', 'skasuj', 'skasowac',
     'ritira', 'ritirare', 'ritiro', 'cancella', 'cancellare', 'annulla', 'annullare',
     'withdraw', 'cancel', 'delete', 'remove',
@@ -605,12 +702,39 @@ const DATA_INTENT_PATTERNS = DATA_INTENTS.map(([intent, words]) => [
    Bez tego warunku „czy mogę zmienić koła w wózku?" otwierałoby kreator weryfikacji adresu.
    Wymagany jest więc drugi sygnał: wskazanie SIEBIE albo swojego zgłoszenia. */
 const DATA_SELF_PATTERNS = [
-  'moje', 'moja', 'moj', 'mój', 'mnie', 'mi', 'siebie', 'zgloszenie', 'zgłoszenie',
+  /* Przypadki polskiego dopisane po pomiarze. „Chcę zmienić numer telefonu w MOIM zgłoszeniu"
+     nie trafiało w nic, bo lista miała „moje", „moja" i „mój", ale nie „moim" ani „mojego" —
+     a to są formy, w których to zdanie w ogóle się mówi. Skutkiem był brak rozpoznania sprawy
+     i gotowa odpowiedź ze słownika o numerze STARTOWYM na pytanie o numer telefonu. */
+  'moje', 'moja', 'moj', 'mój', 'moim', 'mojego', 'mojej', 'moich', 'moim',
+  'mnie', 'mi', 'siebie', 'swoje', 'swoim', 'swojego',
+  'zgloszenie', 'zgłoszenie', 'zgloszenia', 'zgłoszenia', 'zgloszeniu', 'zgłoszeniu',
   'mio', 'mia', 'miei', 'mie', 'iscrizione',
   'my', 'me', 'mine', 'entry', 'registration',
-  'mein', 'meine', 'mich', 'anmeldung',
+  'mein', 'meine', 'meiner', 'mich', 'anmeldung',
   'mi', 'mis', 'inscripcion', 'inscripción',
   'mon', 'ma', 'mes', 'moi', 'inscription'
+].map((word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
+
+/* DRUGI SYGNAŁ TYLKO DLA WYCOFANIA: nazwa tego, z czego ktoś się wycofuje.
+   ---------------------------------------------------------------------------
+   Zmierzone na zdaniu ze zrzutu: „chcę zrezygnować z wyścigu" nie ma ANI JEDNEGO słowa
+   wskazującego siebie („moje", „mnie"), bo w takim zdaniu nikt takiego słowa nie używa —
+   wskazaniem jest wyścig. Bez tej listy rezygnacja nie była rozpoznawana, zdanie szło do
+   modelu, a model odpowiedział najbliższym faktem, jaki miał: ceną sponsoringu.
+
+   Osobna lista, a nie dosypanie tych słów do `DATA_SELF_PATTERNS`, i w tym jest cała
+   ostrożność: „wyścig" wystarcza przy REZYGNACJI, bo „wycofaj mnie z wyścigu" nie znaczy nic
+   innego. Przy ZMIANIE DANYCH nie wystarcza — „czy mogę zmienić koła przed wyścigiem?" jest
+   pytaniem o regulamin i nie ma prawa otwierać weryfikacji adresu. */
+const DATA_RACE_PATTERNS = [
+  'wyscig', 'wyścig', 'wyscigu', 'wyścigu', 'wyscigi', 'zjazd', 'zjazdu',
+  'zawody', 'zawodow', 'zawodów', 'start', 'startu',
+  'gara', 'gare', 'corsa', 'partenza', 'iscrizione',
+  'race', 'entry', 'registration',
+  'rennen', 'anmeldung',
+  'carrera', 'salida', 'inscripcion', 'inscripción',
+  'course', 'départ', 'depart', 'inscription'
 ].map((word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
 
 /**
@@ -640,26 +764,49 @@ function dataIntent(question) {
   const text = String(question || '');
   if (!text.trim()) return null;
   const mine = DATA_SELF_PATTERNS.some((pattern) => pattern.test(text));
+  const race = DATA_RACE_PATTERNS.some((pattern) => pattern.test(text));
   for (const [intent, patterns] of DATA_INTENT_PATTERNS) {
     if (!patterns.some((pattern) => pattern.test(text))) continue;
     /* Powiadomienia same z siebie są jednoznaczne: „nie chcę newslettera" nie jest pytaniem o
-       regulamin. Wycofanie i zmiana danych wymagają wskazania siebie. */
-    if (intent === 'notifications' || mine) return intent;
+       regulamin. Wycofanie wymaga wskazania siebie ALBO wyścigu — patrz `DATA_RACE_PATTERNS`.
+       Zmiana danych wymaga wskazania siebie i tylko siebie. */
+    if (intent === 'notifications') return intent;
+    if (intent === 'withdraw' && (mine || race)) return intent;
+    if (intent === 'edit' && mine) return intent;
   }
   return null;
 }
 
-/** Answers built from the copy deck. Keys are the FAQ entries the site already has. */
+/**
+ * Answers built from the copy deck. Keys are the FAQ entries the site already has.
+ *
+ * REGUŁA TEGO SŁOWNIKA, JEDNYM ZDANIEM
+ *   Lepiej przekazać pytanie człowiekowi niż odpowiedzieć na inne pytanie.
+ *
+ *   Fałszywe trafienie jest tu gorsze niż brak trafienia i nie jest to kwestia gustu: brak
+ *   trafienia oddaje rozmowę modelowi albo organizatorom, czyli kończy się odpowiedzią.
+ *   Fałszywe trafienie daje gościowi PEWNĄ SIEBIE odpowiedź na pytanie, którego nie zadał —
+ *   uznaje temat za załatwiony, wychodzi, i nikt się o tym nie dowiaduje. Dlatego każde
+ *   zawężenie tego słownika jest tanie, a każde poluzowanie drogie.
+ *
+ * TYLKO PRZY PEWNYM DOPASOWANIU — DWA WARUNKI
+ *   1. słowo musi trafić w całe słowo albo w rdzeń, któremu w jego języku wolno mieć
+ *      końcówkę (patrz `FAQ_TOPICS` i `exact` tam);
+ *   2. zdanie może trafić w DOKŁADNIE JEDEN temat. Wcześniej wygrywał pierwszy z listy, więc
+ *      „Ile kosztuje kask z atestem?" dostawało regułkę o obowiązku kasku — bo kask stoi na
+ *      liście wyżej niż koszt — mimo że pytanie było o cenę. Dwa tematy naraz znaczą, że nie
+ *      wiemy, o co pytano; „nie wiem" ma tu oddać rozmowę dalej, a nie wybrać za gościa.
+ *
+ * Cena tej reguły: pytanie o dwie rzeczy naraz nie dostaje gotowej odpowiedzi na żadną z nich
+ * i idzie do modelu, który zna oba fakty i może odpowiedzieć na oba. To jest właściwa strona,
+ * na którą ma się mylić.
+ */
 function faqAnswer(deck, question) {
   const text = String(question || '');
-  // Nadal celowo prymitywne: odpowiadamy tylko na jednoznaczne słowo, a wszystko inne
-  // idzie do człowieka zamiast do zgadywanki. Zmieniło się to, że „jednoznaczne słowo"
-  // znaczy teraz całe słowo.
-  for (const topic of FAQ_TOPICS) {
-    const answer = deck[topic.answer];
-    if (answer && topic.patterns.some((pattern) => pattern.test(text))) return answer;
-  }
-  return null;
+  const hits = FAQ_TOPICS.filter((topic) => deck[topic.answer]
+    && topic.patterns.some((pattern) => pattern.test(text)));
+  if (hits.length !== 1) return null;
+  return deck[hits[0].answer];
 }
 
 /* ============================================================================
@@ -1030,6 +1177,18 @@ function chatSystemPrompt(deck, locale = 'it') {
     'Jeśli odpowiedzi nie ma na liście powyżej, nie wymyślaj jej. Nie szacuj, nie zakładaj,',
     'nie mów „prawdopodobnie". Odpowiedz DOKŁADNIE słowem ESCALATE i niczym więcej.',
     'Człowiek przejmie rozmowę.',
+    '',
+    /* Dopisane po zgłoszeniu ze zrzutu: na „chcę zrezygnować z wyścigu" przyszła gotowa
+       formułka o sponsorowaniu za 100 euro. Rozpoznanie rezygnacji było wtedy niepełne (patrz
+       DATA_INTENTS), więc pytanie trafiło do modelu — a model wybrał NAJBLIŻSZY fakt, jaki
+       miał, zamiast powiedzieć, że tego faktu nie ma. Reguła „nie zmyślaj" tego nie zabraniała
+       wprost: model nie zmyślił niczego, tylko odpowiedział na inne pytanie. Ta sama reguła
+       stoi po stronie słownika FAQ — patrz komentarz przy `faqAnswer`. */
+    'NIE ODPOWIADAJ NA INNE PYTANIE, NIŻ ZOSTAŁO ZADANE',
+    'Jeśli w faktach nie ma odpowiedzi na TO pytanie, nie podstawiaj faktu najbliższego',
+    'tematem ani najbardziej podobnego. Pytanie o rezygnację ze startu nie jest pytaniem',
+    'o wpisowe ani o sponsoring; pytanie o nocleg nie jest pytaniem o miejsce startu.',
+    'Lepiej przekazać pytanie człowiekowi niż odpowiedzieć na inne pytanie: ESCALATE.',
     '',
     'Dotyczy to w szczególności: pogody i tego, czy wyścig się odbędzie; wyników i list',
     'startowych; danych konkretnej osoby, jej numeru startowego i statusu zgłoszenia;',
@@ -1888,6 +2047,37 @@ async function chatVisitor(env, request, payload, cors, ctx) {
     return json({ ok: true, closed: true, existed: true }, 200, cors);
   }
 
+  /**
+   * Gość chce z powrotem automatu — JEDYNE wyjście ze stanu „przekazana człowiekowi".
+   * ---------------------------------------------------------------------------
+   * DLACZEGO OSOBNA CZYNNOŚĆ, A NIE SŁOWO W WIADOMOŚCI
+   *   Stan „przekazana człowiekowi" wycisza automat całkowicie, więc wyjście z niego musi być
+   *   jednoznaczne. Dotąd rozpoznawała je lista słów („automat", „bot") — i działała dokładnie
+   *   odwrotnie do zamiaru, bo zdanie „nie chcę automatu, poproszę człowieka" zawiera słowo
+   *   „automat" i zdejmowało wyciszenie w chwili, w której gość o nie prosił. Naciśnięcie
+   *   przycisku nie ma odmiany przez przypadki i nie da się go napisać przez przypadek.
+   *
+   * DLACZEGO STAN JEST TUTAJ, A NIE W PRZEGLĄDARCE
+   *   `chat_threads.mode` przeżywa odświeżenie strony, zamknięcie karty i przesiadkę na inne
+   *   urządzenie z tym samym tokenem, a przede wszystkim jest TYM SAMYM stanem, który widzi
+   *   organizator w panelu. Zapis w `localStorage` byłby drugą prawdą o tej samej rozmowie
+   *   i rozjechałby się z pierwszą przy pierwszym odświeżeniu.
+   *
+   * `unread_for_admin` NIETKNIĘTE z rozmysłu: gość mógł zadać pytanie, na które człowiek nadal
+   * ma odpowiedzieć. Powrót do automatu nie jest odpowiedzią na to pytanie, więc licznik przy
+   * dzwonku zostaje tam, gdzie był.
+   *
+   * Wątek zamknięty (`closed`) nie wraca tędy do życia: `mode` idzie na `'ai'` tylko z
+   * `'human'`. Rozmowę zamkniętą otwiera się nową rozmową, czyli nowym tokenem — patrz `close`.
+   */
+  if (action === 'bot') {
+    const { thread, error, status } = await chatThread(env, request, payload, false);
+    if (error) return json({ ok: false, code: error }, status, cors);
+    if (thread.mode !== 'human') return json({ ok: true, mode: thread.mode }, 200, cors);
+    await setThreadMode(env, thread.id, 'ai');
+    return json({ ok: true, mode: 'ai' }, 200, cors);
+  }
+
   if (action !== 'send') return json({ ok: false, code: 'CHAT_UNKNOWN_ACTION' }, 400, cors);
 
   const body = String(payload.message || '').trim();
@@ -1978,46 +2168,31 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   if (Object.keys(details).length) await setThreadMode(env, thread.id, thread.mode, details);
 
   /**
-   * ORGANIZATOR PISZE WŁAŚNIE TERAZ — TYLKO WTEDY AUTOMAT MILCZY.
+   * ROZMOWA PRZEKAZANA CZŁOWIEKOWI — AUTOMAT MILCZY. CAŁY CZAS, NIE TYLKO GDY KTOŚ PISZE.
    * ---------------------------------------------------------------------------
-   * Stał tu warunek `thread.mode === 'human'`: raz przekazany wątek nie dostawał już żadnej
-   * automatycznej odpowiedzi, nigdy. A `mode` idzie na `'human'` przy pierwszym pytaniu, na
-   * które model nie umiał odpowiedzieć — więc jedno pytanie o pogodę wyłączało czat do końca
-   * rozmowy. Gość, który potem pytał o kask, dostawał ciszę na pytanie z listy FAQ, mimo że
-   * odpowiedź stała w słowniku. To jest ta „blokada", nie awaria modelu.
+   * CO BYŁO I DLACZEGO TO BYŁ BŁĄD
+   *   Warunek brzmiał: milcz tylko wtedy, gdy organizator pisze W TEJ SEKUNDZIE
+   *   (`admin_typing_at` młodsze niż sześć sekund). Poza tym okienkiem automat odpowiadał
+   *   dalej — także wtedy, gdy gość dopiero co napisał „chcę rozmawiać z człowiekiem"
+   *   i przeczytał „przekazuję to organizatorom". Zgłoszone jako „po prośbie o człowieka
+   *   automat nadal się wtrąca", i to jest dosłownie to, co robił: wtrącał się w rozmowę,
+   *   z której go poproszono.
    *
-   * Powód pierwotny był dobry i zostaje: nie mówić człowiekowi przez ramię. Ale „człowiek jest
-   * w tej rozmowie" to nie to samo co „człowiek pisze w tej sekundzie". Do tego drugiego jest
-   * `admin_typing_at` (migracja 0019) — kolumna odświeżana, dopóki organizator trzyma
-   * klawiaturę, i gasnąca sama, gdy zamknie kartę. Sześć sekund to ta sama stała, z której
-   * panel rysuje kropki „pisze…", więc jedno źródło prawdy o tym, czy ktoś tam jest.
+   *   Tamten warunek naprawiał inny błąd — wątek raz oznaczony `'human'` milczał NA ZAWSZE,
+   *   bo nie było jak z tego stanu wyjść, i gość widział ciszę na pytanie z listy FAQ. To
+   *   rozwiązanie było jednak lekarstwem na brak wyjścia, nie na samo wyciszenie.
    *
-   * Poza tym okienkiem automat odpowiada normalnie — a odpowiada tylko na to, co ma w
-   * słowniku i w faktach, bo reguła „NIGDY NIE ZMYŚLAJ" w chatSystemPrompt() jest nietknięta.
-   * Najgorszy przypadek to gotowa odpowiedź o kasku obok wątku, w którym organizator ustala
-   * warunki sponsoringu. Najgorszy przypadek przedtem to cisza na każde pytanie.
+   * CO JEST TERAZ
+   *   Stan jest jawny: `mode === 'human'` znaczy „rozmowę prowadzi człowiek" i dopóki trwa,
+   *   nie wchodzi ŻADNA odpowiedź — ani ze słownika FAQ, ani z modelu. Wyjście jest jedno
+   *   i widoczne: przycisk „chcę porozmawiać z automatem", czyli `action: 'bot'` wyżej.
+   *   Cisza przestała być pułapką, więc nie musi być połowiczna.
+   *
+   *   `admin_typing_at` zostaje w schemacie i nadal rysuje kropki „organizator pisze"
+   *   w przeglądarce (patrz `poll`). Przestało być tylko warunkiem milczenia automatu.
    */
-  /* `|| 0` po Date.parse, nie przed nim. `Date.parse(0)` to nie „brak daty" — V8 czyta to jako
-     napis "0" i zwraca 1 stycznia 2000, czyli poprawną datę w przeszłości. Tu wyszłoby na to
-     samo, ale tylko przypadkiem, a świeży wątek nie ma tej kolumny w SELECT po INSERT. */
-  /* POWRÓT DO AUTOMATU JEDNYM ZDANIEM.
-     ---------------------------------------------------------------------------
-     Wątek raz przekazany człowiekowi zostaje oznaczony `'human'` i dopóki organizator pisze,
-     automat milczy — słusznie, bo nie mówi się człowiekowi przez ramię. Ale zdarza się, że
-     gość napisał „nie wiem", trafił do kolejki, a chwilę później ma zwykłe pytanie o kask i
-     nie chce czekać do rana na coś, co stoi w słowniku.
-
-     Wystarczy więc, że o to poprosi własnymi słowami — „automat", „bot", „wróć do
-     automatu". Rozpoznanie jest po liście słów w sześciu językach, a nie przez model: to
-     musi działać także wtedy, gdy model jest niedostępny, bo inaczej wyjście z kolejki
-     zależałoby od tej samej rzeczy, która do niej wtrąciła.
-
-     Wątek NIE przestaje czekać na człowieka. `mode` zostaje `'human'`, więc dzwonek i panel
-     nadal go pokazują; zdejmowane jest tylko wyciszenie automatu na tę jedną wiadomość. */
-  const wantsBot = wantsAutomation(body);
-  const humanTyping = !wantsBot && thread.mode === 'human'
-    && Date.now() - (Date.parse(thread.admin_typing_at || '') || 0) < CHAT_TYPING_TTL_MS;
-  if (humanTyping) {
+  const handedOver = thread.mode === 'human';
+  if (handedOver) {
     // Zdjęcie w wiadomości do człowieka nie zmienia niczego w tej gałęzi: organizator
     // zobaczy je w panelu przy tym wierszu, tak jak treść.
     /* Awaited, nie waitUntil. Na Vercelu ctx.waitUntil nie ma czego trzymać przy życiu
@@ -2025,7 +2200,9 @@ async function chatVisitor(env, request, payload, cors, ctx) {
        „wyślemy w tle" znaczyłoby „czasem wyślemy". Ta gałąź nie woła modelu, więc nie ma
        tu żadnego budżetu na opóźnienie do przekroczenia, a każdy kanał ma swój timeout. */
     await alertOrganisers(env, thread, body, false, false, locale);
-    return json({ ok: true, mode: 'human', reply: null, ...echo }, 200, cors);
+    /* `handedOver` w odpowiedzi, żeby przeglądarka nie musiała wnioskować stanu z samego
+       `mode`: pokazuje przycisk „chcę porozmawiać z automatem" i wyjaśnia ciszę. */
+    return json({ ok: true, mode: 'human', handedOver: true, reply: null, ...echo }, 200, cors);
   }
 
   /* Blok językowy słownika po JĘZYKU TEJ WIADOMOŚCI, nie po języku wątku.
@@ -2065,8 +2242,25 @@ async function chatVisitor(env, request, payload, cors, ctx) {
     return json({ ok: true, mode: thread.mode === 'human' ? 'human' : 'ai', reply: null, selfService: intent, ...echo }, 200, cors);
   }
 
-  let reply = hasPhoto ? null : faqAnswer(deck, body);
-  if (!reply) {
+  /**
+   * GOŚĆ POPROSIŁ O CZŁOWIEKA — NIE PYTAMY ANI SŁOWNIKA, ANI MODELU.
+   * ---------------------------------------------------------------------------
+   * „Chciałbym porozmawiać z człowiekiem" nie jest pytaniem o wyścig i nie ma na nie
+   * odpowiedzi ze słownika. Dotąd przechodziło przez `faqAnswer` i przez model, więc gość
+   * dostawał regułkę o czymkolwiek, co udało się dopasować — czyli odpowiedź, która mówiła
+   * „nie, dalej rozmawiasz z automatem".
+   *
+   * Nie ma tu własnego zdania ani własnego powiadomienia: `reply` zostaje `null`, a wszystko
+   * dalej robi gałąź przekazania niżej. Ona już mówi „przekazuję to organizatorom", podaje
+   * godziny pracy, przestawia wątek na `'human'` i wysyła sygnał organizatorom. Drugie
+   * przekazanie obok niej byłoby drugim miejscem, w którym te same trzy rzeczy mogą się
+   * rozjechać — i czwartym wywołaniem `alertOrganisers`, które pilnuje checker
+   * `tools/check-minor-blueprint.mjs`.
+   */
+  const askedForHuman = !hasPhoto && wantsHuman(body);
+
+  let reply = (hasPhoto || askedForHuman) ? null : faqAnswer(deck, body);
+  if (!reply && !askedForHuman) {
     /* Historia czytana JUŻ PO zapisie tej wiadomości, więc bieżące pytanie stoi w niej jako
        ostatni wiersz — a niżej jedzie drugi raz jako `question`. Ten sam tekst dwa razy pod
        rząd to dla modelu sygnał, że gość się powtarza. Odsiewany po identyfikatorze. */
@@ -2076,31 +2270,28 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   }
 
   if (!reply) {
-    /* `mode` nadal idzie na `'human'`, bo to jest sygnał dla panelu i dla dzwonka: ten wątek
-       czeka na człowieka. Zmieniło się to, że od teraz `'human'` nie zamyka automatowi ust
-       na kolejne pytania — patrz warunek `humanTyping` wyżej. */
-    const waiting = thread.mode === 'human';
-    if (!waiting) await setThreadMode(env, thread.id, 'human');
+    /* `mode` idzie na `'human'` i od teraz ZNACZY to, co mówi: rozmowę prowadzi człowiek,
+       a automat milczy do naciśnięcia przycisku „chcę porozmawiać z automatem" — patrz
+       `handedOver` wyżej i `action: 'bot'`. Tą samą gałęzią wchodzi tu jawna prośba o człowieka
+       (`askedForHuman`), więc jedno przekazanie obsługuje oba wejścia. */
+    await setThreadMode(env, thread.id, 'human');
     /* Two sentences, not one: what happens, and when. A handover that only says "somebody
        will answer" reads the same at 23:00 as at 11:00, and at 23:00 it is the sentence
        that makes a chat feel abandoned. */
     const open = chatOpenNow();
-    /* Zdanie o przekazaniu raz, godziny za każdym razem.
+    /* ZDANIE O PRZEKAZANIU MÓWIONE ZA KAŻDYM RAZEM, GDY TU WCHODZIMY — I TYLKO RAZ NA WĄTEK.
        ---------------------------------------------------------------------------
-       Odkąd automat odpowiada także w wątku oznaczonym `'human'`, ta gałąź zdarza się więcej
-       niż raz — a „przekazuję to organizatorom" powtórzone przy trzecim pytaniu z rzędu czyta
-       się jak zapętlony automat, nie jak przekazanie. Gość przeczytał to raz i wie.
+       Stał tu warunek `waiting`, który zjadał to zdanie w wątku już oznaczonym `'human'`: było
+       potrzebne, dopóki automat odpowiadał w takim wątku dalej i ta gałąź mogła się powtórzyć
+       kilka razy pod rząd. Teraz wątek przekazany człowiekowi kończy się wyżej, przy
+       `handedOver`, więc tutaj wchodzi się WYŁĄCZNIE z wątku prowadzonego przez automat —
+       czyli każde wejście jest pierwszym przekazaniem i każde jest nową informacją.
 
-       Ale milczeć też nie można: wiadomość bez żadnej odpowiedzi wygląda jak niedostarczona, i
-       to jest dokładnie ten objaw, od którego cała ta zmiana się zaczęła. Zostaje więc samo
-       zdanie o godzinach — jest w słowniku we wszystkich sześciu językach, mówi „ktoś to
-       przeczyta i kiedy", i za trzecim razem nadal nie brzmi jak kopia poprzedniej odpowiedzi.
-
-       Sygnał do organizatorów leci niezależnie od tego, co widzi gość: to on decyduje, czy
-       ktoś naprawdę odpowie. */
+       Godziny zostają przy zdaniu: „ktoś to przeczyta" bez „kiedy" czyta się o 23:00 tak samo
+       jak o 11:00, a o 23:00 jest zdaniem, po którym czat wygląda na porzucony. */
     const hours = open ? deck.chatHoursNow : deck.chatHoursLater;
     const handover = [
-      waiting ? '' : (deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.'),
+      deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.',
       hours
     ].filter(Boolean).join(' ');
     const saved = handover
@@ -2111,18 +2302,20 @@ async function chatVisitor(env, request, payload, cors, ctx) {
         'id,created_at'
       )
       : { ok: true, row: null };
-    /* Ten sygnał jest ważniejszy od poprzedniego: gość właśnie przeczytał „przekazuję to
-       organizatorom", więc od tej chwili czeka na człowieka i wie o tym.
+    /* Ten sygnał obchodzi wyciszenie po liczniku nieprzeczytanych (`true`), bo przekazanie
+       rozmowy jest nową informacją: gość właśnie przeczytał „przekazuję to organizatorom"
+       i od tej chwili automat milczy, więc nikt inny mu nie odpowie. Trigger z 0005 podnosi
+       `unread_for_admin` przy KAŻDEJ wiadomości gościa, także przy tych, na które odpowiedział
+       automat i których organizator nie miał powodu otwierać — bez tego obejścia najważniejszy
+       sygnał w całym czacie byłby wyciszony przez licznik, którego nikt nie zerował.
 
-       `!waiting`, nie `true`: obejście wyciszenia w alertOrganisers należy do PIERWSZEGO
-       przekazania, bo tylko ono jest nową informacją. Odkąd ta gałąź może się powtórzyć w
-       jednym wątku, `true` znaczyłoby jeden WhatsApp na każde pytanie bez odpowiedzi, także
-       do skrzynki, w którą nikt jeszcze nie zajrzał. Kolejne przechodzą przez zwykły warunek
-       „licznik nieprzeczytanych jest na zerze". */
-    await alertOrganisers(env, thread, body, !waiting, false, locale);
+       Tu wchodzi się teraz wyłącznie z wątku prowadzonego przez automat (patrz `handedOver`),
+       więc to jest PIERWSZE przekazanie tego wątku i nie ma czego powtarzać. */
+    await alertOrganisers(env, thread, body, true, false, locale);
     return json({
       ok: true,
       mode: 'human',
+      handedOver: true,
       reply: handover || null,
       chatOpen: open,
       ...echo,
@@ -6152,7 +6345,7 @@ async function uploadPhoto(env, photo, folder = '', bucket = 'wall-photos') {
   if (!PRIVATE_PHOTO_BUCKETS.has(bucket)) return '';
   // Random name, not the visitor's: a predictable path in a bucket is a directory
   // listing waiting to happen, and a caller-supplied one is a path traversal.
-  const fixedFolders = new Set(['sponsors', 'participants', 'chat']);
+  const fixedFolders = new Set(['sponsors', 'participants', 'chat', 'galleries']);
   const prefix = fixedFolders.has(folder)
     ? `${folder}/`
     : `${new Date().toISOString().slice(0, 10)}/`;
