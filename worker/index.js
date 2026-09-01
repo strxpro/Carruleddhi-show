@@ -6772,6 +6772,44 @@ async function turnstileOk(env, request, token) {
 }
 
 export default {
+  /**
+   * Zegar przypomnień, wewnątrz tego samego Workera.
+   * ===========================================================================
+   * Wcześniej godzinę odmierzał GitHub Actions: jeden uwierzytelniony POST na
+   * `/api/carruleddhi/reminders-due`, co godzinę, z pliku .github/workflows/reminders.yml.
+   * Padło to nie przez błąd w kodzie, tylko przez zablokowane rozliczenia konta GitHuba —
+   * „The job was not started because your account is locked due to a billing issue" —
+   * i od tego momentu żadne przypomnienie nie wyszło, a skrzynka dostawała co godzinę list
+   * o nieudanym przebiegu.
+   *
+   * DLACZEGO TUTAJ, A NIE W KOLEJNEJ USŁUDZE
+   *   Ten Worker i tak obsługuje `/api/carruleddhi/*` na tej domenie, więc zegar trafia do
+   *   procesu, który i tak stoi. Cron Triggers są w darmowym planie Workers, czyli nie
+   *   dochodzi ani nowe konto, ani nowy rachunek.
+   *
+   *   Znika też sekret: GitHub musiał trzymać ROSTER_KEY, żeby uwierzytelnić się do własnego
+   *   API przez internet. Tu wołamy `remindersDue()` wprost, w tym samym procesie — nie ma
+   *   żądania HTTP, więc nie ma czego uwierzytelniać i nie ma kopii klucza w cudzym systemie.
+   *
+   * `cors` to u nas zwykły obiekt dodatkowych nagłówków (patrz `json()`), a odpowiedzi i tak
+   * nikt tu nie czyta — stąd `{}`.
+   *
+   * Wyjątek jest ŁAPANY i zapisany, nie wypuszczany: nieobsłużony błąd w `scheduled()` psuje
+   * jeden przebieg, a Cloudflare i tak zawoła nas za godzinę. Cicha awaria bez wpisu w logu
+   * byłaby jednak dokładnie tym, co właśnie kosztowało tydzień przypomnień.
+   */
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async () => {
+      try {
+        const response = await remindersDue(env, { deliver: true }, {});
+        const body = await response.clone().json().catch(() => null);
+        console.log('reminders-due', response.status, JSON.stringify(body));
+      } catch (problem) {
+        console.error('reminders-due nie wykonalo sie:', problem && problem.message);
+      }
+    })());
+  },
+
   // `ctx` is needed for waitUntil: the attendance forward to Make must outlive the
   // response, so a slow webhook never delays the counter coming back.
   async fetch(request, env, ctx) {

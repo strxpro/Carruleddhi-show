@@ -1,5 +1,19 @@
 # =============================================================================
-# The clock for the reminders.
+# Reczny zapas dla przypomnien. ZEGAR JEST W WORKERZE.
+# =============================================================================
+# Godzine odmierza teraz Cron Trigger w Cloudflare Workerze — patrz `scheduled()` w
+# worker/index.js i `[triggers]` w worker/wrangler.toml. Ten plik zostaje wylacznie jako
+# przycisk „uruchom teraz" na wypadek, gdyby trzeba bylo wymusic przebieg z zewnatrz.
+#
+# DLACZEGO HARMONOGRAM STAD ZNIKNAL
+#   GitHub zablokowal Actions z powodu rozliczen konta: „The job was not started because
+#   your account is locked due to a billing issue". Przez to zadne przypomnienie nie
+#   wychodzilo, a skrzynka dostawala co godzine list o nieudanym przebiegu — czyli awaria
+#   byla glosna i jednoczesnie nic nie robila. Zegar w Workerze nie zalezy od rozliczen
+#   GitHuba, bo Worker i tak obsluguje to API i stoi na tej samej domenie.
+#
+#   `workflow_dispatch` zostaje, bo nic nie kosztuje, dopoki nikt go nie nacisnie. Dopoki
+#   konto jest zablokowane, on rowniez nie wystartuje.
 # =============================================================================
 # WHY THIS AND NOT A MAKE SCENARIO
 #   Make bills an operation per module run. A scenario waking up every hour to ask
@@ -34,13 +48,9 @@
 name: Reminders
 
 on:
-  schedule:
-    # Every hour, on the hour. GitHub runs scheduled jobs on a best-effort basis and can
-    # be late by several minutes under load — which is exactly why the function decides
-    # what is due from windows rather than from an exact hour count. A late run catches
-    # up; a missed run costs nothing.
-    - cron: '0 * * * *'
-  # So it can be tested, and so a run can be forced if one is ever missed.
+  # Bez `schedule`. Zegar stoi w Workerze; dwa zegary wolajace ten sam endpoint znaczylyby
+  # dwa przebiegi na godzine, a `concurrency` nizej chroni tylko przed zbiegiem w obrebie
+  # GitHuba — nie przed Workerem, ktory o tym pliku nic nie wie.
   workflow_dispatch:
 
 # Nothing in the repository is read or written. Least privilege, stated.

@@ -9,6 +9,19 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/carruleddhi/*"]
 
+# Zegar przypomnien. Co godzine, rowno o pelnej — ta sama kadencja, ktora wczesniej
+# odmierzal GitHub Actions (.github/workflows/reminders.yml), przeniesiona tutaj po tym,
+# jak Actions stanelo na zablokowanych rozliczeniach konta.
+#
+# Cron Triggers sa w darmowym planie Workers. Godzina wystarcza, bo `remindersDue()` sam
+# liczy, ktore przypomnienie jest nalezne z OKIEN czasowych, a nie z dokladnej godziny —
+# spozniony przebieg nadrabia, pominiety nic nie kosztuje.
+#
+# UWAGA: sam wpis w tym pliku niczego nie uruchamia. Wchodzi w zycie dopiero po
+#   npx wrangler deploy
+[triggers]
+crons = ["0 * * * *"]
+
 [vars]
 # Comma separated. Leave empty during local development.
 ALLOWED_ORIGINS = ""
