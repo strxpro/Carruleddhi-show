@@ -394,3 +394,34 @@ function setupMenu() {
 }
 
 setupMenu();
+
+/* ===========================================================================
+   Licznik parkuje POD nagłówkiem, nie za nim
+   ===========================================================================
+   `.site-header` jest `position: fixed` z `z-index: 900`, a licznik `sticky top: 0` z
+   `z-index: 60`. Przy przewijaniu licznik dojeżdżał więc do samej góry i chował się pod
+   paskiem — na telefonie znikał prawie w całości, czyli jedyna liczba, która w tych
+   kilkudziesięciu minutach jest pilna, była niewidoczna.
+
+   Wysokość paska liczona w JS, a nie wpisana w CSS: pasek zmienia wysokość razem z
+   szerokością ekranu, długością nazwy i tym, czy zawija się w dwie linie. Każda liczba
+   wpisana na sztywno byłaby poprawna dla jednego telefonu i zła dla następnego.
+*/
+function syncHeaderOffset() {
+  const header = document.querySelector('.site-header');
+  if (!header) return;
+  const bottom = Math.round(header.getBoundingClientRect().bottom);
+  /* `bottom`, nie `height`: pasek stoi 16 px od góry, więc sama wysokość zostawiłaby
+     licznik schowany dokładnie o ten odstęp. */
+  document.documentElement.style.setProperty('--vote-header-bottom', `${Math.max(bottom, 0)}px`);
+}
+
+syncHeaderOffset();
+window.addEventListener('resize', syncHeaderOffset, { passive: true });
+window.addEventListener('load', syncHeaderOffset);
+/* Pasek zmienia wysokość także bez zmiany okna — po przełączeniu języka albo gdy nazwa
+   sekcji się zawinie. ResizeObserver łapie to, czego `resize` nie widzi. */
+if (typeof ResizeObserver === 'function') {
+  const header = document.querySelector('.site-header');
+  if (header) new ResizeObserver(syncHeaderOffset).observe(header);
+}

@@ -1289,23 +1289,42 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 /* Na telefonie kafelki idą w jedną kolumnę — zdjęcie z podpisem na całą szerokość czyta się
    jak plakat, a dwa wąskie obok siebie jak dwie miniatury. */
-@media (max-width: 560px) {
-  .vote-grid { grid-template-columns: 1fr; gap: 18px; }
-  .vote-card__photo { aspect-ratio: 5 / 4; }
-  .vote-card__title { font-size: clamp(21px, 6.4vw, 28px); }
-}
+/* Jedna kolumna do 700 px, nie do 560.
+   Miedzy 561 a 1099 px stala siatka dwukolumnowa — na telefonie 6-calowym dawalo to dwa
+   kafelki po jakies 160 px szerokosci, czyli dwie miniatury zamiast dwoch zdjec. Zdjecie
+   wozu jest tu trescia, a nie ikona.
+
+   Kwadrat zamiast 5/4: przy tej samej szerokosci karta rosnie o jedna piata wysokosci, a
+   podpis z nazwa i pigulka imienia dostaje wiecej miejsca nad dolna krawedzia. */
+
 
 
 /* ===========================================================================
    Publiczna strona głosowania — cukierkowa warstwa wizualna i finał
    =========================================================================== */
+/* Szesc plam zamiast trzech, mocniejszych, plus powolny dryf.
+   To jest strona jednego dnia w roku, karnawalowa — blade tlo bylo poprawne i nijakie.
+   `background-attachment: fixed` NIE jest tu uzyte: na iOS potrafi zablokowac przewijanie
+   calej strony, a to gorsze niz nieruchome tlo. Zamiast tego caly obraz jest wiekszy od
+   ekranu i przesuwa sie animacja, wiec ruch jest, a przewijanie zostaje natywne. */
 .vote-page {
   background:
-    radial-gradient(circle at 8% 12%, rgb(255 107 157 / .24), transparent 28rem),
-    radial-gradient(circle at 90% 25%, rgb(63 190 255 / .25), transparent 30rem),
-    radial-gradient(circle at 34% 68%, rgb(255 211 61 / .2), transparent 34rem),
-    linear-gradient(145deg, #fff9ec 0%, #f6f2ff 48%, #ebfbff 100%);
+    radial-gradient(circle at 8% 12%, rgb(255 107 157 / .38), transparent 26rem),
+    radial-gradient(circle at 90% 22%, rgb(63 190 255 / .38), transparent 28rem),
+    radial-gradient(circle at 30% 70%, rgb(255 201 40 / .34), transparent 30rem),
+    radial-gradient(circle at 78% 82%, rgb(169 108 255 / .32), transparent 28rem),
+    radial-gradient(circle at 55% 40%, rgb(53 199 232 / .22), transparent 26rem),
+    radial-gradient(circle at 15% 92%, rgb(31 169 113 / .24), transparent 24rem),
+    linear-gradient(145deg, #fff7e4 0%, #f4efff 46%, #e6fbff 100%);
+  background-size: 140% 140%;
   color: var(--navy-950);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vote-page { animation: vote-bg-drift 38s ease-in-out infinite alternate; }
+  @keyframes vote-bg-drift {
+    from { background-position: 0% 0%; }
+    to   { background-position: 100% 100%; }
+  }
 }
 .vote-page .scroll-progress { height: 5px; background: linear-gradient(90deg, #ffcc2f, #ff638f, #a96cff, #35c7e8); }
 .vote-page .nav-current { display: flex; }
@@ -1723,8 +1742,11 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   .vote-page .vote-grid { max-width: none; }
   .vote-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    /* Osiem zamiast dziesieciu: kazdy kafelek dostaje przez to pare pikseli szerokosci, a
+       przerwa nadal wystarcza, zeby cukierkowy cien nie wchodzil na sasiada. */
+    gap: 8px;
   }
+
   .vote-card { border-radius: 20px; box-shadow: 4px 4px 0 rgb(154 217 255 / .38); }
   .vote-grid > .vote-card:nth-child(4n + 2) { box-shadow: 4px 4px 0 rgb(255 131 174 / .38); }
   .vote-grid > .vote-card:nth-child(4n + 3) { box-shadow: 4px 4px 0 rgb(255 201 40 / .4); }
@@ -1732,9 +1754,14 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   /* Zdjęcie mniej wysokie: przy 4/5 na połowie szerokości telefonu kafelek zajmował ekran
      w całości i widać było jeden wózek naraz. */
   .vote-card__photo { aspect-ratio: 1 / 1; }
-  .vote-card__body { padding: 9px 10px 11px; }
-  .vote-card__title { font-size: 13px; }
-  .vote-card__rider { font-size: 9px; }
+  /* KAFELEK CZYTA SIE WIEKSZY, A ZDJECIE ZOSTAJE KWADRATOWE.
+     Proporcji zdjecia nie ruszam — 4/5 bylo juz probowane i odrzucone wyzej, bo kafelek
+     zajmowal wtedy caly ekran. Rosnie natomiast to, co bylo naprawde drobne: nazwa wozu z
+     13 na 15 px i podpis z 9 na 10.5 px. Karta zyskuje kilkanascie pikselow wysokosci
+     zamiast osiemdziesieciu, wiec dwa wozy nadal miesza sie w jednym spojrzeniu. */
+  .vote-card__body { padding: 10px 11px 13px; }
+  .vote-card__title { font-size: 15px; }
+  .vote-card__rider { font-size: 10.5px; }
   .vote-search { box-shadow: 4px 4px 0 #9ad9ff; }
 }
 
@@ -1897,7 +1924,10 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    spodem trzyma stronę w cukierkowej palecie i jednocześnie oddziela zegar od nagłówka. */
 .vote-timer {
   position: sticky;
-  top: 0;
+  /* Pod paskiem, nie za nim. Wartosc ustawia syncHeaderOffset() w voting-boot.js, bo
+     wysokosc paska zalezy od szerokosci ekranu i od tego, czy nazwa sie zawija. Zapasowe
+     `0px` znaczy zachowanie sprzed tej zmiany, gdyby skrypt nie wystartowal. */
+  top: var(--vote-header-bottom, 0px);
   z-index: 60;
   display: flex;
   flex-wrap: wrap;
