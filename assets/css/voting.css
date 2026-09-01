@@ -2297,6 +2297,16 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
     radial-gradient(44% 34% at 50% 96%, rgb(55 201 165 / .16), transparent 72%),
     var(--navy-950);
   background-attachment: fixed, fixed, fixed, scroll;
+  /* BIALY TEKST, BO TLO JEST GRANATOWE.
+     ---------------------------------------------------------------------------
+     Ta regula zmienila tlo strony na granat, ale kolor tekstu zostal `var(--navy-950)`
+     ustawiony wyzej — czyli granatowe litery na granatowym tle. Zmierzone w przegladarce:
+     tlo body rgb(7,26,61), naglowek h1 rgb(7,26,61), lead rgb(7,26,61). Naglowek strony,
+     zdanie wiodace i kicker byly NIEWIDOCZNE.
+     Komentarz nad ta regula obiecywal, ze „ani jeden napis nie zmienia koloru" — i to
+     wlasnie bylo zalozenie, ktore nie mialo pokrycia: napisy byly ciemne, zanim tlo
+     sciemnialo. */
+  color: var(--white);
 }
 
 /* Nagłówek na cukierkowym pasie, w tych samych barwach co zegar u góry. */
