@@ -9,6 +9,7 @@ import {
   ListChecks,
   Loader2,
   LogOut,
+  Medal,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -35,6 +36,7 @@ import { Dashboard } from './views/Dashboard';
 import { Registrations } from './views/Registrations';
 import { Voting } from './views/Voting';
 import { Stats } from './views/Stats';
+import { Season } from './views/Season';
 import { Chat } from './views/Chat';
 import { Wall } from './views/Wall';
 import { Subscribers } from './views/Subscribers';
@@ -51,6 +53,7 @@ const INBOX_INTERVAL_MS = 10_000;
 type TabId =
   | 'dashboard'
   | 'stats'
+  | 'season'
   | 'registrations'
   | 'voting'
   | 'chat'
@@ -156,7 +159,14 @@ export default function App() {
           /* Nad grupami, obok pulpitu: to jest ekran, na który się WCHODZI, a nie dane
              wydarzenia, które się prowadzi. Bez plakietki — statystyki nie mają stanu
              „nowe od ostatniego razu", mają zakres czasu wybierany na miejscu. */
-          { id: 'stats', title: t('nav.stats'), icon: BarChart3 }
+          { id: 'stats', title: t('nav.stats'), icon: BarChart3 },
+          /* Podsumowanie sezonu — obok statystyk, z tego samego powodu i z tą samą zasadą.
+             To jest ODCZYT o wydarzeniu, a nie prowadzenie wydarzenia: wchodzi się tu po
+             zawodach albo rok później, żeby przeczytać rocznik. Świadomie NIE w „Głosowaniu",
+             gdzie stoją przyciski czyszczące głosy i wysyłające listy — przeglądanie archiwum
+             obok działania bez cofnięcia to zaproszenie do pomyłki. Bez plakietki: rocznik nie
+             ma stanu „nowe od ostatniego razu". */
+          { id: 'season', title: t('nav.season'), icon: Medal }
         ]
       },
       {
@@ -342,6 +352,7 @@ export default function App() {
             <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} />
           ) : null}
           {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
+          {tab === 'season' ? <Season t={t} apiKey={key} /> : null}
           {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
           {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}

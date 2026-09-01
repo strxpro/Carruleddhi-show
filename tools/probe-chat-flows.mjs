@@ -262,3 +262,347 @@ const probe = `
        zamknięcie wątku, które ma swój własny pomiar niżej. */
     if (el.dataset.chatEnd !== undefined) await sleep(5200);
   }
+
+  /* Po przejściu po wszystkim rozmowa mogła zostać zamknięta albo zaczęta od nowa — wracamy
+     do stanu „rozmowa trwa", bo dalsze pomiary są o rozmowie, nie o panelu. */
+  if (panel.dataset.chatReady !== 'yes') {
+    document.querySelector('[data-chat-restart]')?.click();
+    await sleep(500);
+    const again = document.getElementById('chat-gate-name');
+    const mail = document.getElementById('chat-gate-email');
+    if (again && mail) {
+      again.value = 'Marco';
+      mail.value = 'marco@example.com';
+      document.querySelector('[data-chat-gate-form] button[type=submit]').click();
+      await sleep(900);
+    }
+  }
+
+  /* ======================================================================
+     2a. KROPKI PO WYSŁANIU WIADOMOŚCI
+     ======================================================================
+     Odpowiedź atrapy opóźniona o 800 ms, bo na localhoście bez tego wraca w kilka
+     milisekund — a wtedy „kropki były" i „kropek nie było" wyglądają w pomiarze tak samo.
+     Odczyt natychmiast po kliknięciu, bo wskaźnik ma stanąć w TYM SAMYM zadaniu co
+     naciśnięcie: patrz komentarz o "flow &&" przed "await" w send() w app.js.
+     ====================================================================== */
+  stub.sendDelay = 800;
+  writeInput('Ile kosztuje zapisanie wozka?');
+  document.querySelector('[data-chat-send]')?.click();
+  const sendAtClick = typing();
+  await sleep(300);
+  const sendDuring = typing();
+  await sleep(1400);
+  out.typingSend = { atClick: sendAtClick, during: sendDuring, after: typing(),
+    reply: logText().includes('Odpowiedź automatu') };
+  stub.sendDelay = 0;
+
+  /* ======================================================================
+     2b. i 3. KROPKI ORAZ BĄBELEK PO NACIŚNIĘCIU PASTYLKI
+     ======================================================================
+     Kreator odpowiada Z PAMIĘCI STRONY, więc bez kolejki jego zdania stawały na ekranie
+     w tej samej milisekundzie, w której gość kliknął. Odczyt po 60 ms, nie natychmiast:
+     kolejka jest obietnicą, więc kropki wchodzą w następnym zadaniu mikrokolejki, a przed
+     upływem THINK_MS (280 ms w app.js) mają jeszcze stać.
+     ====================================================================== */
+  stub.selfService = 'sponsor';
+  await say('Chcialbym zostac sponsorem Carruleddhi Show.', 1100);
+  stub.selfService = null;
+
+  const yes = chipByKey('chat.sponsorYes');
+  if (!yes) {
+    out.errors.push('kreator sponsora sie nie otworzyl');
+  } else {
+    const before = visitors();
+    const label = yes.textContent.trim();
+    const scrollBefore = scrollNow();
+    yes.click();
+    await sleep(60);
+    out.pill = {
+      typingShown: typing(),
+      bubbleAdded: visitors() - before,
+      bubbleText: (() => {
+        const all = document.querySelectorAll('.chat-msg--visitor .chat-msg__body');
+        return all.length ? all[all.length - 1].textContent.trim() : '';
+      })(),
+      label,
+      scrollBefore
+    };
+    await sleep(1000);
+    out.pill.typingGone = !typing();
+    out.pill.answered = logText().includes(T('chat.sponsorAskName').slice(0, 24));
+    out.pill.scrollAfter = scrollNow();
+  }
+
+  /* ======================================================================
+     3. KOD: POLE JEST, BĄBELKA NIE MA
+     ======================================================================
+     Do bramki wchodzi się przez całą sprawę sponsora, bo tak wchodzi w nią człowiek: nazwa,
+     zgoda, imię i nazwisko, pominięty telefon, adres. Sześć cyfr nie ma prawa zostawić po
+     sobie ani bąbelka, ani wiersza w wątku — kod do cudzej skrzynki w historii czytanej przez
+     organizatora to kod w miejscu, w którym nie ma prawa być.
+     ====================================================================== */
+  await say('Trattoria Probe');
+  chipByKey('chat.sponsorConsentYes')?.click();
+  await sleep(700);
+  await say('Mario Rossi');
+  chipByKey('chat.sponsorPhoneSkip')?.click();
+  await sleep(700);
+  await say('probe@example.com', 1300);
+
+  const codeInput = document.querySelector('[data-chat-code]');
+  out.code = { fieldThere: Boolean(codeInput) };
+  if (codeInput) {
+    const before = visitors();
+    codeInput.value = '123456';
+    codeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(1200);
+    out.code.bubblesDelta = visitors() - before;
+    out.code.codeInLog = logText().includes('123456');
+  }
+
+  /* ======================================================================
+     2c. KROPKI PRZY ODPOWIEDZI ORGANIZATORA DOCIĄGANEJ ODPYTYWANIEM
+     ======================================================================
+     Trzecia ścieżka: nikt nic nie wysyła, a odpowiedź powstaje po drugiej stronie. Odczyt
+     chodzi co CHAT_POLL_MS (4 s), więc jeden cykl trzeba przeczekać — inaczej mierzy się
+     stan sprzed pierwszego odczytu.
+     ====================================================================== */
+  stub.mode = 'human';
+  stub.theirTyping = true;
+  await sleep(4800);
+  out.typingPoll = { whileTyping: typing() };
+  stub.theirTyping = false;
+  stub.pollMessages = [{ id: 'org-1', author: 'organiser', body: 'Jestem, juz sprawdzam.',
+    at: new Date().toISOString() }];
+  await sleep(4800);
+  out.typingPoll.afterAnswer = typing();
+  out.typingPoll.answerShown = logText().includes('Jestem, juz sprawdzam');
+  stub.mode = 'ai';
+
+  /* ======================================================================
+     5. KLAWIATURA NA TELEFONIE: PASEK NAD POLEM ZOSTAJE NAD KLAWIATURĄ
+     ======================================================================
+     Mierzone dwa razy: przy zamkniętej i przy otwartej klawiaturze, i porównywane z DOLNĄ
+     KRAWĘDZIĄ WIDOCZNEGO OBSZARU (visualViewport.offsetTop + visualViewport.height), a nie
+     z wysokością okna. To jest różnica między „jest na stronie" i „widać to" — a zgłoszenie
+     brzmiało „pastylka nad polem zostaje w złym miejscu", czyli: jest, tylko pod klawiaturą.
+     ====================================================================== */
+  const shot = (label) => {
+    const view = window.visualViewport;
+    const visibleBottom = Math.round((view ? view.offsetTop : 0) + (view ? view.height : window.innerHeight));
+    const chips = box('[data-chat-chips]');
+    const composer = box('[data-chat-form]');
+    const send = box('[data-chat-send]');
+    const logBox = box('[data-chat-log]');
+    const root = getComputedStyle(document.documentElement);
+    return {
+      label,
+      screenH: root.getPropertyValue('--screen-h').trim(),
+      chatVh: root.getPropertyValue('--chat-vh').trim(),
+      viewportH: Math.round(view ? view.height : window.innerHeight),
+      innerH: window.innerHeight,
+      visibleBottom,
+      log: logBox,
+      chips,
+      composer,
+      send,
+      logCap: getComputedStyle(document.querySelector('[data-chat-log]')).maxHeight,
+      inputCap: getComputedStyle(document.querySelector('[data-chat-input]')).maxHeight,
+      chipsBelow: chips ? chips.bottom - visibleBottom : null,
+      composerBelow: composer ? composer.bottom - visibleBottom : null
+    };
+  };
+
+  /* Rozmowa najpierw ustawiona tak, jak ją widzi ktoś, kto zaraz zacznie pisać: kompozytor
+     w widocznym obszarze, palec w polu. Pomiar zrobiony z rozmowy stojącej cztery tysiące
+     pikseli niżej mierzyłby pozycję przewinięcia, nie klawiaturę. */
+  document.querySelector('[data-chat-chips]')?.classList.remove('is-open');
+  document.querySelector('[data-chat-form]')?.scrollIntoView({ block: 'center' });
+  await sleep(700);
+  writeInput('Chcialbym zapytac o kask, o numer startowy i o to, czy moge zapisac sie z kolega '
+    + 'oraz czy wozek musi miec hamulec z linka, bo buduje go z tata w garazu.');
+  document.querySelector('[data-chat-input]')?.focus({ preventScroll: true });
+  await sleep(400);
+  out.keyboardClosed = shot('klawiatura zamknieta');
+
+  window.__keyboard(${KEYBOARD_PX});
+  await sleep(700);
+  out.keyboardOpen = shot('klawiatura otwarta');
+
+  window.__keyboard(0);
+  await sleep(400);
+  out.keyboardBack = shot('klawiatura zwinieta');
+  writeInput('');
+
+  /* Na koniec dwa naciśnięcia, których wcześniej celowo nie dokończyliśmy: potwierdzenie
+     zakończenia rozmowy i „nowa rozmowa". Oba zmieniają całą zawartość panelu, więc są
+     najlepszym testem tego, czy strona przy takiej zmianie nie drgnie. */
+  const end = document.querySelector('[data-chat-end]');
+  if (end) {
+    await clickAndMeasure('koniec: zbrojenie', end, 200);
+    await clickAndMeasure('koniec: potwierdzenie', end, 900);
+  }
+  await clickAndMeasure('koniec: nowa rozmowa', document.querySelector('[data-chat-restart]'), 900);
+  }
+
+  const marker = document.createElement('pre');
+  marker.id = 'probe-result';
+  marker.textContent = JSON.stringify(out, null, 1);
+  document.body.appendChild(marker);
+})();
+</script>
+`;
+
+const profile = mkdtempSync(join(tmpdir(), 'car-chatflows-'));
+const response = await fetch(`${base}/`);
+if (!response.ok) throw new Error(`preview odpowiedział ${response.status}`);
+const html = (await response.text()).replace('</body>', `${probe}</body>`);
+
+const probeFile = 'dist/__chatflowsprobe.html';
+writeFileSync(probeFile, html, 'utf8');
+
+try {
+  const dom = execFileSync(chromePath(), [
+    '--headless=new',
+    '--disable-gpu',
+    `--window-size=${SCREEN.width},${SCREEN.height}`,
+    /* Budżet czasu wirtualnego większy niż w pozostałych sondach z jednego powodu: dwie
+       ścieżki pomiaru czekają na cykl odpytywania (4 s każda), a przejście po wszystkich
+       klikalnych elementach to kilkadziesiąt osobnych pomiarów po niecałej sekundzie. */
+    '--virtual-time-budget=180000',
+    `--user-data-dir=${profile}`,
+    '--dump-dom',
+    `${base}/__chatflowsprobe.html?skipIntro=1`
+  ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+
+  const match = /<pre id="probe-result">([\s\S]*?)<\/pre>/.exec(dom);
+  if (!match) {
+    console.log('Sonda nie wystartowała. Pierwsze 400 znaków:');
+    console.log(dom.slice(0, 400));
+    process.exit(1);
+  }
+  const r = JSON.parse(match[1]
+    .replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
+
+  let fails = 0;
+  const check = (pass, line) => {
+    if (!pass) fails += 1;
+    console.log(`${pass ? 'ok  ' : 'FAIL'}  ${line}`);
+  };
+
+  console.log(`ekran ${SCREEN.width}x${SCREEN.height}, klawiatura ${KEYBOARD_PX} px`);
+  console.log(`błędy JS: ${r.errors.length ? r.errors.join(' | ') : 'brak'}\n`);
+  check(r.viewportFaked === true, 'zaślepka visualViewport weszła przed skryptami strony');
+  check(r.entered?.ready === 'yes', `rozmowa otwarta po podaniu danych: "${r.entered?.ready}"`);
+
+  /* ------------------------------------------------ 1. przewinięcie przy kliknięciach */
+  console.log('');
+  if (Array.isArray(r.clicks) && r.clicks.length) {
+    const measured = r.clicks.filter((one) => !one.missing);
+    const moved = measured.filter((one) => one.before !== one.mid || one.before !== one.after);
+    check(measured.length >= 8, `zmierzonych kliknięć: ${measured.length}`);
+    check(moved.length === 0,
+      moved.length === 0
+        ? `żadne kliknięcie nie ruszyło strony (${measured.length} kontrolek, wszystkie ${measured[0]?.before} px)`
+        : `strona drgnęła przy: ${moved.map((one) => `${one.label} ${one.before}->${one.mid}->${one.after}`).join(' | ')}`);
+    const lost = measured.filter((one) => one.focus === 'BODY');
+    check(lost.length === 0,
+      lost.length === 0
+        ? 'po żadnym kliknięciu fokus nie spadł na <body>'
+        : `fokus na <body> po: ${lost.map((one) => one.label).join(', ')}`);
+    for (const one of measured) {
+      console.log(`      ${one.label}: ${one.before} -> ${one.mid} -> ${one.after} px, fokus ${one.focus}`);
+    }
+  } else {
+    check(false, 'pomiar kliknięć się nie wykonał');
+  }
+
+  /* ------------------------------------------------------- 2. trzy ścieżki wskaźnika */
+  console.log('');
+  if (r.typingSend) {
+    check(r.typingSend.atClick === true, 'kropki stają w tym samym zadaniu co naciśnięcie „wyślij"');
+    check(r.typingSend.during === true, 'i stoją przez cały czas oczekiwania na odpowiedź');
+    check(r.typingSend.after === false, 'i gasną, gdy odpowiedź wejdzie');
+    check(r.typingSend.reply === true, 'odpowiedź naprawdę weszła do rozmowy');
+  } else {
+    check(false, 'pomiar wskaźnika po wysłaniu się nie wykonał');
+  }
+  if (r.pill) {
+    check(r.pill.typingShown === true, 'kropki stają po naciśnięciu pastylki kreatora');
+    check(r.pill.typingGone === true, 'i gasną, gdy zdanie kreatora wejdzie');
+    check(r.pill.answered === true, 'zdanie kreatora naprawdę weszło do rozmowy');
+  } else {
+    check(false, 'pomiar wskaźnika po pastylce się nie wykonał');
+  }
+  if (r.typingPoll) {
+    check(r.typingPoll.whileTyping === true,
+      'kropki stają, gdy organizator pisze, a odpowiedź dociąga odpytywanie');
+    check(r.typingPoll.afterAnswer === false, 'i gasną razem z jego wiadomością');
+    check(r.typingPoll.answerShown === true, 'wiadomość organizatora weszła do rozmowy');
+  } else {
+    check(false, 'pomiar wskaźnika przy odpytywaniu się nie wykonał');
+  }
+
+  /* --------------------------------------------- 3. bąbelek po pastylce, brak po kodzie */
+  console.log('');
+  if (r.pill) {
+    check(r.pill.bubbleAdded === 1,
+      `naciśnięcie pastylki tworzy dokładnie jeden bąbelek gościa: ${r.pill.bubbleAdded}`);
+    check(r.pill.bubbleText === r.pill.label && r.pill.label.length > 0,
+      `bąbelek nosi treść pastylki: "${r.pill.bubbleText}" wobec "${r.pill.label}"`);
+    check(r.pill.scrollBefore === r.pill.scrollAfter,
+      `pastylka nie ruszyła strony: ${r.pill.scrollBefore} -> ${r.pill.scrollAfter} px`);
+  }
+  if (r.code) {
+    check(r.code.fieldThere === true, 'pole na kod stoi w rozmowie');
+    check(r.code.bubblesDelta === 0, `wpisanie kodu NIE tworzy bąbelka: ${r.code.bubblesDelta}`);
+    check(r.code.codeInLog === false, 'sześciu cyfr nie ma w treści rozmowy');
+  } else {
+    check(false, 'pomiar pola na kod się nie wykonał');
+  }
+
+  /* ------------------------------------------------------- 5. klawiatura na telefonie */
+  console.log('');
+  const shots = [r.keyboardClosed, r.keyboardOpen, r.keyboardBack].filter(Boolean);
+  for (const s of shots) {
+    console.log(`      ${s.label}: widok ${s.viewportH} px (okno ${s.innerH}), --screen-h ${s.screenH}`
+      + `, --chat-vh ${s.chatVh || '(brak)'}, sufit dziennika ${s.logCap}`);
+    console.log(`         dziennik ${s.log ? s.log.height : '-'} px, pastylki do ${s.chips ? s.chips.bottom : '-'} px`
+      + `, kompozytor do ${s.composer ? s.composer.bottom : '-'} px, dolna krawędź widoku ${s.visibleBottom} px`);
+  }
+  if (r.keyboardOpen && r.keyboardOpen.chips && r.keyboardOpen.composer) {
+    const k = r.keyboardOpen;
+    check(k.viewportH < k.innerH,
+      `klawiatura naprawdę skróciła widok: ${k.innerH} -> ${k.viewportH} px`);
+    check(k.chipsBelow <= 0,
+      `pasek pastylek nad polem stoi nad klawiaturą, nie pod nią: ${k.chipsBelow} px poniżej krawędzi`);
+    check(k.composerBelow <= 0,
+      `kompozytor z przyciskiem wysyłki stoi nad klawiaturą: ${k.composerBelow} px poniżej krawędzi`);
+    check(k.send !== null && k.send.bottom <= k.composer.bottom + 1,
+      'przycisk wysyłki jest w kompozytorze, nie pod nim');
+  } else {
+    check(false, 'pomiar przy otwartej klawiaturze się nie wykonał');
+  }
+  if (r.keyboardClosed && r.keyboardClosed.composer) {
+    check(r.keyboardClosed.composerBelow <= 0,
+      `przy zamkniętej klawiaturze kompozytor też jest widoczny: ${r.keyboardClosed.composerBelow} px`);
+  }
+  /* Po zwinięciu klawiatury sprawdzana jest WIDOCZNOŚĆ, nie ten sam piksel co przed jej
+     otwarciem. Bezwzględna pozycja wolno się zmienić: klawiatura zdejmuje na telefonie
+     przyklejony pasek działania (patrz `is-keyboard-hidden` w app.js), a to jest zmiana
+     układu poza czatem. Warunek „ten sam piksel" łapałby ją jako błąd czatu. */
+  if (r.keyboardBack && r.keyboardBack.composer && r.keyboardBack.chips) {
+    check(r.keyboardBack.composerBelow <= 0 && r.keyboardBack.chipsBelow <= 0,
+      `po zwinięciu klawiatury czat nadal jest cały widoczny (kompozytor `
+      + `${r.keyboardBack.composerBelow} px, pastylki ${r.keyboardBack.chipsBelow} px od krawędzi)`);
+    check(Number.parseFloat(r.keyboardBack.logCap) >= Number.parseFloat(r.keyboardOpen.logCap),
+      `sufit dziennika wraca po zwinięciu klawiatury: ${r.keyboardOpen.logCap} -> ${r.keyboardBack.logCap}`);
+  }
+
+  console.log(`\n${fails ? `${fails} niezaliczonych` : 'wszystko zaliczone'}`);
+  process.exitCode = fails ? 1 : 0;
+} finally {
+  rmSync(probeFile, { force: true });
+  rmSync(profile, { recursive: true, force: true });
+}

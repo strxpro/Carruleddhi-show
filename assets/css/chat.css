@@ -106,10 +106,29 @@
         musi się jeszcze zmieścić rząd pastylek, kompozytor i notka. Drugi sufit mówi wprost,
         ile miejsca zostawić NA RESZTĘ PANELU — i na normalnym ekranie nie zmienia niczego
         (przy 844 px pierwszy sufit to 354 px, drugi 584 px, więc wygrywa ten sam co dotąd). */
-  min-height: min(180px, calc(var(--screen-h, 100svh) * 0.22));
+  /* 3. LICZONE Z `--chat-vh`, NIE Z `--screen-h` — I TO JEST TA POPRAWKA, KTÓRA DZIAŁA
+        NA PRAWDZIWYM TELEFONIE.
+        `--screen-h` jest ZAMROŻONYM `100svh` (patrz `measureScreenHeight` w site-bridge.js)
+        i taka ma zostać: od niej zależy wysokość czternastu sekcji i to ona naprawiła
+        teleportowanie strony przy przewijaniu palcem. Ale klawiatura systemowa nie zmienia
+        ani `100svh`, ani `innerHeight` — na Androidzie i w iOS skraca WYŁĄCZNIE
+        `visualViewport`. Sufit liczony z `--screen-h` przy otwartej klawiaturze zostawał
+        więc dokładnie taki, jaki był przy zamkniętej.
+
+        ZMIERZONE (`tools/probe-chat-flows.mjs`, 390x844, klawiatura 400 px, PRZED zmianą):
+          widoczna wysokość okna       749 px -> 349 px
+          sufit dziennika           284,62 px -> 284,62 px   <-- nie drgnął
+          dolna krawędź kompozytora    470 px -> 428 px, czyli 79 px POD krawędzią widoku
+        Czyli pasek pastylek i kompozytor z przyciskiem wysyłki były pod klawiaturą — to jest
+        zgłoszenie „pastylka nad polem zostaje w złym miejscu": jest, tylko jej nie widać.
+
+        `--chat-vh` wpisuje app.js z `visualViewport` i widzi ją TYLKO czat. Zapas na
+        `--screen-h` jest po to, żeby bez JavaScriptu (a wtedy nie ma i czatu) oraz w chwili
+        przed pierwszym pomiarem sufit nadal był liczbą, a nie `auto`. */
+  min-height: min(180px, calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.22));
   max-height: min(
-    calc(var(--screen-h, 100svh) * 0.42),
-    calc(var(--screen-h, 100svh) - 260px)
+    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.42),
+    calc(var(--chat-vh, var(--screen-h, 100svh)) - 260px)
   );
   padding: 4px 2px;
   overflow-y: auto;
@@ -225,12 +244,12 @@
      wierszu każde dłuższe zdanie zaczynało się od przewijania w środku pola. Sufit też wyżej,
      bo skoro pole rośnie z tekstem, to niech naprawdę ma gdzie rosnąć. */
   height: 58px;
-  /* Sufit rośnięcia pola. Liczony też od wysokości ekranu, bo przy otwartej klawiaturze na
-     ekran zostaje niecałe 450 px — a pole, które w tym urośnie do 190 px, wypycha przycisk
-     wysyłki pod klawiaturę razem z sobą. `sizeInput()` w app.js CZYTA tę wartość zamiast
-     nosić własną kopię liczby: dwie liczby to albo pasek przewijania w polu, które ma jeszcze
-     miejsce, albo pole rosnące poza swój kadr. */
-  max-height: min(190px, calc(var(--screen-h, 100svh) * 0.24));
+  /* Sufit rośnięcia pola. Liczony od WIDOCZNEJ wysokości okna (`--chat-vh`, patrz dziennik
+     wyżej), bo przy otwartej klawiaturze widać niecałe 350 px — a pole, które w tym urośnie
+     do 190 px, wypycha przycisk wysyłki pod klawiaturę razem z sobą. `sizeInput()` w app.js
+     CZYTA tę wartość zamiast nosić własną kopię liczby: dwie liczby to albo pasek przewijania
+     w polu, które ma jeszcze miejsce, albo pole rosnące poza swój kadr. */
+  max-height: min(190px, calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.24));
   padding: 14px 16px;
   border: 2px solid rgb(7 26 61 / 0.16);
   border-radius: 16px;
@@ -302,7 +321,26 @@
 }
 
 @media (max-width: 560px) {
-  .chat__log { max-height: calc(var(--screen-h, 100svh) * 0.38); }
+  /* TU MIESZKAŁ CAŁY BŁĄD Z TELEFONU — I DLATEGO POPRZEDNIA POPRAWKA GO NIE RUSZYŁA.
+     ---------------------------------------------------------------------------
+     Ta jedna linijka nadpisywała sufit dziennika DOKŁADNIE TAM, gdzie zgłoszono błąd: na
+     telefonie. Miała jeden ułamek zamrożonej wysokości ekranu i nie miała drugiego sufitu,
+     który zostawia miejsce na rząd pastylek i kompozytor — więc poprawki w regule wyżej nie
+     dotyczyły ani jednego telefonu, bo przegrywały z tą regułą przez większą swoistość
+     zapytania medialnego.
+
+     ZMIERZONE (`tools/probe-chat-flows.mjs`, 390x844, klawiatura 400 px):
+       PRZED: sufit dziennika 284,62 px przy 349 px widoku, dziennik 285 px, kompozytor
+              kończył się 42 px pod dolną krawędzią widoku (po naprawie samego pola);
+       PO:    sufit 99 px, dziennik 99 px, kompozytor cały nad klawiaturą.
+     Przy zamkniętej klawiaturze nic się nie zmienia: 0,38 z 749 px to 284,62 px, a drugi
+     sufit wypada wtedy na 499 px, więc wygrywa ten sam co dotąd. */
+  .chat__log {
+    max-height: min(
+      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.38),
+      calc(var(--chat-vh, var(--screen-h, 100svh)) - 250px)
+    );
+  }
   .chat-msg { max-width: 94%; }
   .contact-tab { padding: 10px 10px; font-size: 12px; letter-spacing: 0.02em; }
 }
@@ -409,11 +447,11 @@
   opacity: 0;
   transition: max-height 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s;
 }
-/* Rozwinięty rząd też ma sufit liczony od ekranu: na 380 px wysokości trzy podpowiedzi po dwie
-   linijki zajmowałyby tyle, ile cały widoczny obszar nad klawiaturą. Przewijanie w rzędzie jest
-   tu właściwą ceną — nieprzewijalny rząd wypycha kompozytor z ekranu. */
+/* Rozwinięty rząd też ma sufit liczony od WIDOCZNEJ wysokości okna: przy 350 px nad klawiaturą
+   trzy podpowiedzi po dwie linijki zajmowałyby cały ten obszar. Przewijanie w rzędzie jest tu
+   właściwą ceną — nieprzewijalny rząd wypycha kompozytor pod klawiaturę. */
 .chat__chips.is-open .chat__chips-list {
-  max-height: min(220px, calc(var(--screen-h, 100svh) * 0.28));
+  max-height: min(220px, calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.28));
   overflow-y: auto;
   opacity: 1;
 }

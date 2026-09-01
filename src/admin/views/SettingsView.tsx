@@ -120,6 +120,7 @@ const EMPTY: SiteSettings = {
     '/assets/images/gallery-crowd.svg',
     '/assets/images/gallery-finish.svg'
   ],
+  galleryCaptions: ['', '', '', '', ''],
   galleryPreviewUrls: [
     '/assets/images/gallery-start.svg',
     '/assets/images/gallery-race.svg',
@@ -235,6 +236,7 @@ export function SettingsView({
   const pendingLogoFor = useRef<number | null>(null);
   const pendingGalleryFor = useRef<number | null>(null);
   const galleryImagesRef = useRef(EMPTY.galleryImages);
+  const captionsTimerRef = useRef<number>(0);
   const gallerySaveChain = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -772,6 +774,7 @@ export function SettingsView({
         />
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
           {settings.galleryImages.map((image, index) => (
+            <div key={`${image}-${index}`} className="flex flex-col">
             <button
               key={`${image}-${index}`}
               type="button"
@@ -803,6 +806,27 @@ export function SettingsView({
                 </span>
               )}
             </button>
+            <input
+              type="text"
+              placeholder={t('set.galleryCaptionPlaceholder')}
+              className="mt-1 w-full rounded-md border border-white/10 bg-navy-950/40 px-2 py-1.5 text-xs text-white placeholder-white/30 focus:border-yellow focus:outline-none"
+              value={settings.galleryCaptions?.[index] || ''}
+              onChange={(e) => {
+                const newCaptions = [...(settings.galleryCaptions || ['', '', '', '', ''])];
+                newCaptions[index] = e.target.value;
+                setSettings({ ...settings, galleryCaptions: newCaptions });
+                
+                window.clearTimeout(captionsTimerRef.current);
+                captionsTimerRef.current = window.setTimeout(async () => {
+                  try {
+                    await saveSettings(apiKey, { galleryCaptions: newCaptions });
+                  } catch (err) {
+                    console.error('Failed to save caption', err);
+                  }
+                }, 800);
+              }}
+            />
+          </div>
           ))}
         </div>
         {uploadError ? <p className="mt-3 text-[12px] text-coral">{t('set.uploadFailed')}</p> : null}

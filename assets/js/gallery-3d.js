@@ -144,15 +144,14 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
 
       /* Parallax: the photo slides the opposite way to its own card, so the card
          reads as a window with depth behind it rather than a flat picture being
-         pushed around. The image is held slightly oversized in CSS purely so this
-         shift has somewhere to go — without that headroom the edge of the photo
-         would come into view as it moved.
+         pushed around. The image is scaled up slightly so this shift has somewhere 
+         to go — without that headroom the edge of the photo would come into view.
 
          Only visible cards are written. The ones parked off the ends move too, and
          nobody can see them do it. */
       const layer = layers[index];
       if (layer && visible) {
-        layer.style.transform = `translate3d(${(-delta * 5.5).toFixed(2)}%, 0, 0)`;
+        layer.style.transform = `translate3d(${(-delta * 5.5).toFixed(2)}%, 0, 0) scale(1.12)`;
       }
 
       // On a change only: see the note on cardState.
@@ -273,6 +272,47 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
     state.captionFor = -1;
   }
 
+  /* ----------------------------------------------------------- lightbox */
+
+  const lightbox = document.querySelector('[data-gallery-lightbox]');
+  const lightboxImage = document.querySelector('[data-gallery-lightbox-image]');
+  const lightboxCaption = document.querySelector('[data-gallery-lightbox-caption]');
+
+  function openLightbox(index) {
+    if (!lightbox || !lightboxImage) return;
+    const src = images[index];
+    const caption = captions[index] || '';
+    
+    lightboxImage.src = src;
+    if (lightboxCaption) lightboxCaption.textContent = caption;
+    lightbox.hidden = false;
+    
+    // Add escape listener
+    document.addEventListener('keydown', handleLightboxEsc);
+  }
+
+  function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.hidden = true;
+    document.removeEventListener('keydown', handleLightboxEsc);
+    // Optional: clear src after animation to save memory, though not strictly required
+    window.setTimeout(() => {
+      if (lightbox.hidden && lightboxImage) lightboxImage.src = '';
+    }, 300);
+  }
+
+  function handleLightboxEsc(e) {
+    if (e.key === 'Escape') closeLightbox();
+  }
+
+  if (lightbox) {
+    lightbox.addEventListener('click', (e) => {
+      if (e.target.closest('[data-gallery-lightbox-close]')) {
+        closeLightbox();
+      }
+    });
+  }
+
   /* ----------------------------------------------------------- interaction */
 
   cards.forEach((card, index) => {
@@ -284,9 +324,8 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
         step(relative(index) > 0 ? 1 : -1);
         return;
       }
-      // Already centred: toggle its caption.
-      if (state.captionFor === index) hideCaption();
-      else showCaption(index);
+      // Already centred: open the lightbox.
+      openLightbox(index);
     });
   });
 

@@ -300,6 +300,7 @@ export interface SiteSettings {
   eventLocation: string;
   /** Stable local or bucket paths saved in site_settings. */
   galleryImages: string[];
+  galleryCaptions: string[];
   /** Fresh signed URLs used only by the admin preview; never saved back. */
   galleryPreviewUrls: string[];
   announcementEventDate: string;

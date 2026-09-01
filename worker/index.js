@@ -5143,6 +5143,7 @@ const SETTINGS_DEFAULTS = {
     '/assets/images/gallery-crowd.svg',
     '/assets/images/gallery-finish.svg'
   ],
+  galleryCaptions: ['', '', '', '', ''],
   /* Set only by the explicit announce action. Matching eventDate means the hourly outbox
      may drain this edition; changing a date alone never sends mail. */
   announcementEventDate: ''
@@ -5238,6 +5239,13 @@ function cleanSettings(input) {
     ));
     if (!valid) return { error: 'SETTINGS_GALLERY_IMAGE' };
     out.galleryImages = images;
+  }
+
+  if (input.galleryCaptions !== undefined) {
+    if (!Array.isArray(input.galleryCaptions) || input.galleryCaptions.length !== GALLERY_SIZE) {
+      return { error: 'SETTINGS_GALLERY_SIZE' };
+    }
+    out.galleryCaptions = input.galleryCaptions.map((raw) => String(raw || '').trim().slice(0, 260));
   }
 
   if (Object.keys(out).length === 0) return { error: 'SETTINGS_EMPTY' };

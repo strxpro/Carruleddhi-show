@@ -339,9 +339,17 @@ const probe = `
        z maksymalną. Cały czat miał 469 px przy 444 px widocznego obszaru — rząd pastylek
        i kompozytor z przyciskiem wysyłki były pod klawiaturą.
        ==================================================================== */
+    /* PODSTAWIANE JEST --chat-vh, NIE --screen-h, I TO NIE JEST DROBIAZG.
+       ---------------------------------------------------------------------------
+       Klawiatura systemowa NIE zmienia 100svh ani innerHeight — skraca wyłącznie
+       visualViewport. Dlatego arkusz czatu liczy sufity z --chat-vh, którą app.js wpisuje
+       z widocznej wysokości okna (patrz measureChatViewport), a --screen-h zostaje zamrożona
+       dla układu sekcji. Podstawienie tu --screen-h mierzyłoby więc stan, który na telefonie
+       nigdy nie zachodzi; ta sonda sprawdza kaskadę, a pomiar przy prawdziwej zmianie widoku
+       robi tools/probe-chat-flows.mjs na oknie 390x844. */
     const root = document.documentElement;
-    const realScreen = root.style.getPropertyValue('--screen-h');
-    root.style.setProperty('--screen-h', '380px');
+    const realScreen = root.style.getPropertyValue('--chat-vh');
+    root.style.setProperty('--chat-vh', '380px');
     // Rząd podpowiedzi zwinięty: to jest stan, w którym się pisze wiadomość.
     document.querySelector('[data-chat-chips]')?.classList.remove('is-open');
     writeInput('Chcialbym zapytac o kask, o numer startowy i o to, czy moge zapisac sie z kolega '
@@ -385,8 +393,8 @@ const probe = `
         total: (logBox && noteBox) ? noteBox.bottom - logBox.top : -1
       };
     }
-    if (realScreen) root.style.setProperty('--screen-h', realScreen);
-    else root.style.removeProperty('--screen-h');
+    if (realScreen) root.style.setProperty('--chat-vh', realScreen);
+    else root.style.removeProperty('--chat-vh');
     writeInput('');
 
     /* ====================================================================

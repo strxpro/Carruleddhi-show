@@ -38,7 +38,8 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
       '/assets/images/gallery-craft.svg',
       '/assets/images/gallery-crowd.svg',
       '/assets/images/gallery-finish.svg'
-    ]
+    ],
+    galleryCaptions: ['', '', '', '', '']
   },
   // Logo strip at the bottom of the hero. Empty list hides the whole band.
   sponsors: [],
@@ -251,6 +252,7 @@ export function normalizeSiteConfig(input = {}) {
   const features = isRecord(source.features) ? source.features : {};
   const endpoints = isRecord(source.endpoints) ? source.endpoints : {};
   const gallerySource = Array.isArray(media.galleryImages) ? media.galleryImages : [];
+  const galleryCaptionsSource = Array.isArray(media.galleryCaptions) ? media.galleryCaptions : [];
 
   return {
     eventName: cleanText(source.eventName, DEFAULT_SITE_CONFIG.eventName, 80),
@@ -273,7 +275,8 @@ export function normalizeSiteConfig(input = {}) {
     },
     media: {
       routeImage: cleanAsset(media.routeImage, DEFAULT_SITE_CONFIG.media.routeImage),
-      galleryImages: DEFAULT_SITE_CONFIG.media.galleryImages.map((fallback, index) => cleanAsset(gallerySource[index], fallback))
+      galleryImages: DEFAULT_SITE_CONFIG.media.galleryImages.map((fallback, index) => cleanAsset(gallerySource[index], fallback)),
+      galleryCaptions: DEFAULT_SITE_CONFIG.media.galleryCaptions.map((fallback, index) => cleanText(galleryCaptionsSource[index], fallback, 260))
     },
     sponsors: cleanSponsors(source.sponsors),
     features: Object.fromEntries(featureNames.map((name) => [name, typeof features[name] === 'boolean' ? features[name] : DEFAULT_SITE_CONFIG.features[name]])),

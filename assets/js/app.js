@@ -6152,7 +6152,7 @@ import {
       return;
     }
 
-    const captions = [1, 2, 3, 4, 5].map((number) => text(`gallery.caption${number}`));
+    const captions = [1, 2, 3, 4, 5].map((number, idx) => config.media.galleryCaptions?.[idx] || text(`gallery.caption${number}`));
     const start = () => {
       section.dataset.g3dState = 'loading';
       import('./gallery-3d.js')
@@ -6278,6 +6278,10 @@ import {
       if (usableImages.every((image) => image.startsWith('/') || /^https:\/\//i.test(image))) {
         config.media.galleryImages = usableImages;
       }
+    }
+
+    if (Array.isArray(settings.galleryCaptions) && settings.galleryCaptions.length === 5) {
+      config.media.galleryCaptions = settings.galleryCaptions.map((caption) => String(caption || '').trim());
     }
 
     payloadFor = null;
@@ -8899,6 +8903,69 @@ import {
     window.addEventListener('resize', measureInputCap, { passive: true });
     window.addEventListener('orientationchange', measureInputCap, { passive: true });
     window.addEventListener('carruleddhi:relayout', measureInputCap);
+
+    /* ========================================================================
+       KLAWIATURA NA TELEFONIE: `--chat-vh`, CZYLI WIDOCZNA WYSOKOŚĆ OKNA
+       ========================================================================
+       TO JEST NAPRAWA ZGŁOSZENIA „NA TELEFONIE PASTYLKA NAD POLEM ZOSTAJE W ZŁYM MIEJSCU".
+
+       CO BYŁO ZŁE — I DLACZEGO POPRZEDNIA POPRAWKA NIE MOGŁA DZIAŁAĆ
+         Sufity czatu (wysokość dziennika, sufit rośnięcia pola, rozwinięty rząd pastylek) były
+         liczone z `--screen-h`. Ta zmienna jest ZAMROŻONYM `100svh` — patrz `measureScreenHeight`
+         w site-bridge.js — i taka ma zostać, bo od niej zależy wysokość czternastu sekcji i to
+         ona naprawiła teleportowanie strony przy przewijaniu palcem. Tylko że klawiatura
+         systemowa nie zmienia ani `100svh`, ani `innerHeight`: na Androidzie i w iOS skraca
+         WYŁĄCZNIE `visualViewport`. Czyli sufit liczony z `--screen-h` przy otwartej klawiaturze
+         zostawał dokładnie taki, jaki był przy zamkniętej — a czat kończył się poniżej dolnej
+         krawędzi tego, co widać.
+
+         ZMIERZONE (`tools/probe-chat-flows.mjs`, okno 390x844, klawiatura 400 px):
+           widoczna wysokość        749 px -> 349 px
+           dolna krawędź kompozytora   470 px -> 428 px   (czyli 79 px POD krawędzią widoku)
+           sufit dziennika           284,62 px -> 284,62 px   <-- nie drgnął
+         Kompozytor z przyciskiem wysyłki i pasek pastylek nad nim były więc pod klawiaturą.
+         Stąd zgłoszenie: pastylka JEST, tylko jej nie widać, a strona pod palcem wygląda na
+         zawieszoną.
+
+       CO JEST TERAZ
+         Druga zmienna, obok tej pierwszej i nie zamiast niej: `--chat-vh` to wysokość, którą
+         NAPRAWDĘ widać. Arkusz czatu liczy z niej sufity (patrz chat.css), a reszta strony jej
+         nie widzi i dalej stoi na zamrożonym `--screen-h`. Dzięki temu klawiatura skraca czat,
+         a nie przestawia układu sekcji — czyli jedno zgłoszenie jest naprawione bez odkręcania
+         drugiego.
+
+       DLACZEGO PODŁOGA I SUFIT NA TEJ LICZBIE
+         Podłoga 240 px: przy zupełnie skróconym widoku (klawiatura z podpowiedziami na małym
+         telefonie) czat ma zostać czatem, a nie paskiem bez dziennika. Sufit z zamrożonej
+         wysokości ekranu: `visualViewport.height` rośnie ponad wysokość ekranu, gdy schowa się
+         pasek adresu — i bez tego ograniczenia czat puchłby przy przewijaniu, czyli wracałby
+         błąd, dla którego `--screen-h` w ogóle powstało.
+
+       DLACZEGO `scroll` TEŻ, NIE TYLKO `resize`
+         iOS przy otwarciu klawiatury wysyła na widoku `resize` ORAZ `scroll`, a przy zwijaniu
+         bywa, że tylko `scroll`. Sonda wysyła oba i oba są tu obsłużone: pomiar jest tani
+         (jeden odczyt) i zapisuje zmienną tylko wtedy, gdy liczba jest inna.
+       ====================================================================== */
+    const CHAT_VH_FLOOR = 240;
+    let lastChatVh = 0;
+    function measureChatViewport() {
+      const view = window.visualViewport;
+      const visible = Math.round(view?.height || window.innerHeight || 0);
+      if (!visible) return;
+      const frozen = frozenScreenHeight() || window.innerHeight || visible;
+      const height = Math.max(CHAT_VH_FLOOR, Math.min(visible, frozen));
+      if (height === lastChatVh) return;
+      lastChatVh = height;
+      document.documentElement.style.setProperty('--chat-vh', `${height}px`);
+      /* Sufit pola jest czytany z arkusza, a arkusz właśnie zmienił zdanie — bez tego
+         `sizeInput` trzymałby pole na starej, wyższej liczbie do następnej zmiany okna. */
+      measureInputCap();
+    }
+    measureChatViewport();
+    window.visualViewport?.addEventListener('resize', measureChatViewport, { passive: true });
+    window.visualViewport?.addEventListener('scroll', measureChatViewport, { passive: true });
+    window.addEventListener('resize', measureChatViewport, { passive: true });
+    window.addEventListener('orientationchange', measureChatViewport, { passive: true });
     function sizeInput() {
       if (!input) return;
       /* Measured before anything is written, and written only when it changed.
