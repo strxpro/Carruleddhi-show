@@ -327,6 +327,32 @@
   color: #43516f;
 }
 
+/* ============================================================================
+   WEJŚCIE, KTÓRE JUŻ SIĘ ODBYŁO, NIE ODBYWA SIĘ DRUGI RAZ
+   ============================================================================
+   Zmiana języka przebudowuje nagłówki od nowa — i-18n wymienia treść, a `setupTextEffects`
+   dzieli ją na nowe `.fx-unit`. Przebudowa zostawiała `is-playing` na tych nagłówkach, które
+   już weszły, w intencji „nie animuj ich ponownie". Skutek był dokładnie odwrotny: to właśnie
+   `is-playing` NADAJE animację, a spany są nowe, więc każdy startował od zera.
+
+   Zmierzone na 390x844 przy dławieniu CPU 4x: jedno kliknięcie w przełącznik języka puszczało
+   197 animacji naraz i przez pełną sekundę po zmianie przeglądarka przeliczała style od 200
+   do 370 elementów w każdej klatce — 41 przeliczeń, 659 ms. Tyle kosztowało wejście, którego
+   nikt nie chciał oglądać po raz drugi.
+
+   `is-settled` mówi to, co miało mówić `is-playing`: tekst jest na miejscu, w stanie
+   końcowym, bez animacji. Specyficzność jest o jedną klasę wyższa od `.is-playing .fx-unit`,
+   więc wygrywa bez `!important`.
+
+   Nagłówków jeszcze nie obejrzanych to nie dotyczy — te nie mają `is-playing`, więc wejdą
+   normalnie, kiedy czytelnik do nich dojedzie. */
+[data-text-effect].is-settled .fx-unit,
+[data-text-effect].is-playing.is-settled .fx-unit {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
 /* --------------------------------------------------------- less motion ----
    Not "faster" — off. Somebody who has set this has said that movement is a problem,
    and a shorter version of the problem is still the problem. The text has to end up

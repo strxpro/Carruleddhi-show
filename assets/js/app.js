@@ -497,7 +497,7 @@ import {
    * is often a grid cell far narrower than any element that can be named. Six
    * languages and a fluid layout multiply that out into something nobody will keep
    * correct. Measuring is exact and self-maintaining: read the base size once, then
-   * bisect downwards until scrollWidth fits clientWidth.
+   * scale it by how much room the text actually needs (see `fitMany`).
    *
    * Cost is a forced layout per probe, so it runs on load, on resize and on language
    * change — never on scroll.
@@ -507,21 +507,6 @@ import {
     '.stack-card h3', '.prize-card h3', '.form-step h3', '.modal h2',
     '.g3d__heading', '.attendance__title', '.footer__brand', '.wall-note__text'
   ].join(',');
-
-  /**
-   * Fits one heading. Always measures — no shortcuts.
-   *
-   * An earlier version skipped when the element's width had not changed since the
-   * last run, which looked like a sensible optimisation and was a bug: the *content*
-   * width also changes without the box moving. When the webfont landed, Bungee's
-   * wider glyphs pushed "Carruleddhi Classic" 139 px past its box, but the box was
-   * still 424 px, so the guard skipped it and the heading stayed too big. The guard
-   * belongs in the ResizeObserver, where the loop it was protecting against
-   * actually lives.
-   */
-  function fitOne(element) {
-    fitMany([element]);
-  }
 
   /**
    * Kolejka nagłówków do dopasowania, opróżniana raz na klatkę.
@@ -562,10 +547,10 @@ import {
    * "Carruleddhi Classic" 139 px poza jego pudełko — a pudełko miało tę samą szerokość co
    * przedtem, więc skrót je przepuścił.
    *
-   * Bisekcja idzie WSZERZ, nie w głąb: najpierw wszystkie zapisy jednej rundy, potem wszystkie
-   * odczyty tej rundy. Wynik jest co do piksela ten sam co przy dopasowywaniu pojedynczo, bo
-   * każdy nagłówek ma własny przedział `low`/`high` i te same osiem połowień. Różnica jest
-   * wyłącznie w liczbie przeliczeń stylów — patrz komentarz przy `fitLater`.
+   * Pomiar idzie WSZERZ, nie w głąb: najpierw wszystkie zapisy jednej rundy, potem wszystkie
+   * odczyty tej rundy. Każdy nagłówek dostaje swój własny rozmiar, dokładnie taki jak przy
+   * dopasowywaniu pojedynczo — różnica jest wyłącznie w liczbie przeliczeń stylów, patrz
+   * komentarz przy `fitLater` i przy samym liczeniu rozmiaru niżej.
    */
   function fitMany(elements) {
     // Rozmiar, którego chcą style, zapamiętywany raz, żeby kolejne przebiegi nie schodziły
@@ -582,29 +567,56 @@ import {
     const jobs = [];
     for (const element of elements) {
       const base = Number(element.dataset.fitBase);
-      if (base && element.clientWidth >= 8) jobs.push({ element, low: base * 0.45, high: base, middle: base });
+      if (base && element.clientWidth >= 8) jobs.push({ element, low: base * 0.45, high: base, size: base });
     }
     if (!jobs.length) return;
 
     for (const job of jobs) job.element.style.fontSize = `${job.high}px`;
-    const tight = jobs.filter(({ element }) => element.scrollWidth > element.clientWidth + 1);
+
+    /* PROPORCJA ZAMIAST POŁOWIENIA.
+       ---------------------------------------------------------------------------
+       Wcześniej szło tu osiem rund bisekcji między 45% a 100% rozmiaru ze stylów. Każda runda
+       to zapis `font-size` i zaraz potem odczyt `scrollWidth`, czyli osiem wymuszonych
+       przeliczeń stylu i układu — na jeden nagłówek. Zmierzone na 390x844 przy dławieniu CPU
+       4x: przy zmianie języka jeden zbyt szeroki nagłówek kosztował 158 ms, w ośmiu parach po
+       9 ms przeliczenia i 13 ms układania.
+
+       Szerokość jednej linijki tekstu jest wprost proporcjonalna do rozmiaru czcionki, więc
+       odpowiedzi nie trzeba szukać po omacku — wystarczy ją policzyć: rozmiar razy stosunek
+       miejsca, które jest, do miejsca, które napis zajmuje. Mnożnik 0.995 zostawia pół procent
+       zapasu na zaokrąglenia i kerning.
+
+       Dwie rundy sprawdzające są dla przypadków, w których proporcja nie trzyma: łamanie
+       wyrazów, `text-transform`, odstępy między literami. Każda schodzi o 3%. Razem najwyżej
+       cztery przeliczenia zamiast dziewięciu, a w typowym przypadku trzy.
+
+       Dolne 45% zostaje bez zmian: napis patologicznie długi ma zrobić się mały, a nie po
+       cichu nieczytelny. */
+    const tight = [];
+    for (const job of jobs) {
+      const room = job.element.clientWidth + 1;
+      const need = job.element.scrollWidth;
+      if (need <= room) continue;
+      job.size = Math.max(job.low, job.high * (room / need) * 0.995);
+      tight.push(job);
+    }
     if (!tight.length) return;
 
-    // Połowienie między 45% a 100% rozmiaru ze stylów. Osiem rund trafia z dokładnością do
-    // ułamka piksela, a zatrzymanie się na 45% sprawia, że napis wyjątkowo długi robi się mały,
-    // a nie po cichu nieczytelny.
-    for (let round = 0; round < 8; round += 1) {
-      for (const job of tight) {
-        job.middle = (job.low + job.high) / 2;
-        job.element.style.fontSize = `${job.middle}px`;
-      }
-      for (const job of tight) {
-        if (job.element.scrollWidth <= job.element.clientWidth + 1) job.low = job.middle;
-        else job.high = job.middle;
-      }
-    }
+    let left = tight;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      for (const job of left) job.element.style.fontSize = `${job.size.toFixed(2)}px`;
+      if (attempt === 2) break;
 
-    for (const job of tight) job.element.style.fontSize = `${job.low.toFixed(2)}px`;
+      const again = [];
+      for (const job of left) {
+        if (job.element.scrollWidth <= job.element.clientWidth + 1) continue;
+        if (job.size <= job.low + 0.01) continue;
+        job.size = Math.max(job.low, job.size * 0.97);
+        again.push(job);
+      }
+      if (!again.length) break;
+      left = again;
+    }
   }
 
   function fitHeadings() {
@@ -668,9 +680,9 @@ import {
 
     /* ONLY WHEN THE WINDOW GOT WIDER OR NARROWER, NOT WHEN IT GOT SHORTER.
        ---------------------------------------------------------------------------
-       `fitHeadings()` walks every heading on the page and bisects its font size eight times,
-       and each round writes `font-size` and then reads `scrollWidth` — a forced layout per
-       round, per heading. That is fine as an answer to "the column is a different width now".
+       `fitHeadings()` walks every heading on the page, writes `font-size` and reads
+       `scrollWidth` back — a forced style recalculation and layout per pass. That is fine as
+       an answer to "the column is a different width now".
        It is not fine as an answer to a phone's address bar, which fires `resize` every time
        the reader changes direction and does not change any heading's width by a single pixel.
        Measured at 4x CPU throttling it was about 90 ms of the work a `resize` did, spent to
@@ -6683,7 +6695,17 @@ import {
       const played = $$('[data-text-effect].is-playing');
       $$('[data-text-effect], [data-text-jitter], [data-text-ghost], [data-text-roll]')
         .forEach((element) => { delete element.dataset.textOriginal; });
-      played.forEach((element) => element.classList.add('is-playing'));
+      /* `is-settled` obok `is-playing`, i to jest tutaj cała rzecz.
+         ---------------------------------------------------------------------------
+         Samo `is-playing` robiło coś przeciwnego do zamiaru opisanego wyżej: spany są po
+         przebudowie nowe, a `is-playing` to właśnie ta klasa, która nadaje im animację
+         wejścia — więc każdy startował od zera. Zmierzone na 390x844 przy dławieniu CPU 4x:
+         197 animacji naraz i sekunda przeliczania stylów 200-370 elementów co klatkę,
+         41 przeliczeń i 659 ms, po każdym kliknięciu w przełącznik języka.
+
+         `is-settled` stawia nowe spany od razu w stanie końcowym. `is-playing` zostaje, bo
+         czyta je reszta kodu jako „ten nagłówek ma już swoje wejście za sobą". */
+      played.forEach((element) => element.classList.add('is-playing', 'is-settled'));
       setupTextEffects();
     } catch (error) {
       console.error('Carruleddhi: text effects failed to rebuild.', error);
