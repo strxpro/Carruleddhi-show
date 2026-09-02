@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Handshake, ImageOff, RefreshCw } from 'lucide-react';
 import { formatMoment } from '@/lib/utils';
+import { Highlighter } from './Highlighter';
 import type { TranslateKey } from '../i18n';
 import {
   ApiError,
@@ -60,10 +61,12 @@ interface Note {
 export function SponsorLeads({
   t,
   apiKey,
-  onApproved
+  onApproved,
+  highlightQuery
 }: {
   t: (key: TranslateKey) => string;
   apiKey: string;
+  highlightQuery?: string;
   /**
    * Wywoływane po udanym zatwierdzeniu, z ustawieniami oddanymi przez Workera.
    *
@@ -281,7 +284,9 @@ export function SponsorLeads({
                 </div>
 
                 <div className="mt-3 min-w-0 flex-1 sm:mt-0">
-                  <p className="truncate text-sm font-bold text-white">{leadSponsorName(lead)}</p>
+                  <p className="truncate text-sm font-bold text-white">
+                    <Highlighter text={leadSponsorName(lead)} query={highlightQuery} />
+                  </p>
 
                   <dl className="mt-2 grid gap-1.5 text-[12px] sm:grid-cols-2">
                     <div className="flex min-w-0 gap-1.5">
@@ -290,7 +295,9 @@ export function SponsorLeads({
                     </div>
                     <div className="flex min-w-0 gap-1.5">
                       <dt className="shrink-0 text-white/40">{t('set.leadPerson')}</dt>
-                      <dd className="min-w-0 break-words text-white/80">{person || '—'}</dd>
+                      <dd className="min-w-0 break-words text-white/80">
+                        <Highlighter text={person || '—'} query={highlightQuery} />
+                      </dd>
                     </div>
                     <div className="flex min-w-0 gap-1.5">
                       <dt className="shrink-0 text-white/40">{t('set.leadEmail')}</dt>

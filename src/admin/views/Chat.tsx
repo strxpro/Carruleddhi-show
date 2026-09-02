@@ -80,6 +80,7 @@ function Bubble({
 /* ------------------------------------------------------------------- view */
 
 export function Chat({
+  highlightQuery,
   t,
   locale,
   apiKey,
@@ -89,6 +90,7 @@ export function Chat({
   locale: PanelLocale;
   apiKey: string;
   onChanged: () => void;
+  highlightQuery?: string;
 }) {
   const [threads, setThreads] = useState<ChatThread[] | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -265,7 +267,7 @@ export function Chat({
           <div className="border-b border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/40">
             {t('chat.threads')}
           </div>
-          <ul className="max-h-[62vh] overflow-y-auto">
+          <ul className="max-h-[62vh] overflow-y-auto overscroll-contain">
             {threads === null ? (
               /* Three lines per row, the same three the real thread has: name, address and
                  how long ago. The list keeps its height while it loads, so the conversation
@@ -400,7 +402,7 @@ export function Chat({
                   onScroll={onScroll}
                   role="log"
                   aria-relevant="additions"
-                  className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+                  className="flex h-full flex-col gap-4 overflow-y-auto overscroll-contain p-4"
                 >
                   {messages.map((message, index) => (
                     <Bubble

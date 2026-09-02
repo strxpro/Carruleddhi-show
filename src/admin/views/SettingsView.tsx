@@ -280,7 +280,7 @@ function toMinuteKey(iso: string): string {
   return iso.slice(0, 16);
 }
 
-export function SettingsView({
+export function SettingsView({\n  highlightQuery,
   t,
   locale,
   setLocale,

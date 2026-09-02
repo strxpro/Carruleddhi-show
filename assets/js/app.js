@@ -10450,11 +10450,24 @@ import {
       const frozen = frozenScreenHeight() || window.innerHeight || visible;
       const height = Math.max(CHAT_VH_FLOOR, Math.min(visible, frozen));
       if (height === lastChatVh) return;
+      /* Przewiń dziennik do dołu, jeśli był na dole przed zmniejszeniem okna (wysunięcie klawiatury).
+         Używamy rAF, by poczekać na zastosowanie nowych stylów i przeliczenie wysokości przez CSS. */
+      let wasAtBottom = false;
+      if (log) {
+        wasAtBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+      }
+
       lastChatVh = height;
       document.documentElement.style.setProperty('--chat-vh', `${height}px`);
       /* Sufit pola jest czytany z arkusza, a arkusz właśnie zmienił zdanie — bez tego
          `sizeInput` trzymałby pole na starej, wyższej liczbie do następnej zmiany okna. */
       measureInputCap();
+
+      if (log && wasAtBottom) {
+        requestAnimationFrame(() => {
+          log.scrollTop = log.scrollHeight;
+        });
+      }
     }
     measureChatViewport();
     window.visualViewport?.addEventListener('resize', measureChatViewport, { passive: true });
@@ -10513,6 +10526,15 @@ import {
       if (!log) return;
       const naDole = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
       if (naDole) log.scrollTop = log.scrollHeight;
+    });
+
+    /* Skocz do najnowszej wiadomości przy wejściu w pole (pojawienie się klawiatury),
+       zeby uniknąć pisania w ciemno i wymusić pokazanie najnowszej wiadomości. */
+    input?.addEventListener('focus', () => {
+      if (!log) return;
+      requestAnimationFrame(() => {
+        log.scrollTop = log.scrollHeight;
+      });
     });
 
     /* --------------------------------------------------------------- chips */

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Loader2, Pencil, Printer, Search, ShieldAlert, Trash2, X } from 'lucide-react';
+import { Highlighter } from './Highlighter';
 import { cn, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import {
@@ -24,12 +25,14 @@ export function Registrations({
   t,
   locale,
   apiKey,
-  onChanged
+  onChanged,
+  highlightQuery
 }: {
   t: (key: TranslateKey) => string;
   locale: PanelLocale;
   apiKey: string;
   onChanged: () => void;
+  highlightQuery?: string;
 }) {
   const pl = locale === 'pl';
   const [rows, setRows] = useState<RosterRow[] | null>(null);

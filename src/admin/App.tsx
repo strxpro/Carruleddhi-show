@@ -30,7 +30,7 @@ import {
   type NavItemData
 } from '@/components/ui/dashboard-sidebar';
 import { dictionaries, type PanelLocale, type TranslateKey } from './i18n';
-import { fetchInbox, type Inbox } from './api';
+import { fetchInbox, type Inbox, fetchRoster, fetchSponsorLeads, fetchThreads } from './api';
 import { useSession } from './useSession';
 import { Gate } from './Gate';
 import { Dashboard } from './views/Dashboard';
@@ -102,6 +102,7 @@ export default function App() {
   }, [wide, railInitialised]);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [highlightQuery, setHighlightQuery] = useState('');
   const [inbox, setInbox] = useState<Inbox | null>(null);
 
   const key = state.status === 'open' ? state.key : '';
@@ -242,6 +243,58 @@ export default function App() {
 
   const flat = useMemo(() => flattenNav(groups, bottom), [groups, bottom]);
 
+  const [searchResults, setSearchResults] = useState<NavItemData[]>([]);
+  const handleGlobalSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 2 || !key) {
+      setSearchResults([]);
+      return;
+    }
+    const needle = query.trim().toLowerCase();
+    try {
+      const [roster, sponsors, threads] = await Promise.all([
+        fetchRoster(key, 500).catch(() => ({ roster: [] })),
+        fetchSponsorLeads(key, 100).catch(() => ({ leads: [] })),
+        fetchThreads(key, 100).catch(() => ({ threads: [] }))
+      ]);
+      const results: NavItemData[] = [];
+      
+      roster.roster?.forEach(p => {
+        if (p.name.toLowerCase().includes(needle) || p.email?.toLowerCase().includes(needle)) {
+          results.push({
+            id: `searchResult:registrations:${needle}`,
+            title: p.name || '?',
+            subtitle: t('nav.registrations') + (p.email ? ` • ${p.email}` : ''),
+            icon: ListChecks
+          });
+        }
+      });
+
+      sponsors.leads?.forEach(l => {
+        if (l.name.toLowerCase().includes(needle) || l.contact_person?.toLowerCase().includes(needle)) {
+          results.push({
+            id: `searchResult:settings:${needle}`,
+            title: l.name || '?',
+            subtitle: 'Sponsor' + (l.contact_person ? ` • ${l.contact_person}` : ''),
+            icon: Settings
+          });
+        }
+      });
+
+      threads.threads?.forEach(tItem => {
+        if (tItem.name?.toLowerCase().includes(needle) || tItem.email?.toLowerCase().includes(needle)) {
+          results.push({
+            id: `searchResult:chat:${needle}`,
+            title: tItem.name || '?',
+            subtitle: t('nav.chat') + (tItem.email ? ` • ${tItem.email}` : ''),
+            icon: MessageSquare
+          });
+        }
+      });
+
+      setSearchResults(results);
+    } catch (e) {}
+  }, [key, t]);
+
   const go = useCallback(
     (id: string) => {
       if (id === 'logout') {
@@ -375,13 +428,13 @@ export default function App() {
             <Dashboard t={t} locale={locale} inbox={inbox} onGo={setTab} apiKey={key} />
           ) : null}
           {tab === 'registrations' ? (
-            <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} />
+            <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} highlightQuery={highlightQuery} />
           ) : null}
           {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
           {tab === 'season' ? <Season t={t} apiKey={key} /> : null}
           {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
           {tab === 'awards' ? <Prizes t={t} apiKey={key} /> : null}
-          {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
+          {tab === 'chat' ? <Chat t={t} locale={locale} apiKey={key} onChanged={refreshInbox} highlightQuery={highlightQuery} /> : null}
           {tab === 'wall' ? <Wall t={t} locale={locale} apiKey={key} onChanged={refreshInbox} /> : null}
           {tab === 'reminders' ? (
             <Subscribers t={t} locale={locale} apiKey={key} kind="reminders" onChanged={refreshInbox} />
@@ -390,7 +443,7 @@ export default function App() {
             <Subscribers t={t} locale={locale} apiKey={key} kind="newsletter" onChanged={refreshInbox} />
           ) : null}
           {tab === 'settings' ? (
-            <SettingsView
+            <SettingsView highlightQuery={highlightQuery}
               t={t}
               locale={locale}
               setLocale={setLocale}

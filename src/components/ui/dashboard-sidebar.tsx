@@ -44,6 +44,7 @@ export interface NavItemData {
   icon: React.ElementType;
   badge?: number | string;
   shortcut?: string;
+  subtitle?: string;
   children?: NavItemData[];
 }
 
@@ -396,6 +397,8 @@ export function CommandPalette({
   onSelect: (id: string) => void;
   placeholder: string;
   emptyLabel: string;
+  externalResults?: NavItemData[];
+  onSearchChange?: (query: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -413,9 +416,16 @@ export function CommandPalette({
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const usable = items.filter((item) => item.id !== 'search');
-    if (!needle) return usable;
-    return usable.filter((item) => item.title.toLowerCase().includes(needle));
-  }, [items, query]);
+    let found = usable;
+    if (needle) {
+      found = usable.filter((item) => item.title.toLowerCase().includes(needle));
+    }
+    return [...found, ...(externalResults || [])];
+  }, [items, query, externalResults]);
+
+  useEffect(() => {
+    if (onSearchChange) onSearchChange(query);
+  }, [query, onSearchChange]);
 
   useEffect(() => {
     if (cursor >= results.length) setCursor(0);
@@ -498,7 +508,12 @@ export function CommandPalette({
                     )}
                   >
                     <Icon className="size-4 shrink-0" strokeWidth={1.5} />
-                    <span className="truncate">{item.title}</span>
+                    <div className="flex flex-col min-w-0 flex-1">
+                      <span className="truncate">{item.title}</span>
+                      {item.subtitle ? (
+                        <span className="truncate text-[11px] text-muted-foreground/70">{item.subtitle}</span>
+                      ) : null}
+                    </div>
                     {item.badge ? (
                       <span className="ml-auto text-[11px] font-semibold text-primary">{item.badge}</span>
                     ) : null}
