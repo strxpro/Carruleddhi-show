@@ -9220,6 +9220,45 @@ import {
      *
      * @param {string} email adres z karty czatu albo z „zmień adres"
      */
+    /**
+     * Wydruk formularza: pokazanie biezacego stanu i dwie pastylki.
+     *
+     * Stan czytany PRZED pytaniem, a nie zakladany: „czy chcesz, zebysmy wydrukowali" zadane
+     * komus, kto juz o to poprosil, brzmi jak zgubiona odpowiedz. Dlatego najpierw `view`,
+     * potem zdanie o tym, jak jest teraz, a dopiero potem wybor.
+     *
+     * Kod zostaje w pamieci kreatora i NIE jest zuzywany po stronie serwera — patrz czynnosc
+     * `print` w Workerze. Ktos, kto pomylil pastylke, naciska druga, a nie zaczyna od nowa
+     * od listu z kodem.
+     */
+    async function printDecide(email, entryId, code) {
+      const seen = await gatePost('entry-manage', { action: 'view', email, code, id: entryId });
+      const wants = Boolean(seen?.entry?.wantsPrint);
+      flowSay(wants ? 'chat.printNowYes' : 'chat.printNowNo');
+
+      const set = async (value) => {
+        const saved = await gatePost('entry-manage', {
+          action: 'print', email, code, id: entryId, wantsPrint: value
+        });
+        if (!saved?.ok) throw Object.assign(new Error('print'), { payload: saved });
+        flowSay(value ? 'chat.printSetYes' : 'chat.printSetNo');
+        endFlow();
+      };
+
+      /* Kolejnosc odwrotna do biezacego stanu: pierwsza pastylka jest zawsze ta, ktora COS
+         zmienia. Ustawienie tego, co juz jest, nie jest bledem, ale nie jest tez powodem,
+         dla ktorego ktos zaczal te rozmowe. */
+      flowChoices(wants
+        ? [
+          ['chat.printChooseNo', () => flowGuard(() => set(false))],
+          ['chat.printKeep', async () => { flowSay('chat.printKept'); endFlow(); }]
+        ]
+        : [
+          ['chat.printChooseYes', () => flowGuard(() => set(true))],
+          ['chat.printKeep', async () => { flowSay('chat.printKept'); endFlow(); }]
+        ]);
+    }
+
     async function entryHandover(email) {
       if (!flow) return;
       const intent = flow.intent;
@@ -9260,10 +9299,15 @@ import {
            zeszła — ta sama ostrożność, co przy sponsorze i przy wypisaniu. */
         await gateStart(email, purpose, {
           entryId: only.id,
-          onConfirmed: (code) => flowGuard(() => entryOpenForm(email, intent, {
-            code,
-            entryId: only.id
-          })),
+          /* Wydruk zostaje W ROZMOWIE, a nie idzie do formularza.
+             ---------------------------------------------------------------------------
+             `edit` i `withdraw` oddaja sprawe formularzowi, bo tam sie widzi i poprawia
+             wszystkie pola naraz. Tu jest jedno pytanie o tak/nie — otwieranie dla niego
+             calego formularza znaczyloby przewijanie strony do miejsca, w ktorym stoi jeden
+             znacznik, po tym jak sie juz przepisalo szesc cyfr z maila. */
+          onConfirmed: (code) => flowGuard(() => (intent === 'print'
+            ? printDecide(email, only.id, code)
+            : entryOpenForm(email, intent, { code, entryId: only.id }))),
           /* „Zmień adres" wraca do pytania o adres — to samo zdanie i ta sama pastylka co przy
              powiadomieniach, a krok `email` rozgałęzia się po `flow.intent`. */
           onChangeEmail: () => notifyAskEmail()
@@ -10029,7 +10073,7 @@ import {
         sponsorOffer();
         return;
       }
-      if (intent === 'edit' || intent === 'withdraw') {
+      if (intent === 'edit' || intent === 'withdraw' || intent === 'print') {
         if (!openEntryManager || !visitor.email) {
           flowSay('chat.dataNeedGate');
           return;
@@ -10041,7 +10085,9 @@ import {
         flow = newFlow(intent, intent === 'withdraw' ? 'cancel-entry' : 'edit-entry', {
           step: 'lookup'
         });
-        flowSay(intent === 'withdraw' ? 'chat.dataAskWithdraw' : 'chat.dataAskEdit');
+        flowSay(intent === 'withdraw'
+          ? 'chat.dataAskWithdraw'
+          : intent === 'print' ? 'chat.printAsk' : 'chat.dataAskEdit');
         await flowGuard(() => entryHandover(visitor.email));
         return;
       }

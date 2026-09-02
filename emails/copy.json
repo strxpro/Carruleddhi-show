@@ -184,7 +184,10 @@
     "sponsorAckSoon": "Ti rispondiamo il prima possibile. Se vuoi aggiungere qualcosa, rispondi a questa e-mail: arriva direttamente agli organizzatori, a %ORGEMAIL%.",
     "sponsorAckSiteLabel": "Sito o profilo",
     "sponsorAckLogoLabel": "Logo",
-    "sponsorAckLogoYes": "allegato"
+    "sponsorAckLogoYes": "allegato",
+    "regPrintMine": "Hai scelto di stampare tu il modulo.",
+    "regPrintOurs": "Hai chiesto a noi di stamparlo: lo troverai pronto alla partenza.",
+    "regPrintChange": "Hai cambiato idea? Scrivilo nella chat del sito — basta dire che non hai una stampante, o che invece ce l’hai."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -360,7 +363,10 @@
     "sponsorAckSoon": "Odezwiemy się najszybciej, jak to możliwe. Jeśli chcesz coś dopisać, odpowiedz na tego maila — trafi wprost do organizatorów, na %ORGEMAIL%.",
     "sponsorAckSiteLabel": "Strona lub profil",
     "sponsorAckLogoLabel": "Logo",
-    "sponsorAckLogoYes": "dołączone"
+    "sponsorAckLogoYes": "dołączone",
+    "regPrintMine": "Wybrałeś, że formularz drukujesz sam.",
+    "regPrintOurs": "Poprosiłeś, żebyśmy wydrukowali go my — będzie czekał na starcie.",
+    "regPrintChange": "Zmieniłeś zdanie? Napisz na czacie na stronie — wystarczy powiedzieć, że nie masz drukarki albo że jednak masz."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -536,7 +542,10 @@
     "sponsorAckSoon": "We will get back to you as soon as we can. If you want to add anything, reply to this e-mail: it goes straight to the organisers, at %ORGEMAIL%.",
     "sponsorAckSiteLabel": "Site or profile",
     "sponsorAckLogoLabel": "Logo",
-    "sponsorAckLogoYes": "attached"
+    "sponsorAckLogoYes": "attached",
+    "regPrintMine": "You chose to print the form yourself.",
+    "regPrintOurs": "You asked us to print it: it will be waiting for you at the start.",
+    "regPrintChange": "Changed your mind? Say so in the chat on the site — just tell it you have no printer, or that you do after all."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -712,7 +721,10 @@
     "sponsorAckSoon": "Wir melden uns so schnell wie möglich. Wenn du etwas ergänzen möchtest, antworte einfach auf diese E-Mail: sie geht direkt an die Organisatoren, an %ORGEMAIL%.",
     "sponsorAckSiteLabel": "Website oder Profil",
     "sponsorAckLogoLabel": "Logo",
-    "sponsorAckLogoYes": "beigefügt"
+    "sponsorAckLogoYes": "beigefügt",
+    "regPrintMine": "Sie haben gewählt, das Formular selbst zu drucken.",
+    "regPrintOurs": "Sie haben uns gebeten, es zu drucken: es liegt am Start für Sie bereit.",
+    "regPrintChange": "Meinung geändert? Schreiben Sie es im Chat auf der Website — sagen Sie einfach, dass Sie keinen Drucker haben, oder doch einen."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -888,7 +900,10 @@
     "sponsorAckSoon": "Te respondemos lo antes posible. Si quieres añadir algo, responde a este correo: llega directamente a los organizadores, a %ORGEMAIL%.",
     "sponsorAckSiteLabel": "Web o perfil",
     "sponsorAckLogoLabel": "Logo",
-    "sponsorAckLogoYes": "adjunto"
+    "sponsorAckLogoYes": "adjunto",
+    "regPrintMine": "Has elegido imprimir tú el formulario.",
+    "regPrintOurs": "Nos has pedido que lo imprimamos nosotros: lo tendrás listo en la salida.",
+    "regPrintChange": "¿Has cambiado de idea? Dilo en el chat de la web: basta con decir que no tienes impresora, o que sí la tienes."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -1064,6 +1079,9 @@
     "sponsorAckSoon": "Nous vous répondons dès que possible. Si vous voulez ajouter quelque chose, répondez à cet e-mail, il arrive directement aux organisateurs, à %ORGEMAIL%.",
     "sponsorAckSiteLabel": "Site ou profil",
     "sponsorAckLogoLabel": "Logo",
-    "sponsorAckLogoYes": "joint"
+    "sponsorAckLogoYes": "joint",
+    "regPrintMine": "Vous avez choisi d’imprimer le formulaire vous-même.",
+    "regPrintOurs": "Vous nous avez demandé de l’imprimer : il vous attendra au départ.",
+    "regPrintChange": "Vous avez changé d’avis ? Dites-le dans le chat du site — il suffit d’indiquer que vous n’avez pas d’imprimante, ou que si."
   }
 }
