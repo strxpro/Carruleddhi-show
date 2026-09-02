@@ -10307,8 +10307,12 @@ import {
     let lastInputHeight = 0;
     /** Sufit wysokości pola, wzięty z arkusza. Odświeżany tylko przy zmianie układu. */
     let inputCap = 190;
+    /** Dolna granica pola, wzięta z arkusza (`min-height`). Patrz komentarz przy `next`. */
+    let inputFloor = 58;
     function measureInputCap() {
       if (!input) return;
+      const floor = Number.parseFloat(getComputedStyle(input).minHeight);
+      if (Number.isFinite(floor) && floor > 0) inputFloor = floor;
       const cap = Number.parseFloat(getComputedStyle(input).maxHeight);
       /* `none` albo wartość, której nie da się odczytać, znaczy „bez sufitu z arkusza" —
          wtedy zostaje ostatnia znana liczba, a nie NaN, po którym pole przestałoby rosnąć. */
@@ -10422,7 +10426,11 @@ import {
          czyli pole rosło ponad swój kadr i wypychało przycisk wysyłki pod klawiaturę.
          Odczyt jest buforowany i odświeżany przy zmianie układu, bo `getComputedStyle`
          w obsłudze każdego naciśnięcia klawisza to wymuszone przeliczenie stylu na znak. */
-      const next = Math.min(input.scrollHeight, inputCap);
+      /* Podloga TAKZE z arkusza, tak samo jak sufit — zeby ta funkcja nie probowala wpisac
+         wysokosci mniejszej niz `min-height`. Sama proba niczego by nie zepsula (arkusz i tak
+         wygrywa), ale `lastInputHeight` zapamietywaloby wtedy liczbe, ktorej pole nigdy nie
+         mialo, i kolejne porownanie „czy sie zmienilo" bylo by porownaniem z fikcja. */
+      const next = Math.max(Math.min(input.scrollHeight, inputCap), inputFloor);
       if (next !== lastInputHeight) {
         lastInputHeight = next;
         input.style.height = `${next}px`;

@@ -318,7 +318,17 @@
      wiersze widoczne od razu, czyli tyle, ile ma zwykłe pytanie na czacie — przy jednym
      wierszu każde dłuższe zdanie zaczynało się od przewijania w środku pola. Sufit też wyżej,
      bo skoro pole rośnie z tekstem, to niech naprawdę ma gdzie rosnąć. */
-  height: 58px;
+  /* `min-height`, NIE `height` — i to jest naprawa skakania pola przy pisaniu.
+     ---------------------------------------------------------------------------
+     Sztywne 58 px klocilo sie z `sizeInput()` w app.js, ktore po kazdym nacisnieciu klawisza
+     wpisuje w `style.height` wysokosc TRESCI. Dla jednego wiersza tresc ma okolo 52 px, wiec
+     pierwszy wpisany znak KURCZYL pole o kilka pikseli, a dopiero drugi wiersz je powiekszal.
+     Z boku wygladalo to jak pole, ktore najpierw drgnie w dol, a potem rosnie skokami —
+     zgloszone jako „czat dziwnie sie powieksza, jak chce napisac wiadomosc".
+
+     Jako dolna granica ta sama liczba przestaje byc sprzeczna z tamta: pole nigdy nie schodzi
+     ponizej dwoch widocznych wierszy, a rosnie dokladnie tak jak dotad. */
+  min-height: 58px;
   /* Sufit rośnięcia pola. Liczony od WIDOCZNEJ wysokości okna (`--chat-vh`, patrz dziennik
      wyżej), bo przy otwartej klawiaturze widać niecałe 350 px — a pole, które w tym urośnie
      do 190 px, wypycha przycisk wysyłki pod klawiaturę razem z sobą. `sizeInput()` w app.js
