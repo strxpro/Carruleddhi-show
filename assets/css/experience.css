@@ -929,10 +929,21 @@ body.is-language-transitioning .nav-current__copy {
   .language-picker__trigger { width: 68px; min-width: 68px; height: 50px; gap: 5px; padding-inline: 8px; }
   .language-picker__flag { font-size: 19px; }
   .language-picker__trigger svg { width: 8px; }
+  /* 52, NIE 50 — INACZEJ `border-radius: 50%` RYSUJE OWAL, A NIE KOŁO.
+     ---------------------------------------------------------------------------
+     Tu powstawało koło menu na telefonie: 50 na 50. Później `.nav-actions .menu-toggle`
+     w carnival.css dostało `min-height: 52px`, żeby zrównać je z kołem flagi — i podniosło
+     samą WYSOKOŚĆ. Szerokość została 50, więc przy `border-radius: 50%` z koła robił się
+     owal 50 na 52, stojący obok idealnie okrągłej flagi 52 na 52.
+
+     Zmierzone na 360, 390, 430, 600 i 760 px: menu 50x52 przy fladze 52x52, w każdej z tych
+     szerokości. Teraz oba są kwadratami 52 na 52, więc `border-radius: 50%` daje w obu
+     przypadkach koło, a jedna liczba stoi w jednym miejscu zamiast dwóch, które muszą się
+     zgadzać. */
   .menu-toggle {
-    width: 50px;
-    min-width: 50px;
-    height: 50px;
+    width: 52px;
+    min-width: 52px;
+    height: 52px;
     padding: 0;
     border-radius: 50%;
   }
