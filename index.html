@@ -1472,6 +1472,22 @@
                   </p>
 
                   <label class="checkbox"><input name="newsConsent" type="checkbox"><span data-i18n="form.newsConsent">Desidero ricevere aggiornamenti su future edizioni (facoltativo).</span></label>
+
+                  <!-- WYDRUK ZA ZAWODNIKA — PYTANIE ZADANE TU, A NIE PRZY STOLE REJESTRACYJNYM.
+                       ===========================================================================
+                       Formularz przychodzi mailem jako PDF i ma dojechac wydrukowany i podpisany.
+                       Czesc ludzi nie ma drukarki i przychodzi z telefonem — a wtedy organizator
+                       i tak drukuje im go na miejscu, tyle ze dowiaduje sie o tym w kolejce,
+                       w dniu zawodow. Ten znacznik przenosi to pytanie na moment zapisu.
+
+                       Stoi pod zgodami, a nie w danych osobowych, bo to nie jest dana o czlowieku
+                       — to prosba do organizatora i czyta sie ja razem z „co jeszcze musze zrobic
+                       przed startem".
+
+                       Puste znaczy „drukuje sam". Tak dziala ta impreza od poczatku i tak mowi
+                       formularz, wiec brak zaznaczenia nie jest brakiem odpowiedzi i nie ma tu
+                       trzeciego stanu. -->
+                  <label class="checkbox"><input name="wantsPrint" type="checkbox"><span data-i18n="form.wantsPrint">Non ho una stampante: stampate voi il modulo per me.</span></label>
                 </div>
                 <p class="field__error" data-consent-error data-i18n="validation.consentGate">Devi accettare il regolamento per inviare l’iscrizione.</p>
                 <div class="form-nav"><button class="btn btn--outline" type="button" data-form-back><span aria-hidden="true">←</span><span data-i18n="form.back">Indietro</span></button><button class="btn" type="submit"><span data-i18n="form.submit">Invia iscrizione</span><span aria-hidden="true">✓</span></button></div>

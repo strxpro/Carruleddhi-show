@@ -4071,7 +4071,10 @@ import {
          Kanału nie nazywa przeglądarka: to robi serwer, jedną regułą dla wejść i zapisów. */
       refHost: firstTouch()?.ref || '',
       utmSource: firstTouch()?.utmSource || '',
-      utmCampaign: firstTouch()?.utmCampaign || ''
+      utmCampaign: firstTouch()?.utmCampaign || '',
+      /* Prosba o wydruk. Jedzie w KAZDYM zgloszeniu, takze niezaznaczona: `false` znaczy
+         „drukuje sam" i jest odpowiedzia tak samo jak `true`. */
+      wantsPrint: raw.wantsPrint === 'on'
     };
 
     if (!isMinor) return base;

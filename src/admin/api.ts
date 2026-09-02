@@ -129,6 +129,8 @@ export interface RosterRow {
   selfUpdatedAt: string | null;
   /** Riders sharing this e-mail address. More than one means a family entry. */
   emailGroupSize: number;
+  /** Zawodnik poprosil, zeby to organizator wydrukowal jego formularz. */
+  wantsPrint: boolean;
   isMinor: boolean;
   riderAge: number | null;
   guardian: RosterGuardian | null;

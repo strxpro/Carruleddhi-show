@@ -209,7 +209,10 @@ const FIELD_WHITELIST = {
        powstała: nie „ile osób weszło z Instagrama", tylko „ile z nich się zapisało".
        Klasyfikacji kanału NIE robi przeglądarka: przysyła surowy host i utm, a nazwę kanału
        liczy classifySource() — jedna reguła, ta sama co przy zliczaniu wejść. */
-    'refHost', 'utmSource', 'utmCampaign'
+    'refHost', 'utmSource', 'utmCampaign',
+    /* Prosba o wydruk formularza. Bez wpisania tutaj zostalaby odrzucona po cichu — biala
+       lista niczego nie zglasza, tylko nie przepuszcza. */
+    'wantsPrint'
   ],
   reminder: ['name', 'email', 'consent', 'reminderSchedule'],
   attendance: ['attendeeId'],
@@ -4633,7 +4636,8 @@ const ROSTER_COLUMNS = [
   'email', 'phone', 'address', 'cart_name', 'category', 'team_name', 'cart_notes', 'locale',
   'status', 'email_status', 'printed_at', 'self_updated_at',
   'is_minor', 'rider_age', 'child_kind', 'guardian_relation', 'guardian_name',
-  'guardian_email', 'guardian_phone', 'mother_name', 'father_name', 'guardian_consent'
+  'guardian_email', 'guardian_phone', 'mother_name', 'father_name', 'guardian_consent',
+  'wants_print'
 ].join(',');
 
 /** One row, in the shape the panel speaks. */
@@ -4664,6 +4668,9 @@ function rosterRow(row) {
        several children from one inbox — which since 0020 is allowed and normal. Absent when
        the row came from a PATCH rather than from the view, hence the fallback. */
     emailGroupSize: Number(row.email_group_size) || 1,
+    /* Prosba o wydruk. Brak kolumny (baza sprzed migracji 0038) czyta sie jako „drukuje sam" —
+       i to jest prawda o takim wierszu: nikt go nie pytal, wiec nikt mu nic nie obiecal. */
+    wantsPrint: Boolean(row.wants_print),
     isMinor: Boolean(row.is_minor),
     riderAge: row.rider_age,
     guardian: row.is_minor
@@ -6626,6 +6633,10 @@ async function storeIntake(env, request, type, payload) {
       : null,
     utm_campaign: trimmed(payload.utmCampaign)
   };
+
+  /* Prosba o wydruk stoi POZA blokiem opiekuna: dotyczy kazdego zgloszenia, doroslego
+     tak samo jak nieletniego. */
+  row.wants_print = Boolean(payload.wantsPrint);
 
   // Guardian block only on a minor entry. The handler has already stripped these
   // from an adult one; sending nulls keeps the row honest either way.

@@ -300,13 +300,23 @@ export function Registrations({
                     <div className="flex justify-end gap-1.5">
                       {/* Strzalka pierwsza, bo to jest czynnosc wykonywana najczesciej: przed
                           zawodami kazdy formularz trzeba wydrukowac. Edycja i usuwanie sa
-                          rzadsze i stoja dalej od palca. */}
+                          rzadsze i stoja dalej od palca.
+
+                          Podswietlona, gdy zawodnik poprosil o wydruk — wtedy ta strzalka nie
+                          jest juz mozliwoscia, tylko rzecza do zrobienia. */}
                       <button
                         type="button"
                         disabled={busyId !== null}
                         onClick={() => void downloadForms([row.id], row.id)}
-                        title={pl ? 'Pobierz wypełniony formularz' : 'Scarica il modulo compilato'}
-                        className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+                        title={row.wantsPrint
+                          ? (pl ? 'Prosi o wydruk — pobierz formularz' : 'Chiede la stampa — scarica il modulo')
+                          : (pl ? 'Pobierz wypełniony formularz' : 'Scarica il modulo compilato')}
+                        className={cn(
+                          'grid size-8 place-items-center rounded-md transition-colors disabled:opacity-40',
+                          row.wantsPrint
+                            ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                        )}
                       >
                         {busyId === row.id
                           ? <Loader2 className="size-4 animate-spin" strokeWidth={1.5} />
