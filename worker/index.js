@@ -2552,13 +2552,39 @@ async function inbox(env, payload, cors) {
     return Number.parseInt(range.split('/')[1], 10) || 0;
   }
 
-  const [registrations, contacts, reminders, newsletter, wall, chats] = await Promise.all([
+  /* SPONSORZY LICZĄ SIĘ INACZEJ NIŻ POZOSTAŁE SZEŚĆ — ZADANIE, A NIE POWIADOMIENIE.
+     ---------------------------------------------------------------------------
+     Tamtych sześć odpowiada na pytanie „co przyszło, odkąd tu ostatnio zaglądałeś”, więc
+     zeruje się samym otwarciem panelu. Zgłoszenie sponsora nie znika od popatrzenia: czeka
+     na TAK albo NIE i dopóki decyzji nie ma, jest robotą do zrobienia. Liczone jest więc
+     `status = pending`, BEZ `since` — firma, która pisała trzy tygodnie temu i nadal nie
+     dostała odpowiedzi, ma być na tej plakietce tak samo widoczna jak ta z dzisiaj.
+
+     Osobna funkcja zamiast parametru w `countSince`: tam `since` jest częścią zapytania i
+     dorobienie mu wyjątku zamieniłoby jedno czytelne zapytanie w dwa tryby.
+
+     Brak tabeli nie jest błędem. `countSince` też oddaje zero, gdy odczyt nie wyjdzie —
+     dzwonek ma pokazać mniej, a nie zawalić cały panel przez jedną liczbę. */
+  async function countPendingSponsors() {
+    const url = new URL(`${env.SUPABASE_URL}/rest/v1/sponsor_submissions`);
+    url.searchParams.set('select', 'id');
+    url.searchParams.set('status', 'eq.pending');
+    const response = await fetch(url, {
+      headers: supabaseHeaders(env, { Prefer: 'count=exact', Range: '0-0' })
+    });
+    if (!response.ok) return 0;
+    const range = response.headers.get('content-range') || '';
+    return Number.parseInt(range.split('/')[1], 10) || 0;
+  }
+
+  const [registrations, contacts, reminders, newsletter, wall, chats, sponsors] = await Promise.all([
     countSince('registrations'),
     countSince('contact_messages'),
     countSince('reminder_subscribers'),
     countSince('newsletter_subscribers'),
     countSince('wall_comments', 'created_at', ['approved', 'is.false']),
-    countSince('chat_threads', 'last_message_at', ['mode', 'eq.human'])
+    countSince('chat_threads', 'last_message_at', ['mode', 'eq.human']),
+    countPendingSponsors()
   ]);
 
   /* The bell had a number and nothing behind it: clicking it marked everything read and
@@ -2576,7 +2602,12 @@ async function inbox(env, payload, cors) {
   return json({
     ok: true,
     since,
-    counts: { registrations, contacts, reminders, newsletter, wall, chats },
+    counts: { registrations, contacts, reminders, newsletter, wall, chats, sponsors },
+    /* `sponsors` ŚWIADOMIE POZA `total`. Suma na dzwonku znaczy „nowe, odkąd ostatnio
+       czytałeś” i ma się wyzerować po przeczytaniu. Zgłoszenie czekające na decyzję nie
+       zeruje się od czytania, więc wliczone tutaj trzymałoby na dzwonku liczbę, której nie
+       da się zgasić inaczej niż decyzją — a wtedy przestałby znaczyć cokolwiek. Ta liczba
+       ma jedno miejsce: plakietkę przy „Ustawieniach”, gdzie stoi lista zgłoszeń. */
     total: registrations + contacts + reminders + newsletter + wall + chats,
     ...(items ? { items } : {}),
 
