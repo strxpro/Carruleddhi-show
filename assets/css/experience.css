@@ -2650,7 +2650,17 @@ html.no-js .preloader { display: none !important; }
    viewport, so the bottom of it was unreachable while pinned. */
 @media (max-width: 760px) {
   .stack-card__inner { grid-template-rows: auto minmax(0, 1fr); }
-  .stack-card__visual { min-height: 150px; max-height: calc(var(--screen-h, 100svh) * 0.34); }
+  /* SUFIT PODNIESIONY Z 0,34 NA 0,5 — TO ON ZOSTAWIAL SZPARE POD ZDJECIEM.
+     ---------------------------------------------------------------------------
+     Wiersz siatki jest `minmax(0, 1fr)`, wiec panel MOGL wypelnic reszte karty. Nie wypelnial,
+     bo zatrzymywal go ten sufit. Zmierzone na 390 na 844: karta 366 na 602, kolumna z tekstem
+     296 px, panel zdjecia 287 px — czyli 0,34 z 844 co do piksela — i pod spodem zostawalo
+     19 px tla karty przy „classic" i „safety", a 50 px przy „art", gdzie tekst jest krotszy.
+     Zglaszone jako „szpara na dole i na gorze".
+
+     Sufit zostaje, bo na niskim ekranie zdjecie nie ma prawa zjesc calej karty — podniesiony
+     tylko na tyle, zeby przestal wiazac tam, gdzie miejsce naprawde jest. */
+  .stack-card__visual { min-height: 150px; max-height: calc(var(--screen-h, 100svh) * 0.5); }
   .stack-card__visual svg { width: min(58%, 240px); }
   .stack-card__copy { padding: 46px 20px 20px; }
   .stack-card h3 { max-width: none; margin: 12px 0 8px; font-size: clamp(26px, 8vw, 34px); }

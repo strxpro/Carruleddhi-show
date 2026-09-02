@@ -10289,13 +10289,33 @@ import {
       }
     }
 
+    /**
+     * NA MYSZY ODBIERAMY FOKUSOWI PRAWO UCIECZKI. NA DOTYKU — NIE, I TO JEST CALA RZECZ.
+     * ===========================================================================
+     * Stalo tu `preventDefault()` na `mousedown` ORAZ na `touchstart`. Na myszy dziala to tak,
+     * jak mialo: przycisk nie zabiera kursora z pola, wiec klawiatura ekranowa nie znika,
+     * a uklad nie skacze.
+     *
+     * Na dotyku robi cos zupelnie innego. `preventDefault()` w `touchstart` kasuje calą
+     * sekwencje zdarzen myszy, KTORE PRZEGLADARKA Z NIEGO WYWODZI — razem z `click`. A skoro
+     * nie ma `click`, to przycisk `type="submit"` nie wysyla formularza i wiadomosc nie
+     * wychodzi WCALE. Zglaszone jako „nie moge nawet wyslac wiadomosci na czacie", i tylko
+     * z telefonu: na komputerze ta sama sciezka dziala, bo tam `mousedown` klikniecia nie
+     * unieważnia.
+     *
+     * Fokus na dotyku nie potrzebuje tej zapory, bo pilnuje go `keepFocus()` wolane na samym
+     * poczatku `send()` — oddaje kursor polu z `preventScroll: true`, wiec klawiatura zostaje
+     * otwarta i nic sie nie przesuwa. To jest ta sama obrona, tyle ze po fakcie zamiast przed,
+     * i nie kosztuje klikniecia.
+     *
+     * `pointerdown` zamiast `mousedown`, zeby jeden warunek rozstrzygal o obu urzadzeniach:
+     * `pointerType` mowi wprost, czy to mysz, czy palec.
+     */
     const preventFocusLoss = (event) => {
-      if (document.activeElement === input) {
-        event.preventDefault();
-      }
+      if (event.pointerType && event.pointerType !== 'mouse') return;
+      if (document.activeElement === input) event.preventDefault();
     };
-    sendButton?.addEventListener('mousedown', preventFocusLoss);
-    sendButton?.addEventListener('touchstart', preventFocusLoss, { passive: false });
+    sendButton?.addEventListener('pointerdown', preventFocusLoss);
 
     form?.addEventListener('submit', (event) => {
       event.preventDefault();
