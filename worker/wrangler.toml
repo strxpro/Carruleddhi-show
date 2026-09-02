@@ -1,3 +1,22 @@
+# TEN PLIK LEZY W worker/, A NIE W KORZENIU â€” I DLATEGO KAZDE WYWOLANIE WRANGLERA
+# MUSI GO WSKAZAC JAWNIE:
+#
+#   npx wrangler dev    -c worker/wrangler.toml
+#   npx wrangler deploy -c worker/wrangler.toml
+#
+# Skrypty `npm run preview` i `npm run deploy` maja juz to `-c` w sobie. Bez niego wrangler
+# szuka configu w korzeniu, nie znajduje zadnego i konczy sie "missing entry-point" â€” blad,
+# ktory brzmi jak zepsuty kod Workera, a jest zwyklym zlym katalogiem. Kosztowal juz dwa
+# podejscia do podgladu, wiec: `npm run preview:static` (samo vite preview na porcie 4173)
+# wystarcza do sond i do wygladu strony; `npm run preview` jest potrzebny tylko wtedy, gdy
+# testujesz sam Worker, czyli /api/carruleddhi/* i zegar przypomnien.
+#
+# Sciezki nizej (`main`, `[assets] directory`) sa liczone WZGLEDEM TEGO PLIKU, nie wzgledem
+# katalogu, z ktorego uruchamiasz polecenie. Dlatego `../dist` jest poprawne i nie wolno tego
+# "naprawiac" na `dist`.
+#
+# Sprawdzenie bez wysylania czegokolwiek na swiat:
+#   npm run deploy:dry
 name = "carruleddhi-intake"
 main = "index.js"
 compatibility_date = "2026-08-01"
