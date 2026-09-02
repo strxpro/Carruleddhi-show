@@ -10289,6 +10289,14 @@ import {
       }
     }
 
+    const preventFocusLoss = (event) => {
+      if (document.activeElement === input) {
+        event.preventDefault();
+      }
+    };
+    sendButton?.addEventListener('mousedown', preventFocusLoss);
+    sendButton?.addEventListener('touchstart', preventFocusLoss, { passive: false });
+
     form?.addEventListener('submit', (event) => {
       event.preventDefault();
       send(input?.value);

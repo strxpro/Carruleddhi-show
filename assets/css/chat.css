@@ -197,7 +197,7 @@
         pierwszego ułamka zmienia więc TYLKO przypadek zamkniętej klawiatury, gdzie miejsce
         naprawdę jest. Sprawdzone: przy widoku 349 px sufit wychodzi 121 px, bez zmian. */
   max-height: min(
-    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.62),
+    calc(100% - 240px),
     calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.76 - 110px)
   );
   padding: 4px 2px;
@@ -463,7 +463,7 @@
      121 px, a cały czat od góry dziennika do dołu kompozytora 275 px z 349 px widocznych. */
   .chat__log {
     max-height: min(
-      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.62),
+      calc(100% - 240px),
       calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.76 - 130px)
     );
   }
@@ -857,7 +857,7 @@
      czatu sam ma ograniczoną wysokość. */
   width: 100%;
   max-height: calc(var(--screen-h, 100svh) * 0.34);
-  object-fit: contain;
+  object-fit: cover;
 }
 /* Bąbelek ze zdjęciem jest szerszy od bąbelka z jednym zdaniem — inaczej zdjęcie zwężałoby się
    do szerokości tekstu, który je komentuje. */
@@ -1041,7 +1041,7 @@
   border: 2px solid rgb(7 26 61 / .12);
   border-radius: 12px;
   background: #fff;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 /* ===========================================================================
