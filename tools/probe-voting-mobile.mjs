@@ -1,5 +1,5 @@
 /**
- * NA TELEFONIE NIE DA SIĘ ZAGŁOSOWAĆ — CAŁA DROGA DO GŁOSU SAMYMI DOTKNIĘCIAMI.
+ * DROGA DO GŁOSU SAMYMI DOTKNIĘCIAMI — TERAZ DWA DOTKNIĘCIA DO RZĘDU OCEN.
  * ===========================================================================
  *
  *   TELEFON (dotyk prawdziwy — poniżej 700 px harness włącza emulację palca):
@@ -7,56 +7,49 @@
  *        --url "/votazione.html?lang=pl" --origin http://127.0.0.1:4173 \
  *        --inject tools/inject-voting-open.js --wait 3000
  *
- *   TABLET i MONITOR (żeby naprawa telefonu nie zepsuła myszy):
+ *   TABLET i MONITOR (żeby przepływ pod palcem nie zepsuł myszy):
  *   ...--w 768 --h 1024...        ...--w 1440 --h 900...
  *
  *   TA SAMA SONDA NA WBUDOWANYM DEMO (bez zaślepki):
  *   ...--url "/votazione.html?demo=1&lang=pl"...
  *
- * DLACZEGO `--url /votazione.html` SAMO NIE WYSTARCZA
- *   Faza głosowania i stawka uczestników przychodzą z Workera, a podglądowy serwer Workera nie
- *   ma. Bez `?demo=1` albo bez zaślepki `--inject` siatka jest PUSTA i sonda nie ma czego
- *   dotknąć — dlatego pierwszym warunkiem niżej jest „siatka ma kafelki", z jasnym komunikatem
- *   zamiast dwudziestu błędów kaskadowych. Zaślepka jest lepsza od `?demo=1`, bo `demo=1`
- *   ustawia `demoDriven` i wyłącza odpytywanie serwera oraz prawdziwą wysyłkę — czyli połowę
- *   drogi, którą tu mierzymy. Obie muszą być zielone.
+ * NOWY KONTRAKT: TRZY KROKI, DWA DOTKNIĘCIA DO OCEN
+ * ---------------------------------------------------------------------------
+ *   1. dotknięcie zdjęcia            → widoczna pigułka „Zagłosuj", rząd ocen JESZCZE ZAMKNIĘTY,
+ *   2. dotknięcie pigułki            → rząd ocen wyrastający Z TEJ pigułki,
+ *   3. potwierdzenie oceny           → okno z adresem (tylko gdy głosu jeszcze nie ma).
  *
- * ZASTĘPUJE tools/probe-voting-touch.js
- *   Tamta sonda powstała przy poprzednim podejściu do tej samej usterki i mierzyła tę samą drogę,
- *   tylko opisaną jako DWA dotknięcia: „dotknięcie odsłania Zagłosuj", potem „dotknięcie Zagłosuj
- *   rozwija oceny". Po naprawie ten stan pośredni nie istnieje pod palcem, więc tamten opis
- *   byłby po prostu nieprawdą. Dwie sondy mierzące tę samą drogę rozjeżdżają się przy pierwszej
- *   zmianie i wtedy nie wiadomo, która kłamie — została jedna. Wszystko, czego tamta pilnowała
- *   dodatkowo (połysk wczytywanego zdjęcia, paski przyklejone nad kafelkami, przeżycie
- *   przerysowania siatki, przeniesienie głosu), jest tutaj.
+ *   Do poprzedniego uruchomienia tej sondy kontrakt brzmiał odwrotnie: JEDNO dotknięcie miało
+ *   rozwijać oceny od razu. Zmienione na wyraźne życzenie właściciela — „chciałbym żeby pokazał
+ *   się tam napis ZAGŁOSUJ, i po kliknięciu wtedy z tego guzika rozsuwa się ten pop-out
+ *   z suwakiem". Sonda musi mierzyć to, co zamówione, a nie to, co było wygodniejsze do
+ *   napisania: dlatego warunek „JEDNO dotknięcie rozwija oceny" został zamieniony na parę
+ *   warunków „pierwsze dotknięcie NIE rozwija ocen, ale pokazuje pigułkę" i „drugie rozwija".
  *
- * DLACZEGO OSOBNA SONDA, SKORO SĄ JUŻ probe-voting-page.js I probe-vote-veil.js
- *   Obie tamte wołają `element.click()`. To jest wywołanie funkcji, nie dotknięcie: trafia w
- *   WSKAZANY element bez względu na to, czy palec w ogóle by w niego trafił, i bez względu na
- *   to, czy do jego odsłonięcia potrzeba było jednego dotknięcia czy trzech. Dokładnie dlatego
- *   obie były zielone w dniu, w którym przyszło zgłoszenie „klikam w zagłosuj i nic się nie
- *   robi".
+ * TO JEST CZĘŚCIOWY POWRÓT DO STANU, KTÓRY BYŁ ZEPSUTY — I DLATEGO TA SONDA MIERZY ODLEGŁOŚĆ
+ * ---------------------------------------------------------------------------
+ *   Ten przepływ istniał już kiedyś i wywołał zgłoszenie „klikam w zagłosuj i nic się nie robi,
+ *   nie da się zagłosować na telefonie". Trzy przyczyny, ZMIERZONE wtedy na 390×844:
  *
- *   Tu każde dotknięcie idzie przez `window.__tap(x, y)` — zaślepkę harnessu, która wysyła
- *   PRAWDZIWE zdarzenie dotknięcia przez protokół (patrz `__tapNative` w tools/cdp.mjs).
- *   Przeglądarka sama trafia w element leżący pod punktem, sama dokłada `pointerdown`,
- *   `pointerup` i `click` z `pointerType: 'touch'`, sama ustawia fokus i sama decyduje, że
- *   dotknięcie zjadła nakładka zamiast przycisku pod nią. Sonda nie wskazuje celu — podaje
- *   współrzędne, tak jak palec.
+ *     (a) pigułka wyrastała DOKŁADNIE POD KCIUKIEM — odległość jej środka od punktu dotknięcia
+ *         0 px, przy pigułce 159×44 w kadrze 173×173. Z ekranu wyglądało to na brak reakcji;
+ *     (b) tło odsłoniętej nakładki nie miało obsługi: 20 z 25 punktów zdjęcia zjadało dotknięcie
+ *         bez śladu, więc „dotknę jeszcze raz w to samo miejsce" nie robiło nic;
+ *     (c) połysk szkieletu wczytywanego zdjęcia (`.vote-card__photo.is-loading::after`)
+ *         przechwytywał dotknięcia, dopóki zdjęcie leciało z sieci.
  *
- * CZEGO PILNUJE NAJWAŻNIEJSZY WARUNEK
- *   JEDNO dotknięcie kafelka musi zrobić to, co JEDNO kliknięcie myszą: rozwinąć rząd ocen.
- *   ZMIERZONE przed naprawą, ta sama strona, ta sama sonda, dwie szerokości:
+ *   (b) i (c) są naprawione i MUSZĄ zostać naprawione — mają tu własne warunki. (a) jest tym,
+ *   co zostało usunięte razem z przywróceniem drugiego dotknięcia: pigułka staje po PRZECIWNEJ
+ *   stronie kadru niż palec, a ta sonda liczy tę odległość w pikselach i nie przepuszcza jej
+ *   poniżej jednego celu dotykowego (44 px).
  *
- *     1440×900 (wskaźnik z hoverem)  jedno dotknięcie → is-picking=true, suwak rozwinięty
- *     390×844  (hover: none)         jedno dotknięcie → is-picking=false, suwaka NIE MA
- *
- *   Na telefonie pierwsze dotknięcie zużywał przezroczysty `.vote-card__hit`, żeby odsłonić
- *   przycisk „Zagłosuj" — czyli żeby pokazać to, co mysz dostaje darmo, samym najechaniem.
- *   Z ekranu wygląda to jak „nacisnąłem i nic się nie stało": zdjęcie przygasa, a przycisk
- *   wyrasta DOKŁADNIE POD KCIUKIEM, który go zasłania. Do rzędu ocen trzeba było drugiego
- *   dotknięcia, a każde, które nie trafiło w pigułkę 159×44 w kadrze 173×173, zjadała nakładka
- *   i nie robiło NIC.
+ * DLACZEGO PRAWDZIWE DOTKNIĘCIA, A NIE `element.click()`
+ *   `.click()` to wywołanie funkcji: trafia w WSKAZANY element bez względu na to, czy palec by
+ *   w niego trafił, czy leży pod nim nakładka i czy element jest w ogóle widoczny. Dokładnie
+ *   dlatego sondy wołające `.click()` były zielone w dniu tamtego zgłoszenia. Tu każde
+ *   dotknięcie idzie przez `window.__tap(x, y)` — zaślepkę harnessu wysyłającą PRAWDZIWE
+ *   zdarzenie dotknięcia przez protokół (patrz `__tapNative` w tools/cdp.mjs). Sonda nie
+ *   wskazuje celu, podaje współrzędne, tak jak palec.
  */
 async (document, window) => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -84,8 +77,15 @@ async (document, window) => {
      siatki jest o jedno przerysowanie dalej. */
   for (let i = 0; i < 80 && !$('[data-vote-grid] .vote-card:not(.vote-card--skeleton)'); i += 1) await wait(150);
 
-  /* Przejścia i animacje wyłączone: mierzone jest POŁOŻENIE i TRAFIENIE, a element w połowie
-     drogi ma inne pudełko niż na końcu. Robione PO wejściu, żeby nie zmieniać rozruchu. */
+  /**
+   * ANIMACJE WYŁĄCZONE, ALE SPRAWDZONE OSOBNO Z ARKUSZA.
+   *
+   * Mierzone jest POŁOŻENIE i TRAFIENIE, a element w połowie animacji ma inne pudełko niż na
+   * końcu — bez tego rząd ocen mierzyłby się w skali 0.86. Cena jest ta, że `animationName`
+   * zwraca wtedy `none` wszędzie, więc wymóg „rząd ocen wyrasta z pigułki" jest sprawdzany
+   * DWOMA innymi sposobami: obecnością klatek `vote-morph` w arkuszu i geometrią (krawędź
+   * rzędu ocen musi stać tam, gdzie stała krawędź pigułki).
+   */
   const kill = document.createElement('style');
   kill.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}';
   document.head.appendChild(kill);
@@ -113,7 +113,12 @@ async (document, window) => {
     const box = el.getBoundingClientRect();
     return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
   };
+  const size = (el) => {
+    const box = el.getBoundingClientRect();
+    return `${Math.round(box.width)}x${Math.round(box.height)}`;
+  };
   const tap = async (x, y) => { if (typeof window.__tap === 'function') await window.__tap(x, y); };
+  const shownBox = (el) => Boolean(el) && !el.hidden && el.getBoundingClientRect().height > 1;
 
   /**
    * Dotknięcie w środek elementu, ze sprawdzeniem PRZED dotknięciem, kto w tym punkcie leży.
@@ -124,21 +129,24 @@ async (document, window) => {
    * wtedy, gdy w punkcie leży coś, co NIE jest częścią celu.
    *
    * Dotykamy TAK CZY INACZEJ, także gdy w punkcie leży co innego: to jest właśnie „dotknięcie
-   * w powietrze" i chcemy zobaczyć, co po nim zostaje na ekranie.
+   * w powietrze" i chcemy zobaczyć, co po nim zostaje na ekranie. Zwracany jest punkt, bo
+   * odległość pigułki od NIEGO jest tu jednym z najważniejszych pomiarów.
    */
   const tapOn = async (element, label) => {
-    if (!element) return ok(label, false, 'elementu nie ma w drzewie');
+    if (!element) { ok(label, false, 'elementu nie ma w drzewie'); return null; }
     const box = element.getBoundingClientRect();
     if (box.width < 1 || box.height < 1) {
-      return ok(label, false, `cel ma zerowe wymiary ${Math.round(box.width)}x${Math.round(box.height)}`);
+      ok(label, false, `cel ma zerowe wymiary ${Math.round(box.width)}x${Math.round(box.height)}`);
+      return null;
     }
     const point = at(element);
     const under = document.elementFromPoint(point.x, point.y);
     const reachable = Boolean(under) && element.contains(under);
     await tap(point.x, point.y);
-    return ok(label, reachable, reachable
+    ok(label, reachable, reachable
       ? `punkt ${point.x},${point.y}`
       : `w punkcie ${point.x},${point.y} leży ${describe(under)}`);
+    return reachable ? point : null;
   };
 
   /**
@@ -166,6 +174,55 @@ async (document, window) => {
     return ok(`cel ≥44 px: ${label}`, w >= 44 && h >= 44, `${w}x${h}`);
   };
 
+  /**
+   * SIATKA 5×5 PO ZDJĘCIU: KTO LEŻY W DWUDZIESTU PIĘCIU PUNKTACH KADRU.
+   *
+   * Jedno narzędzie, dwa pytania. W spoczynku: czy CAŁE zdjęcie przyjmuje pierwsze dotknięcie
+   * (czyli czy pod każdym punktem leży przezroczysty cel, a nie dekoracja — tu wychodził połysk
+   * szkieletu). Po odsłonięciu: czy tło nakładki nie jest martwą strefą (czyli czy każdy punkt
+   * należy do nakładki, która ma obsługę, a nie do czegoś, co dotknięcie zje bez śladu).
+   */
+  const grid5 = (node) => {
+    const box = $('.vote-card__photo', node).getBoundingClientRect();
+    const points = [];
+    for (let ix = 0; ix < 5; ix += 1) {
+      for (let iy = 0; iy < 5; iy += 1) {
+        const x = Math.round(box.left + box.width * (0.1 + ix * 0.2));
+        const y = Math.round(box.top + box.height * (0.1 + iy * 0.2));
+        if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) continue;
+        points.push({ x, y, el: document.elementFromPoint(x, y) });
+      }
+    }
+    return points;
+  };
+
+  /**
+   * Czy arkusz nadal umie „rozsunąć" rząd ocen z pigułki.
+   *
+   * Animacja `vote-morph` jest tym, co z dwóch pudełek robi jedno rozwijające się — i była
+   * wprost wymieniona w zamówieniu jako własność do utrzymania. Sonda wyłącza animacje, żeby
+   * mierzyć pudełka, więc pytanie idzie do arkusza, nie do `getComputedStyle`. Liczone są
+   * WZMIANKI: klatki (`@keyframes vote-morph`) i reguła, która je zakłada na `.vote-veil__pick`.
+   */
+  const morphMentions = () => {
+    let hits = 0;
+    /* Pytamy o `style.animation`, a NIE o `cssText`, i wchodzimy w zagnieżdżenia BEZ warunku
+       „to nie jest zwykła reguła". Od kiedy Chrome umie zagnieżdżanie CSS, `cssRules` istnieje
+       także na zwykłej regule (pusta lista), więc rozgałęzienie „ma cssRules → wejdź i wracaj"
+       przeskakiwało wszystkie reguły stylu i liczyło tylko same klatki. Sonda mówiła wtedy
+       „animacji nie ma" na arkuszu, w którym stała. */
+    const walk = (list) => Array.from(list || []).forEach((rule) => {
+      if (rule.name === 'vote-morph') hits += 1;
+      const animation = rule.style ? String(rule.style.animation || rule.style.animationName || '') : '';
+      if (/vote-morph/.test(animation)) hits += 1;
+      if (rule.cssRules && rule.cssRules.length) walk(rule.cssRules);
+    });
+    Array.from(document.styleSheets).forEach((sheet) => {
+      try { walk(sheet.cssRules); } catch (_) { /* arkusz z innego źródła */ }
+    });
+    return hits;
+  };
+
   /* ------------------------------------------------------------------- stan wyjściowy */
 
   const cards = () => $$('[data-vote-grid] .vote-card:not(.vote-card--skeleton)');
@@ -179,19 +236,12 @@ async (document, window) => {
    *
    * Nagłówek jest `position: fixed` i zostaje na górze ekranu przy każdym przewinięciu. Kafelek,
    * który wjedzie pod niego, wygląda normalnie, a dotknięcia nie przyjmuje. Raport, nie warunek:
-   * dolna krawędź tego, co przykrywa górę ekranu, plus to, co leży w środku zdjęć pierwszych
-   * kafelków. Pozwala odróżnić „przycisk nie działa" od „przycisk jest pod paskiem".
+   * pozwala odróżnić „przycisk nie działa" od „przycisk jest pod paskiem".
    *
-   * SELEKTOR Z KLASĄ, NIE SAM ATRYBUT — I TO JEST POPRAWKA, NIE UPIĘKSZENIE.
-   *   Od przeniesienia zegara w treść strony `[data-vote-timer]` niosą DWA elementy: pudełko w
-   *   treści i jego kopia zadokowana w pasku. Kopia stoi wcześniej w dokumencie, więc samo
-   *   `querySelector('[data-vote-timer]')` mierzyło od tej zmiany wnętrze nagłówka — czyli
-   *   liczbę, którą `headerBottom` i tak już podaje. Pomiar nadal wychodził poprawnie i to jest
-   *   najgorszy rodzaj takiej pomyłki: sonda była zielona, mierząc coś innego, niż mówi.
-   *
-   *   Zegar w treści nie jest już `sticky`, więc nie zasłania niczego na stałe — zostaje w
-   *   pomiarze dlatego, że stoi nad pierwszym rzędem kafelków i wchodzi w rachunek tego, co
-   *   widać po wejściu na stronę.
+   * SELEKTOR Z KLASĄ, NIE SAM ATRYBUT: `[data-vote-timer]` niosą DWA elementy — pudełko w treści
+   * i jego kopia zadokowana w pasku, która stoi wcześniej w dokumencie. Samo
+   * `querySelector('[data-vote-timer]')` mierzyło więc wnętrze nagłówka, czyli liczbę, którą
+   * `headerBottom` i tak podaje.
    */
   const bar = $('.vote-timer[data-vote-timer]');
   const header = $('.site-header');
@@ -199,14 +249,9 @@ async (document, window) => {
     headerBottom: header ? Math.round(header.getBoundingClientRect().bottom) : null,
     timerBottom: bar && !bar.hidden ? Math.round(bar.getBoundingClientRect().bottom) : null
   };
-  /* TYLKO NAGŁÓWEK, BO TYLKO ON ZOSTAJE NA EKRANIE.
-     Do tej pory brany był największy z dwóch: nagłówka i zegara — i miało to sens, dopóki zegar
-     był `position: sticky` i jechał pod paskiem przy każdym przewinięciu. Nie jest już: stoi w
-     treści, więc odjeżdża razem z nią i po pierwszym przewinięciu nie zasłania niczego.
-     Zostawienie go w tej sumie dawałoby „góra ekranu zakryta do 461 px" na stronie, gdzie
-     zakryte jest 96 px — czyli liczbę, na którą ktoś kiedyś oprze diagnozę „przycisk jest pod
-     paskiem". `timerBottom` zostaje w raporcie osobno, bo mówi, ile treści stoi nad pierwszym
-     kafelkiem po wejściu na stronę, i to jest inne, nadal przydatne pytanie. */
+  /* TYLKO NAGŁÓWEK, BO TYLKO ON ZOSTAJE NA EKRANIE. Zegar nie jest już `sticky` — stoi w treści,
+     więc odjeżdża razem z nią. `timerBottom` zostaje w raporcie osobno, bo mówi, ile treści stoi
+     nad pierwszym kafelkiem po wejściu na stronę, i to jest inne, nadal przydatne pytanie. */
   out.chrome.coveredTo = out.chrome.headerBottom || 0;
   out.coverage = cards().slice(0, 4).map((node) => {
     const box = node.getBoundingClientRect();
@@ -215,9 +260,9 @@ async (document, window) => {
   });
 
   const card = cards()[0];
-  /* Kafelek na środek okna: nagłówek jest `fixed`, a zegar `sticky`, więc kafelek stojący pod
-     nimi jest zasłonięty niezależnie od tego, czy przyciski działają. Stawiamy go tam, gdzie
-     postawiłby go człowiek, który na niego patrzy. */
+  /* Kafelek na środek okna: nagłówek jest `fixed`, więc kafelek stojący pod nim jest zasłonięty
+     niezależnie od tego, czy przyciski działają. Stawiamy go tam, gdzie postawiłby go człowiek,
+     który na niego patrzy. */
   card.scrollIntoView({ block: 'center', inline: 'nearest' });
   await wait(280);
 
@@ -226,22 +271,33 @@ async (document, window) => {
   const veil = $('.vote-veil', card);
   out.rest = {
     hasHit: Boolean(hit),
-    /* Przezroczysty przycisk NIESIE NAZWĘ „Zagłosuj…". Stąd bierze się cała ta sonda: element,
-       który ogłasza się czytnikowi ekranu jako „Zagłosuj na uczestnika — Tuono", musi po
-       naciśnięciu zrobić to, co robi „Zagłosuj", a nie tylko pokazać drugi przycisk o tej
-       samej nazwie. */
+    /* Przezroczysty przycisk NIESIE NAZWĘ „Zagłosuj…" — ten sam zamiar co pigułka, tylko krok
+       wcześniej. Dlatego jego naciśnięcie musi przenieść fokus NA pigułkę: inaczej czytnik
+       ekranu ogłasza czynność i zostawia człowieka bez śladu, gdzie ona teraz jest. */
     hitLabel: hit?.getAttribute('aria-label') || '',
+    photoBox: photo ? size(photo) : '',
     veilOpacity: veil ? Number(getComputedStyle(veil).opacity) : null,
     veilEvents: veil ? getComputedStyle(veil).pointerEvents : null,
+    veilPill: veil ? (veil.dataset.pill || '') : null,
     atPhotoCentre: photo ? describe(document.elementFromPoint(at(photo).x, at(photo).y)) : ''
   };
+  out.measures['kadr zdjęcia'] = out.rest.photoBox;
   ok('kafelek jest czysty: nakładka niewidoczna i nie łapie wskaźnika',
     out.rest.veilOpacity === 0 && out.rest.veilEvents === 'none',
     `krycie ${out.rest.veilOpacity}, wskaźnik ${out.rest.veilEvents}`);
+  ok('w spoczynku pigułka nie ma jeszcze przypisanej strony kadru', out.rest.veilPill === '',
+    `data-pill="${out.rest.veilPill}"`);
   ok('w środku zdjęcia leży cel dotknięcia, a nie dekoracja',
     Boolean(hit) && hit.contains(document.elementFromPoint(at(photo).x, at(photo).y)),
     out.rest.atPhotoCentre);
   target44(hit, 'cel dotknięcia zdjęcia');
+
+  /* CAŁE zdjęcie przyjmuje pierwsze dotknięcie, nie tylko jego środek. */
+  const restGrid = grid5(card);
+  out.rest.gridDead = restGrid.filter((p) => !hit || !hit.contains(p.el)).map((p) => `${p.x},${p.y}: ${describe(p.el)}`);
+  ok('spoczynek: wszystkie 25 punktów zdjęcia przyjmuje dotknięcie',
+    out.rest.gridDead.length === 0,
+    `${restGrid.length - out.rest.gridDead.length}/${restGrid.length} punktów na celu${out.rest.gridDead.length ? `, martwe: ${out.rest.gridDead.join(' | ')}` : ''}`);
 
   /**
    * KAFELEK MUSI PRZYJMOWAĆ DOTKNIĘCIA TAKŻE WTEDY, GDY ZDJĘCIE JESZCZE LECI.
@@ -254,176 +310,272 @@ async (document, window) => {
    *
    * ZMIERZONE, gdy połysk nie miał jeszcze `pointer-events: none`: `elementFromPoint` w środku
    * takiego kafelka zwracał `figure.vote-card__photo` i pierwsze dotknięcie nie robiło NIC.
+   * To jest jedna z dwóch przyczyn tamtego zgłoszenia, która MA zostać naprawiona.
    */
   photo.classList.add('is-loading');
   await wait(90);
+  const loadingGrid = grid5(card);
   out.loading = {
     atPhotoCentre: describe(document.elementFromPoint(at(photo).x, at(photo).y)),
     shimmerEvents: getComputedStyle(photo, '::after').pointerEvents,
-    hitZ: getComputedStyle(hit).zIndex
+    hitZ: getComputedStyle(hit).zIndex,
+    gridDead: loadingGrid.filter((p) => !hit.contains(p.el)).map((p) => `${p.x},${p.y}: ${describe(p.el)}`)
   };
-  ok('szkielet wczytywanego zdjęcia nie zjada dotknięcia',
-    Boolean(hit) && hit.contains(document.elementFromPoint(at(photo).x, at(photo).y)),
-    out.loading.atPhotoCentre);
+  ok('szkielet wczytywanego zdjęcia nie zjada dotknięcia (25 punktów)',
+    out.loading.gridDead.length === 0,
+    `${out.loading.atPhotoCentre}, połysk wskaźnik=${out.loading.shimmerEvents}, hit z-index=${out.loading.hitZ}`);
   photo.classList.remove('is-loading');
   await wait(60);
 
-  /* ============================================ KROK 1: JEDNO DOTKNIĘCIE = RZĄD OCEN */
+  /* ======================= KROK 1: DOTKNIĘCIE ZDJĘCIA ODSŁANIA PIGUŁKĘ, I TO WIDOCZNĄ */
   /**
-   * TU MIESZKA NAPRAWIANA USTERKA.
+   * TU MIESZKA PRZYWRACANY KROK — I TU MIESZKAŁA USTERKA.
    *
-   * Jedno dotknięcie zdjęcia ma rozwinąć rząd ocen 3–10 z przyciskiem potwierdzenia, czyli
-   * dokładnie to, co na myszy robi jedno kliknięcie w „Zagłosuj". Przed naprawą pierwsze
-   * dotknięcie zużywała warstwa odsłaniająca przycisk i sonda widziała `is-picking=false`
-   * z pustym miejscem tam, gdzie ma stać suwak.
+   * Pierwsze dotknięcie ma pokazać pigułkę „Zagłosuj" i NIE rozwijać jeszcze ocen. Warunek
+   * „pigułka jest widoczna" nie wystarcza: poprzednio też była widoczna dla drzewa, tylko stała
+   * pod kciukiem. Dlatego pytamy o trzy rzeczy naraz: czy ma pudełko, czy w jej środku leży
+   * ona sama, i JAK DALEKO jej środek jest od punktu, w który uderzył palec.
    */
-  await tapOn(hit, 'krok 1: dotknięcie zdjęcia trafia w cel');
+  const tap1 = await tapOn(hit, 'krok 1: dotknięcie zdjęcia trafia w cel');
   await wait(300);
 
-  const picker = $('.vote-veil__pick', card);
-  const slider = $('.vote-slider', card);
-  const send = $('.vote-veil__send', card);
-  const cancel = $('.vote-veil__cancel', card);
   const cta = $('.vote-veil__cta', card);
-  out.oneTap = {
+  const pickerAfter1 = $('.vote-veil__pick', card);
+  const ctaBox = cta ? cta.getBoundingClientRect() : null;
+  const photoBox1 = photo.getBoundingClientRect();
+  const ctaCentre = cta ? at(cta) : null;
+  const gap = tap1 && ctaCentre
+    ? {
+      dx: Math.abs(ctaCentre.x - tap1.x),
+      dy: Math.abs(ctaCentre.y - tap1.y),
+      dist: Math.round(Math.hypot(ctaCentre.x - tap1.x, ctaCentre.y - tap1.y))
+    }
+    : null;
+
+  out.step1 = {
     cardArmed: card.classList.contains('is-armed'),
     cardPicking: card.classList.contains('is-picking'),
     hitHidden: hit ? hit.hidden : null,
     veilOpacity: Number(getComputedStyle(veil).opacity),
     veilEvents: getComputedStyle(veil).pointerEvents,
-    pickerShown: Boolean(picker) && !picker.hidden && picker.getBoundingClientRect().height > 1,
+    veilPill: veil.dataset.pill || '',
+    ctaShown: shownBox(cta),
+    ctaLabel: cta?.textContent.trim() || '',
+    ctaBox: cta ? size(cta) : '',
+    ctaVisibility: cta ? getComputedStyle(cta).visibility : '',
+    ctaInsidePhoto: ctaBox
+      ? ctaBox.top >= photoBox1.top - 1 && ctaBox.bottom <= photoBox1.bottom + 1
+      : false,
+    atCtaCentre: ctaCentre ? describe(document.elementFromPoint(ctaCentre.x, ctaCentre.y)) : '',
+    atTapPoint: tap1 ? describe(document.elementFromPoint(tap1.x, tap1.y)) : '',
+    pickerShown: shownBox(pickerAfter1),
+    activeElement: describe(document.activeElement),
+    gap
+  };
+  if (gap) {
+    out.measures['pigułka: odległość środka od punktu dotknięcia'] =
+      `${gap.dist} px (dx ${gap.dx}, dy ${gap.dy})`;
+  }
+
+  ok('krok 1: nakładka odsłonięta i łapie dotknięcie',
+    out.step1.cardArmed && out.step1.veilOpacity === 1 && out.step1.veilEvents === 'auto',
+    `is-armed=${out.step1.cardArmed}, krycie ${out.step1.veilOpacity}, wskaźnik ${out.step1.veilEvents}`);
+  ok('krok 1: przezroczysta warstwa zeszła z drogi', out.step1.hitHidden === true,
+    `hidden=${out.step1.hitHidden}`);
+  ok('KROK 1: pigułka „Zagłosuj" jest NAPRAWDĘ widoczna i ma pudełko',
+    out.step1.ctaShown && out.step1.ctaVisibility === 'visible' && Boolean(out.step1.ctaLabel),
+    `„${out.step1.ctaLabel}" ${out.step1.ctaBox}, widoczność ${out.step1.ctaVisibility}`);
+  ok('krok 1: pigułka stoi NA zdjęciu, nie pod kadrem', out.step1.ctaInsidePhoto === true);
+  ok('krok 1: w środku pigułki leży pigułka', Boolean(cta)
+    && cta.contains(document.elementFromPoint(ctaCentre.x, ctaCentre.y)), out.step1.atCtaCentre);
+  target44(cta, 'pigułka „Zagłosuj"');
+  /* NAJWAŻNIEJSZY POMIAR TEJ SONDY.
+     Pigułka postawiona w punkcie dotknięcia jest zasłonięta kciukiem i cały przepływ dwóch
+     dotknięć wygląda wtedy jak „nacisnąłem i nic się nie stało". Poprzednio: 0 px. Próg 44 px,
+     czyli jeden pełny cel dotykowy — tyle mniej więcej zakrywa opuszka. */
+  ok('KROK 1: pigułka NIE STOI POD PALCEM — środek dalej niż 44 px od dotknięcia',
+    Boolean(gap) && gap.dist >= 44, gap ? `${gap.dist} px (dx ${gap.dx}, dy ${gap.dy})` : 'brak pomiaru');
+  ok('krok 1: w punkcie dotknięcia nie leży pigułka',
+    Boolean(tap1) && Boolean(cta) && !cta.contains(document.elementFromPoint(tap1.x, tap1.y)),
+    out.step1.atTapPoint);
+  ok('krok 1: strona kadru wybrana z dotknięcia', ['top', 'bottom'].includes(out.step1.veilPill),
+    `data-pill="${out.step1.veilPill}"`);
+  ok('KROK 1: rząd ocen JESZCZE zamknięty — o to prosił właściciel',
+    out.step1.pickerShown === false && out.step1.cardPicking === false,
+    `is-picking=${out.step1.cardPicking}, suwak w kadrze=${out.step1.pickerShown}`);
+  ok('krok 1: fokus przeszedł na pigułkę (klawiatura i czytnik ekranu idą dalej)',
+    document.activeElement === cta, out.step1.activeElement);
+
+  /**
+   * TŁO ODSŁONIĘTEJ NAKŁADKI NIE MOŻE BYĆ MARTWĄ STREFĄ — SIATKA 5×5 PO ZDJĘCIU.
+   *
+   * Nakładka kryje CAŁE zdjęcie i przy odsłonięciu łapie wskaźnik, więc każdy punkt, w którym
+   * nie leży kontrolka, jest miejscem, gdzie dotknięcie może przepaść. ZMIERZONE przed naprawą
+   * na 390×844: 20 z 25 punktów zwracało `div.vote-veil` i nie robiło NIC.
+   *
+   * Warunek jest o PRZYNALEŻNOŚĆ, nie o listę selektorów: każdy punkt musi należeć do nakładki,
+   * bo nakładka — razem ze swoim tłem — ma obsługę w `voteOverlay()`. Punkt zwracający cokolwiek
+   * spoza niej (figurę, obrazek, podpis) to dotknięcie, które przepada.
+   */
+  const armedGrid = grid5(card);
+  const outsideVeil = armedGrid.filter((p) => !veil.contains(p.el));
+  const bareBackdrop = armedGrid.filter((p) => p.el === veil);
+  out.deadZone = {
+    points: armedGrid.length,
+    onVeil: armedGrid.length - outsideVeil.length,
+    bareBackdrop: bareBackdrop.length,
+    outside: outsideVeil.map((p) => `${p.x},${p.y}: ${describe(p.el)}`),
+    map: armedGrid.map((p) => `${p.x},${p.y}: ${describe(p.el)}`)
+  };
+  out.measures['siatka 5x5 po odsłonięciu: punkty na nakładce'] =
+    `${out.deadZone.onVeil}/${out.deadZone.points} (gołe tło: ${out.deadZone.bareBackdrop})`;
+  ok('krok 1: żaden z 25 punktów zdjęcia nie jest martwy',
+    outsideVeil.length === 0,
+    `${out.deadZone.onVeil}/${out.deadZone.points} na nakładce${outsideVeil.length ? `, poza: ${out.deadZone.outside.join(' | ')}` : ''}`);
+
+  /* ======================= KROK 2: DOTKNIĘCIE PIGUŁKI ROZWIJA RZĄD OCEN Z JEJ MIEJSCA */
+  const pillBox = cta.getBoundingClientRect();
+  const pillSide = out.step1.veilPill;
+  await tapOn(cta, 'krok 2: dotknięcie pigułki trafia w pigułkę');
+  await wait(320);
+
+  const picker = $('.vote-veil__pick', card);
+  const slider = $('.vote-slider', card);
+  const send = $('.vote-veil__send', card);
+  const cancel = $('.vote-veil__cancel', card);
+  const pickBox = picker ? picker.getBoundingClientRect() : null;
+  const cardBox = card.getBoundingClientRect();
+  const photoBox2 = photo.getBoundingClientRect();
+
+  /* „Wyrasta Z TEJ pigułki" zmierzone geometrycznie: krawędź, przy której stała pigułka, musi
+     być krawędzią rzędu ocen. Przy pigułce u góry porównujemy górne krawędzie, przy dolnej —
+     dolne, a przy myszy (pigułka na środku) środki. Dwa piksele luzu na zaokrąglenia układu. */
+  const morphAnchor = pickBox
+    ? (pillSide === 'top' ? Math.abs(pickBox.top - pillBox.top)
+      : pillSide === 'bottom' ? Math.abs(pickBox.bottom - pillBox.bottom)
+        : Math.abs((pickBox.top + pickBox.height / 2) - (pillBox.top + pillBox.height / 2)))
+    : null;
+
+  out.step2 = {
+    cardPicking: card.classList.contains('is-picking'),
+    pickerShown: shownBox(picker),
+    ctaGone: cta ? getComputedStyle(cta).display === 'none' : null,
+    veilPill: veil.dataset.pill || '',
     sliderRange: slider ? `${slider.min}-${slider.max}` : '',
     sendLabel: send?.textContent.trim() || '',
-    ctaLabel: cta?.textContent.trim() || '',
+    pillBox: `${Math.round(pillBox.width)}x${Math.round(pillBox.height)} @${Math.round(pillBox.top)}`,
+    pickBox: pickBox ? `${Math.round(pickBox.width)}x${Math.round(pickBox.height)} @${Math.round(pickBox.top)}` : '',
+    morphAnchor,
+    morphMentions: morphMentions(),
     atSliderCentre: slider ? describe(document.elementFromPoint(at(slider).x, at(slider).y)) : '',
     atSendCentre: send ? describe(document.elementFromPoint(at(send).x, at(send).y)) : '',
+    atCancelCentre: cancel ? describe(document.elementFromPoint(at(cancel).x, at(cancel).y)) : '',
     activeElement: describe(document.activeElement)
   };
-  ok('krok 1: nakładka odsłonięta i łapie dotknięcie',
-    out.oneTap.cardArmed && out.oneTap.veilOpacity === 1 && out.oneTap.veilEvents === 'auto',
-    `is-armed=${out.oneTap.cardArmed}, krycie ${out.oneTap.veilOpacity}, wskaźnik ${out.oneTap.veilEvents}`);
-  ok('krok 1: przezroczysta warstwa zeszła z drogi', out.oneTap.hitHidden === true,
-    `hidden=${out.oneTap.hitHidden}`);
-  ok('KROK 1: JEDNO dotknięcie rozwija rząd ocen — bez drugiego dotknięcia',
-    out.oneTap.pickerShown,
-    `is-picking=${out.oneTap.cardPicking}, suwak w kadrze=${out.oneTap.pickerShown}`);
-  ok('krok 1: zakres ocen przychodzi z serwera', out.oneTap.sliderRange === '3-10', out.oneTap.sliderRange);
-  ok('krok 1: potwierdzenie ma napis', Boolean(out.oneTap.sendLabel), out.oneTap.sendLabel);
-  ok('krok 1: w środku suwaka leży suwak', Boolean(slider)
-    && slider.contains(document.elementFromPoint(at(slider).x, at(slider).y)), out.oneTap.atSliderCentre);
-  ok('krok 1: w środku potwierdzenia leży potwierdzenie', Boolean(send)
-    && send.contains(document.elementFromPoint(at(send).x, at(send).y)), out.oneTap.atSendCentre);
+  out.measures['pigułka → rząd ocen: przesunięcie krawędzi'] = `${morphAnchor} px (strona ${pillSide || 'środek'})`;
+
+  ok('KROK 2: dotknięcie pigułki rozwija rząd ocen', out.step2.pickerShown && out.step2.cardPicking,
+    `is-picking=${out.step2.cardPicking}`);
+  ok('krok 2: pigułka ustępuje miejsca rzędowi ocen', out.step2.ctaGone === true);
+  ok('krok 2: rząd ocen wyrasta Z MIEJSCA pigułki, a nie skądś indziej',
+    morphAnchor !== null && morphAnchor <= 2,
+    `pigułka ${out.step2.pillBox} → oceny ${out.step2.pickBox}, przesunięcie ${morphAnchor} px`);
+  ok('krok 2: animacja `vote-morph` nadal jest w arkuszu', out.step2.morphMentions >= 2,
+    `wzmianek: ${out.step2.morphMentions}`);
+  ok('krok 2: zakres ocen przychodzi z serwera', out.step2.sliderRange === '3-10', out.step2.sliderRange);
+  ok('krok 2: potwierdzenie ma napis', Boolean(out.step2.sendLabel), out.step2.sendLabel);
+  ok('krok 2: w środku suwaka leży suwak', Boolean(slider)
+    && slider.contains(document.elementFromPoint(at(slider).x, at(slider).y)), out.step2.atSliderCentre);
+  ok('krok 2: w środku potwierdzenia leży potwierdzenie', Boolean(send)
+    && send.contains(document.elementFromPoint(at(send).x, at(send).y)), out.step2.atSendCentre);
+  ok('krok 2: w środku wyjścia leży wyjście', Boolean(cancel)
+    && cancel.contains(document.elementFromPoint(at(cancel).x, at(cancel).y)), out.step2.atCancelCentre);
   target44(slider, 'suwak oceny');
   target44(send, 'przycisk potwierdzenia');
   target44(cancel, 'wyjście z wybierania');
 
   /* Rząd ocen musi zmieścić się W KADRZE zdjęcia: `overflow: hidden` potrafi schować wysyłkę i
-     wyjście pod dolną krawędź, a wtedy nie da się ani oddać głosu, ani się wycofać. */
-  const cardBox = card.getBoundingClientRect();
-  out.oneTap.insideCard = [slider, send, cancel].filter(Boolean).every((el) => {
+     wyjście pod dolną krawędź, a wtedy nie da się ani oddać głosu, ani się wycofać. Mierzone
+     względem kadru ZDJĘCIA, bo to jego obcinanie było usterką, i względem kafelka. */
+  const fits = (el, ref) => {
     const box = el.getBoundingClientRect();
-    return box.top >= cardBox.top - 1 && box.bottom <= cardBox.bottom + 1;
-  });
-  ok('krok 1: suwak, potwierdzenie i wyjście mieszczą się w kafelku', out.oneTap.insideCard);
+    return box.top >= ref.top - 1 && box.bottom <= ref.bottom + 1;
+  };
+  out.step2.insidePhoto = [slider, send, cancel].filter(Boolean).every((el) => fits(el, photoBox2));
+  out.step2.insideCard = [slider, send, cancel].filter(Boolean).every((el) => fits(el, cardBox));
+  ok('krok 2: suwak, potwierdzenie i wyjście mieszczą się w kadrze zdjęcia', out.step2.insidePhoto);
+  ok('krok 2: … i w kafelku', out.step2.insideCard);
 
+  /* ============================== WYJŚCIE ODDAJE ZDJĘCIE PALCOWI, A TŁO PROWADZI DALEJ */
   /**
-   * PRZYGASZONE TŁO NAKŁADKI NIE MOŻE BYĆ MARTWĄ STREFĄ — SPRAWDZANE DOTKNIĘCIEM.
-   *
-   * Nakładka kryje CAŁE zdjęcie i przy odsłonięciu łapie wskaźnik, więc każdy punkt, w którym
-   * nie leży żadna kontrolka, jest miejscem, gdzie dotknięcie może przepaść bez śladu. Kafelek
-   * wygląda przy tym jak jeden wielki przycisk, więc palec ląduje tam często.
-   *
-   * ZMIERZONE przed naprawą na 390×844: 20 z 25 punktów zdjęcia zwracało `div.vote-veil` i nie
-   * robiło NIC — jedynym czynnym celem była pigułka 159×44 w kadrze 173×173.
-   *
-   * Pytanie nie brzmi „czy pod punktem leży element z listy", bo lista selektorów rozjedzie się
-   * przy pierwszej zmianie znacznika i sonda zacznie kłamać w obie strony. Pytanie brzmi: czy po
-   * dotknięciu tego punktu STAN SIĘ ZMIENIŁ. Dlatego tło jest tu naprawdę dotykane, a potem
-   * kafelek otwierany z powrotem jednym dotknięciem — co przy okazji sprawdza, że droga jest
-   * przejezdna także po pomyłce.
+   * Mierzone TU, a nie na końcu sondy: po oddaniu i zmianie głosu kafelki nie mają już nakładki
+   * (jedna zmiana na głos), więc na końcu nie byłoby czego zamykać — i warunek przechodziłby na
+   * pustym zbiorze.
    */
-  const photoBox = photo.getBoundingClientRect();
-  let backdrop = null;
-  const sampled = [];
-  for (let ix = 0; ix < 5 && !backdrop; ix += 1) {
-    for (let iy = 0; iy < 5 && !backdrop; iy += 1) {
-      const x = Math.round(photoBox.left + photoBox.width * (0.1 + ix * 0.2));
-      const y = Math.round(photoBox.top + photoBox.height * (0.1 + iy * 0.2));
-      if (y < 0 || y > window.innerHeight || x < 0 || x > window.innerWidth) continue;
-      const under = document.elementFromPoint(x, y);
-      sampled.push(`${x},${y}: ${describe(under)}`);
-      if (under === veil) backdrop = { x, y };
-    }
-  }
-  out.deadZone = { backdrop, sampledPoints: sampled.length };
-  if (backdrop) {
-    await tap(backdrop.x, backdrop.y);
-    await wait(320);
-    out.deadZone.collapsed = !card.classList.contains('is-armed') && !card.classList.contains('is-picking');
-    ok('krok 1: dotknięcie przygaszonego tła NIE przepada — kafelek reaguje',
-      out.deadZone.collapsed === true, `punkt ${backdrop.x},${backdrop.y}`);
-    /* Z powrotem do rzędu ocen jednym dotknięciem — tak jak po pomyłce robi to człowiek. */
-    const hitBack = $('.vote-card__hit', card);
-    out.deadZone.hitBack = Boolean(hitBack) && !hitBack.hidden;
-    ok('krok 1: po złożeniu zdjęcie znowu przyjmuje dotknięcie', out.deadZone.hitBack === true);
-    await tapOn(entry(card), 'krok 1: powrót do rzędu ocen jednym dotknięciem');
-    await wait(320);
-    ok('krok 1: rząd ocen wrócił po jednym dotknięciu',
-      Boolean($('.vote-veil__pick', card)) && !$('.vote-veil__pick', card).hidden);
-  } else {
-    /* Na telefonie rząd ocen zajmuje cały kadr (patrz blok `max-width: 700px` w voting.css),
-       więc gołego tła nie ma ani w jednym z dwudziestu pięciu punktów — i to też jest wynik. */
-    ok('krok 1: nakładka nie ma gołego tła — rząd ocen wypełnia kadr', true,
-      `${sampled.length} punktów, wszystkie na kontrolkach`);
-  }
-
-  /**
-   * WYJŚCIE Z WYBIERANIA MUSI ODDAĆ ZDJĘCIE PALCOWI.
-   *
-   * Bez tego pomyłka jest pułapką: rząd ocen zostaje otwarty, przezroczysta warstwa nie wraca i
-   * kafelek przestaje przyjmować cokolwiek poza przyciskami w środku nakładki. Mierzone TU, a nie
-   * na końcu sondy: po oddaniu i zmianie głosu kafelki nie mają już nakładki (jedna zmiana na
-   * głos), więc na końcu nie byłoby czego zamykać — i warunek przechodziłby na pustym zbiorze.
-   */
-  await tapOn($('.vote-veil__cancel', card), 'wyjście: dotknięcie „zamknij" trafia w przycisk');
+  await tapOn(cancel, 'wyjście: dotknięcie „zamknij" trafia w przycisk');
   await wait(320);
   const hitAfterCancel = $('.vote-card__hit', card);
   out.cancel = {
     armed: card.classList.contains('is-armed'),
     picking: card.classList.contains('is-picking'),
     hitBack: Boolean(hitAfterCancel) && !hitAfterCancel.hidden,
+    veilPill: veil.dataset.pill || '',
     atPhotoCentre: describe(document.elementFromPoint(at(photo).x, at(photo).y))
   };
   ok('wyjście: kafelek złożony', out.cancel.armed === false && out.cancel.picking === false,
     `is-armed=${out.cancel.armed}, is-picking=${out.cancel.picking}`);
   ok('wyjście: zdjęcie znowu przyjmuje dotknięcie', out.cancel.hitBack === true, out.cancel.atPhotoCentre);
-  await tapOn(entry(card), 'wyjście: po „zamknij" jedno dotknięcie znowu rozwija oceny');
-  await wait(320);
-  ok('wyjście: rząd ocen wrócił', Boolean($('.vote-veil__pick', card))
-    && !$('.vote-veil__pick', card).hidden);
+  ok('wyjście: strona kadru wyczyszczona (mysz dostaje pigułkę na środku)',
+    out.cancel.veilPill === '', `data-pill="${out.cancel.veilPill}"`);
+
+  /**
+   * DRUGIE DOTKNIĘCIE W TO SAMO MIEJSCE CO PIERWSZE MUSI PROWADZIĆ DALEJ.
+   *
+   * To jest najczęstszy ruch człowieka, któremu „nic się nie stało": dotyka jeszcze raz tam,
+   * gdzie dotknął. Pigułka stoi wtedy po drugiej stronie kadru, więc palec ląduje na przygaszonym
+   * tle — i właśnie dlatego tło rozwija oceny, zamiast składać kafelek. Gdyby składało, dwa
+   * dotknięcia w to samo miejsce wracałyby do punktu wyjścia, czyli wprost do tamtego zgłoszenia.
+   */
+  const again = await tapOn(entry(card), 'tło: pierwsze dotknięcie z powrotem odsłania pigułkę');
+  await wait(300);
+  out.backdrop = { armed: card.classList.contains('is-armed') };
+  if (again) {
+    const under = document.elementFromPoint(again.x, again.y);
+    out.backdrop.atSamePoint = describe(under);
+    out.backdrop.bareBackdrop = under === veil;
+    await tap(again.x, again.y);
+    await wait(320);
+    out.backdrop.picking = card.classList.contains('is-picking');
+    out.backdrop.pickerShown = shownBox($('.vote-veil__pick', card));
+    ok('tło: drugie dotknięcie W TO SAMO MIEJSCE rozwija rząd ocen',
+      out.backdrop.pickerShown === true,
+      `w punkcie ${again.x},${again.y} leżało ${out.backdrop.atSamePoint}`);
+  }
 
   /* Wybór oceny: ciągnięcia uchwytu nie da się zbudować z jednego dotknięcia, więc wartość idzie
      przez `value` + zdarzenie `input`. To, czy w suwak da się trafić palcem i czy ma 44 px, jest
-     zmierzone wyżej — a szerokość jednego stopnia niżej. */
-  if (slider) {
-    out.measures['suwak: px na stopień oceny'] = String(Math.round(slider.getBoundingClientRect().width
-      / Math.max(1, Number(slider.max) - Number(slider.min))));
-    slider.value = '9';
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
+     zmierzone wyżej — a szerokość jednego stopnia tutaj. */
+  const slider2 = $('.vote-slider', card);
+  if (slider2) {
+    out.measures['suwak: px na stopień oceny'] = String(Math.round(slider2.getBoundingClientRect().width
+      / Math.max(1, Number(slider2.max) - Number(slider2.min))));
+    slider2.value = '9';
+    slider2.dispatchEvent(new Event('input', { bubbles: true }));
     await wait(100);
   }
-  out.oneTap.readout = $('.vote-slider__value', card)?.textContent.trim() || '';
-  ok('krok 1: wybrana ocena widoczna wielką liczbą', out.oneTap.readout === '9', out.oneTap.readout);
+  out.readout = $('.vote-slider__value', card)?.textContent.trim() || '';
+  ok('krok 2: wybrana ocena widoczna wielką liczbą', out.readout === '9', out.readout);
 
   /* ================================ ODPORNOŚĆ NA PRZERYSOWANIE SIATKI POD PALCEM */
   /**
    * Siatka przerysowuje się SAMA: odczyt z serwera chodzi co trzydzieści sekund, a w dniu zjazdu
    * liczba głosów przy każdym wozie rośnie z każdym odczytem, czyli odcisk kafelka się zmienia i
-   * kafelek powstaje OD NOWA. Otwarty rząd ocen i wybrana ocena muszą to przeżyć — inaczej
-   * człowiek, który wybrał dziewiątkę, po pół minuty patrzy na czyste zdjęcie.
+   * kafelek powstaje OD NOWA. Otwarty rząd ocen, wybrana ocena I STRONA KADRU muszą to przeżyć —
+   * ta ostatnia dlatego, że przeskok pigułki na środek po przerysowaniu postawiłby ją pod palcem,
+   * czyli cofnąłby całą naprawę bez zmiany ani jednej linijki.
    *
-   * Wymuszane zdarzeniem `visibilitychange`, bo na nim wisi ten sam `pull()`, który chodzi z
-   * zegara — czekanie trzydziestu sekund w sondzie nie zmierzyłoby nic więcej.
+   * Wymuszane zdarzeniem `visibilitychange`, bo na nim wisi ten sam `pull()`, który chodzi
+   * z zegara — czekanie trzydziestu sekund w sondzie nie zmierzyłoby nic więcej.
    */
   document.dispatchEvent(new Event('visibilitychange'));
   await wait(900);
@@ -434,19 +586,23 @@ async (document, window) => {
   out.afterPoll = {
     sameNode: same === card,
     stillPicking: Boolean(same?.classList.contains('is-picking')),
-    pickerShown: Boolean(pickAfter) && !pickAfter.hidden && pickAfter.getBoundingClientRect().height > 1,
+    pickerShown: shownBox(pickAfter),
+    veilPill: same ? ($('.vote-veil', same)?.dataset.pill || '') : '',
     score: sliderAfter?.value || '',
     atSendCentre: sendAfter ? describe(document.elementFromPoint(at(sendAfter).x, at(sendAfter).y)) : ''
   };
   ok('odczyt z serwera nie składa otwartego wyboru', out.afterPoll.pickerShown,
     `wezel przebudowany=${!out.afterPoll.sameNode}, is-picking=${out.afterPoll.stillPicking}`);
   ok('odczyt z serwera nie cofa wybranej oceny', out.afterPoll.score === '9', out.afterPoll.score);
+  ok('odczyt z serwera nie przenosi pigułki pod palec',
+    out.afterPoll.veilPill === out.step1.veilPill,
+    `data-pill="${out.afterPoll.veilPill}" (było "${out.step1.veilPill}")`);
   ok('po odczycie w środku potwierdzenia nadal leży potwierdzenie', Boolean(sendAfter)
     && sendAfter.contains(document.elementFromPoint(at(sendAfter).x, at(sendAfter).y)),
     out.afterPoll.atSendCentre);
 
-  /* ============================================ KROK 2: POTWIERDZENIE OTWIERA OKNO */
-  await tapOn(sendAfter, 'krok 2: dotknięcie potwierdzenia trafia w przycisk');
+  /* ============================================ KROK 3: POTWIERDZENIE OTWIERA OKNO */
+  await tapOn(sendAfter, 'krok 3: dotknięcie potwierdzenia trafia w przycisk');
   await wait(560);
 
   const dialog = $('[data-vote-dialog]');
@@ -469,13 +625,13 @@ async (document, window) => {
       : null,
     atSubmitCentre: submit ? describe(document.elementFromPoint(at(submit).x, at(submit).y)) : ''
   };
-  ok('krok 2: okno z adresem otwarte', out.dialog.open);
-  ok('krok 2: okno niesie wybraną ocenę', out.dialog.score === '9', out.dialog.score);
-  ok('krok 2: okno mówi, o który wóz chodzi', Boolean(out.dialog.who), out.dialog.who);
-  ok('krok 2: tło zablokowane, gdy okno stoi na ekranie', out.dialog.bodyLocked);
+  ok('krok 3: okno z adresem otwarte', out.dialog.open);
+  ok('krok 3: okno niesie wybraną ocenę', out.dialog.score === '9', out.dialog.score);
+  ok('krok 3: okno mówi, o który wóz chodzi', Boolean(out.dialog.who), out.dialog.who);
+  ok('krok 3: tło zablokowane, gdy okno stoi na ekranie', out.dialog.bodyLocked);
   if (!out.dialog.open) return out;
-  ok('krok 2: wysyłka mieści się w ekranie', out.dialog.submitInView === true);
-  ok('krok 2: w środku wysyłki leży wysyłka', Boolean(submit)
+  ok('krok 3: wysyłka mieści się w ekranie', out.dialog.submitInView === true);
+  ok('krok 3: w środku wysyłki leży wysyłka', Boolean(submit)
     && submit.contains(document.elementFromPoint(at(submit).x, at(submit).y)), out.dialog.atSubmitCentre);
   target44(close, 'zamknięcie okna');
   target44(submit, 'wyślij głos w oknie');
@@ -493,8 +649,8 @@ async (document, window) => {
   setField('email', 'marco@example.com');
   await wait(150);
 
-  /* ============================================ KROK 3: GŁOS ODDANY */
-  await tapOn(submit, 'krok 3: dotknięcie „wyślij głos" trafia w przycisk');
+  /* ============================================ KROK 4: GŁOS ODDANY */
+  await tapOn(submit, 'krok 4: dotknięcie „wyślij głos" trafia w przycisk');
   await wait(950);
 
   const shown = (el) => Boolean(el) && !el.hidden
@@ -502,53 +658,74 @@ async (document, window) => {
   out.afterVote = {
     dialogClosed: !dialog.open,
     bodyUnlocked: !document.body.classList.contains('is-locked'),
-    minePanelShown: shown($('[data-vote-mine]')),
-    mineScore: $('[data-vote-mine-score]')?.textContent.trim() || '',
     votedCards: $$('.vote-card.is-voted').length,
     toast: $('[data-toast-text]')?.textContent.trim() || '',
-    toastTone: $('[data-toast]')?.dataset.toastTone || ''
+    toastTone: $('[data-toast]')?.dataset.toastTone || '',
+    minePanelShown: shown($('[data-vote-mine]'))
   };
-  ok('krok 3: okno zamknięte po wysłaniu', out.afterVote.dialogClosed);
-  ok('krok 3: przewijanie odblokowane', out.afterVote.bodyUnlocked);
-  ok('krok 3: panel „Twój głos" na górze strony', out.afterVote.minePanelShown);
-  ok('krok 3: panel niesie oddaną ocenę', out.afterVote.mineScore === '9', out.afterVote.mineScore);
-  ok('krok 3: dokładnie jeden kafelek oznaczony jako mój', out.afterVote.votedCards === 1,
+  ok('krok 4: okno zamknięte po wysłaniu', out.afterVote.dialogClosed);
+  ok('krok 4: przewijanie odblokowane', out.afterVote.bodyUnlocked);
+  ok('krok 4: dokładnie jeden kafelek oznaczony jako mój', out.afterVote.votedCards === 1,
     String(out.afterVote.votedCards));
-  ok('krok 3: potwierdzenie na ekranie', Boolean(out.afterVote.toast), out.afterVote.toast);
+  ok('krok 4: potwierdzenie na ekranie', Boolean(out.afterVote.toast), out.afterVote.toast);
 
-  /* ==================================== DRUGA DROGA: PRZENIESIENIE GŁOSU JEDNYM DOTKNIĘCIEM */
+  /* ==================================== DRUGA DROGA: PRZENIESIENIE GŁOSU, TEŻ DWOMA DOTKNIĘCIAMI */
   /**
-   * Głos jest jeden, ale wolno go raz zmienić — i to też musi być przejezdne jednym dotknięciem.
-   * Bez tego kroku „na telefonie nie da się zagłosować" byłoby naprawione do połowy: kto trafił
-   * w zły kafelek, zostaje z głosem na cudzym wozie i bez wyjścia.
+   * Głos jest jeden, ale wolno go raz zmienić — i to też musi być przejezdne pod palcem. Bez tego
+   * kroku „na telefonie nie da się zagłosować" byłoby naprawione do połowy: kto trafił w zły
+   * kafelek, zostaje z głosem na cudzym wozie i bez wyjścia.
+   *
+   * DRUGI WARUNEK TEGO BLOKU: zmiana idzie BEZ okna z adresem. Adres jest już znany, a pytanie
+   * o niego dawałoby możliwość podania cudzego i zamiany poprawki w drugi głos (patrz
+   * `changeVote` w voting-page.js).
    */
   const second = cards()[1];
   if (second) {
     second.scrollIntoView({ block: 'center', inline: 'nearest' });
     await wait(280);
-    if (await tapOn(entry(second), 'zmiana: dotknięcie drugiego kafelka trafia w cel')) {
-      await wait(320);
-      const pick2 = $('.vote-veil__pick', second);
-      out.change = {
-        pickerShown: Boolean(pick2) && !pick2.hidden && pick2.getBoundingClientRect().height > 1,
-        ctaLabel: $('.vote-veil__cta', second)?.textContent.trim() || ''
-      };
-      ok('zmiana: JEDNO dotknięcie rozwija rząd ocen na drugim kafelku', out.change.pickerShown);
-      ok('zmiana: przycisk zaprasza do przeniesienia głosu', Boolean(out.change.ctaLabel), out.change.ctaLabel);
-      const send2 = $('.vote-veil__send', second);
-      if (send2) {
-        await tapOn(send2, 'zmiana: dotknięcie potwierdzenia trafia w przycisk');
-        await wait(800);
-        out.change.movedTo = cards()[1]?.classList.contains('is-voted')
-          && $$('.vote-card.is-voted').length === 1;
-        out.change.toast = $('[data-toast-text]')?.textContent.trim() || '';
-        ok('zmiana: głos stoi teraz na drugim kafelku', Boolean(out.change.movedTo), out.change.toast);
-      }
+    const tapB = await tapOn(entry(second), 'zmiana: pierwsze dotknięcie drugiego kafelka trafia w cel');
+    await wait(320);
+    const ctaB = $('.vote-veil__cta', second);
+    const ctaBcentre = ctaB && shownBox(ctaB) ? at(ctaB) : null;
+    out.change = {
+      pillShown: shownBox(ctaB),
+      ctaLabel: ctaB?.textContent.trim() || '',
+      pickerAfterFirst: shownBox($('.vote-veil__pick', second)),
+      gap: tapB && ctaBcentre
+        ? Math.round(Math.hypot(ctaBcentre.x - tapB.x, ctaBcentre.y - tapB.y))
+        : null
+    };
+    ok('zmiana: pierwsze dotknięcie pokazuje pigułkę i nie rozwija ocen',
+      out.change.pillShown === true && out.change.pickerAfterFirst === false,
+      `„${out.change.ctaLabel}"`);
+    if (out.change.gap !== null) {
+      out.measures['pigułka na drugim kafelku: odległość od dotknięcia'] = `${out.change.gap} px`;
+      ok('zmiana: pigułka drugiego kafelka też nie stoi pod palcem', out.change.gap >= 44,
+        `${out.change.gap} px`);
+    }
+    await tapOn(ctaB || entry(second), 'zmiana: dotknięcie pigułki rozwija rząd ocen');
+    await wait(320);
+    out.change.pickerShown = shownBox($('.vote-veil__pick', second));
+    ok('zmiana: rząd ocen otwarty na drugim kafelku', out.change.pickerShown === true);
+
+    const sendB = $('.vote-veil__send', second);
+    if (sendB) {
+      await tapOn(sendB, 'zmiana: dotknięcie potwierdzenia trafia w przycisk');
+      await wait(850);
+      out.change.dialogOpened = Boolean($('[data-vote-dialog]')?.open);
+      out.change.movedTo = cards()[1]?.classList.contains('is-voted')
+        && $$('.vote-card.is-voted').length === 1;
+      out.change.toast = $('[data-toast-text]')?.textContent.trim() || '';
+      ok('zmiana: głos stoi teraz na drugim kafelku', Boolean(out.change.movedTo), out.change.toast);
+      ok('zmiana: okno z adresem NIE wstaje przy zmianie istniejącego głosu',
+        out.change.dialogOpened === false);
     }
   }
 
+  out.notes.push('KONTRAKT: dwa dotknięcia do rzędu ocen (zdjęcie → pigułka → oceny). Życzenie właściciela; warunkiem jego działania jest to, że pigułka nie stoi pod palcem — dlatego odległość jej środka od punktu dotknięcia jest tu warunkiem, nie ozdobą.');
   out.notes.push('Ciągnięcia uchwytu suwaka nie da się zbudować z jednego dotknięcia — ocena idzie przez `value` + zdarzenie `input`. Mierzona jest trafialność i wysokość suwaka, nie samo ciągnięcie.');
-  out.notes.push('Harness włącza emulację palca poniżej 700 px, więc `hover: none` jest prawdziwe tylko w przebiegu 390 px. Przebiegi 768 i 1440 pilnują, żeby naprawa telefonu nie zepsuła myszy — patrz `pointer` w wyniku.');
+  out.notes.push('Harness włącza emulację palca poniżej 700 px, więc `hover: none` jest prawdziwe tylko w przebiegu 390 px. Przebiegi 768 i 1440 pilnują, żeby przepływ pod palcem nie zepsuł myszy — patrz `pointer` w wyniku.');
+  out.notes.push('Animacje są wyłączone, żeby mierzyć pudełka, więc `vote-morph` jest sprawdzana z arkusza (obecność klatek) i z geometrii (krawędź rzędu ocen = krawędź pigułki), nie z `animationName`.');
   out.notes.push('Odpowiedź serwera jest podstawiona (zaślepka albo demo), więc mierzalne jest wszystko po stronie przeglądarki — nie to, czy Worker zapisze głos.');
   return out;
 }

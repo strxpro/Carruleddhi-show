@@ -1589,6 +1589,56 @@ import {
     window.addEventListener('resize', scheduleUpdate, { passive: true });
     window.addEventListener('orientationchange', scheduleUpdate, { passive: true });
     if ('ResizeObserver' in window) new ResizeObserver(scheduleUpdate).observe(stack);
+
+    /* ============================================================
+       STOS KART POZA WIDOKIEM ODDAJE SWOJE WARSTWY KOMPOZYTORA.
+       ============================================================
+       OBJAW, KTÓREGO TO DOTYCZY
+         „Strona na telefonie sama się odświeża w okolicy sekcji nagród." Nie ma tu ani jednego
+         `location.reload()` ani service workera, a sonda błędów przechodzi tę okolicę czysto —
+         więc przeładowanie jest ubiciem procesu renderującego z braku pamięci. Rachunek
+         zbierany jest w czterech miejscach naraz: `backdrop-filter` i cienie paneli
+         (carnival.css), cień rysunku nagrody (main.css), warstwy karuzeli (gallery-3d.js).
+         To jest piąte.
+
+       CO TU BYŁO, ZMIERZONE
+         `will-change: transform` na `.stack-card` (experience.css) stało bezwarunkowo. To jest
+         jawna prośba o osobną warstwę kompozytora i przeglądarka spełnia ją NATYCHMIAST, nie
+         dopiero wtedy, gdy coś się rusza.
+
+         Pomiar tools/probe-c-prizes-memory.js na 390x844, snapshot „sekcja nagrod w widoku",
+         czyli w chwili gdy stos kart jest już dawno za plecami czytelnika:
+           elementy z niezerowym `will-change`:   6
+           z tego karty stosu:                    3  (335x551, 335x551, 366x602)
+           suma ich pudełek:                      589 502 px2 (0,59 Mpx)
+         Czyli połowa wszystkich warstw z `will-change` i 0,59 Mpx pamięci graficznej trzymanej
+         dla sekcji, której nie ma na ekranie.
+
+       DLACZEGO TO NIE JEST TO SAMO CO ZDJĘCIE `will-change` NA STAŁE
+         Gdy stos JEST na ekranie, `updateCardStack` pisze mu `transform` w każdej klatce
+         przewijania. Tam podpowiedź zarabia na siebie i nie ma powodu jej zabierać — bez niej
+         każda klatka byłaby przemalowaniem karty wielkości ekranu. Chodzi wyłącznie o to, żeby
+         nie płacić za nią przez pozostałe kilka tysięcy pikseli przewijania.
+
+       DLACZEGO `IntersectionObserver`, A NIE NASŁUCH `scroll`
+         Wersja na `scroll` musiałaby wołać `getBoundingClientRect()` na stosie przy każdym
+         zdarzeniu, czyli wymuszać przeliczenie układu w trakcie przewijania — dokładnie ten
+         błąd, który jest rozpisany przy `measure()` w setupPanels i przy dokowaniu licznika.
+         Obserwator odpowiada na to samo pytanie bez ani jednego pomiaru w naszym kodzie.
+
+       `rootMargin` HOJNY Z ROZMYSŁU
+         Warstwa musi być gotowa, ZANIM karta wjedzie na ekran, bo pierwsza klatka po powrocie
+         jest tą, w której czytelnik patrzy na stos. Pół ekranu zapasu w każdą stronę znaczy, że
+         podpowiedź wraca zawczasu, a mimo to nie obowiązuje przy sekcji nagród, która leży
+         kilka ekranów niżej. */
+    if ('IntersectionObserver' in window) {
+      const nearby = new IntersectionObserver((entries) => {
+        const onScreen = entries.some((entry) => entry.isIntersecting);
+        stack.classList.toggle('is-offscreen', !onScreen);
+      }, { rootMargin: '50% 0px 50% 0px', threshold: 0 });
+      nearby.observe(stack);
+    }
+
     scheduleUpdate();
   }
 
@@ -1634,6 +1684,63 @@ import {
         // transform composite; filter does not.
         card.style.pointerEvents = relative === 0 ? 'auto' : 'none';
         card.setAttribute('aria-hidden', relative === 0 ? 'false' : 'true');
+
+        /* ============================================================
+           KARTY, KTÓRYCH NIE WIDAĆ, PRZESTAJĄ BYĆ MALOWANE.
+           ============================================================
+           OBJAW, KTÓREGO TO DOTYCZY
+             „Strona na telefonie sama się odświeża w okolicy sekcji nagród." Sonda
+             tools/probe-c-errors.js przechodzi tę okolicę bez wyjątku, bez odrzuconej obietnicy
+             i bez spadku liczby klatek, więc to nie jest awaria kodu — to przeglądarka mobilna
+             ubijająca proces renderujący z braku pamięci i wczytująca dokument od nowa. Takie
+             zabicie NIE ZOSTAWIA ŚLADU W KONSOLI, więc jedyne, co da się zmierzyć i obniżyć,
+             to zużycie, które do niego prowadzi.
+
+           CO TU BYŁO
+             `opacity: 0` na kartach głębszych niż ósma. Zerowa przezroczystość NIE ZWALNIA
+             malowania: element dalej ma układ, dalej jest rasteryzowany i dalej zajmuje
+             teksturę — po prostu składa się z wagą zero. Cztery karty po 328x380 px razem z
+             rysunkami z prizes.svg były więc malowane po to, żeby ich nie było widać.
+
+           ZMIERZONE, tools/probe-c-prizes-memory.js oraz test trafiania po siatce 3x3 px
+           (`elementFromPoint`, 17 568 punktów) na 390x844, karta 01 na wierzchu:
+             karta na wierzchu                  4 548 punktów, z tego rysunek 2 996
+             karty 2-8 w stosie                 256, 305, 198, 142, 80, 47, 22 punktów krawędzi
+             karty 9-12                         ZERO punktów — nie widać z nich nic
+             rysunek widoczny w ogóle           tylko na kartach 1, 3 i 4 (2 996, 47, 14 punktów)
+           Czyli: cztery karty malowane na darmo w całości, a rysunek — osobne poddrzewo
+           `<use>` z jednego pliku SVG na każdą kartę — malowany dwanaście razy po to, żeby
+           widać go było na jednej i w śladowych ilościach na dwóch dalszych (razem ~549 px2
+           z 540 325 px2 wszystkich rysunków, czyli 0,1%).
+
+           CO ROBIMY
+             1. `visibility: hidden` dla kart poza stosem (głębsze niż ósma). Zmierzone zero
+                widocznych punktów, więc to jest usunięcie z malowania czegoś, czego nie ma na
+                ekranie — nie zmiana wyglądu.
+             2. Klasa `is-art-hidden` od czwartej karty w głąb zdejmuje z malowania sam
+                rysunek, zostawiając korpus karty. Krawędzie kart, z których zbudowany jest
+                stos, zostają widoczne co do piksela — schodzi tylko rysunek, którego test
+                trafiania nie znalazł na ekranie ani w jednym punkcie.
+
+           DLACZEGO `visibility`, A NIE `display: none` ANI `content-visibility`
+             `display: none` wyjmuje pudełko z układu, więc karta wracająca na wierzch musiałaby
+             przeliczyć swój układ w tej samej klatce, w której wjeżdża — najgorszej możliwej.
+             `content-visibility: hidden` pomija układ POTOMKÓW, więc wysokość karty spadłaby do
+             `min-height` i wróciłaby skokiem. `visibility: hidden` nie rusza układu, a jest
+             wystarczające: przeglądarka nie maluje ukrytego poddrzewa.
+
+           DLACZEGO PRÓG 4, A NIE 2
+             Karty 3 i 4 mają zmierzone 47 i 14 punktów widocznego rysunku. Są to skrawki za
+             obróconą krawędzią karty przed nimi, ale są NIEZEROWE, a próg ma wynikać z pomiaru,
+             nie z zaokrąglenia pomiaru w wygodną stronę. Od czwartej w głąb pomiar daje zero.
+
+           KOSZT, KTÓREGO NIE UKRYWAM
+             Karta wracająca na wierzch przy cofaniu talii (`advance(-1)`) idzie z pozycji poza
+             stosem, więc jej rysunek trzeba zrasteryzować w chwili powrotu. To jeden rysunek
+             259x166 px w tej samej klatce, w której i tak zmienia się układ całego stosu —
+             nieporównywalnie mniej niż trzymanie dwunastu naraz przez całą wizytę. */
+        card.style.visibility = relative > 7 ? 'hidden' : '';
+        card.classList.toggle('is-art-hidden', relative >= 4);
       });
       const current = $('[data-deck-current]');
       if (current) current.textContent = String(state.deckIndex + 1).padStart(2, '0');
@@ -1889,6 +1996,17 @@ import {
     });
     $('[data-deck-next]')?.addEventListener('click', () => advance(1));
     $('[data-deck-prev]')?.addEventListener('click', () => advance(-1));
+
+    if ('IntersectionObserver' in window) {
+      const section = deck.closest('.prizes');
+      if (section) {
+        const observer = new IntersectionObserver((entries) => {
+          section.classList.toggle('is-offscreen', !entries[0].isIntersecting);
+        }, { threshold: 0.02 });
+        observer.observe(section);
+      }
+    }
+
     layout();
   }
 

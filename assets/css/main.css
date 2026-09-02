@@ -1667,10 +1667,69 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   width: min(100%, 430px);
   max-height: 290px;
   overflow: visible;
-  filter: drop-shadow(0 18px 18px rgba(7,26,61,.18));
   transform-origin: center 70%;
 }
-.prize-card[aria-hidden='false'] .prize-card__art svg { animation: prize-float 3.8s ease-in-out infinite; }
+/* ============================================================
+   CIEŃ RYSUNKU TYLKO NA KARCIE, KTÓRĄ WIDAĆ. TRZECIA POZYCJA NA RACHUNKU PAMIĘCI.
+   ============================================================
+   OBJAW
+     „Strona na telefonie sama się odświeża w okolicy sekcji nagród." Sonda błędów przechodzi
+     tę okolicę bez ani jednego wyjątku, bez odrzuconej obietnicy i bez spadku liczby klatek,
+     więc to nie jest awaria JavaScriptu — to przeglądarka mobilna ubijająca proces renderujący
+     z braku pamięci. Takie zabicie nie zostawia śladu w konsoli; jedyne, co da się zmierzyć,
+     to ZUŻYCIE, które do niego prowadzi. Dwa poprzednie bloki tego samego rachunku stoją w
+     carnival.css przy `backdrop-filter` i przy cieniach paneli.
+
+   CO TU BYŁO, ZMIERZONE
+     `filter: drop-shadow(0 18px 18px)` stało bezwarunkowo na `.prize-card__art svg`, czyli na
+     WSZYSTKICH DWUNASTU rysunkach nagród naraz. Samo istnienie `filter` wymusza dla elementu
+     osobną warstwę kompozytora z własną teksturą, a `drop-shadow` z 18 px rozmycia jeszcze tę
+     teksturę powiększa — warstwa musi się zmieścić razem z cieniem, czyli jest o kilkadziesiąt
+     pikseli szersza i wyższa od samego rysunku.
+
+     Pomiar sondą tools/probe-c-prizes-memory.js na 390x844, w sekcji nagród:
+       elementów z `filter` różnym od `none`:            16
+       z tego rysunków nagród:                           12
+       suma pudełek tych dwunastu:                       540 325 px2 (0,54 Mpx)
+       po dodaniu marginesu na 18 px rozmycia:           ~0,95 Mpx tekstury
+
+   ILE Z TEGO WIDAĆ — TO JEST TA LICZBA, KTÓRA ROZSTRZYGA
+     Test trafiania (`elementFromPoint` po siatce 3x3 px na całym obszarze talii, 17 568
+     punktów) pokazał, ile punktów przypada na KAŻDĄ kartę jako element najwyższy:
+       karta na wierzchu           4 548 punktów, rysunek widoczny w 2 996
+       karty 2 i 3 w stosie        47 i 14 punktów rysunku (razem ~549 px2)
+       karta 1 oraz karty 5-12     ZERO punktów rysunku
+     Czyli z 540 325 px2 rysunków, dla których trzymaliśmy dwanaście warstw z rozmyciem, widać
+     0,1%. Jedenaście cieni płaciło pamięcią za coś, czego nie ma na ekranie.
+
+   CO ZAMIAST
+     Cień dostaje tylko karta z `aria-hidden='false'`, czyli dokładnie ta na wierzchu — ten sam
+     selektor, którym już jest wybierana do unoszenia rysunku. Dwanaście warstw z filtrem
+     schodzi do jednej. Wygląd wierzchniej karty, jedynej, którą się czyta, nie zmienia się
+     wcale.
+
+   DLACZEGO NIE `@media (max-width: 760px)`
+     Bo argument nie jest o rozmiarze ekranu: jedenaście z dwunastu cieni jest niewidocznych
+     także na pulpicie, gdzie stos jest tak samo poukładany. Zawężenie do telefonu znaczyłoby
+     dwa różne zachowania do utrzymania i pamięć wyrzuconą w oknie 761 px szerokości.
+   ============================================================ */
+.prize-card[aria-hidden='false'] .prize-card__art svg {
+  filter: drop-shadow(0 18px 18px rgba(7,26,61,.18));
+  animation: prize-float 3.8s ease-in-out infinite;
+}
+/* ============================================================
+   RYSUNEK KARTY GŁĘBIEJ NIŻ CZWARTA W STOSIE NIE JEST MALOWANY.
+   ============================================================
+   Klasę zakłada `layout()` w app.js — tam stoi pełny powód i pomiar. W skrócie: test
+   trafiania wykazał ZERO widocznych punktów rysunku na kartach od czwartej w głąb, a każdy
+   taki rysunek to osobne poddrzewo `<use>` z pliku prizes.svg, które przeglądarka i tak
+   rasteryzuje. Osiem z dwunastu przestaje być malowanych.
+
+   `visibility: hidden`, nie `display: none`: pudełko zostaje, więc wysokość karty i układ
+   siatki (`grid-template-rows: auto minmax(185px, 1fr) auto`) nie zmieniają się ani o piksel,
+   gdy karta wraca na wierzch. `display: none` przeliczyłby jej układ od nowa dokładnie w tej
+   klatce, w której karta wjeżdża na wierzch — czyli w najgorszej możliwej. */
+.prize-card.is-art-hidden .prize-card__art { visibility: hidden; }
 .prize-card__bottom { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: end; gap: 20px; }
 .prize-card__number { color: currentColor; font-size: clamp(58px, 8vw, 92px); opacity: .17; }
 .prize-card h3 { margin: 0 0 6px; font-size: clamp(24px, 3.2vw, 39px); }

@@ -49,6 +49,24 @@ async function launch() {
       '--disable-extensions',
       '--hide-scrollbars',
       '--force-device-scale-factor=1',
+      /**
+       * DOKŁADNY ODCZYT `performance.memory.usedJSHeapSize`.
+       * =====================================================================
+       * Bez tej flagi Chrome celowo zaokrągla `performance.memory` — wartości są kwantowane
+       * (rząd 100 kB), aktualizowane najwyżej raz na 20 minut i identyczne dla różnych stanów
+       * strony. To jest zabezpieczenie przed odczytem cudzej pamięci przez stronę, ale w sondzie
+       * uruchamianej lokalnie znaczy tylko jedno: pomiar „ile strona dokłada po wejściu w sekcję
+       * nagród" wychodzi TAKI SAM przed i po naprawie, bo różnica ginie w zaokrągleniu.
+       *
+       * ZMIERZONE: bez flagi trzy punkty pomiaru sondy tools/probe-c-prizes-memory.js dawały
+       * ten sam odczyt kopca co do kilobajta, mimo że między nimi strona przewijała się przez
+       * kilkanaście przypiętych sekcji i przeszła całą dwunastokartową talię. Z flagą każdy
+       * punkt ma własną liczbę i różnicę da się porównać przed i po zmianie.
+       *
+       * Flaga dotyczy WYŁĄCZNIE przeglądarki uruchamianej przez ten harness do pomiaru — nie
+       * ma wpływu na to, co dostaje odwiedzający.
+       */
+      '--enable-precise-memory-info',
       `--remote-debugging-port=${PORT}`,
       // A fresh profile every run: a persisted localStorage made the attendance
       // button arrive already pressed and silently voided the next measurement.

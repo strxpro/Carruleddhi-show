@@ -194,6 +194,35 @@
   will-change: transform;
 }
 
+/* ============================================================
+   POZA WIDOKIEM KARUZELA ODDAJE SWOJE WARSTWY.
+   ============================================================
+   Klasę `is-offscreen` zakłada i zdejmuje obserwator widoczności w gallery-3d.js — pełny
+   powód i pomiar stoją tam, przy nim. W skrócie i z liczbami:
+
+   `will-change` to prośba o osobną warstwę kompozytora, spełniana od razu, a nie dopiero
+   wtedy, gdy coś się rusza. Zmierzone sondą tools/probe-c-prizes-memory.js na 390x844, w
+   chwili gdy na ekranie jest SEKCJA NAGRÓD (galeria leży bezpośrednio nad nią, scrollY 6645
+   wobec 7324):
+
+     wszystkich elementów z niezerowym `will-change`:   16
+     z tego karuzela:                                   10  (5 kart + 5 zdjęć)
+     suma ich pudełek:                                  603 429 px2 (0,60 Mpx)
+
+   Czyli ponad połowa warstw z `will-change` na całej stronie należała do sekcji, której w tym
+   momencie nie widać. Ta pamięć jest tą samą pamięcią, której brak każe przeglądarce mobilnej
+   ubić kartę i wczytać dokument od nowa — objaw „strona sama się odświeża". Trzy inne pozycje
+   tego samego rachunku są opisane w carnival.css (`backdrop-filter`, cienie paneli) i w
+   main.css (cień rysunku nagrody).
+
+   Poza widokiem nie ma przeciągania ani autoodtwarzania (ten sam obserwator je zatrzymuje),
+   więc nie ma czego przygotowywać. `will-change` wraca razem z sekcją na ekran, gdzie karty
+   naprawdę zmieniają transformację w każdej klatce tweenu GSAP-a i podpowiedź zarabia na
+   siebie.
+   ============================================================ */
+.g3d.is-offscreen .g3d__card,
+.g3d.is-offscreen .g3d__media img { will-change: auto; }
+
 /* The centred card gets the fairground treatment: a hard offset shadow in the
    same language as the buttons, plus a yellow plate peeking out behind it. */
 .g3d__card.is-front .g3d__media {

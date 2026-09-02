@@ -808,6 +808,14 @@
 .prize-card.is-resetting { transition: none; }
 .prize-card:active { cursor: grabbing; }
 
+/* KARUZELA POZA WIDOKIEM ZWALNIA SWOJE WARSTWY KOMPOZYTORA.
+   Zapobiega to crashowaniu Safari (iOS) spowodowanemu zbyt dużą liczbą elementów
+   z `will-change` (12 dużych SVG) w pamięci graficznej telefonu. */
+.prizes.is-offscreen .prize-card,
+.prizes.is-offscreen .prize-card__art svg {
+  will-change: auto !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .prize-card { transition: none; }
   .prize-card__art svg { animation: none !important; }
@@ -3170,13 +3178,22 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
 
        .nav-shell          pasek nawigacji, zawsze na ekranie
        .quick-actions      pływający dok, zawsze na ekranie
-       .stack-card::before etykieta na KAŻDEJ z dwunastu przypiętych kart
+       .stack-card::before etykieta na KAŻDEJ z przypiętych kart stosu
        .hero-stat          kafelki liczb w hero
        .sponsor-band       pas sponsorów
 
-     Dwanaście rozmytych etykiet na kartach, które przez całe przewijanie zmieniają
-     pozycję, to dwanaście warstw przeliczanych w kółko. Na pulpicie to niewidoczne,
-     na telefonie to jest ta pamięć, której potem brakuje.
+     Rozmyte etykiety na kartach, które przez całe przewijanie zmieniają pozycję, to tyle
+     warstw przeliczanych w kółko, ile jest kart. Na pulpicie to niewidoczne, na telefonie
+     to jest ta pamięć, której potem brakuje.
+
+     SPROSTOWANIE LICZBY, KTÓRA TU WCZEŚNIEJ STAŁA
+       Ten akapit mówił „dwanaście przypiętych kart". Pomiar
+       (tools/probe-c-prizes-memory.js, 390x844) daje TRZY: `document.querySelectorAll(
+       '.stack-card').length === 3`, co potwierdza też `content: '0' counter(stack-card)
+       ' / 03'` w main.css. Dwanaście jest liczbą kart TALII NAGRÓD (`.prize-card`), która
+       jest zupełnie inną rzeczą w zupełnie innej sekcji. Wniosek bloku się nie zmienia —
+       rozmycie schodzi z etykiet tak samo — ale liczba w uzasadnieniu ma być zmierzona,
+       bo inaczej następna decyzja oparta na tym akapicie wyjdzie z fałszywej skali.
 
    CO ZAMIAST
      Samo usunięcie rozmycia zrobiłoby tekst nieczytelnym nad zdjęciem, bo tła są
@@ -3246,6 +3263,32 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   /* Stopka ma własny cień tej samej wielkości (experience.css), więc i tej samej wagi. */
   .site-footer { box-shadow: 0 -10px 18px rgba(7, 26, 61, .34); }
 }
+
+/* ============================================================
+   STOS KART POZA WIDOKIEM — TRZECIA POZYCJA NA TYM SAMYM RACHUNKU PAMIĘCI.
+   ============================================================
+   Klasę `is-offscreen` zakłada i zdejmuje obserwator widoczności w `setupCardStack()`
+   (app.js) — pełny powód, pomiar i uzasadnienie `rootMargin` stoją tam. Tu tylko liczby i to,
+   co z nich wynika dla arkusza.
+
+   `will-change: transform` na `.stack-card` (experience.css) to jawna prośba o osobną warstwę
+   kompozytora, spełniana natychmiast, a nie dopiero wtedy, gdy karta się rusza. Zmierzone
+   sondą tools/probe-c-prizes-memory.js na 390x844, w chwili gdy na ekranie jest SEKCJA NAGRÓD,
+   a stos kart został kilka ekranów wyżej:
+
+     wszystkich elementów z niezerowym `will-change`:   6
+     z tego karty stosu:                               3  (335x551, 335x551, 366x602)
+     suma ich pudełek:                                 589 502 px2 (0,59 Mpx)
+
+   Połowa warstw z `will-change` na całej stronie i 0,59 Mpx pamięci graficznej trzymanej dla
+   trzech kart, których nie ma na ekranie. Gdy stos JEST widoczny, `updateCardStack` pisze im
+   `transform` w każdej klatce przewijania i podpowiedź zarabia na siebie — dlatego wraca razem
+   z sekcją, a nie znika na stałe.
+
+   Ten arkusz jest wciągany po experience.css (patrz kolejność `@import` w site.css), więc
+   nadpisanie działa bez `!important`.
+   ============================================================ */
+.card-stack.is-offscreen .stack-card { will-change: auto; }
 
 /* ============================================================
    18b. Dolny dok — hierarchia i wejście

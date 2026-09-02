@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -40,24 +40,47 @@ export function ActionButton({
   /** Klasy koloru dla stanu czynnego. Stan wyłączony ma własne, wspólne dla wszystkich. */
   tone: string;
   icon?: ReactNode;
+  confirmLabel?: string;
+  confirmTone?: string;
   onPress: () => void;
 }) {
   const off = reason !== '';
   const describedBy = useId();
+  
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<number>(0);
+
+  const disarm = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = 0;
+    setArmed(false);
+  }, []);
+
+  useEffect(() => disarm, [disarm]);
+
+  const click = () => {
+    if (confirmLabel && !armed) {
+      setArmed(true);
+      timer.current = window.setTimeout(disarm, 5000);
+      return;
+    }
+    disarm();
+    onPress();
+  };
   return (
     <span className="inline-flex max-w-[19rem] flex-col gap-1">
       <button
         type="button"
         disabled={off}
         aria-describedby={off ? describedBy : undefined}
-        onClick={onPress}
+        onClick={click}
         className={cn(
           'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-colors',
-          off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70' : tone
+          off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70' : armed ? (confirmTone || 'bg-coral text-white border border-coral') : tone
         )}
       >
         {icon}
-        {label}
+        {armed && confirmLabel ? confirmLabel : label}
       </button>
       {off ? (
         <span id={describedBy} className="text-[11px] leading-relaxed text-white/45">

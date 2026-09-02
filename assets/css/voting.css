@@ -1387,9 +1387,13 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    `figure.vote-card__photo`, a nie przycisk, i dotknięcie nie robiło NIC. Na komputerze tego
    nie widać, bo nakładkę odsłania tam `:hover`, który nie wymaga trafienia w przycisk.
 
-   Trzy, nie osiem: nakładka z oceną ma `z-index: 4` i musi zostać NAD przyciskiem, bo po
-   odsłonięciu dotknięcia mają trafiać w „Zagłosuj". Trzy jest wyżej niż każda dekoracja na
-   zdjęciu i niżej niż nakładka — czyli dokładnie tam, gdzie ten przycisk należy. */
+   Trzy, nie osiem: nakładka z oceną ma `z-index: 4` i musi zostać NAD przyciskiem, bo pod
+   palcem pigułka „Zagłosuj" stoi na zdjęciu OD RAZU i dotknięcie napisu ma trafić w napis.
+   Trzy jest wyżej niż każda dekoracja na zdjęciu i niżej niż nakładka — czyli dokładnie tam,
+   gdzie ten przycisk należy. Tło nakładki dotknięć przy tym nie zabiera: w spoczynku ma
+   `pointer-events: none`, więc całe zdjęcie OBOK pigułki nadal należy do tego przycisku
+   i prowadzi do tego samego miejsca. Patrz `@media (hover: none)` w sekcji „ocenianie na
+   zdjęciu". */
 .vote-card__hit {
   position: absolute; inset: 0; z-index: 3;
   border: 0; padding: 0; background: transparent; cursor: pointer;
@@ -2324,15 +2328,27 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 .vote-card__photo img { transition: opacity .3s ease; }
 
 /* ============================================================ ocenianie na zdjęciu */
-/* Kafelek jest czysty, dopóki ktoś nie wykaże zainteresowania tym konkretnym wozem. Nakładka
-   przygasza zdjęcie i wynosi na jego środek jedno zaproszenie; klik przeistacza je w suwak.
-   Cała mechanika stanów jest w voteOverlay() w voting-page.js. */
+/* Nakładka przygasza zdjęcie i wynosi na nie jedno zaproszenie — pigułkę „Zagłosuj" —
+   a naciśnięcie pigułki przeistacza ją W MIEJSCU w suwak z oceną.
+   ---------------------------------------------------------------------------
+   POD MYSZĄ kafelek jest czysty, dopóki kursor nie wejdzie na zdjęcie: nakładka ma wtedy
+   `opacity: 0` i pigułka pojawia się na środku kadru na najechanie (`@media (hover: hover)`
+   niżej). POD PALCEM nakładka jest widoczna OD RAZU, bo `:hover` na telefonie nie istnieje i
+   ukryta pigułka byłaby zaproszeniem, którego nikt nie widzi — patrz blok
+   „PIGUŁKA WIDOCZNA W SPOCZYNKU" niżej. Cała mechanika stanów jest w voteOverlay()
+   w voting-page.js. */
 .vote-veil {
   position: absolute;
   inset: 0;
   z-index: 4;
   display: grid;
   place-items: center;
+  /* Wypisane WPROST, mimo że `place-items: center` wyżej wygląda, jakby już to mówiło.
+     Nie mówi: o położeniu pigułki w wysokim kadrze decyduje `align-content` (rozkład ścieżki
+     wiersza w siatce), a nie `align-items` (rozkład elementu w ścieżce). Bez tej deklaracji
+     nadpisania niżej — `[data-pill]` — nie miałyby czego nadpisać i pigułka zostawałaby na
+     środku, czyli pod palcem. Patrz komentarz przy `[data-pill]`. */
+  align-content: center;
   padding: 10px;
   /* Przygaszenie od dołu mocniejsze, bo tam leży podpis — biały tekst musi trzymać kontrast
      także wtedy, gdy nakładka jest widoczna. */
@@ -2341,8 +2357,9 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   pointer-events: none;
   transition: opacity .26s var(--ease-out, ease);
 }
-/* Mysz: najechanie na kafelek. Palec: klasa `is-armed` po dotknięciu — `:hover` na telefonie
-   nie istnieje, a `@media (hover: hover)` odcina przeglądarki, które udają, że istnieje. */
+/* Mysz: najechanie na kafelek odsłania nakładkę i zdejmuje przezroczystą warstwę, więc klik
+   trafia wprost w pigułkę. `@media (hover: hover)` odcina przeglądarki, które udają hover;
+   `:hover` na telefonie nie istnieje i dlatego palec ma osobny blok niżej. */
 @media (hover: hover) {
   .vote-card:hover .vote-veil,
   .vote-card:focus-within .vote-veil { opacity: 1; pointer-events: auto; }
@@ -2352,13 +2369,83 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 .vote-card.is-armed .vote-veil { opacity: 1; pointer-events: auto; }
 
+/* ===========================================================================
+   PIGUŁKA WIDOCZNA W SPOCZYNKU: POD PALCEM NAPIS „ZAGŁOSUJ" JEST NA ZDJĘCIU OD RAZU
+   ===========================================================================
+   Właściciel poprosił dosłownie: „jak klikam w zdjęcie żeby zagłosować to chciałbym żeby
+   pokazał się tam napis zagłosuj i po kliknięciu wtedy z tego guzika rozsuwa się ten pop out
+   z suwakiem". Napis ma więc BYĆ, a nie pojawiać się po pierwszym dotknięciu.
+
+   CO TU BYŁO PRZEDTEM I DLACZEGO TO NIE MOGŁO ZOSTAĆ
+   ---------------------------------------------------------------------------
+   Nakładka miała `opacity: 0` we wszystkich wskaźnikach i odsłaniał ją albo `:hover` (mysz),
+   albo klasa `is-armed` po pierwszym dotknięciu (palec). Na telefonie `:hover` nie istnieje,
+   więc pigułki NIE BYŁO WIDAĆ NIGDY, dopóki ktoś nie dotknął zdjęcia w ciemno. Pierwsze
+   dotknięcie zużywała wtedy przezroczysta warstwa na odsłonięcie pigułki, która wyrastała
+   dokładnie pod kciukiem — ZMIERZONE na 390×844 w kadrze 173×173: odległość jej środka od
+   punktu dotknięcia 0 px. Stąd zgłoszenie „klikam w zagłosuj i nic się nie robi".
+
+   Poprzednia naprawa odsuwała pigułkę do drugiej połowy kadru (`[data-pill]`, `arm()`
+   w voting-page.js) i zostawiała dwa dotknięcia. Ta zmiana usuwa PRZYCZYNĘ, a nie skutek:
+   pigułka jest widoczna, zanim ktokolwiek dotknie zdjęcia, więc pierwsze dotknięcie trafia
+   w widoczny przycisk i cała arytmetyka „w której połowie kadru wylądował palec" przestaje
+   mieć po co istnieć. Razem z nią zniknęły reguły `[data-pill]` — kto je będzie przywracał,
+   niech najpierw sprawdzi, czy pigułka znowu nie jest ukryta.
+
+   DLACZEGO NA DOLE KADRU, A NIE NA ŚRODKU
+   ---------------------------------------------------------------------------
+   Środek zdjęcia to wóz, po który ktoś tu przyszedł — pigułka zasłaniałaby na stałe dokładnie
+   to, co ma pomóc ocenić. Dół kadru jest wolny (podpis stoi POD zdjęciem, nie na nim), jest
+   bliżej kciuka i ma naturalne przygaszenie, na którym żółta pigułka czyta się jak podpis
+   zdjęcia, a nie jak plama. Rząd ocen wyrasta potem TĄ SAMĄ krawędzią — `align-content: end`
+   ustawia w jednej własności i pigułkę, i suwak, więc „rozsuwanie się z guzika"
+   (animacja `vote-morph` niżej) zostaje rozsuwaniem, a nie przyjazdem pudełka skądinąd.
+
+   KONTRAST: PRZYGASZENIE POD NAPISEM, NIE SAM NAPIS NA FOTOGRAFII
+   ---------------------------------------------------------------------------
+   Biały tekst rzucony na fotografię jest czytelny na jednym zdjęciu i niewidoczny na drugim.
+   Pigułka niesie własne tło: żółte wypełnienie (#ffc928) z granatowym napisem (#071a3d) daje
+   kontrast 11.1:1 NIEZALEŻNIE od zdjęcia pod nią, a leżące pod nią przygaszenie odcina ją od
+   szczegółów fotografii i domyka trzypikselową obwódkę. Gradient jest przy tym SŁABSZY niż
+   przy odsłoniętej nakładce i sięga tylko dolnej części kadru: siatka ma nadal wyglądać jak
+   galeria wozów, a nie jak dwie kolumny przygaszonych prostokątów. */
+@media (hover: none) {
+  .vote-veil {
+    opacity: 1;
+    align-content: end;
+    background: linear-gradient(180deg,
+      transparent 30%, rgb(7 26 61 / .24) 54%, rgb(7 26 61 / .74) 100%);
+    /* WYPISANE WPROST, mimo że tak samo brzmi wartość domyślna wyżej.
+       Nakładka jest tu WIDOCZNA, a widoczna warstwa na całym zdjęciu wygląda, jakby miała
+       łapać dotknięcia — i nie może, bo w spoczynku celem jest `.vote-card__hit` pod nią
+       (jeden przycisk na całe zdjęcie, z nazwą dla czytnika ekranu). Bez tej linijki tło
+       nakładki przechwytywałoby dotknięcia i nie robiło nic: dokładnie ta martwa strefa,
+       którą sonda probe-voting-mobile.mjs mierzy siatką 5×5. */
+    pointer-events: none;
+  }
+  /* Sama pigułka JEST celem: dotknięcie napisu ma trafić w napis, a nie w przezroczystą
+     warstwę pod nim. Oba prowadzą do tego samego `toPick()`, ale różnią się tym, co widzi
+     palec — pigułka reaguje jak przycisk, którym jest. */
+  .vote-veil__cta { pointer-events: auto; }
+  /* Po dotknięciu przygaszenie robi się pełne: na zdjęciu stoi wtedy rząd ocen z białym
+     panelem i to on ma być najjaśniejszą rzeczą w kadrze. */
+  .vote-card.is-armed .vote-veil {
+    background: linear-gradient(180deg, rgb(7 26 61 / .58), rgb(7 26 61 / .82));
+  }
+}
+
 /* Przygaszone tło nakładki jest czynne, więc musi to POKAZYWAĆ.
    ---------------------------------------------------------------------------
-   Nakładka kryje całe zdjęcie i przy odsłonięciu łapie wskaźnik, a jej tło nie robiło nic:
-   ZMIERZONE sondą probe-voting-mobile.mjs na 390×844, 20 z 25 punktów zdjęcia zwracało
-   `div.vote-veil` i dotknięcie przepadało bez śladu. Obsługa jest teraz w `voteOverlay()`
-   (tło zamknięte otwiera rząd ocen, otwarte składa kafelek), a tutaj zostaje jedyna rzecz,
-   której nie da się powiedzieć z JavaScriptu: że pod kursorem to jest cel, a nie dekoracja.
+   Nakładka kryje całe zdjęcie i po odsłonięciu (`is-armed`) łapie wskaźnik, a jej tło nie
+   robiło nic: ZMIERZONE sondą probe-voting-mobile.mjs na 390×844, 20 z 25 punktów zdjęcia
+   zwracało `div.vote-veil` i dotknięcie przepadało bez śladu. Obsługa jest teraz
+   w `voteOverlay()`: tło przy otwartym rzędzie ocen składa kafelek, a tło przy odsłoniętej
+   nakładce BEZ rzędu ocen (mysz na kafelku, albo powrót klawiszem Escape) rozwija oceny —
+   czyli prowadzi dalej, nie wstecz. W spoczynku pod palcem tło nie łapie niczego i całe
+   zdjęcie należy do `.vote-card__hit` — patrz blok `@media (hover: none)` wyżej.
+
+   Tutaj zostaje jedyna rzecz, której nie da się powiedzieć z JavaScriptu: że pod kursorem to
+   jest cel, a nie dekoracja.
 
    `-webkit-tap-highlight-color`, bo bez tego dotknięcie tła zapala na pół sekundy szary
    prostokąt na CAŁYM zdjęciu — wygląda jak błąd rysowania, nie jak reakcja na dotknięcie. */

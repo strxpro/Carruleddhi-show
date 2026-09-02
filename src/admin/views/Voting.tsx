@@ -529,10 +529,8 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             reason={reasonRestore}
             tone="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25"
             icon={<RotateCcw size={13} />}
-            onPress={() => {
-              if (!window.confirm(t('vote.restoreConfirm'))) return;
-              commitSchedule(t('vote.restored'));
-            }}
+            confirmLabel={t('vote.restoreConfirm')}
+            onPress={() => commitSchedule(t('vote.restored'))}
           />
           {/* WRÓĆ DO ODLICZANIA.
               Bierze godzinę z pola „Start wyścigu" obok, więc dokładną datę ustawia się w tym
@@ -602,10 +600,8 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             reason={reasonCloseNow}
             tone="bg-white/10 text-white hover:bg-white/20"
             icon={<Square size={13} />}
-            onPress={() => {
-              // Zamknięcia nie da się cofnąć zegarem, więc pytanie jest tu na miejscu.
-              if (window.confirm(t('vote.closeConfirm'))) void run(() => closeVoting(apiKey));
-            }}
+            confirmLabel={t('vote.closeConfirm')}
+            onPress={() => void run(() => closeVoting(apiKey))}
           />
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-white/40">{t('vote.countdownHint')}</p>
@@ -634,30 +630,26 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               reason={reasonClearVotes}
               tone="border border-coral/40 text-coral hover:bg-coral hover:text-white"
               icon={<Eraser size={13} />}
-              onPress={() => {
-                if (!window.confirm(t('vote.clearConfirm'))) return;
-                void run(() => clearVoting(apiKey), t('vote.cleared'));
-              }}
+              confirmLabel={t('vote.clearConfirm')}
+              onPress={() => void run(() => clearVoting(apiKey), t('vote.cleared'))}
             />
             <ActionButton
               label={t('vote.winnersSend')}
               reason={reasonMailWinners}
               tone="bg-yellow text-navy-950 hover:bg-white"
               icon={<Trophy size={13} />}
-              onPress={() => {
-                if (!window.confirm(t('vote.winnersConfirm'))) return;
-                void (async () => {
-                  setBusy(true);
-                  setError(null);
-                  try {
-                    setWinners(await mailWinners(apiKey));
-                  } catch (problem) {
-                    setError(explain(problem));
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
+              confirmLabel={t('vote.winnersConfirm')}
+              onPress={() => void (async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  setWinners(await mailWinners(apiKey));
+                } catch (problem) {
+                  setError(explain(problem));
+                } finally {
+                  setBusy(false);
+                }
+              })()}
             />
           </div>
         </div>

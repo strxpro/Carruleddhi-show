@@ -28,6 +28,43 @@ import { PurgePanel } from './PurgePanel';
 import { EditionWizard } from './EditionWizard';
 import { SponsorLeads } from './SponsorLeads';
 
+function ArmedDeleteButton({ onConfirm, title }: { onConfirm: () => void, title: string }) {
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<number>(0);
+
+  const disarm = useCallback(() => {
+    window.clearTimeout(timer.current);
+    timer.current = 0;
+    setArmed(false);
+  }, []);
+
+  useEffect(() => disarm, [disarm]);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (armed) {
+          disarm();
+          onConfirm();
+        } else {
+          setArmed(true);
+          timer.current = window.setTimeout(disarm, 5000);
+        }
+      }}
+      title={title}
+      aria-label={title}
+      className={
+        armed
+          ? 'grid size-8 place-items-center rounded-lg bg-coral text-white'
+          : 'grid size-8 place-items-center rounded-lg text-coral/70 hover:bg-coral hover:text-white'
+      }
+    >
+      <Trash2 className="size-4" />
+    </button>
+  );
+}
+
 /**
  * Settings, and the two things that used to need a developer.
  *
@@ -1107,6 +1144,20 @@ export function SettingsView({
                 <input
                   value={sponsor.url}
                   onChange={(event) => editSponsor(index, { url: event.target.value })}
+                  onBlur={(event) => {
+                    let val = event.target.value.trim();
+                    if (!val) return;
+                    if (val.startsWith('http://') || val.startsWith('https://')) {
+                      // zostawiamy jak jest
+                    } else if (val.startsWith('www.')) {
+                      val = 'https://' + val;
+                    } else {
+                      val = 'https://www.' + val;
+                    }
+                    if (val !== sponsor.url) {
+                      editSponsor(index, { url: val });
+                    }
+                  }}
                   placeholder="https://…"
                   aria-label={t('set.sponsorUrl')}
                   inputMode="url"
@@ -1135,20 +1186,15 @@ export function SettingsView({
                 >
                   <ArrowDown className="size-4" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() =>
+                <ArmedDeleteButton
+                  onConfirm={() =>
                     setSettings((current) => ({
                       ...current,
                       sponsors: current.sponsors.filter((_, i) => i !== index)
                     }))
                   }
                   title={t('set.sponsorRemove')}
-                  aria-label={t('set.sponsorRemove')}
-                  className="grid size-8 place-items-center rounded-lg text-coral/70 hover:bg-coral hover:text-white"
-                >
-                  <Trash2 className="size-4" />
-                </button>
+                />
               </div>
             </li>
           ))}

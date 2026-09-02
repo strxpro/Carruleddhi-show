@@ -1,0 +1,967 @@
+﻿{
+ "consoleErrors": [],
+ "width": 390,
+ "height": 844,
+ "points": [
+  {
+   "label": "gora strony",
+   "y": 0,
+   "heapKb": 2917,
+   "domNodes": 1925,
+   "layers": {
+    "willChange": {
+     "count": 6,
+     "areaMpx": 0.73,
+     "biggest": [
+      {
+       "sel": "article.stack-card.stack-card--classic",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      },
+      {
+       "sel": "article.stack-card.stack-card--art",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      },
+      {
+       "sel": "article.stack-card.stack-card--safety",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      }
+     ]
+    },
+    "filter": {
+     "count": 5,
+     "areaMpx": 0.11,
+     "biggest": [
+      {
+       "sel": "svg",
+       "w": 320,
+       "h": 168,
+       "area": 53692
+      },
+      {
+       "sel": "img",
+       "w": 299,
+       "h": 172,
+       "area": 51556
+      },
+      {
+       "sel": "g",
+       "w": 411,
+       "h": 12,
+       "area": 4777
+      }
+     ]
+    },
+    "backdropFilter": {
+     "count": 3,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "div.gallery-lightbox__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      },
+      {
+       "sel": "button.modal__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      }
+     ]
+    },
+    "transform3d": {
+     "count": 0,
+     "areaMpx": 0,
+     "biggest": []
+    },
+    "fixed": {
+     "count": 6,
+     "areaMpx": 0.5,
+     "biggest": [
+      {
+       "sel": "div.noise",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "header.site-header",
+       "w": 370,
+       "h": 68,
+       "area": 25160
+      }
+     ]
+    },
+    "sticky": {
+     "count": 12,
+     "areaMpx": 1.96,
+     "biggest": [
+      {
+       "sel": "section#schedule.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#attendance.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#faq.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      }
+     ]
+    },
+    "animating": {
+     "count": 17,
+     "areaMpx": 0.54,
+     "biggest": [
+      {
+       "sel": "float-orb @ section.hero",
+       "w": 390,
+       "h": 869,
+       "area": 338892
+      },
+      {
+       "sel": "cookie-in @ aside.cookie-banner",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "marquee @ div.marquee__track",
+       "w": 2108,
+       "h": 24,
+       "area": 50598
+      }
+     ]
+    }
+   },
+   "layerCandidates": 49,
+   "layerAreaMpx": 3.98,
+   "deck": {
+    "cards": 12,
+    "paintedCards": 8,
+    "visibleByOpacity": 8,
+    "drawnArtSvg": 4,
+    "drawnArtAreaPx": 202986,
+    "useNodes": 12,
+    "contentVisibilityAuto": 0,
+    "cardsWithWillChange": 0,
+    "cardBox": {
+     "w": 328,
+     "h": 380
+    },
+    "counter": "01"
+   }
+  },
+  {
+   "label": "sekcja nagrod w widoku",
+   "y": 7324,
+   "heapKb": 3477,
+   "domNodes": 1945,
+   "layers": {
+    "willChange": {
+     "count": 6,
+     "areaMpx": 0.68,
+     "biggest": [
+      {
+       "sel": "article.stack-card.stack-card--safety",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      },
+      {
+       "sel": "article.stack-card.stack-card--classic",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      },
+      {
+       "sel": "article.stack-card.stack-card--art",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      }
+     ]
+    },
+    "filter": {
+     "count": 5,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "img",
+       "w": 379,
+       "h": 208,
+       "area": 78978
+      },
+      {
+       "sel": "svg",
+       "w": 320,
+       "h": 168,
+       "area": 53692
+      },
+      {
+       "sel": "g",
+       "w": 415,
+       "h": 12,
+       "area": 4943
+      }
+     ]
+    },
+    "backdropFilter": {
+     "count": 3,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "div.gallery-lightbox__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      },
+      {
+       "sel": "button.modal__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      }
+     ]
+    },
+    "transform3d": {
+     "count": 4,
+     "areaMpx": 0.19,
+     "biggest": [
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 158,
+       "h": 236,
+       "area": 37374
+      }
+     ]
+    },
+    "fixed": {
+     "count": 6,
+     "areaMpx": 0.5,
+     "biggest": [
+      {
+       "sel": "div.noise",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "header.site-header.is-compact",
+       "w": 322,
+       "h": 64,
+       "area": 20608
+      }
+     ]
+    },
+    "sticky": {
+     "count": 12,
+     "areaMpx": 1.89,
+     "biggest": [
+      {
+       "sel": "section#schedule.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#attendance.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#faq.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      }
+     ]
+    },
+    "animating": {
+     "count": 193,
+     "areaMpx": 0.54,
+     "biggest": [
+      {
+       "sel": "float-orb @ section.hero",
+       "w": 390,
+       "h": 869,
+       "area": 338892
+      },
+      {
+       "sel": "marquee @ div.marquee__track",
+       "w": 2108,
+       "h": 24,
+       "area": 50598
+      },
+      {
+       "sel": "fx-jump @ span.fx-unit",
+       "w": 202,
+       "h": 33,
+       "area": 6651
+      }
+     ]
+    }
+   },
+   "layerCandidates": 229,
+   "layerAreaMpx": 4.08,
+   "deck": {
+    "cards": 12,
+    "paintedCards": 8,
+    "visibleByOpacity": 8,
+    "drawnArtSvg": 4,
+    "drawnArtAreaPx": 202986,
+    "useNodes": 12,
+    "contentVisibilityAuto": 0,
+    "cardsWithWillChange": 0,
+    "cardBox": {
+     "w": 328,
+     "h": 380
+    },
+    "counter": "01"
+   }
+  },
+  {
+   "label": "po przejsciu calej talii",
+   "y": 7324,
+   "heapKb": 2975,
+   "domNodes": 1945,
+   "layers": {
+    "willChange": {
+     "count": 6,
+     "areaMpx": 0.68,
+     "biggest": [
+      {
+       "sel": "article.stack-card.stack-card--safety",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      },
+      {
+       "sel": "article.stack-card.stack-card--classic",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      },
+      {
+       "sel": "article.stack-card.stack-card--art",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      }
+     ]
+    },
+    "filter": {
+     "count": 5,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "img",
+       "w": 379,
+       "h": 208,
+       "area": 78978
+      },
+      {
+       "sel": "svg",
+       "w": 318,
+       "h": 168,
+       "area": 53546
+      },
+      {
+       "sel": "g",
+       "w": 412,
+       "h": 12,
+       "area": 4917
+      }
+     ]
+    },
+    "backdropFilter": {
+     "count": 3,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "div.gallery-lightbox__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      },
+      {
+       "sel": "button.modal__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      }
+     ]
+    },
+    "transform3d": {
+     "count": 4,
+     "areaMpx": 0.19,
+     "biggest": [
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 158,
+       "h": 236,
+       "area": 37374
+      }
+     ]
+    },
+    "fixed": {
+     "count": 6,
+     "areaMpx": 0.5,
+     "biggest": [
+      {
+       "sel": "div.noise",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "header.site-header.is-compact",
+       "w": 322,
+       "h": 64,
+       "area": 20608
+      }
+     ]
+    },
+    "sticky": {
+     "count": 12,
+     "areaMpx": 1.89,
+     "biggest": [
+      {
+       "sel": "section#schedule.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#attendance.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#faq.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      }
+     ]
+    },
+    "animating": {
+     "count": 31,
+     "areaMpx": 2.03,
+     "biggest": [
+      {
+       "sel": "float-orb @ section.hero",
+       "w": 390,
+       "h": 869,
+       "area": 338892
+      },
+      {
+       "sel": "js @ article.prize-card",
+       "w": 327,
+       "h": 379,
+       "area": 123859
+      },
+      {
+       "sel": "js @ article.prize-card",
+       "w": 327,
+       "h": 379,
+       "area": 123859
+      }
+     ]
+    }
+   },
+   "layerCandidates": 67,
+   "layerAreaMpx": 5.57,
+   "deck": {
+    "cards": 12,
+    "paintedCards": 8,
+    "visibleByOpacity": 9,
+    "drawnArtSvg": 4,
+    "drawnArtAreaPx": 202929,
+    "useNodes": 12,
+    "contentVisibilityAuto": 0,
+    "cardsWithWillChange": 0,
+    "cardBox": {
+     "w": 327,
+     "h": 379
+    },
+    "counter": "01"
+   }
+  },
+  {
+   "label": "karuzela 3D w widoku",
+   "y": 6645,
+   "heapKb": 2847,
+   "domNodes": 1945,
+   "layers": {
+    "willChange": {
+     "count": 16,
+     "areaMpx": 1.29,
+     "biggest": [
+      {
+       "sel": "article.stack-card.stack-card--safety",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      },
+      {
+       "sel": "article.stack-card.stack-card--classic",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      },
+      {
+       "sel": "article.stack-card.stack-card--art",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      }
+     ]
+    },
+    "filter": {
+     "count": 5,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "img",
+       "w": 379,
+       "h": 208,
+       "area": 78978
+      },
+      {
+       "sel": "svg",
+       "w": 320,
+       "h": 168,
+       "area": 53692
+      },
+      {
+       "sel": "g",
+       "w": 409,
+       "h": 12,
+       "area": 4756
+      }
+     ]
+    },
+    "backdropFilter": {
+     "count": 3,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "div.gallery-lightbox__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      },
+      {
+       "sel": "button.modal__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      }
+     ]
+    },
+    "transform3d": {
+     "count": 4,
+     "areaMpx": 0.19,
+     "biggest": [
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 158,
+       "h": 236,
+       "area": 37374
+      }
+     ]
+    },
+    "fixed": {
+     "count": 6,
+     "areaMpx": 0.5,
+     "biggest": [
+      {
+       "sel": "div.noise",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "header.site-header.is-compact",
+       "w": 370,
+       "h": 64,
+       "area": 23680
+      }
+     ]
+    },
+    "sticky": {
+     "count": 12,
+     "areaMpx": 1.89,
+     "biggest": [
+      {
+       "sel": "section#schedule.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#attendance.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#faq.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      }
+     ]
+    },
+    "animating": {
+     "count": 16,
+     "areaMpx": 0.4,
+     "biggest": [
+      {
+       "sel": "float-orb @ section.hero",
+       "w": 390,
+       "h": 869,
+       "area": 338892
+      },
+      {
+       "sel": "marquee @ div.marquee__track",
+       "w": 2108,
+       "h": 24,
+       "area": 50598
+      },
+      {
+       "sel": "fx-jitter @ span.fx-jitter",
+       "w": 118,
+       "h": 42,
+       "area": 4933
+      }
+     ]
+    }
+   },
+   "layerCandidates": 62,
+   "layerAreaMpx": 4.55,
+   "deck": {
+    "cards": 12,
+    "paintedCards": 8,
+    "visibleByOpacity": 8,
+    "drawnArtSvg": 4,
+    "drawnArtAreaPx": 202986,
+    "useNodes": 12,
+    "contentVisibilityAuto": 0,
+    "cardsWithWillChange": 0,
+    "cardBox": {
+     "w": 328,
+     "h": 380
+    },
+    "counter": "01"
+   }
+  },
+  {
+   "label": "powrot do nagrod",
+   "y": 7324,
+   "heapKb": 3248,
+   "domNodes": 1945,
+   "layers": {
+    "willChange": {
+     "count": 6,
+     "areaMpx": 0.68,
+     "biggest": [
+      {
+       "sel": "article.stack-card.stack-card--safety",
+       "w": 366,
+       "h": 602,
+       "area": 220332
+      },
+      {
+       "sel": "article.stack-card.stack-card--classic",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      },
+      {
+       "sel": "article.stack-card.stack-card--art",
+       "w": 335,
+       "h": 551,
+       "area": 184467
+      }
+     ]
+    },
+    "filter": {
+     "count": 5,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "img",
+       "w": 379,
+       "h": 208,
+       "area": 78978
+      },
+      {
+       "sel": "svg",
+       "w": 320,
+       "h": 168,
+       "area": 53692
+      },
+      {
+       "sel": "g",
+       "w": 407,
+       "h": 11,
+       "area": 4533
+      }
+     ]
+    },
+    "backdropFilter": {
+     "count": 3,
+     "areaMpx": 0.14,
+     "biggest": [
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "div.gallery-lightbox__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      },
+      {
+       "sel": "button.modal__backdrop",
+       "w": 0,
+       "h": 0,
+       "area": 0
+      }
+     ]
+    },
+    "transform3d": {
+     "count": 4,
+     "areaMpx": 0.19,
+     "biggest": [
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 215,
+       "h": 277,
+       "area": 59589
+      },
+      {
+       "sel": "button.g3d__card",
+       "w": 158,
+       "h": 236,
+       "area": 37374
+      }
+     ]
+    },
+    "fixed": {
+     "count": 6,
+     "areaMpx": 0.5,
+     "biggest": [
+      {
+       "sel": "div.noise",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "aside.cookie-banner.is-visible",
+       "w": 370,
+       "h": 375,
+       "area": 138750
+      },
+      {
+       "sel": "header.site-header.is-compact",
+       "w": 322,
+       "h": 64,
+       "area": 20608
+      }
+     ]
+    },
+    "sticky": {
+     "count": 12,
+     "areaMpx": 1.89,
+     "biggest": [
+      {
+       "sel": "section#schedule.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#attendance.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      },
+      {
+       "sel": "section#faq.section.section-card",
+       "w": 390,
+       "h": 844,
+       "area": 329160
+      }
+     ]
+    },
+    "animating": {
+     "count": 16,
+     "areaMpx": 0.4,
+     "biggest": [
+      {
+       "sel": "float-orb @ section.hero",
+       "w": 390,
+       "h": 869,
+       "area": 338892
+      },
+      {
+       "sel": "marquee @ div.marquee__track",
+       "w": 2108,
+       "h": 24,
+       "area": 50598
+      },
+      {
+       "sel": "fx-jitter @ span.fx-jitter",
+       "w": 118,
+       "h": 42,
+       "area": 4913
+      }
+     ]
+    }
+   },
+   "layerCandidates": 52,
+   "layerAreaMpx": 3.94,
+   "deck": {
+    "cards": 12,
+    "paintedCards": 8,
+    "visibleByOpacity": 8,
+    "drawnArtSvg": 4,
+    "drawnArtAreaPx": 202986,
+    "useNodes": 12,
+    "contentVisibilityAuto": 0,
+    "cardsWithWillChange": 0,
+    "cardBox": {
+     "w": 328,
+     "h": 380
+    },
+    "counter": "01"
+   }
+  }
+ ],
+ "heapAvailable": true,
+ "counterAfterForward": "01",
+ "counterAfterBack": "01",
+ "delta": {
+  "heapKb": 331,
+  "domNodes": 20,
+  "layerCandidates": 3,
+  "layerAreaMpx": -0.04
+ },
+ "peak": {
+  "heapKb": 3477,
+  "layerCandidates": 229,
+  "layerAreaMpx": 5.57
+ }
+}

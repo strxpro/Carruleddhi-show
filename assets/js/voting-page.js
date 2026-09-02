@@ -13,17 +13,24 @@
  *   czternastoma innymi sekcjami. W chwili, w której ktoś głosuje, żadna z tych rzeczy nie jest
  *   już aktualna — wyścig właśnie jedzie. Tu nie ma licznika, „zapisz się" ani „będę tam".
  *
- * TRZY KROKI PRZY POJEŹDZIE, A NIE OKNO NA KLIKNIĘCIE ZDJĘCIA
- *   Zdjęcie nie otwiera niczego. Na kafelku stoi przycisk „Zagłosuj"; po naciśnięciu wyrasta z
- *   niego rząd ocen od 3 do 10 i przycisk potwierdzenia; dopiero potwierdzenie otwiera okno z
- *   adresem. Ocena zostaje przy pojeździe, a okno pojawia się raz — na to, co naprawdę wymaga
- *   pisania.
+ * CZTERY KROKI PRZY POJEŹDZIE, A NIE OKNO NA KLIKNIĘCIE ZDJĘCIA
+ *   Zdjęcie nie otwiera niczego. Dotknięcie zdjęcia odsłania pigułkę „Zagłosuj"; dotknięcie
+ *   pigułki rozwija W JEJ MIEJSCU rząd ocen od 3 do 10 z przyciskiem potwierdzenia; dopiero
+ *   potwierdzenie otwiera okno z adresem. Ocena zostaje przy pojeździe, a okno pojawia się raz —
+ *   na to, co naprawdę wymaga pisania.
  *
- *   JEDNO NACIŚNIĘCIE, TAKŻE PALCEM. Pod palcem przycisku „Zagłosuj" nie widać, dopóki ktoś nie
- *   dotknie kafelka, bo `:hover` na telefonie nie istnieje — ale przezroczysta warstwa na całym
- *   zdjęciu JEST tym przyciskiem i nosi jego nazwę. Dotknięcie zdjęcia rozwija więc rząd ocen od
- *   razu, bez pośredniego dotknięcia „na odsłonięcie". To pośrednie dotknięcie było usterką
- *   „klikam w zagłosuj i nic się nie robi" — patrz `hit.addEventListener` w `voteOverlay()`.
+ *   DWA DOTKNIĘCIA SĄ ŚWIADOMYM ŻYCZENIEM WŁAŚCICIELA, A NIE PRZEOCZENIEM.
+ *   ---------------------------------------------------------------------------
+ *   Ten sam przepływ istniał już wcześniej i został ścięty do JEDNEGO dotknięcia po zgłoszeniu
+ *   „klikam w zagłosuj i nic się nie robi, nie da się zagłosować na telefonie". Wrócił na
+ *   wyraźną prośbę: „jak klikam w zdjęcie żeby zagłosować, to chciałbym żeby pokazał się tam
+ *   napis ZAGŁOSUJ, i po kliknięciu wtedy z tego guzika rozsuwa się ten pop-out z suwakiem".
+ *
+ *   WARUNEK, BEZ KTÓREGO TE DWA DOTKNIĘCIA ZNOWU BĘDĄ USTERKĄ: pigułka NIE MOŻE stanąć w
+ *   punkcie, w którym wylądował palec. Wtedy zasłania ją kciuk i z ekranu wygląda to jak brak
+ *   reakcji — dokładnie tak brzmiało tamto zgłoszenie. Dlatego `arm()` w `voteOverlay()` liczy,
+ *   w którą połowę kadru trafiło dotknięcie, i stawia pigułkę w DRUGIEJ. Kto to kiedyś uprości
+ *   „bo po co ta arytmetyka", ten wróci do jednego dotknięcia albo do zgłoszenia sprzed niego.
  *
  * DOCZYTYWANIE PORCJAMI
  *   Kafelki wchodzą po dwanaście. Przy stu uczestnikach pierwsze wejście nie zaczyna się od stu
@@ -177,6 +184,12 @@ import {
   function collapseCard(node) {
     if (!node) return;
     node.classList.remove('is-armed', 'is-picking');
+    /* Strona kadru, po której stała pigułka, schodzi razem z odsłonięciem. Bez tego kafelek
+       złożony po dotknięciu górnej połowy pamiętałby „pigułka na dole" i przy najechaniu myszą
+       pokazywałby ją w narożniku zamiast na środku — czyli tam, gdzie mysz nigdy o nią nie
+       prosiła. Patrz `arm()` w voteOverlay(). */
+    const veil = $('.vote-veil', node);
+    if (veil) delete veil.dataset.pill;
     const pick = $('.vote-veil__pick', node);
     if (pick) pick.hidden = true;
     const cta = $('.vote-veil__cta', node);
@@ -219,6 +232,14 @@ import {
     hit.hidden = true;
     pick.hidden = !open.picking;
     cta.setAttribute('aria-expanded', String(Boolean(open.picking)));
+    /* Strona kadru odtwarzana razem z resztą, bo pigułka i wyrastający z niej rząd ocen mają po
+       przerysowaniu stać TAM, GDZIE STAŁY. Bez tego doczytanie porcji przenosiło pigułkę z dołu
+       kadru na środek — czyli pod palec, który właśnie po nią sięgał. */
+    const veil = $('.vote-veil', node);
+    if (veil) {
+      if (open.pill) veil.dataset.pill = open.pill;
+      else delete veil.dataset.pill;
+    }
     const slider = $('.vote-slider', node);
     if (slider && open.score) {
       slider.value = String(open.score);
@@ -1159,11 +1180,11 @@ import {
    *   MYSZ — najechanie przygasza zdjęcie i wynosi na jego środek jeden przycisk, a KLIK w ten
    *           przycisk PRZEISTACZA GO w suwak z oceną i przyciskiem wysyłki, w miejscu, w którym
    *           stał, więc wzrok nie musi nigdzie skakać;
-   *   PALEC — JEDNO dotknięcie zdjęcia daje od razu ten sam suwak. Nie „to samo, co najechanie":
-   *           to samo, co KLIK. `:hover` na telefonie nie istnieje, więc nie ma czym oddzielić
-   *           „przygotowania" od „naciśnięcia" — a dotknięcie, które tylko odsłania przycisk
-   *           pod własnym kciukiem, wygląda z ekranu jak strona, która nie zareagowała.
-   *           Patrz `hit.addEventListener` na dole tej funkcji.
+   *   PALEC — dotknięcie zdjęcia odsłania tę samą pigułkę „Zagłosuj", tylko NIE W PUNKCIE
+   *           DOTKNIĘCIA, a dotknięcie pigułki rozwija z niej rząd ocen. Dwa dotknięcia są tu
+   *           świadomym życzeniem właściciela (patrz nagłówek pliku), a jedynym powodem, dla
+   *           którego wcześniej nie działały, było to, że pigułka wyrastała pod kciukiem, który
+   *           ją zasłaniał. Patrz `arm()` i `hit.addEventListener` na dole tej funkcji.
    *
    * DLACZEGO SUWAK, A NIE OSIEM PRZYCISKÓW
    *   Osiem sąsiadujących celów na szerokości pół telefonu to osiem okazji do trafienia w
@@ -1283,15 +1304,18 @@ import {
     picker.append(label, track, scale, actions);
     veil.append(cta, picker);
 
-    /* Przezroczysty przycisk na całym zdjęciu — i to ON JEST przyciskiem „Zagłosuj" pod palcem.
+    /* Przezroczysty przycisk na całym zdjęciu — pierwszy krok drogi do głosu pod palcem.
        ---------------------------------------------------------------------------
        Na myszy jest niewidoczny i nieużywany: CSS zdejmuje go, gdy kursor wejdzie na kafelek,
-       więc klik zawsze trafia wprost w pigułkę na środku zdjęcia. Pod palcem `:hover` nie
-       istnieje, więc pigułki nie ma na ekranie, dopóki ktoś nie dotknie kafelka — i dlatego to
-       ten przycisk niesie nazwę „Zagłosuj na uczestnika — <wóz>" dla czytnika ekranu.
+       więc klik zawsze trafia wprost w pigułkę na zdjęciu. Pod palcem `:hover` nie istnieje,
+       więc pigułki nie ma na ekranie, dopóki ktoś nie dotknie kafelka — i to jest właśnie to
+       dotknięcie.
 
-       Nazwa zobowiązuje: naciśnięcie musi zrobić to, co robi „Zagłosuj", a nie tylko pokazać
-       drugi przycisk o tej samej nazwie. Patrz `hit.addEventListener` niżej. */
+       Nazwa dla czytnika ekranu zostaje ta sama co na pigułce („Zagłosuj — <wóz>"), bo to jest
+       ten sam zamiar, tylko rozłożony na dwa kroki: naciśnięcie odsłania pigułkę i przenosi na
+       nią fokus, więc dla klawiatury i czytnika kolejny Enter jest już tym drugim krokiem. Bez
+       przeniesienia fokusa byłby to przycisk, który ogłasza czynność, a zostawia człowieka bez
+       śladu, gdzie ta czynność się teraz znajduje. Patrz `arm()` niżej. */
     const hit = document.createElement('button');
     hit.type = 'button';
     hit.className = 'vote-card__hit';
@@ -1318,6 +1342,74 @@ import {
       if (state.open && state.open.id === row.id) state.open = null;
     };
 
+    /**
+     * GDZIE POSTAWIĆ PIGUŁKĘ, ŻEBY BYŁO JĄ WIDAĆ: W DRUGIEJ POŁOWIE KADRU NIŻ PALEC.
+     * ===========================================================================
+     *
+     * Kciuk trafia dokładnie tam, gdzie dotknął, i zasłania sobą krążek o promieniu kilkunastu
+     * pikseli — plus całą dłoń poniżej. Pigułka postawiona w tym punkcie jest więc niewidoczna
+     * w chwili, w której ma zaprosić do drugiego dotknięcia, i to był JEDYNY powód, dla którego
+     * poprzednia wersja tego przepływu wyglądała jak „naciskam i nic się nie dzieje".
+     *
+     * Rozstrzygane połową kadru, a nie stałym miejscem: dotknięcie dolnej połowy wynosi pigułkę
+     * pod górną krawędź, dotknięcie górnej — pod dolną. Stała pozycja (choćby „zawsze u góry")
+     * byłaby zepsuta dla jednego z dwóch naturalnych ruchów, bo w siatce dwóch kolumn palec
+     * ląduje i wysoko, i nisko.
+     *
+     * ZMIERZONE sondą probe-voting-mobile.mjs na 390×844, kadr zdjęcia 173×173, pigułka 44 px
+     * wysokości, wyściółka nakładki 7 px:
+     *
+     *     dotknięcie w środek kadru (najgorszy przypadek)  odległość środków 57 px
+     *     dotknięcie w 1/4 wysokości od góry               odległość środków 101 px
+     *     dotknięcie w 1/4 wysokości od dołu               odległość środków 101 px
+     *
+     * Poprzednio ta odległość wynosiła 0 px — pigułka stawała dokładnie pod palcem.
+     * Pięćdziesiąt siedem pikseli to więcej niż pełny cel dotykowy (44 px), czyli pigułka jest
+     * poza obszarem, który zasłania opuszka.
+     *
+     * Klawiatura nie ma współrzędnych (`detail === 0`), więc tam zostaje góra kadru — nic tam
+     * niczego nie zasłania, a fokus i tak wędruje na pigułkę.
+     */
+    const pillSide = (event) => {
+      const node = card();
+      const photo = node ? $('.vote-card__photo', node) : null;
+      const y = event && event.detail > 0 ? Number(event.clientY) : 0;
+      if (!photo || !y) return 'top';
+      const box = photo.getBoundingClientRect();
+      return (y - box.top) > box.height / 2 ? 'top' : 'bottom';
+    };
+
+    /**
+     * KROK PIERWSZY: DOTKNIĘCIE ZDJĘCIA ODSŁANIA PIGUŁKĘ „ZAGŁOSUJ".
+     *
+     * Nie rozwija jeszcze ocen — o to właśnie prosił właściciel. Cała różnica między tym stanem
+     * a stanem, który był tu usterką, siedzi w jednej linijce: `veil.dataset.pill`. Ona mówi
+     * arkuszowi, po której stronie kadru postawić pigułkę, żeby nie stanęła pod palcem.
+     */
+    const arm = (event) => {
+      closeOthers();
+      const node = card();
+      if (!node) return;
+      veil.dataset.pill = pillSide(event);
+      node.classList.add('is-armed');
+      node.classList.remove('is-picking');
+      /* Przezroczysta warstwa schodzi z drogi, żeby drugie dotknięcie trafiło w pigułkę, a nie
+         znowu w nią. Tło nakładki nie jest przy tym martwe — patrz nasłuch na `veil` niżej. */
+      hit.hidden = true;
+      picker.hidden = true;
+      cta.setAttribute('aria-expanded', 'false');
+      /* Zapisane w stanie, nie tylko w klasach: przerysowanie siatki (doczytana porcja, odczyt z
+         serwera) buduje kafelki od nowa i klasy by przepadły — patrz `state.open`. Razem z nim
+         idzie strona kadru, żeby pigułka po przerysowaniu nie przeskoczyła pod palec. */
+      state.open = {
+        id: row.id,
+        picking: false,
+        score: Number(slider.value),
+        pill: veil.dataset.pill
+      };
+      cta.focus({ preventScroll: true });
+    };
+
     const toPick = () => {
       if (isMine && mine && !mine.canChange && !mine.identified) {
         askIdentity(row, mine.score);
@@ -1331,41 +1423,50 @@ import {
       hit.hidden = true;
       picker.hidden = false;
       cta.setAttribute('aria-expanded', 'true');
-      /* Zapisane w stanie, nie tylko w klasach: przerysowanie siatki (doczytana porcja, odczyt z
-         serwera) buduje kafelki od nowa i klasy by przepadły — patrz `state.open`. */
-      state.open = { id: row.id, picking: true, score: Number(slider.value) };
+      /* Strona kadru NIE jest tu zmieniana: rząd ocen ma wyrosnąć w miejscu pigułki, w którą
+         ktoś właśnie dotknął (animacja `vote-morph` w voting.css robi z tego rozsunięcie się
+         jednego elementu, a nie przyjazd drugiego pudełka z innego miejsca). Przy myszy, która
+         wchodzi tu wprost z pigułki na środku, `dataset.pill` jest pusty i środek zostaje. */
+      state.open = {
+        id: row.id,
+        picking: true,
+        score: Number(slider.value),
+        pill: veil.dataset.pill || ''
+      };
       slider.focus({ preventScroll: true });
     };
 
     /**
-     * JEDNO DOTKNIĘCIE KAFELKA ROBI TO, CO JEDNO KLIKNIĘCIE MYSZĄ.
+     * DWA DOTKNIĘCIA: ZDJĘCIE ODSŁANIA PIGUŁKĘ, PIGUŁKA ROZWIJA OCENY.
      * ===========================================================================
      *
-     * TU BYŁA USTERKA „KLIKAM W ZAGŁOSUJ I NIC SIĘ NIE ROBI".
-     *   Stało tu `hit.addEventListener('click', arm)`, gdzie `arm()` tylko odsłaniał nakładkę
-     *   i chował przezroczystą warstwę, żeby DRUGIE dotknięcie mogło trafić w „Zagłosuj".
-     *   Czyli pierwsze dotknięcie było zużywane na pokazanie tego, co mysz dostaje darmo, samym
-     *   najechaniem — i nie posuwało głosowania o ani jeden krok.
+     * TAK CHCE WŁAŚCICIEL — I TO NIE JEST POMYŁKA DO „NAPRAWIENIA" NA JEDNO DOTKNIĘCIE.
+     *   Zgłoszenie, dosłownie: „jak klikam w zdjęcie żeby zagłosować, to chciałbym żeby pokazał
+     *   się tam napis ZAGŁOSUJ, i po kliknięciu wtedy z tego guzika rozsuwa się ten pop-out z
+     *   suwakiem, a jak się kliknie ZAGŁOSUJ [wyślij] to wtedy pokazuje się to z e-mailem".
+     *   Stało tu przez chwilę `hit.addEventListener('click', toPick)`, czyli jedno dotknięcie
+     *   prosto do ocen. Zostało zmienione z powrotem na prośbę, a nie przez przypadek.
      *
-     * ZMIERZONE sondą tools/probe-voting-mobile.mjs, ta sama strona, to samo jedno dotknięcie:
+     * ALE WARUNKIEM JEST TO, ŻE PIGUŁKA NIE STOI POD PALCEM.
+     *   Poprzedni obrót tej samej karuzeli skończył się zgłoszeniem „klikam w zagłosuj i nic się
+     *   nie robi, nie da się zagłosować na telefonie". ZMIERZONE wtedy na 390×844: pigułka
+     *   wyrastała DOKŁADNIE w punkcie dotknięcia (odległość środków 0 px), kciuk ją zasłaniał, a
+     *   drugie dotknięcie „w to samo miejsce" trafiało w przygaszone tło, które nie miało żadnej
+     *   obsługi — 20 z 25 punktów zdjęcia zjadało dotknięcie bez śladu, przy pigułce 159×44 w
+     *   kadrze 173×173.
      *
-     *     1440×900 (wskaźnik z hoverem)   is-picking=true   → rząd ocen rozwinięty
-     *     768×1024 (wskaźnik z hoverem)   is-picking=true   → rząd ocen rozwinięty
-     *     390×844  (hover: none)          is-picking=false  → suwaka NIE MA W KADRZE
-     *
-     *   Na telefonie z ekranu wyglądało to dokładnie jak w zgłoszeniu: zdjęcie przygasa, a
-     *   pigułka „Zagłosuj" wyrasta DOKŁADNIE POD KCIUKIEM, który ją zasłania. Nic się nie
-     *   otwiera, więc naturalną reakcją jest dotknąć jeszcze raz — a przy pigułce 159×44 w
-     *   kadrze 173×173 (ZMIERZONE: 20 z 25 punktów zdjęcia zjadała nakładka i nie robiły NIC)
-     *   drugie dotknięcie najczęściej trafiało w przygaszone tło. Stąd „nie da się zagłosować".
+     *   Oba te powody są usunięte: `arm()` stawia pigułkę w DRUGIEJ POŁOWIE KADRU niż palec
+     *   (ZMIERZONE: 57 px w najgorszym przypadku, 101 px przy dotknięciu w ćwiartce), a tło
+     *   nakładki ma obsługę i prowadzi dalej — patrz nasłuch na `veil` niżej. Kto zdejmie
+     *   którąkolwiek z tych dwóch rzeczy, wróci do tamtego zgłoszenia, nie do „prostszego kodu".
      *
      * DLACZEGO TO NIE ZMIENIA NICZEGO NA MYSZY
-     *   Kursor nigdy nie klika w tę warstwę: `.vote-card:hover .vote-card__hit { display: none }`
-     *   zdejmuje ją, gdy kursor wejdzie na kafelek. Mysz klika wprost w pigułkę, tak jak
-     *   wcześniej, i tak samo dostaje rząd ocen. Znika WYŁĄCZNIE dodatkowe dotknięcie, którego
-     *   nie było w opisie przepływu na początku tego pliku.
+     *   Kursor nigdy nie klika w przezroczystą warstwę: `.vote-card:hover .vote-card__hit
+     *   { display: none }` zdejmuje ją, gdy kursor wejdzie na kafelek. Mysz dostaje pigułkę
+     *   darmo, samym najechaniem, i klika wprost w nią — czyli ma dokładnie jedno kliknięcie do
+     *   rzędu ocen, tak jak przedtem, i pigułkę na środku, bo nie ma palca, który by ją zasłonił.
      */
-    hit.addEventListener('click', toPick);
+    hit.addEventListener('click', arm);
     cta.addEventListener('click', toPick);
     cancel.addEventListener('click', () => { disarm(); hit.focus({ preventScroll: true }); });
 
@@ -1377,10 +1478,21 @@ import {
      * przepadało bez śladu — na kafelku, który wyglądał jak wielki przycisk. ZMIERZONE przed
      * naprawą: 20 z 25 punktów zdjęcia zwracało `div.vote-veil` i nie robiło nic.
      *
-     * Teraz tło jest przełącznikiem tego samego, co robi dotknięcie zdjęcia: zamknięte otwiera
-     * rząd ocen, otwarte składa kafelek. To ta sama zasada, którą ma dotknięcie POZA kafelkiem
-     * (nasłuch na dokumencie w `start()`), tylko rozciągnięta na przygaszone tło, bo z punktu
-     * widzenia palca to jest to samo miejsce: „nie w kontrolkę".
+     * Teraz tło prowadzi DALEJ, a nie wstecz, i to jest wybór podjęty przeciw pokusie zrobienia
+     * z niego „anuluj":
+     *
+     *   TŁO PRZY ODSŁONIĘTEJ PIGUŁCE (rząd ocen jeszcze schowany) → rozwija rząd ocen, dokładnie
+     *     jak dotknięcie samej pigułki. Bo najczęstszym drugim dotknięciem jest dotknięcie W TO
+     *     SAMO MIEJSCE co pierwsze — pigułka stoi wtedy po drugiej stronie kadru, więc palec
+     *     ląduje na tle. Gdyby tło składało kafelek, człowiek dwoma dotknięciami w to samo
+     *     miejsce wracałby do punktu wyjścia i widziałby dokładnie to, co w zgłoszeniu: „klikam
+     *     i nic się nie robi". Tak jest wybaczająco: dwa dotknięcia gdziekolwiek po zdjęciu
+     *     zawsze dowożą do ocen, a pigułka mówi, o co w tym drugim dotknięciu chodzi.
+     *   TŁO PRZY OTWARTYM RZĘDZIE OCEN → składa kafelek, bo wtedy wszystko, co prowadzi dalej,
+     *     jest już na ekranie i jedyną rzeczą, której brakuje, jest wyjście.
+     *
+     * Wyjściem z odsłoniętej pigułki zostaje dotknięcie POZA kafelkiem (nasłuch na dokumencie
+     * w `start()`), klawisz Escape i „zamknij" w rzędzie ocen.
      *
      * `event.target !== veil` przepuszcza dalej trafienia w przyciski i suwak w środku — one
      * mają własną obsługę i nie wolno ich dublować.

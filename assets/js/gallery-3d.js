@@ -437,8 +437,44 @@ export function setupGallery3D({ images = [], captions = [], reducedMotion = fal
   let visibility = null;
   if ('IntersectionObserver' in window) {
     visibility = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) startAutoplay();
+      const onScreen = entries.some((entry) => entry.isIntersecting);
+      if (onScreen) startAutoplay();
       else stopAutoplay();
+      /* ============================================================
+         KARUZELA POZA WIDOKIEM ZWALNIA SWOJE WARSTWY KOMPOZYTORA.
+         ============================================================
+         OBJAW, KTÓREGO TO DOTYCZY
+           „Strona na telefonie sama się odświeża w okolicy sekcji nagród." Sekcja nagród leży
+           bezpośrednio POD galerią (zmierzone: scrollY galerii 6645, nagród 7324 na 390x844),
+           więc obie płacą rachunek pamięci graficznej w tej samej chwili — czytelnik jest w
+           talii, a karuzela dalej trzyma swoje tekstury kilkaset pikseli wyżej.
+
+         CO TU BYŁO, ZMIERZONE
+           `will-change: transform, opacity` na `.g3d__card` i `will-change: transform` na
+           `.g3d__media img` (gallery-3d.css) stały bezwarunkowo, przez cały czas życia strony.
+           `will-change` to jawna prośba o osobną warstwę kompozytora, i przeglądarka ją
+           spełnia od razu, a nie dopiero gdy coś się rusza.
+
+           Pomiar tools/probe-c-prizes-memory.js na 390x844, snapshot „sekcja nagrod w widoku":
+             elementów z niezerowym `will-change`:      16
+             z tego karuzela:                           10  (5 kart + 5 zdjęć)
+             suma pudełek tych dziesięciu:              603 429 px2 (0,60 Mpx)
+           Czyli ponad połowa wszystkich warstw z `will-change` na stronie i 0,60 Mpx pamięci
+           graficznej trzymanej dla sekcji, której w tym momencie nie ma na ekranie.
+
+         CO ROBIMY
+           Klasa na sekcji, a w gallery-3d.css `will-change: auto` pod nią. Poza widokiem nikt
+           nie przeciąga kart i nie działa autoodtwarzanie (zatrzymane linijkę wyżej, tym samym
+           obserwatorem), więc nie ma czego przygotowywać. Warstwy wracają, gdy karuzela wraca
+           na ekran — a wtedy `will-change` znowu ma sens, bo karty naprawdę ruszają się w
+           każdej klatce tweenu GSAP-a.
+
+         DLACZEGO KLASA, A NIE ZAPIS STYLU Z JS
+           Zapis inline musiałby przejść po dziesięciu elementach i pisać im właściwość przy
+           każdym wejściu i wyjściu sekcji z widoku. Jedna klasa na sekcji to jedna zmiana
+           atrybutu, a decyzję, KTÓRE elementy tracą podpowiedź, trzyma arkusz — czyli to samo
+           miejsce, które ją nadaje. */
+      section.classList.toggle('is-offscreen', !onScreen);
     }, { threshold: 0.02 });
     visibility.observe(section);
   }
