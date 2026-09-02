@@ -116,7 +116,7 @@ const UNSUB = {
     unsubFooter: 'Non voglio più questi avvisi',
     unsubSubject: 'Il tuo codice: %CODE%',
     unsubCodeTitle: 'Ecco il codice',
-    unsubCodeLead: 'Inseriscilo sul sito per disattivare gli avvisi. Vale 10 i.',
+    unsubCodeLead: 'Inseriscilo sul sito per disattivare gli avvisi. Vale 10 minuti.',
     unsubCodeNote: 'Se non hai chiesto tu questo codice, ignora il messaggio: non cambia nulla.',
     unsubDone: 'Fatto. Non ti scriveremo più.'
   },
@@ -124,7 +124,7 @@ const UNSUB = {
     unsubFooter: 'Nie chcę już tych powiadomień',
     unsubSubject: 'Twój kod: %CODE%',
     unsubCodeTitle: 'Oto kod',
-    unsubCodeLead: 'Wpisz go na stronie, żeby wyłączyć powiadomienia. Jest ważny 10 .',
+    unsubCodeLead: 'Wpisz go na stronie, żeby wyłączyć powiadomienia. Jest ważny 10 minut.',
     unsubCodeNote: 'Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — nic się nie zmieni.',
     unsubDone: 'Gotowe. Nie będziemy już pisać.'
   },
@@ -132,7 +132,7 @@ const UNSUB = {
     unsubFooter: 'I no longer want these',
     unsubSubject: 'Your code: %CODE%',
     unsubCodeTitle: 'Here is the code',
-    unsubCodeLead: 'Enter it on the website to switch the reminders off. It lasts 10 es.',
+    unsubCodeLead: 'Enter it on the website to switch the reminders off. It lasts 10 minutes.',
     unsubCodeNote: 'If you did not ask for this code, ignore this message — nothing changes.',
     unsubDone: 'Done. We will not write again.'
   },
@@ -140,7 +140,7 @@ const UNSUB = {
     unsubFooter: 'Ich möchte das nicht mehr',
     unsubSubject: 'Dein Code: %CODE%',
     unsubCodeTitle: 'Hier ist der Code',
-    unsubCodeLead: 'Gib ihn auf der Website ein, um die Erinnerungen abzuschalten. Er gilt 10 .',
+    unsubCodeLead: 'Gib ihn auf der Website ein, um die Erinnerungen abzuschalten. Er gilt 10 Minuten.',
     unsubCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — es ändert sich nichts.',
     unsubDone: 'Erledigt. Wir schreiben nicht mehr.'
   },
@@ -148,7 +148,7 @@ const UNSUB = {
     unsubFooter: 'Ya no quiero estos avisos',
     unsubSubject: 'Tu código: %CODE%',
     unsubCodeTitle: 'Aquí tienes el código',
-    unsubCodeLead: 'Escríbelo en la web para desactivar los avisos. Vale 10 os.',
+    unsubCodeLead: 'Escríbelo en la web para desactivar los avisos. Vale 10 minutos.',
     unsubCodeNote: 'Si no has pedido este código, ignora el mensaje: no cambia nada.',
     unsubDone: 'Hecho. No volveremos a escribir.'
   },
@@ -156,7 +156,7 @@ const UNSUB = {
     unsubFooter: 'Je ne veux plus ces rappels',
     unsubSubject: 'Votre code : %CODE%',
     unsubCodeTitle: 'Voici le code',
-    unsubCodeLead: 'Saisissez-le sur le site pour désactiver les rappels. Il est valable 10 es.',
+    unsubCodeLead: 'Saisissez-le sur le site pour désactiver les rappels. Il est valable 10 minutes.',
     unsubCodeNote: 'Si vous n’avez pas demandé ce code, ignorez ce message : rien ne change.',
     unsubDone: 'C’est fait. Nous n’écrirons plus.'
   }
@@ -207,37 +207,37 @@ const ENTRY = {
   it: {
     entrySubject: 'Il tuo codice: %CODE%',
     entryCodeTitle: 'Ecco il codice',
-    entryCodeLead: 'Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 10 i.',
+    entryCodeLead: 'Inseriscilo sul sito per vedere la tua iscrizione, correggerla o ritirarti. Vale 10 minuti.',
     entryCodeNote: 'Se non hai chiesto tu questo codice, ignora il messaggio: la tua iscrizione non cambia.'
   },
   pl: {
     entrySubject: 'Twój kod: %CODE%',
     entryCodeTitle: 'Oto kod',
-    entryCodeLead: 'Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 10 .',
+    entryCodeLead: 'Wpisz go na stronie, żeby zobaczyć swoje zgłoszenie, poprawić je albo zrezygnować. Jest ważny 10 minut.',
     entryCodeNote: 'Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość — Twoje zgłoszenie się nie zmienia.'
   },
   en: {
     entrySubject: 'Your code: %CODE%',
     entryCodeTitle: 'Here is the code',
-    entryCodeLead: 'Enter it on the website to see your entry, correct it or withdraw. It lasts 10 es.',
+    entryCodeLead: 'Enter it on the website to see your entry, correct it or withdraw. It lasts 10 minutes.',
     entryCodeNote: 'If you did not ask for this code, ignore this message — your entry does not change.'
   },
   de: {
     entrySubject: 'Dein Code: %CODE%',
     entryCodeTitle: 'Hier ist der Code',
-    entryCodeLead: 'Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 10 .',
+    entryCodeLead: 'Gib ihn auf der Website ein, um deine Anmeldung zu sehen, zu korrigieren oder zurückzuziehen. Er gilt 10 Minuten.',
     entryCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere die Nachricht — an deiner Anmeldung ändert sich nichts.'
   },
   es: {
     entrySubject: 'Tu código: %CODE%',
     entryCodeTitle: 'Aquí tienes el código',
-    entryCodeLead: 'Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 10 os.',
+    entryCodeLead: 'Escríbelo en la web para ver tu inscripción, corregirla o retirarte. Vale 10 minutos.',
     entryCodeNote: 'Si no has pedido este código, ignora el mensaje: tu inscripción no cambia.'
   },
   fr: {
     entrySubject: 'Votre code : %CODE%',
     entryCodeTitle: 'Voici le code',
-    entryCodeLead: 'Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 10 es.',
+    entryCodeLead: 'Saisissez-le sur le site pour voir votre inscription, la corriger ou vous retirer. Il est valable 10 minutes.',
     entryCodeNote: 'Si vous n’avez pas demandé ce code, ignorez ce message : votre inscription ne change pas.'
   }
 };
@@ -254,7 +254,7 @@ const QUIT = {
   it: {
     quitSubject: 'Codice per ritirarti: %CODE%',
     quitCodeTitle: 'Vuoi ritirarti dalla gara?',
-    quitCodeLead: 'Inserisci questo codice sul sito per confermare il ritiro. Vale 10 i. Non serve per altro.',
+    quitCodeLead: 'Inserisci questo codice sul sito per confermare il ritiro. Vale 10 minuti. Non serve per altro.',
     quitCodeNote: 'Se non hai chiesto tu questo codice, ignoralo: la tua iscrizione resta come è.',
     quitDoneSubject: 'Ritiro confermato — Carruleddhi Show 2026',
     quitDoneTitle: 'Ti abbiamo ritirato dalla gara',
@@ -264,7 +264,7 @@ const QUIT = {
   pl: {
     quitSubject: 'Kod do rezygnacji: %CODE%',
     quitCodeTitle: 'Chcesz zrezygnować z wyścigu?',
-    quitCodeLead: 'Wpisz ten kod na stronie, żeby potwierdzić rezygnację. Jest ważny 10 . Do niczego innego nie służy.',
+    quitCodeLead: 'Wpisz ten kod na stronie, żeby potwierdzić rezygnację. Jest ważny 10 minut. Do niczego innego nie służy.',
     quitCodeNote: 'Jeśli to nie Ty prosiłeś o ten kod, zignoruj go — Twoje zgłoszenie zostaje bez zmian.',
     quitDoneSubject: 'Rezygnacja przyjęta — Carruleddhi Show 2026',
     quitDoneTitle: 'Wycofaliśmy Cię z wyścigu',
@@ -274,7 +274,7 @@ const QUIT = {
   en: {
     quitSubject: 'Code to withdraw: %CODE%',
     quitCodeTitle: 'Withdrawing from the race?',
-    quitCodeLead: 'Enter this code on the website to confirm the withdrawal. It lasts 10 es and does nothing else.',
+    quitCodeLead: 'Enter this code on the website to confirm the withdrawal. It lasts 10 minutes and does nothing else.',
     quitCodeNote: 'If you did not ask for this code, ignore it — your entry stays as it is.',
     quitDoneSubject: 'Withdrawal confirmed — Carruleddhi Show 2026',
     quitDoneTitle: 'You are withdrawn from the race',
@@ -284,7 +284,7 @@ const QUIT = {
   de: {
     quitSubject: 'Code zum Rücktritt: %CODE%',
     quitCodeTitle: 'Vom Rennen zurücktreten?',
-    quitCodeLead: 'Gib diesen Code auf der Website ein, um den Rücktritt zu bestätigen. Er gilt 10  und tut nichts anderes.',
+    quitCodeLead: 'Gib diesen Code auf der Website ein, um den Rücktritt zu bestätigen. Er gilt 10 Minuten und tut nichts anderes.',
     quitCodeNote: 'Wenn du diesen Code nicht angefordert hast, ignoriere ihn — deine Anmeldung bleibt.',
     quitDoneSubject: 'Rücktritt bestätigt — Carruleddhi Show 2026',
     quitDoneTitle: 'Du bist vom Rennen zurückgetreten',
@@ -294,7 +294,7 @@ const QUIT = {
   es: {
     quitSubject: 'Código para retirarte: %CODE%',
     quitCodeTitle: '¿Te retiras de la carrera?',
-    quitCodeLead: 'Escribe este código en la web para confirmar la retirada. Vale 10 os y no sirve para nada más.',
+    quitCodeLead: 'Escribe este código en la web para confirmar la retirada. Vale 10 minutos y no sirve para nada más.',
     quitCodeNote: 'Si no has pedido este código, ignóralo: tu inscripción se queda como está.',
     quitDoneSubject: 'Retirada confirmada — Carruleddhi Show 2026',
     quitDoneTitle: 'Te hemos retirado de la carrera',
@@ -304,7 +304,7 @@ const QUIT = {
   fr: {
     quitSubject: 'Code pour vous retirer : %CODE%',
     quitCodeTitle: 'Vous vous retirez de la course ?',
-    quitCodeLead: 'Saisissez ce code sur le site pour confirmer le retrait. Il est valable 10 es et ne sert à rien d’autre.',
+    quitCodeLead: 'Saisissez ce code sur le site pour confirmer le retrait. Il est valable 10 minutes et ne sert à rien d’autre.',
     quitCodeNote: 'Si vous n’avez pas demandé ce code, ignorez-le : votre inscription reste telle quelle.',
     quitDoneSubject: 'Retrait confirmé — Carruleddhi Show 2026',
     quitDoneTitle: 'Vous êtes retiré de la course',
@@ -738,6 +738,99 @@ for (const lang of Object.keys(written).filter((key) => !key.startsWith('_'))) {
   if (missing.length) {
     problems += 1;
     console.log(`FAIL  ${lang} missing: ${missing.join(', ')}`);
+  }
+}
+
+/* ============================================================================
+   WAŻNOŚĆ KODU: JEDNA LICZBA I JEDNOSTKA, KTÓRA MUSI ZOSTAĆ PRZY LICZBIE
+   ============================================================================
+   PO CO TEN SPRAWDZIAN ISTNIEJE — I JAKI BŁĄD JUŻ RAZ POPEŁNIŁ
+     Ważność kodu decyduje się w JEDNYM miejscu: `CODE_TTL_MINUTES` w worker/index.js.
+     Migracja 0035 ustawia na to samo domyślną wartość kolumny, a te trzy napisy mówią to
+     człowiekowi — w sześciu językach, liczbą wpisaną w zdanie, bo renderer w Make nie umie
+     ani liczyć, ani podstawiać niczego poza ścieżkami (patrz nagłówek emails/copy.json).
+
+     Osiemnaście zdań poprawianych ręcznie przy każdej zmianie tej liczby to osiemnaście
+     szans na hurtową podmianę, która zabiera za dużo. Dokładnie to się stało: zamiana
+     „piętnastu" na „dziesięć" zjadła słowo z jednostką i została z „Jest ważny 10 .",
+     „Vale 10 i." oraz „It lasts 10 es." — zdania, które przechodzą każdy sprawdzian
+     kompletności kluczy, bo klucz JEST, tylko nic nie znaczy.
+
+     Ten test łapie oba warianty tej pomyłki: rozjazd liczby ze stałą w Workerze (list
+     obiecujący piętnaście minut przy kodzie żyjącym dziesięć jest gorszy niż brak
+     informacji) i zgubioną jednostkę. Liczba czytana ze źródła Workera, a nie wpisana
+     tutaj — drugie miejsce z tą samą liczbą byłoby trzecim miejscem do rozjechania.
+
+   CZEGO NIE SPRAWDZA
+     Gramatyki liczebnika. „10 minut" jest po polsku poprawne, „2 minut" nie — ale ta
+     liczba nie schodzi poniżej dziesięciu i sprawdzanie odmiany dla wartości, których nikt
+     nie ustawi, byłoby testem cudzej hipotezy. */
+const TTL_KEYS = ['unsubCodeLead', 'entryCodeLead', 'quitCodeLead'];
+/* Słowo, które MUSI stać przy liczbie. Wielkość liter ma znaczenie w niemieckim
+   (rzeczownik), więc porównanie jest dosłowne — a nie „gdziekolwiek, byle podobne". */
+const TTL_UNIT = {
+  it: 'minuti', pl: 'minut', en: 'minutes', de: 'Minuten', es: 'minutos', fr: 'minutes'
+};
+
+const workerSource = readFileSync(join(root, 'worker', 'index.js'), 'utf8');
+const ttlMatch = workerSource.match(/const CODE_TTL_MINUTES\s*=\s*(\d+)/);
+if (!ttlMatch) {
+  problems += 1;
+  console.log('FAIL  nie znalazlem CODE_TTL_MINUTES w worker/index.js');
+} else {
+  const ttl = ttlMatch[1];
+  let ttlProblems = 0;
+  /* Sprawdzane W DWÓCH MIEJSCACH: w tablicach wyżej i w zapisanym słowniku. Klucz raz
+     dodany nigdy więcej nie jest przepisywany (ten skrypt jest idempotentny), więc zdanie
+     zepsute w tablicy nie rusza copy.json i sprawdzian po samym pliku nic by nie zobaczył —
+     do dnia, w którym ktoś doda siódmy język albo wyczyści klucz, i wtedy do listów wjedzie
+     „Jest ważny 10 ." prosto z tablicy. */
+  const sources = { file: written };
+  for (const group of GROUPS) {
+    for (const lang of LANGS) {
+      for (const key of TTL_KEYS) {
+        if (group[lang]?.[key] === undefined) continue;
+        sources.table = sources.table || {};
+        sources.table[lang] = { ...(sources.table[lang] || {}), [key]: group[lang][key] };
+      }
+    }
+  }
+
+  for (const [where, deckToCheck] of Object.entries(sources)) {
+    for (const lang of LANGS) {
+      const unit = TTL_UNIT[lang];
+      for (const key of TTL_KEYS) {
+        /* W tablicy klucza może nie być (grupa go nie niesie) — brakiem jest tylko brak w
+           zapisanym pliku, bo tam MUSI stać. */
+        if (where === 'table' && deckToCheck[lang]?.[key] === undefined) continue;
+        const text = String(deckToCheck[lang]?.[key] ?? '');
+        if (!text) {
+          ttlProblems += 1;
+          console.log(`FAIL  [${where}] ${lang}.${key} nie istnieje, a mowi o waznosci kodu`);
+          continue;
+        }
+        /* Liczba i jednostka RAZEM, w tej kolejności, z jedną spacją. Osobne sprawdzenie
+           „jest 10" i „jest minut" przepuściłoby zdanie, w którym jednostka odjechała do
+           innego akapitu — a to jest ten sam nieczytelny wynik dla czytającego. */
+        if (!text.includes(`${ttl} ${unit}`)) {
+          ttlProblems += 1;
+          console.log(`FAIL  [${where}] ${lang}.${key} nie mowi "${ttl} ${unit}": ${text}`);
+        }
+        /* I ani jednej INNEJ liczby minut w tym samym zdaniu. Zdanie „ważny 10 minut, czyli
+           15 minut od wysłania" zawiera poprawny napis i przeszłoby test powyżej, a mówi dwie
+           rzeczy naraz — z czego jedna jest nieprawdą. */
+        for (const [, number] of text.matchAll(/(\d{1,3})\s*[Mm]inut/g)) {
+          if (number !== ttl) {
+            ttlProblems += 1;
+            console.log(`FAIL  [${where}] ${lang}.${key} niesie takze ${number} minut: ${text}`);
+          }
+        }
+      }
+    }
+  }
+  problems += ttlProblems;
+  if (!ttlProblems) {
+    console.log(`ok    kod zyje ${ttl} ${TTL_UNIT.pl}, i tak mowia listy w szesciu jezykach`);
   }
 }
 

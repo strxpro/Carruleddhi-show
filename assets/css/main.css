@@ -722,6 +722,28 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .stack-card__visual { position: relative; display: grid; place-items: center; overflow: hidden; }
 .stack-card__visual svg { width: min(78%, 540px); filter: drop-shadow(0 28px 34px rgba(7,26,61,.22)); transition: transform .8s var(--ease-out); }
 .stack-card:hover .stack-card__visual svg { transform: rotate(-4deg) scale(1.06); }
+
+/* Zdjecie kategorii wypelnia panel.
+   ---------------------------------------------------------------------------
+   Rysunek, ktory tu byl, plywal na srodku (78% szerokosci, cien) — bo byl ilustracja na
+   kolorowym tle. Zdjecie tak potraktowane wyglada jak polaroid przyklejony do karty, wiec
+   kadruje panel w calosci. Karta ma juz overflow: hidden i zaokraglenie, wiec nie trzeba
+   ich tu powtarzac.
+
+   Bez obrotu przy najezdzie: obrocone zdjecie odslania rogi tla pod spodem. Zostaje samo
+   przyblizenie, i tylko tam, gdzie kursor istnieje — na dotyku :hover zostaje wcisniety
+   po stuknieciu. */
+.stack-card__photo {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .8s var(--ease-out);
+}
+@media (hover: hover) {
+  .stack-card:hover .stack-card__photo { transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stack-card__photo { transition: none; }
+  .stack-card:hover .stack-card__photo { transform: none; }
+}
 .stack-card--classic { background: var(--yellow); color: var(--navy-950); }
 .stack-card--art { background: var(--coral); color: var(--white); }
 .stack-card--art .stack-card__visual { background: var(--blue-700); }

@@ -99,6 +99,31 @@ const ALLOWED_TYPES = new Set([
      w skrzynce — ta sama konstrukcja co przy rezygnacji z powiadomień. */
   'entry-lookup', 'entry-code', 'entry-manage',
 
+  /* Zgłoszenia sponsorów widziane oczami organizatora: `list`, `approve`, `reject`.
+     ---------------------------------------------------------------------------
+     OSOBNY TYP, A NIE TRZY AKCJE W `settings-admin` — I TO JEST RÓŻNICA W KONTRAKCIE,
+     NIE W KODZIE. Handlery są te same (`sponsorLeads`, `sponsorLeadApprove`,
+     `sponsorLeadReject`); nowy jest tylko adres, pod którym panel je woła. Powód: panel
+     pisze ktoś inny, a kontrakt, który brzmi „wyślij na /settings-admin i podaj action:
+     'sponsor-approve'", każe zgadywać, że zatwierdzenie sponsora jest zapisem ustawień.
+     Pod własnym typem lista pól tej końcówki (`FIELD_WHITELIST['sponsor-admin']`) mówi
+     dokładnie, co ta końcówka przyjmuje, i nie miesza się z `settings` ani z `photo`.
+
+     Trzy stare akcje w `settings-admin` ZOSTAJĄ i to nie jest niechlujstwo: panel już je
+     woła (`src/admin/api.ts`), a zabranie ich byłoby zepsuciem działającego ekranu w
+     zamian za czystszą nazwę.
+
+     CZTERY MIEJSCA, wszystkie cztery po imieniu — patrz komentarz przy `verify-start`:
+       ALLOWED_TYPES     tu; bez tego żądanie odbija się o UNKNOWN_TYPE przed handlerem,
+       SUPABASE_TYPES    bez tego leci do Make, który odpowiada „Accepted" i nie robi nic,
+       PROTECTED_TYPES   bez tego lista nazwisk, adresów i telefonów firm stoi otwarta,
+       FIELD_WHITELIST   bez tego `id` i `status` giną w sanitizacji, a `approve` odmawia
+                         tak, jakby panel przysłał śmieci,
+       router w fetch()  bez tego wpada w `wallAdmin` na końcu łańcucha `if`-ów.
+     `carriesImage` NIE — ta końcówka nie niesie zdjęcia. Logo jest wgrane wcześniej przez
+     `sponsor-lead` i tutaj jedzie jako ścieżka, czyli kilkadziesiąt znaków. */
+  'sponsor-admin',
+
   // Public voting and organiser controls. The latter is protected below.
   'voting', 'voting-admin'
 ]);
@@ -109,6 +134,10 @@ const SUPABASE_TYPES = new Set([
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
   'unsub-start', 'unsub-confirm', 'notify-code', 'notify-off', 'sponsor-lead',
+  /* Zgłoszenia sponsorów czyta i rozstrzyga Worker z Supabase. Make nie ma tu nic do
+     roboty i gdyby żądanie do niego doleciało, odpowiedziałby „Accepted" na listę, której
+     nie zna — panel pokazałby zero zgłoszeń z pełnym przekonaniem. */
+  'sponsor-admin',
   'verify-start', 'verify-code',
   'chat', 'chat-admin', 'chat-inbound', 'inbox',
   'entry-lookup', 'entry-code', 'entry-manage',
@@ -153,6 +182,11 @@ const PROTECTED_TYPES = new Set([
   'roster', 'subscribers',
   'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge',
   'voting-admin',
+  /* Zgłoszenia sponsorów to nazwiska, adresy i telefony firm, plus podpisany adres do logo,
+     które jeszcze nie jest publiczne. Bez hasła ta końcówka byłaby książką telefoniczną
+     wystawioną pod adresem, który da się odgadnąć z nazwy — a `reject` i `approve` byłyby
+     przyciskiem do rozstrzygania cudzych zgłoszeń dla każdego, kto zna ścieżkę. */
+  'sponsor-admin',
   /* `stats` tak, `visit` NIE. Sondę wysyła przeglądarka każdego zwiedzającego, więc hasło
      musiałoby stać w kodzie strony — czyli nie byłoby hasłem. Odczyt statystyk to co innego:
      to są liczby organizatora i nikt poza nim nie ma powodu ich widzieć. */
@@ -234,6 +268,17 @@ const FIELD_WHITELIST = {
      po cichu, `sponsor-approve` widzi puste `id` i odmawia tak, jakby panel przysłał
      śmieci — awaria wyglądająca jak działający przycisk, który zawsze mówi „nie". */
   'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit'],
+  /* Zgłoszenia sponsorów, oczami organizatora. Cztery pola i ani jednego więcej — to jest
+     cała treść kontraktu tej końcówki:
+       action  'list' | 'approve' | 'reject'
+       id      identyfikator zgłoszenia; wymagany przy `approve` i `reject`
+       status  filtr listy: 'pending' (domyślnie w panelu) | 'approved' | 'rejected' | 'all'
+       limit   ile wierszy oddać; sufit po stronie serwera, patrz SPONSOR_LEADS_LIMIT
+     Nie ma tu `settings` ani `photo` i to jest różnica względem `settings-admin`: tamta
+     końcówka pisze ustawienia i przyjmuje obrazek, ta nie robi ani jednego, ani drugiego.
+     Lista pól jest sprawdzana PRZED handlerem, więc pole pominięte tutaj nie wraca błędem —
+     ginie po cichu i handler odmawia tak, jakby panel przysłał pustkę. */
+  'sponsor-admin': ['action', 'id', 'status', 'limit'],
   /* The clock supplies nothing: the function works out what is due from the date it
      already knows.
        dryRun   render the letters without recording that they went out, so the whole
@@ -5862,16 +5907,21 @@ async function rolloverVotingEdition(env, settings) {
 /* ============================================================================
    ZGŁOSZENIA SPONSORÓW W PANELU — odczyt listy i werdykt
    ============================================================================
-   Trzy akcje: `sponsor-leads` czyta listę, `sponsor-approve` dopisuje sponsora na stronę,
-   `sponsor-reject` odkłada zgłoszenie ze stanem. Wszystkie trzy siedzą w `settings-admin`,
-   a nie w nowym typie — i to jest decyzja, nie skrót:
+   Trzy czynności: odczyt listy, dopisanie sponsora na stronę, odłożenie zgłoszenia ze
+   stanem. Te same trzy funkcje odpowiadają pod DWOMA adresami i to jest zamierzone:
 
-     1. Zatwierdzenie ZAPISUJE do `site_settings.sponsors`, czyli robi dokładnie to, co
-        zwykły zapis ustawień. Osobny typ znaczyłby dwa miejsca piszące do jednego wiersza
-        i dwie kopie walidacji ścieżki logo oraz protokołu adresu.
-     2. `settings-admin` jest już na `PROTECTED_TYPES` i na `carriesImage`. Nowy typ trzeba
-        by dopisać w czterech miejscach (patrz komentarze przy `ALLOWED_TYPES`), a pominięcie
-        któregokolwiek daje końcówkę, która wygląda na działającą.
+     `sponsor-admin` z akcjami `list` / `approve` / `reject` — kontrakt dla panelu, opisany
+        po imieniu nad `sponsorAdmin()`. To pod tym adresem końcówka daje się przeczytać:
+        własna lista pól, własny typ, nazwa mówiąca o zgłoszeniach sponsorów.
+     `settings-admin` z akcjami `sponsor-leads` / `sponsor-approve` / `sponsor-reject` —
+        pierwsza droga, którą panel już woła (`src/admin/api.ts`). ZOSTAJE. Zabranie jej w
+        zamian za czystszą nazwę byłoby zepsuciem działającego ekranu; jedna funkcja pod
+        dwoma adresami nie może się rozjechać sama ze sobą, bo jest jedna.
+
+   Zatwierdzenie ZAPISUJE do `site_settings.sponsors`, więc jest tu, obok `settingsAdmin`, a
+   nie w osobnym pliku: `cleanSettings` i `MAX_SPONSORS` mają zostać jednym miejscem. Druga
+   kopia walidacji ścieżki logo i protokołu adresu to druga odpowiedź na pytanie, co wolno
+   wpuścić w atrybut `href` na stronie głównej.
 
    DLACZEGO ZATWIERDZENIE PRZECHODZI PRZEZ `cleanSettings`
      Bo ścieżka logo i adres wchodzą na stronę główną — do atrybutów `src` i `href`. Wiersz
@@ -6069,6 +6119,40 @@ async function sponsorLeadReject(env, payload, cors) {
   const marked = await markSponsorLead(env, found.row.id, 'rejected');
   if (!marked) return json({ ok: false, code: 'SPONSOR_LEAD_WRITE_FAILED' }, 502, cors);
   return json({ ok: true, submission: await sponsorLeadShape(env, marked) }, 200, cors);
+}
+
+/**
+ * KONTRAKT KOŃCÓWKI `sponsor-admin` — jedno miejsce, które panel ma przeczytać.
+ * ============================================================================
+ * POST /api/carruleddhi/sponsor-admin, nagłówek `X-Carruleddhi-Roster-Key` z hasłem panelu
+ * (typ jest na `PROTECTED_TYPES`, więc bez nagłówka wraca 401 zanim ta funkcja się zaczyna).
+ *
+ *   { action: 'list',    status?: 'pending'|'approved'|'rejected'|'all', limit?: number }
+ *     → { ok: true, submissions: [...], counts: { pending, approved, rejected, total }, limit }
+ *
+ *   { action: 'approve', id: uuid }
+ *     → { ok: true, submission, settings, added: boolean }
+ *
+ *   { action: 'reject',  id: uuid }
+ *     → { ok: true, submission }
+ *
+ * DLACZEGO NAZWY AKCJI SĄ KRÓTKIE, A NIE `sponsor-approve`
+ *   Typ już mówi, o co chodzi. `sponsor-admin` + `action: 'sponsor-approve'` powtarza słowo
+ *   „sponsor" dwa razy w jednym żądaniu i zostawia pytanie, czy te dwa „sponsory" znaczą to
+ *   samo. Stare, długie nazwy nadal działają pod `settings-admin` — patrz nagłówek nad
+ *   `sponsorLeads` — bo panel je już woła i zabranie ich zepsułoby działający ekran.
+ *
+ * NIEZNANA AKCJA TO 400, NIE CICHA LISTA
+ *   Domyślne „gdy nie wiem, to pokaż listę" zamieniłoby literówkę w `approve` w odpowiedź
+ *   200 z listą zgłoszeń — czyli w przycisk, który wygląda na działający i nic nie zmienia.
+ *   Ta pomyłka nie krzyczy, dopóki ktoś nie zapyta, dlaczego sponsora nadal nie ma na stronie.
+ */
+async function sponsorAdmin(env, payload, cors) {
+  const action = String(payload.action || '').toLowerCase();
+  if (action === 'list') return sponsorLeads(env, payload, cors);
+  if (action === 'approve') return sponsorLeadApprove(env, payload, cors);
+  if (action === 'reject') return sponsorLeadReject(env, payload, cors);
+  return json({ ok: false, code: 'SPONSOR_UNKNOWN_ACTION' }, 400, cors);
 }
 
 async function settingsAdmin(env, payload, cors) {
@@ -9212,6 +9296,10 @@ export default {
       if (type === 'reminders-due') return remindersDue(env, payload, cors);
       if (type === 'purge') return purge(env, payload, cors);
       if (type === 'sponsor-lead') return sponsorLead(env, payload, cors);
+      /* Zgłoszenia sponsorów dla panelu. Kontrakt w komentarzu nad `sponsorAdmin`; bez tej
+         linijki żądanie przelatuje cały łańcuch i kończy w `wallAdmin`, który odpowiada
+         błędem o nieznanej akcji tablicy — komunikatem mówiącym o zupełnie innej sprawie. */
+      if (type === 'sponsor-admin') return sponsorAdmin(env, payload, cors);
       if (type === 'verify-start') return verifyStart(env, payload, cors);
       if (type === 'verify-code') return verifyCode(env, payload, cors);
       if (type === 'notify-code') return notifyCode(env, payload, cors);

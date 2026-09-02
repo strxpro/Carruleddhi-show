@@ -726,16 +726,14 @@ button.is-race-locked {
    Podstrona głosowania — votazione.html
    ============================================================================ */
 
-.vote-page {
-  background: linear-gradient(135deg, #fbc2eb 0%, #a18cd1 33%, #ff9a9e 66%, #fecfef 100%);
-  background-size: 400% 400%;
-  animation: votePageBg 20s ease infinite;
-}
-@keyframes votePageBg {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
+/* Tło i barwa pisma tej podstrony stoją w JEDNYM miejscu — w sekcji „paleta podstrony" niżej.
+   ---------------------------------------------------------------------------
+   Było tu wcześniej pierwsze z TRZECH `.vote-page` w tym pliku: pastelowy gradient z własną
+   animacją `votePageBg`. Dwa dalsze nadpisywały i tło, i animację, i kolor tekstu — czyli ten
+   zapis nie malował na ekranie ani jednego piksela, a przy czytaniu pliku wyglądał na to,
+   czego szuka się w pierwszej kolejności. Razem z nim zniknęły klatki `@keyframes votePageBg`,
+   bo nie było już czego nimi animować. */
+
 /* Baner DEMO zajmuje trzydzieści pikseli u góry i zsuwa nagłówek o tyle samo (demo.css), więc
    treść musi zejść razem z nim — inaczej pierwszy wiersz nagłówka wchodzi pod pasek. */
 html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh) * 0.14 + 30px), 180px); }
@@ -841,7 +839,10 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   max-width: 1120px;
 }
 @media (min-width: 1100px) { .vote-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-.vote-empty { margin: 26px 0 0; color: var(--muted); font-size: 14.5px; }
+/* `--blue-700`, nie `--muted`: to jedno zdanie leży wprost na tle strony, a nie na białej
+   karcie, i wypada dokładnie tam, gdzie za treścią stoi żółta plama z hero. Zmierzone:
+   `--muted` daje na niej 3.9:1, `--blue-700` — 6.2:1. */
+.vote-empty { margin: 26px 0 0; color: var(--blue-700); font-size: 14.5px; }
 .vote-empty[hidden] { display: none; }
 
 .vote-sentinel { height: 1px; }
@@ -880,12 +881,15 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    podmiany szkieletu na treść. */
 .vote-card--skeleton { pointer-events: none; }
 .vote-card--skeleton .vote-card__photo { display: block; }
+/* Kreska w kolorze atramentu, nie bieli. Biel z dziewięcioma procentami krycia była liczona na
+   granatowe wnętrze kafelka; na jasnym nie widać jej wcale, czyli szkielet przestawał być
+   szkieletem i zostawał pusty kafelek — nieodróżnialny od takiego, który się nie wczytał. */
 .vote-skeleton__line {
   display: block;
   height: 12px;
   margin: 12px 14px 0;
   border-radius: 999px;
-  background: rgb(255 255 255 / .09);
+  background: rgb(7 26 61 / .1);
 }
 .vote-skeleton__line--short { width: 45%; margin-bottom: 16px; }
 
@@ -896,16 +900,31 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
      kompozytowana, zero przeliczania układu. */
   .vote-card--skeleton .vote-card__photo,
   .vote-card--skeleton .vote-skeleton__line {
-    background-image: linear-gradient(
-      100deg,
-      transparent 20%,
-      rgb(255 255 255 / .07) 40%,
-      rgb(255 255 255 / .07) 55%,
-      transparent 75%
-    );
     background-size: 220% 100%;
     background-repeat: no-repeat;
     animation: vote-skeleton 1.5s ease-in-out infinite;
+  }
+  /* Dwa różne podkłady, więc dwa różne połyski. Zdjęcie ma granatowe wnętrze
+     (`.vote-card__photo`), więc jego połysk jest biały; kreska leży na jasnym wnętrzu kafelka,
+     więc jej połysk jest z atramentu. Jeden wspólny biały gradient — tak było — świecił tylko
+     na zdjęciu, a nad kreskami nie robił nic. */
+  .vote-card--skeleton .vote-card__photo {
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgb(255 255 255 / .09) 40%,
+      rgb(255 255 255 / .09) 55%,
+      transparent 75%
+    );
+  }
+  .vote-card--skeleton .vote-skeleton__line {
+    background-image: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgb(7 26 61 / .1) 40%,
+      rgb(7 26 61 / .1) 55%,
+      transparent 75%
+    );
   }
   @keyframes vote-skeleton {
     from { background-position: 140% 0; }
@@ -1020,8 +1039,11 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   color: #ffe08a;
   font: 800 9px/1.3 var(--font-meta); letter-spacing: .03em;
 }
+/* Ciemniejsza zieleń niż #1f7a52: ten napis leży na kafelku z zielonym nalotem (`is-voted`),
+   więc jego tło jest o kilka procent ciemniejsze od pozostałych. Przy 10.5 px próg to 4.5,
+   a #1f7a52 dawał tam 4.19. #146349 to nadal jednoznacznie zieleń „zrobione", tylko 6.1:1. */
 .vote-card__yours {
-  margin: 6px 0 0; color: #1f7a52;
+  margin: 6px 0 0; color: #146349;
   font: 800 10.5px/1 var(--font-meta); letter-spacing: .07em; text-transform: uppercase;
 }
 .vote-card__used {
@@ -1381,17 +1403,27 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   .vote-card:hover .vote-card__photo.is-tappable img,
   .vote-card__hit:focus-visible ~ img { transform: scale(1.05); }
 }
-@media (hover: hover) {
-  .vote-card:hover { border-color: rgb(255 201 40 / .55); transform: translateY(-3px); }
-}
+/* Podniesienie pod kursorem i barwa obwódki stoją w sekcji „siatka" niżej, w jednym miejscu.
+   Był tu drugi `@media (hover: hover) { .vote-card:hover { … } }` z żółtą obwódką i
+   przesunięciem o 3 px — przegrywał kolejnością z tamtym i nie robił nic. */
 
-/* Ciemny kafelek znaczy jasny tekst w treści pod zdjęciem. */
-.vote-card__body { color: var(--white); }
-.vote-card__rider { color: rgb(255 255 255 / .55); }
-.vote-card__stats b { color: var(--yellow); }
-.vote-card__stats small,
-.vote-card__used { color: rgb(255 255 255 / .5); }
-.vote-card__yours { color: #6ee7b7; }
+/* JASNA SZYBKA POD ZDJĘCIEM ZNACZY CIEMNY TEKST.
+   ---------------------------------------------------------------------------
+   Cały ten blok był napisany pod kafelek wypełniony granatem: biały tekst w treści, biel z
+   pięćdziesięcioma procentami krycia na podpisach, mięta na „twojej ocenie". Kafelek nie jest
+   już granatowy — jest jasną szybką, jak `.hero-stat` na stronie głównej. ZMIERZONE po zmianie
+   tła, przed poprawieniem tego bloku: „twoja ocena" 1.27:1, „zmiana zużyta" 1.02:1. Czyli oba
+   napisy zniknęły całkowicie, a to są jedyne dwa zdania, które kafelek mówi o MOIM głosie.
+
+   Cztery pozostałe deklaracje z tego bloku dotyczyły napisów leżących NA ZDJĘCIU, pod
+   przyciemnieniem (`.vote-card__rider`, `.vote-card__stats`) — czyli tam, gdzie biel była i
+   jest poprawna. Każda z nich powtarzała jednak wartość ustawioną wyżej w tym samym pliku,
+   dwie z nich w słabszym wariancie (.55 i .5 zamiast .72). Zostały usunięte, a nie poprawione:
+   jedna barwa na jeden napis, w jednym miejscu.
+
+   `.vote-card__yours` i `.vote-card__used` mają swoje barwy wyżej, przy definicji — ciemną
+   zieleń i `--muted`, obie zmierzone na tej szybce (6.1:1 i 4.7:1). */
+.vote-card__body { color: var(--ink); }
 
 /* Krok „zagłosować na ten wóz?" nie istnieje od przeniesienia oceniania na zdjęcie: nakładka
    pojawia się dopiero po najechaniu albo dotknięciu, więc przypadkowe muśnięcie nie stawia
@@ -1459,42 +1491,46 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 
 /* ===========================================================================
-   Publiczna strona głosowania — cukierkowa warstwa wizualna i finał
+   Publiczna strona głosowania — warstwa wizualna i finał
    =========================================================================== */
-/* Szesc plam zamiast trzech, mocniejszych, plus powolny dryf.
-   To jest strona jednego dnia w roku, karnawalowa — blade tlo bylo poprawne i nijakie.
-   `background-attachment: fixed` NIE jest tu uzyte: na iOS potrafi zablokowac przewijanie
-   calej strony, a to gorsze niz nieruchome tlo. Zamiast tego caly obraz jest wiekszy od
-   ekranu i przesuwa sie animacja, wiec ruch jest, a przewijanie zostaje natywne. */
-.vote-page {
-  background:
-    radial-gradient(circle at 8% 12%, rgb(255 107 157 / .38), transparent 26rem),
-    radial-gradient(circle at 90% 22%, rgb(63 190 255 / .38), transparent 28rem),
-    radial-gradient(circle at 30% 70%, rgb(255 201 40 / .34), transparent 30rem),
-    radial-gradient(circle at 78% 82%, rgb(169 108 255 / .32), transparent 28rem),
-    radial-gradient(circle at 55% 40%, rgb(53 199 232 / .22), transparent 26rem),
-    radial-gradient(circle at 15% 92%, rgb(31 169 113 / .24), transparent 24rem),
-    linear-gradient(145deg, #fff7e4 0%, #f4efff 46%, #e6fbff 100%);
-  background-size: 140% 140%;
-  color: var(--navy-950);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .vote-page { animation: vote-bg-drift 38s ease-in-out infinite alternate; }
-  @keyframes vote-bg-drift {
-    from { background-position: 0% 0%; }
-    to   { background-position: 100% 100%; }
-  }
-}
-.vote-page .scroll-progress { height: 5px; background: linear-gradient(90deg, #ffcc2f, #ff638f, #a96cff, #35c7e8); }
-.vote-page .nav-current { display: flex; }
+
+/* Drugie z trzech `.vote-page` zniknęło razem z pierwszym, i z tego samego powodu: sześć plam
+   pastelu, które nadpisywała sekcja „paleta podstrony" na końcu pliku. Tło jest teraz JEDNO,
+   tam gdzie mu wypada — patrz „paleta podstrony głosowania".
+
+   Zniknęły też dwa nadpisania, które przestały mieć czego dotyczyć:
+
+     `.vote-page .scroll-progress` — grubszy i tęczowy pasek postępu, inny niż na stronie
+     głównej, ustawiany dla elementu, którego w `votazione.html` W OGÓLE NIE BYŁO. Element
+     wszedł do znacznika, a pasek maluje teraz ten sam zapis co tam (main.css), więc góra
+     ekranu wygląda na obu stronach identycznie.
+
+     `.vote-page .nav-current { display: flex }` — chip z nazwą sekcji, także nieobecny w
+     znaczniku, a base w main.css i tak ma dla niego `display: flex`. Chip wrócił do
+     `votazione.html` i nie potrzebuje ani jednej reguły dla siebie. */
+
 .vote-page .vote-main { position: relative; overflow: clip; }
+/* DWIE PLAMY ZA TREŚCIĄ, TE SAME CO W HERO STRONY GŁÓWNEJ.
+   ---------------------------------------------------------------------------
+   Były tu dwa różowo-żółte krążki po 180 i 130 px, których na stronie głównej nie ma nigdzie.
+   Teraz jest to samo, co stoi za pierwszym ekranem tamtej: żółte słońce w prawym górnym
+   narożniku i niebieski pierścień wychodzący dołem z kadru (`.hero::before` i `.hero::after`
+   w main.css). Rozmiary w `vw`, tak jak tam, więc na telefonie schodzą razem z ekranem.
+   `overflow: clip` na `.vote-main` obcina je do kolumny treści; `z-index: -1` trzyma je pod
+   tekstem, więc kontrast napisów zależy od tła strony, nie od tego, gdzie akurat jest plama. */
 .vote-page .vote-main::before,
 .vote-page .vote-main::after {
   content: ''; position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
-  filter: blur(2px);
+  aspect-ratio: 1;
 }
-.vote-page .vote-main::before { width: 180px; height: 180px; top: 8rem; right: -65px; background: #ffd83d; opacity: .45; }
-.vote-page .vote-main::after { width: 130px; height: 130px; top: 36rem; left: -55px; background: #ff73a7; opacity: .32; }
+.vote-page .vote-main::before {
+  top: -16vw; right: -18vw; width: min(72vw, 720px);
+  background: var(--yellow); opacity: .5; filter: blur(2px);
+}
+.vote-page .vote-main::after {
+  bottom: -30vw; left: -12vw; width: min(68vw, 620px);
+  border: clamp(18px, 4vw, 46px) solid var(--blue-200); opacity: .7;
+}
 
 .vote-head {
   position: relative; max-width: 880px; padding: clamp(22px, 4vw, 42px);
@@ -1512,46 +1548,50 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 .vote-rule { border-color: var(--navy-950); background: #fff0a8; box-shadow: 0 8px 24px rgb(0 0 0 / .06); }
 .vote-notice { border: 3px solid var(--navy-950); background: #fff; color: var(--navy-950); box-shadow: 0 12px 32px rgb(0 0 0 / .08); }
-.vote-mine { display: none !important; }
+/* Stało tu `.vote-mine { display: none !important }` — bez ani jednego słowa wyjaśnienia i w
+   sprzeczności z resztą pliku: dwie sekcje niżej ten sam panel dostaje własny cukierkowy cień,
+   a `votazione.html` ma nad nim komentarz o tym, po co istnieje. Zapis chował JEDYNĄ odpowiedź
+   na pytanie „czy ja już głosowałem", która nie wymaga znalezienia swojego kafelka wśród
+   kilkudziesięciu. Zmierzone: sonda probe-voting-mobile.mjs przewracała się na warunku
+   „krok 3: panel «Twój głos» na górze strony". Usunięty. */
 .vote-filter { border-color: var(--navy-950); box-shadow: 0 6px 16px rgb(0 0 0 / .05); }
 .vote-filter:nth-child(3n+1) { background: #fff0a8; }
 .vote-filter:nth-child(3n+2) { background: #ffddeb; }
 .vote-filter:nth-child(3n) { background: #dff6ff; }
 .vote-filter.is-active { border-color: var(--navy-950); background: var(--navy-950); color: #fff; box-shadow: 0 8px 24px rgb(0 0 0 / .15); }
 
-.vote-card {
-  --card-candy: #ff79a8;
-  border: 3px solid var(--navy-950);
-  background: var(--navy-950);
-  box-shadow: 0 14px 28px rgb(0 0 0 / .12);
-}
-.vote-card:nth-child(4n+2) { --card-candy: #55cdef; }
-.vote-card:nth-child(4n+3) { --card-candy: #ffd53d; }
-.vote-card:nth-child(4n) { --card-candy: #a987ff; }
-.vote-card.is-voted { 
-  border-color: #1fa971; 
-  background: #0b5944; 
-  box-shadow: 0 14px 34px rgb(31 169 113 / .35); 
-}
-.vote-card.is-voted::before {
-  content: 'TWÓJ GŁOS';
-  position: absolute;
-  top: -14px; left: 50%; transform: translateX(-50%);
-  background: var(--yellow);
-  color: var(--navy-950);
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-weight: 900;
-  font-size: 14px;
-  z-index: 10;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  pointer-events: none;
-}
-.vote-card.is-voted .vote-card__who,
-.vote-card.is-voted .vote-card__title,
-.vote-card.is-voted .vote-card__rider,
-.vote-card.is-voted .vote-card__place {
-  color: #fff;
+/* Obwódka kafelka. Tło i cień dokłada sekcja „siatka" niżej — tu zostaje tylko to, co nie
+   jest tam nadpisywane.
+   ---------------------------------------------------------------------------
+   Były tu obok siebie `background: var(--navy-950)` i `box-shadow: 0 14px 28px`, oba
+   nadpisywane w sekcji „siatka" (jasne, półprzezroczyste tło i przesunięty pastelowy cień) —
+   czyli granatu z tego zapisu nie było widać nigdzie. Zniknęła też zmienna `--card-candy`
+   deklarowana w czterech regułach i nieczytana ani raz. */
+.vote-card { border: 3px solid var(--navy-950); }
+
+/* KAFELEK Z MOIM GŁOSEM: ZIELONY POŚWIST, NIE CIEMNA PLAMA.
+   ---------------------------------------------------------------------------
+   Było `background: #0b5944`, czyli butelkowa zieleń w środku kafelka. Pod zdjęciem leży
+   jednak `.vote-card__yours` w kolorze #1f7a52 i `.vote-card__used` w `--muted` — dwa
+   ciemne napisy na ciemnym tle, dokładnie ta pomyłka, którą opisuje komentarz przy palecie na
+   końcu pliku. Zmierzone: 1.6:1 i 1.5:1 przy wymaganych 4.5. Teraz kafelek dostaje zieloną
+   obwódkę i ledwie zauważalny zielony nalot, więc oba napisy czyta się jak na każdym innym.
+
+   Plakietka „twój głos" jest JEDNA i jest tłumaczona — `.vote-card__mine` w kadrze zdjęcia,
+   z napisem z `voting.voted`. Stał tu obok niej drugi znacznik na `::before` z wpisanym na
+   sztywno polskim „TWÓJ GŁOS": na włoskiej stronie, w pliku CSS, gdzie żaden słownik go nie
+   dosięgnie. Usunięty razem z regułą malującą `.vote-card__who` na biało — ta pigułka ma
+   BIAŁE tło, więc biały napis znikał w niej całkowicie.
+
+   Bez własnego `box-shadow`: rozdaje go `.vote-grid > .vote-card:nth-child(4n+…)`, czyli
+   selektor o wyższej wadze, więc zielony cień zadeklarowany tutaj i tak nigdy nie wchodził na
+   ekran. Rozpoznawalność niesie zielony pierścień wokół ZDJĘCIA (`.vote-card.is-voted
+   .vote-card__photo` wyżej) — ten sam, który był tam od początku. */
+.vote-card.is-voted {
+  border-color: #1fa971;
+  background:
+    linear-gradient(165deg, rgb(31 169 113 / .22), rgb(31 169 113 / .1)),
+    rgb(255 255 255 / .8);
 }
 .vote-card__number { border: 2px solid #fff; }
 .vote-card__body { padding: 16px; }
@@ -1732,8 +1772,15 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 
 @media (max-width: 700px) {
-  .vote-page .nav-current { display: none; }
-  .vote-head { margin-inline: 3px; box-shadow: 7px 7px 0 #b8eaf5; }
+  /* Stało tu `.vote-page .nav-current { display: none }` — chip z nazwą sekcji zdejmowany na
+     telefonie. Strona główna go tam ZOSTAWIA, tylko zwęża do 78 px i chowa samą nazwę sekcji
+     (patrz `@media (max-width: 760px)` w experience.css). Podstrona, która na telefonie ma
+     inny pasek niż strona główna, jest dokładnie tym, o co było zgłoszenie. Zdjęte — chip
+     zachowuje się teraz tak jak tam, bez ani jednej reguły dla siebie. */
+  /* Bez `box-shadow`: ten sam element dostawał go tu (`7px 7px 0 #b8eaf5`) i drugi raz w
+     sekcji palety na końcu pliku, w tym samym zapytaniu o szerokość. Wygrywał ten późniejszy,
+     więc ta deklaracja nie malowała nic. Cień nagłówka jest teraz w jednym miejscu. */
+  .vote-head { margin-inline: 3px; }
   .vote-head::after { width: 44px; height: 44px; }
   .vote-results { padding: 22px 10px 26px; box-shadow: 7px 7px 0 #a7e5f3; }
   .vote-podium { gap: 5px; margin-top: 42px; }
@@ -1777,7 +1824,10 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 
 @media (max-width: 560px) {
-  .vote-main { padding-top: 92px; }
+  /* Odstęp od paska stoi w sekcji „pierwszy ekran" na końcu pliku, pod selektorem
+     `.vote-page .vote-main` — takim samym, jaki ustawia go dla większych ekranów. Było tu
+     `.vote-main { padding-top: 92px }`, czyli jedna klasa przeciw dwóm: reguła przegrywała
+     wagą i na żadnym telefonie nie zmieniła ani jednego piksela. */
   .vote-card__body { padding: 16px 14px 18px; }
   .vote-slider__row { display: grid; grid-template-columns: minmax(0, 1fr) 58px; }
   .vote-slider__value { font-size: 30px; }
@@ -1883,7 +1933,10 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 
 .vote-count {
   margin: 0 0 14px;
-  color: var(--blue-200);
+  /* `--blue-200` był liczony na granatowe tło, którego ta strona już nie ma — bladoniebieski
+     napis na jasnym kremie to 1.3:1, czyli nic. `--blue-700` daje na tym samym tle 6.7:1
+     i jest tym samym kolorem, którym strona główna pisze podpisy na jasnych sekcjach. */
+  color: var(--blue-700);
   font: 800 11px/1.4 var(--font-meta);
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -1897,8 +1950,14 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    zdjęcie. Teraz każdy dostaje pastelowy cień w jednym z czterech kolorów, rozdawany po
    kolei przez `:nth-child` — bez ani jednej linii JavaScriptu i bez zależności od danych,
    więc kolejność kolorów jest stabilna także po przefiltrowaniu listy. */
+/* Kafelek na jasnej szybce, tak jak `.hero-stat` na stronie głównej.
+   Było `rgb(255 255 255 / .1)` — biel z dziesięcioma procentami krycia, czyli warstwa
+   rozjaśniająca granat pod spodem. Na jasnym tle nie robi nic: kafelek stawał się dokładnie
+   tłem strony i zostawała po nim sama obwódka. Przy okazji jest to jedyne miejsce, gdzie da
+   się wygrać kontrast dla dwóch napisów pod zdjęciem (`.vote-card__yours` i `.vote-card__used`)
+   bez ruszania ich barw: bielsza szybka to 4.7:1 zamiast 4.4:1 przy tym samym `--muted`. */
 .vote-card {
-  background: linear-gradient(165deg, rgb(255 255 255 / .1), rgb(255 255 255 / .04));
+  background: linear-gradient(165deg, rgb(255 255 255 / .78), rgb(255 255 255 / .58));
   box-shadow: 6px 6px 0 rgb(154 217 255 / .38);
 }
 .vote-grid > .vote-card:nth-child(4n + 2) { box-shadow: 6px 6px 0 rgb(255 131 174 / .38); }
@@ -1907,7 +1966,11 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 .vote-card--skeleton { box-shadow: none; }
 
 @media (hover: hover) {
-  .vote-card:hover { transform: translateY(-4px); border-color: rgb(255 255 255 / .3); }
+  /* Obwódka na niebiesko, nie na biało: biel z trzydziestoprocentowym kryciem była wyraźna na
+     granacie, a na jasnym tle jest jaśniejsza od samej obwódki — kafelek pod kursorem GUBIŁ
+     krawędź, zamiast ją podkreślać. `--blue-600` to ten sam kolor, którym strona główna
+     zaznacza rzeczy pod kursorem. */
+  .vote-card:hover { transform: translateY(-4px); border-color: var(--blue-600); }
 }
 
 /* Pigułka z imieniem i numer startowy w cukierkowych barwach — te same cztery kolory. */
@@ -2641,92 +2704,233 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 
 /* ============================================================ paleta podstrony głosowania */
-/* MOCNIEJSZY KOLOR, TEN SAM KONTRAST.
-   ---------------------------------------------------------------------------
-   Strona była granatowa z żółtymi akcentami: czytelna, ale w dniu karnawału wyglądała jak
-   panel administracyjny. Kolor dochodzi w trzech miejscach i w każdym ma zadanie, nie tylko
-   barwę:
+/* TA SAMA WITRYNA, NIE OSOBNY SERWIS.
+   ===========================================================================
+   Zgłoszone wprost: „ogarnij podstronę z votazione, żeby wyglądała jak strona główna". Nagłówek
+   i stopka były już wspólne co do znacznika i co do styli, ale między nimi leżało tło z innego
+   świata. ZMIERZONE sondą probe-vote-shell.mjs przed tą zmianą, obie strony w jednym oknie
+   390×844: luminancja tła podstrony 0.020 (granat), strony głównej 0.854 (błękit). Ciemny pasek
+   nawigacji, który na stronie głównej odcina się od jasnego tła, na podstronie zlewał się z nim
+   w jedną plamę — czyli ten sam pasek czytał się jako dwa różne elementy dwóch różnych stron.
 
-     TŁO — dwie duże, rozmyte plamy różu i fioletu pod treścią. Nie gradient na całej stronie:
-     plamy dają głębię, a treść dalej leży na granacie, więc kontrast tekstu się nie zmienia.
+   TŁO JEST TERAZ TYM SAMYM, CO STOI ZA PIERWSZYM EKRANEM STRONY GŁÓWNEJ
+     Dokładnie ten gradient, co `.hero` w main.css: błękit w lewym górnym narożniku, krem w
+     środku, ciepła żółć w prawym dolnym. Plus dwie plamy z hero na `.vote-main` (żółte słońce
+     i niebieski pierścień) — patrz sekcja „Publiczna strona głosowania" wyżej. Podstrona nie
+     dostaje więc „podobnej" palety, dostaje tę samą.
 
-     NAGŁÓWEK — cukierkowy pas nad tytułem, ten sam co w pasku zegara, żeby góra strony
-     czytała się jako jedna rzecz.
+   RUCH ZOSTAJE, KARNAWAŁ ZOSTAJE
+     Obraz jest większy od ekranu (`background-size: 140% 140%`) i przesuwa się bardzo powoli.
+     `background-attachment: fixed` NIE jest użyte: na iOS potrafi zablokować przewijanie całej
+     strony, a to gorsze niż nieruchome tło. Karnawał niosą kafelki, zegar i cokół — czyli
+     rzeczy, na które się patrzy, a nie tapeta pod nimi.
 
-     AKCENTY — filtry, plakietki i tabela dostają pełne kolory zamiast półprzezroczystej bieli.
+   TO JEST TRZECIE I JEDYNE `.vote-page` W TYM PLIKU
+     Były trzy, każde z własnym tłem, i tylko to nadpisywało pozostałe dwa. Dwa pierwsze
+     zniknęły — patrz komentarze w ich miejscach. Jedno tło znaczy jedno miejsce do zmiany.
 
-   Wszystko na `::before`/`::after` i na tłach, więc ani jeden napis nie zmienia koloru — a
-   `prefers-reduced-motion` niżej gasi tylko ruch, nie barwy. */
+   KOLOR PISMA I TŁO ZMIENIAJĄ SIĘ W TEJ SAMEJ REGULE, I TO NIE JEST OZDOBA ZAPISU
+     Poprzednia wersja tej sekcji zmieniła tło na granat, zostawiając `color: var(--navy-950)`
+     z reguły wyżej — granatowe litery na granatowym tle, tytuł i zdanie wiodące NIEWIDOCZNE.
+     Naprawiono to potem drugą deklaracją, `color: var(--white)`, w tej samej regule. Ta sama
+     pułapka czeka w drugą stronę: białe litery na kremowym tle to 1.1:1. Dlatego jasność tła i
+     barwa pisma stoją w jednej regule, o dwie linijki od siebie, a sonda mierzy kontrast
+     tytułu, zdania wiodącego, licznika i podpisów na kafelku — nie „na oko". */
 .vote-page {
   position: relative;
-  background:
-    radial-gradient(58% 42% at 12% 8%, rgb(255 111 159 / .22), transparent 68%),
-    radial-gradient(52% 40% at 92% 24%, rgb(143 113 255 / .24), transparent 70%),
-    radial-gradient(44% 34% at 50% 96%, rgb(55 201 165 / .16), transparent 72%),
-    var(--navy-950);
-  background-attachment: fixed, fixed, fixed, scroll;
-  /* BIALY TEKST, BO TLO JEST GRANATOWE.
-     ---------------------------------------------------------------------------
-     Ta regula zmienila tlo strony na granat, ale kolor tekstu zostal `var(--navy-950)`
-     ustawiony wyzej — czyli granatowe litery na granatowym tle. Zmierzone w przegladarce:
-     tlo body rgb(7,26,61), naglowek h1 rgb(7,26,61), lead rgb(7,26,61). Naglowek strony,
-     zdanie wiodace i kicker byly NIEWIDOCZNE.
-     Komentarz nad ta regula obiecywal, ze „ani jeden napis nie zmienia koloru" — i to
-     wlasnie bylo zalozenie, ktore nie mialo pokrycia: napisy byly ciemne, zanim tlo
-     sciemnialo. */
-  color: var(--white);
+  background: linear-gradient(145deg, #edf5ff 0%, var(--cream) 48%, #fff0cc 100%);
+  background-size: 140% 140%;
+  color: var(--ink);
 }
 
-/* Nagłówek na cukierkowym pasie, w tych samych barwach co zegar u góry. */
+/* GRANAT NIE BRAŁ SIĘ Z TŁA STRONY. BRAŁ SIĘ Z `#main`.
+   ---------------------------------------------------------------------------
+   To jest miejsce, w którym łatwo naprawić objaw i przeoczyć przyczynę, więc zapisane wprost.
+   `experience.css` ma `#main { background: var(--navy-950) }` — i na stronie głównej jest to
+   zapis bez znaczenia dla oka: każda sekcja jest tam pełnowymiarową kartą z własnym tłem, więc
+   granat pod nimi to podkładka, której nigdy nie widać. Na tej podstronie treść leży wprost w
+   `<main>`, bez ani jednej takiej karty. Ten sam zapis znaczy tu więc CAŁĄ powierzchnię strony
+   między paskiem a stopką.
+
+   ZMIERZONE sondą probe-vote-shell.mjs po zmianie samego tła `body`: tło dokumentu jasne
+   (#f9f4e6), a tło pod licznikiem pozycji i pod panelem „Twój głos" nadal granatowe (#071a3d) —
+   czyli `--blue-700` na granacie, 2.19:1. Zmiana tła `body` bez tej reguły byłaby zmianą,
+   której nie widać poza marginesami.
+
+   Waga celowo z identyfikatora: `#main.vote-main` to (1,1,0) przeciw (1,0,0) z tamtej reguły.
+   Krótszy zapis `.vote-page .vote-main` przegrałby z pojedynczym `#main` i wyglądałby na
+   działający, dopóki ktoś nie zmierzy koloru. `transparent`, nie druga kopia gradientu: tło
+   jest jedno i stoi na `body`. */
+.vote-page #main.vote-main { background: transparent; }
+@media (prefers-reduced-motion: no-preference) {
+  .vote-page { animation: vote-bg-drift 38s ease-in-out infinite alternate; }
+  @keyframes vote-bg-drift {
+    from { background-position: 0% 0%; }
+    to   { background-position: 100% 100%; }
+  }
+}
+
+/* Nagłówek na białej karcie z cukierkowym nalotem.
+   Sam nalot to za mało, odkąd tło jest jasne: dwa gradienty po dwadzieścia procent krycia na
+   kremie dawały kartę, której krawędzi nie było widać — a to ona oddziela tytuł od tła. Biel
+   idzie więc pod nie jako ostatnia warstwa `background`, tak jak w `.hero-stat` na stronie
+   głównej, i to ona trzyma kontrast tytułu (zmierzone 13.5:1). */
 .vote-head {
   background:
-    linear-gradient(180deg, rgb(255 255 255 / .1), rgb(255 255 255 / .03)),
-    linear-gradient(100deg, rgb(255 215 94 / .2), rgb(255 131 174 / .2) 48%, rgb(141 118 255 / .22));
-  box-shadow: 9px 9px 0 rgb(154 217 255 / .3);
+    linear-gradient(100deg, rgb(255 215 94 / .22), rgb(255 131 174 / .18) 48%, rgb(141 118 255 / .2)),
+    rgb(255 255 255 / .82);
+  box-shadow: 9px 9px 0 rgb(188 214 255 / .55);
 }
 
-/* Filtr kategorii: pełne kolory zamiast bieli z przezroczystością. Aktywny jest żółty, bo to
-   ten sam kolor, którym strona mówi „tu naciśnij" na przycisku głosowania. */
-.vote-page .vote-filter {
-  border-color: rgb(255 255 255 / .22);
-  background: rgb(255 255 255 / .07);
-  color: #fff;
-}
-.vote-page .vote-filter:hover { border-color: #ff83ae; background: rgb(255 131 174 / .16); }
-.vote-page .vote-filter.is-active {
-  border-color: var(--navy-950);
-  background: var(--yellow);
-  color: var(--navy-950);
-  box-shadow: 4px 4px 0 #ff83ae;
-}
+/* Filtr kategorii nie ma tu już własnej palety.
+   Stały tu trzy reguły z białym napisem na przezroczystej bieli — pisane pod granatowe tło,
+   czyli po tej zmianie biały tekst na jasnym kremie, 1.2:1. Wygląd filtra przychodzi teraz w
+   całości z sekcji wyżej: pastelowe wypełnienia po kolei, granatowa obwódka, `--blue-700` na
+   napisie i granat z bielą na wybranym. Ten sam sposób, którym strona główna maluje pigułki
+   kategorii na jasnych sekcjach. */
 
 /* Plakietka „twój głos" i numer startowy — te same cztery barwy co cienie kafelków. */
 .vote-page .vote-card__mine { background: #37c9a5; color: var(--navy-950); }
 .vote-page .vote-card__rank { background: #8d76ff; color: #fff; }
 
 /* Panel „Twój głos" nad listą: mocniejsza zieleń, bo to jedyny kafel na stronie, który mówi
-   „zrobione", i ma się różnić od wszystkiego, co jeszcze czeka na decyzję. */
-.vote-page .vote-mine { box-shadow: 8px 8px 0 #37c9a5; }
+   „zrobione", i ma się różnić od wszystkiego, co jeszcze czeka na decyzję.
+   Biel pod nalotem, jak w kafelkach i w nagłówku: w środku panelu stoi podpis w `--muted`, a na
+   samym zielonym nalocie na jasnym tle to 4.4:1 przy wymaganych 4.5. Na bieli — 4.7:1. Obwódka
+   pełną zielenią zamiast pięćdziesięcioprocentowej: to ona niesie „zrobione". */
+.vote-page .vote-mine {
+  border-color: #1fa971;
+  background: rgb(255 255 255 / .82);
+  box-shadow: 8px 8px 0 #37c9a5;
+}
 
 /* Wyniki: podium i tabela dostają cukierkowy cień zamiast szarego. */
 .vote-page .vote-results { box-shadow: 8px 8px 0 rgb(141 118 255 / .45); }
 .vote-page .vote-standings__scroll { box-shadow: 6px 6px 0 rgb(255 131 174 / .4); }
 
-/* Stopka i pasek postępu w tęczy — bez zmian w kontraście, bo to paski, nie tekst. */
-.vote-page .footer-glow { filter: saturate(1.25); }
+/* Tęcza w stopce bez własnego nasycenia.
+   Stało tu `.vote-page .footer-glow { filter: saturate(1.25) }` — o dwadzieścia pięć procent
+   mocniejsza łuna niż w tej samej stopce na stronie głównej. Przy prośbie „stopka to samo"
+   różnica w nasyceniu jednego elementu jest dokładnie tym, czego nie da się nazwać, ale widać
+   przy przejściu z jednej strony na drugą. Zdjęte: stopka jest teraz identyczna.
+
+   Zniknął też blok telefonowy, który tu stał: podmieniał cztery warstwy tła i wyłączał
+   `background-attachment: fixed`. Tło jest jednym gradientem i nigdzie nie jest `fixed`, więc
+   nie miał już czego podmieniać ani czego wyłączać. */
 
 @media (max-width: 700px) {
-  /* Plamy w tle mniejsze i bez `fixed`: na telefonie tło przyklejone do okna kosztuje
-     przemalowanie przy każdym przewinięciu, a różnicy nie widać na 400 px szerokości. */
-  .vote-page {
-    background-attachment: scroll, scroll, scroll, scroll;
-    background-image:
-      radial-gradient(70% 30% at 10% 4%, rgb(255 111 159 / .2), transparent 70%),
-      radial-gradient(70% 28% at 92% 18%, rgb(143 113 255 / .22), transparent 72%),
-      none,
-      none;
+  /* Cień nagłówka schodzi razem z ekranem — 9 px odsunięcia na 390 px szerokości wypycha
+     kartę w bok i kradnie trzy piksele treści przy prawej krawędzi. */
+  .vote-head { box-shadow: 6px 6px 0 rgb(188 214 255 / .55); }
+}
+
+/* ============================================================ pierwszy ekran telefonu */
+/* SIATKA WOZÓW MA BYĆ WIDOCZNA BEZ PRZEWIJANIA.
+   ===========================================================================
+   Zgłoszone: „i dobrze pokazują od razu to do głosowania na telefonie". W fazie głosowania
+   jedyną rzeczą, po którą ktokolwiek na tę stronę wchodzi, jest siatka pojazdów — a stała pod
+   ekranem z nagłówkiem.
+
+   ZMIERZONE sondą probe-vote-shell.mjs na 390×844, PRZED tą zmianą. Pierwszy kafelek zaczynał
+   się na 594 px, przy 844 px ekranu, i rozkład kosztów wyglądał tak:
+
+     odstęp od paska (`.vote-main` padding-top)     93 px
+     nagłówek sekcji z zegarem w środku            338 px
+     odstęp pod nagłówkiem                          30 px
+     pole szukania z odstępem                       72 px
+     filtr kategorii z odstępem                     62 px
+     ------------------------------------------------------
+     razem nad pierwszym kafelkiem                 595 px
+
+   Czyli: kafelek o wysokości 179 px wchodził w ekran ostatnimi pięćdziesięcioma pikselami, a
+   drugiego rzędu nie było widać wcale. Formalnie „widoczny", praktycznie — nie.
+
+   CZEGO NIE ZROBIŁEM I DLACZEGO
+     Zegar zostaje i filtry zostają — to był wyraźny warunek. Nie skracam też ani jednego
+     napisu: zdanie wiodące mówi, ile punktów wolno dać i że trzeba zostawić adres, czyli
+     odpowiada na dwa pytania, które inaczej wracają w wiadomościach do organizatora.
+
+   CO ZROBIŁEM
+     Każdy z pięciu składników oddaje po kilkanaście pikseli tam, gdzie było powietrze, a nie
+     treść: mniejsza wyściółka karty, ciaśniejsze odstępy między jej wierszami, zdanie wiodące
+     w rozmiarze zdania (13.5 px), a nie akapitu, zegar w wersji kompaktowej i o połowę mniejsze
+     odstępy między pudełkami. Suma tych drobnych ustępstw to około stu pikseli, czyli tyle, że
+     w pierwszym ekranie staje CAŁY pierwszy rząd kafelków i większość drugiego.
+
+   `.vote-page .vote-main`, nie `.vote-main`: dwie klasy, tak jak w regule, którą tu nadpisujemy
+   (`.vote-page .vote-main { padding-top: clamp(...) }`). Jedna klasa przegrywa wagą i taka
+   reguła stała w tym pliku przez cały czas, nie zmieniając ani jednego piksela. */
+@media (max-width: 700px) {
+  /* 86 px, bo pasek kończy się na 78 px (górna krawędź 10 + wysokość 68, zmierzone na 390 px),
+     a tytuł nie ma powodu stać bliżej niż osiem pikseli od niego. `clamp` liczony z wysokości
+     okna dawał tu 93 px — czyli siedem pikseli powietrza dobranych z proporcji ekranu, a nie
+     z tego, co na tym ekranie stoi. */
+  .vote-page .vote-main { padding-top: 86px; }
+  /* Z banerem DEMO to samo 86 px plus trzydzieści, które baner zabiera u góry (demo.css).
+     Bez tej linii wygrywałby `html.is-demo .vote-main` z góry pliku, liczony z wysokości okna:
+     148 px zamiast 116, czyli podglądowa wersja strony pokazywałaby inny pierwszy ekran niż
+     ta, którą widzi publiczność — a to jest jedyna rzecz, której od trybu demo się nie chce. */
+  html.is-demo .vote-page .vote-main { padding-top: 116px; }
+
+  .vote-head { padding: 15px 14px 17px; gap: 8px; border-radius: 24px; margin-bottom: 16px; }
+  /* Zdanie, nie akapit: 13.5 px z ciaśniejszą interlinią zdejmuje jeden wiersz z pięciu i
+     dwadzieścia parę pikseli z wysokości karty, a nadal jest większe od podpisów na kafelkach. */
+  .vote-head .lead { font-size: 13.5px; line-height: 1.45; }
+  /* Zegar kompaktowy: ta sama treść, ta sama tęcza i ta sama bijąca kropka, tylko bez
+     wyściółki dobranej pod monitor. Liczba zostaje największym napisem w tym pudełku. */
+  .vote-timer { margin-top: 8px; padding: 7px 12px 8px; border-width: 2px; gap: 4px 9px; box-shadow: 3px 3px 0 rgb(7 26 61 / .18); }
+  .vote-timer__time { font-size: 20px; }
+
+  .vote-search { margin-bottom: 8px; }
+  .vote-filters { margin-bottom: 10px; }
+  .vote-count { margin-bottom: 8px; }
+}
+
+/* KRÓTKI TELEFON ODDAJE JESZCZE CZTERDZIEŚCI PIKSELI.
+   ---------------------------------------------------------------------------
+   `max-height`, nie `max-width`: 320×568 i 360×640 to nie „węższe" telefony, to NIŻSZE. Pomiar
+   pokazał to wprost — nad siatką stało tam tyle samo pikseli co na 390×844 (477), tylko ekranu
+   było o 276 px mniej, więc pierwszy rząd wychodził dołem. Dwa zapytania złączone, żeby ten
+   blok nie dotknął krótkiego, ale szerokiego okna na monitorze, gdzie siatka ma trzy kolumny
+   i rządzą nią inne liczby.
+
+   Tytuł 28 px zamiast 34 i zdanie 12.5 px zamiast 13.5: na ekranie wysokości 568 px każdy
+   wiersz tekstu jest ułamkiem widoku, a tytuł nadal zostaje największym napisem na stronie.
+   Zmierzone: 621 → 580 px nad dolną krawędzią pierwszego rzędu na 320×568. */
+@media (max-width: 700px) and (max-height: 700px) {
+  .vote-head { padding: 12px 13px 14px; gap: 6px; margin-bottom: 12px; }
+  .vote-head h1 { font-size: 28px; }
+  .vote-head .lead { font-size: 12.5px; line-height: 1.4; }
+  .vote-timer { margin-top: 6px; padding: 5px 10px 6px; }
+  .vote-timer__time { font-size: 18px; }
+}
+
+/* NA SZEROKIM EKRANIE ZEGAR STAJE OBOK TYTUŁU, NIE POD ZDANIEM WIODĄCYM.
+   ---------------------------------------------------------------------------
+   To samo pytanie, inna odpowiedź, bo inne ograniczenie. Na telefonie brakuje SZEROKOŚCI, więc
+   zegar zostaje pod zdaniem i chudnie. Na monitorze szerokości jest w nadmiarze: karta nagłówka
+   ma 880 px, a zdanie wiodące kończy się na 62 znakach, czyli prawa trzecia część karty stoi
+   pusta — i pod tą pustą trzecią częścią leży zegar, dokładając 72 px wysokości.
+
+   ZMIERZONE na 1440×900: nagłówek sekcji 459 px, pierwszy kafelek na 722 px, widoczne 40%
+   pierwszego rzędu. Po przeniesieniu zegara w prawą kolumnę: nagłówek 387 px, kafelek na 650 px,
+   widoczne 56%. Całego rzędu i tak nie da się tu zmieścić — kafelek na monitorze ma 444 px
+   wysokości — więc to jest zysk, nie rozwiązanie; wymaganie „cały rząd w pierwszym ekranie"
+   dotyczy telefonu i tam jest spełnione.
+
+   Placement wypisany co do wiersza i kolumny, bez automatycznego układania: zegar jest
+   `hidden` do pierwszego odczytu stanu, a element wyjęty z układu przestawiałby resztę o jedno
+   pole, gdyby siatka miała się układać sama. */
+@media (min-width: 701px) {
+  .vote-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: clamp(18px, 3vw, 40px);
   }
-  .vote-head { box-shadow: 6px 6px 0 rgb(154 217 255 / .3); }
+  .vote-head > .eyebrow { grid-column: 1; grid-row: 1; }
+  .vote-head > h1 { grid-column: 1; grid-row: 2; }
+  .vote-head > .lead { grid-column: 1; grid-row: 3; }
+  .vote-head > .vote-timer { grid-column: 2; grid-row: 1 / -1; margin: 0; align-self: center; }
 }
 
 /* ===========================================================================

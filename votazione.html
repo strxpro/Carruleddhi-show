@@ -16,37 +16,78 @@
 <body class="vote-page">
   <a class="skip-link" href="#main" data-i18n="a11y.skip">Vai al contenuto</a>
   <div class="noise" aria-hidden="true"></div>
+  <!-- Pasek postępu, ten sam element i ta sama klasa co na stronie głównej.
+       Do tej pory brakowało go w znaczniku, a `assets/css/voting.css` miał dla niego własną,
+       grubszą i tęczową regułę — czyli martwy zapis stylujący coś, czego na stronie nie było.
+       Reguła zniknęła, element wszedł: bar wygląda teraz dokładnie jak tam, bo maluje go ten
+       sam arkusz. Wypełnia go `setupScrollEffects` w voting-boot.js. -->
+  <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
 
   <!-- Zegar głosowania stoi TERAZ W TREŚCI STRONY, pod nagłówkiem sekcji — patrz
        `[data-vote-timer]` w `.vote-head` niżej. Przy przewijaniu w dół wjeżdża W PASEK
        nawigacji, dokładnie tym samym mechanizmem, którym odliczanie z hero wjeżdża tam na
        stronie głównej: `[data-clock-docked]` na nagłówku plus `.nav-clock` w pasku. -->
 
-  <!-- Nagłówek: ten sam pasek co na stronie głównej, z tym samym przełącznikiem języka.
+  <!-- NAGŁÓWEK: TEN SAM ZNACZNIK CO W index.html, NIE „PODOBNY".
        ==========================================================================
-       Wcześniej stał tu rząd sześciu przycisków z nazwami języków — czyli coś, czego nie ma
-       na żadnej innej stronie serwisu i co wyglądało na prowizorkę. Ten sam znacznik co w
-       index.html znaczy te same style i to samo zachowanie: flaga, skrót, lista rozwijana.
+       Zamówione wprost: „to jest podstrona, więc footer i header to samo, ten sam styl".
+       Wszystko, co tu stoi, stoi w tej samej kolejności i z tymi samymi klasami co na stronie
+       głównej — marka z datą, chip z nazwą sekcji, zadokowany licznik, wybór języka, przycisk
+       menu — więc styl przychodzi ze wspólnych arkuszy i nie da się go rozjechać w jednym
+       miejscu, nie ruszając drugiego.
 
-       Bez menu, bez „zapisz się" i bez „będę tam" — w chwili, gdy wózki jadą, żadna z tych
-       rzeczy nie jest już aktualna. Zostaje powrót na stronę. -->
-  <header class="site-header">
+       `data-header` na nagłówku, jak tam: to po tym atrybucie strona główna znajduje pasek.
+       Podstrona nie wciąga app.js, więc sama z niego nie korzysta, ale znacznik, który się od
+       tamtego różni, jest pierwszym miejscem, w którym dwie strony zaczynają się rozjeżdżać.
+
+       CZEGO TU NIE MA I DLACZEGO — dwie świadome różnice, obie o TREŚCI, nie o wyglądzie:
+         `[data-vote-cta]` („Zagłosuj na uczestnika") prowadzi na TĘ stronę. Przycisk, który
+         przeładowuje stronę, na której stoisz, nie jest przyciskiem; jego miejsce w pasku
+         zajmuje „Wróć na stronę", w tych samych klasach `btn btn--small btn--yellow`.
+         „Będę tam" otwiera okno przypomnienia, które mieszka w index.html i jest obsługiwane
+         przez app.js. Tutaj byłby przyciskiem, który nie robi nic — a przycisk bez działania
+         jest gorszy niż brak przycisku. Sekcja „ci sarò" jest za to w rozwiniętym menu, tak
+         jak wszystkie pozostałe. -->
+  <header class="site-header" data-header>
     <div class="nav-shell">
       <a class="brand" href="index.html" data-vote-back aria-label="Carruleddhi Show">
         <span class="brand__name">Carruleddhi</span>
         <span class="brand__date" data-header-date>17 · 10 · 2026</span>
       </a>
 
-      <!-- Bez plakietki „00% Voto del pubblico".
-           Procent przewinięcia i nazwa sekcji, w której i tak jesteś, to dwie informacje,
-           których nikt tu nie potrzebuje — a stały w najbardziej widocznym miejscu paska i na
-           telefonie ściskały flagę z przyciskiem powrotu. Pasek postępu na górze ekranu
-           zostaje, bo nie zabiera miejsca. Obsługa `[data-nav-progress]` w voting-boot.js jest
-           warunkowa, więc brak tego elementu niczego nie psuje. -->
-
-      <!-- ZEGAR GŁOSOWANIA ZADOKOWANY W PASKU.
+      <!-- Chip z nazwą sekcji i procentem przewinięcia — ten sam element co na stronie głównej.
            ==========================================================================
-           Ten sam mechanizm co odliczanie do wydarzenia na stronie głównej: `.nav-clock`
+           Był z tej strony zdjęty, a `voting.css` trzymał dla niego dwie reguły: jedną
+           włączającą go z powrotem (`display: flex`) i jedną gaszącą na telefonie. Dwie
+           reguły dla elementu, którego nie ma w drzewie, to definicja martwego zapisu — a
+           gdyby ktoś kiedyś chip przywrócił, pierwsza z nich nie robiłaby nic (base ma już
+           `display: flex`), a druga cicho zabrałaby go na telefonach. Oba zapisy zniknęły,
+           chip wrócił i zachowuje się dokładnie tak jak tam.
+
+           Procent liczy `setupScrollEffects`, nazwę sekcji ustawia `applyLanguage` — ta strona
+           jest JEDNĄ sekcją, więc nazwa nie zmienia się przy przewijaniu i nie ma tu czego
+           obserwować. Na samej górze chip gaśnie, tym samym `[data-nav-at-top]`, którym gasi
+           go app.js, żeby nie mówić „100% Voto del pubblico" nad tytułem, który mówi to samo. -->
+      <div class="nav-current" data-nav-current aria-live="polite">
+        <span class="nav-current__pulse" aria-hidden="true"></span>
+        <span class="nav-current__copy">
+          <small class="nav-current__progress" data-nav-progress>100%</small>
+          <strong data-current-section>Carruleddhi</strong>
+        </span>
+      </div>
+
+      <!-- ZEGAR GŁOSOWANIA ZADOKOWANY W PASKU — W MIEJSCU `[data-nav-clock]` ZE STRONY GŁÓWNEJ.
+           ==========================================================================
+           Ten sam slot, te same klasy, ten sam mechanizm dokowania. INNA LICZBA, i to jest
+           rozstrzygnięcie pytania „czy przenosić `[data-nav-clock]` ze strony głównej":
+           tamten licznik odlicza DO wydarzenia, a na tej podstronie wydarzenie już się zaczęło
+           — w fazie głosowania pokazywałby cztery zera, czyli największą liczbę na pasku bez
+           ani jednej informacji w środku. Na jego miejscu stoi jedyne odliczanie, które w tej
+           chwili ma sens: ile zostało do zamknięcia głosowania. Ta sama zamiana zachodzi na
+           stronie głównej w hero (patrz `.hero-vote` w index.html), więc podstrona nie wymyśla
+           tu nowej zasady, tylko stosuje istniejącą.
+
+           `.nav-clock`
            pozycjonowany bezwzględnie na środku paska, wygaszony do chwili, gdy nagłówek
            dostanie `[data-clock-docked]`. O tym, kiedy go dostaje, decyduje `setupVoteClock`
            w voting-boot.js — obserwator przecięć na zegarze stojącym w treści strony, bez ani
@@ -85,7 +126,9 @@
         <a class="btn btn--small btn--yellow" href="index.html" data-vote-back>
           <span data-i18n="voting.backToSite">← Torna al sito</span>
         </a>
-        <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Menu">
+        <!-- `aria-label` ten sam co na stronie głównej: „Apri il menu", nie „Menu". Nazwa
+             kontrolki mówi, co się stanie po naciśnięciu, a nie jak się nazywa to, co otwiera. -->
+        <button class="menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="site-menu" aria-label="Apri il menu">
           <span class="menu-toggle__label">Menu</span>
           <span class="menu-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span>
         </button>
@@ -102,13 +145,40 @@
        waży cała ta strona.
 
        Odsyłacze prowadzą do `index.html#…`, nie do samych zakotwiczeń: tych sekcji tutaj nie
-       ma, więc `#route` byłby skokiem donikąd. -->
+       ma, więc `#route` byłby skokiem donikąd.
+
+       TA SAMA JEDENASTKA I TA SAMA NUMERACJA CO NA STRONIE GŁÓWNEJ.
+         Było osiem pozycji i numeracja 01–08, czyli inna mapa serwisu niż w tym samym menu
+         o jedno kliknięcie stąd. Trzy brakujące — galeria, „ci sarò", zapisy — są dokładnie
+         tymi, które strona główna potrafi wyłączyć w ustawieniach, więc dostają to samo
+         `data-feature-link`, którym app.js je chowa; tutaj robi to `applyFeatureLinks`
+         w voting-boot.js, z tego samego pola `config.features`. Bez tego odsyłacz do
+         wyłączonej sekcji lądowałby na górze strony głównej. -->
   <button class="menu-backdrop" type="button" data-menu-backdrop tabindex="-1" aria-label="Chiudi il menu"></button>
   <nav class="mobile-nav" id="site-menu" data-mobile-menu aria-label="Main navigation" aria-hidden="true">
     <div class="menu-panel__inner">
       <div class="menu-panel__heading">
         <span class="menu-panel__eyebrow" data-config-event-name>Carruleddhi Show 2026</span>
         <span data-i18n="hero.kicker" data-config-date-label>17 ottobre 2026 · Santa Teresa Gallura</span>
+
+        <!-- Wybór języka w rozwiniętym menu, jak na stronie głównej.
+             Flaga w pasku jest przy otwartym panelu przykryta nakładką, więc bez tego rzędu
+             zmiana języka wymagała najpierw zamknięcia menu. Podpis dwujęzyczny na stałe i
+             kody ISO zamiast tłumaczonych nazw — to jedyny napis na stronie, który musi być
+             zrozumiały także wtedy, gdy strona jest w języku, którego ktoś nie zna.
+             Kliknięcie przekazuje `setupMenuLangs` w voting-boot.js do listy w pasku, więc
+             kod zmiany języka pozostaje jeden. -->
+        <div class="menu-langs" data-menu-langs>
+          <span class="menu-langs__label">Lingua / Language</span>
+          <div class="menu-langs__row">
+            <button class="menu-lang" type="button" data-menu-language="it" aria-pressed="true">IT</button>
+            <button class="menu-lang" type="button" data-menu-language="pl" aria-pressed="false">PL</button>
+            <button class="menu-lang" type="button" data-menu-language="en" aria-pressed="false">EN</button>
+            <button class="menu-lang" type="button" data-menu-language="de" aria-pressed="false">DE</button>
+            <button class="menu-lang" type="button" data-menu-language="es" aria-pressed="false">ES</button>
+            <button class="menu-lang" type="button" data-menu-language="fr" aria-pressed="false">FR</button>
+          </div>
+        </div>
       </div>
 
       <div class="menu-panel__grid">
@@ -118,9 +188,12 @@
           <a href="index.html#categories"><span class="menu-link__index">03</span><span data-i18n="nav.categories">Categorie</span><span class="menu-link__arrow">↗</span></a>
           <a href="index.html#route"><span class="menu-link__index">04</span><span data-i18n="nav.route">Percorso</span><span class="menu-link__arrow">↗</span></a>
           <a href="index.html#schedule"><span class="menu-link__index">05</span><span data-i18n="nav.program">Programma</span><span class="menu-link__arrow">↗</span></a>
-          <a href="index.html#prizes"><span class="menu-link__index">06</span><span data-i18n="nav.prizes">Premi</span><span class="menu-link__arrow">↗</span></a>
-          <a href="index.html#faq"><span class="menu-link__index">07</span><span data-i18n="nav.faq">FAQ</span><span class="menu-link__arrow">↗</span></a>
-          <a href="index.html#contact"><span class="menu-link__index">08</span><span data-i18n="nav.contact">Contatti</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#gallery" data-feature-link="gallery"><span class="menu-link__index">06</span><span data-i18n="nav.gallery">Galleria</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#prizes"><span class="menu-link__index">07</span><span data-i18n="nav.prizes">Premi</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#attendance" data-feature-link="attendance"><span class="menu-link__index">08</span><span data-i18n="nav.attend">Ci sarò</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#signup" data-feature-link="registration"><span class="menu-link__index">09</span><span data-i18n="nav.signup">Iscriviti</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#faq"><span class="menu-link__index">10</span><span data-i18n="nav.faq">FAQ</span><span class="menu-link__arrow">↗</span></a>
+          <a href="index.html#contact"><span class="menu-link__index">11</span><span data-i18n="nav.contact">Contatti</span><span class="menu-link__arrow">↗</span></a>
         </div>
       </div>
     </div>
@@ -353,13 +426,18 @@
           <div class="footer__brand">CARRULEDDHI<br><span>SHOW <span data-config-event-year>2026</span></span></div>
           <p class="footer__copy" data-i18n="footer.copy">Una discesa, un paese, una storia costruita a mano.</p>
         </div>
+        <!-- Te same sześć pozycji i ta sama kolejność co w stopce strony głównej. Było pięć,
+             w innej kolejności i z „Premi" zamiast galerii i zapisów — czyli dwie stopki
+             obiecujące dwie różne mapy serwisu. Galeria i zapisy dostają `data-feature-link`,
+             więc gasną razem z sekcjami, których nie ma (patrz `applyFeatureLinks`). -->
         <div class="footer__group">
           <h3 data-i18n="footer.explore">Esplora</h3>
           <div class="footer__links">
             <a href="index.html#story" data-i18n="nav.race">La gara</a>
             <a href="index.html#categories" data-i18n="nav.categories">Categorie</a>
-            <a href="index.html#prizes" data-i18n="nav.prizes">Premi</a>
             <a href="index.html#route" data-i18n="nav.route">Percorso</a>
+            <a href="index.html#gallery" data-feature-link="gallery" data-i18n="nav.gallery">Galleria</a>
+            <a href="index.html#signup" data-feature-link="registration" data-i18n="nav.signup">Iscriviti</a>
             <a href="index.html#contact" data-i18n="nav.contact">Contatti</a>
           </div>
         </div>
@@ -376,9 +454,15 @@
         <span class="patron__label" data-i18n="patron.thanks">Grazie a loro c’è la festa</span>
         <img class="patron__logo" src="/assets/images/fidali.jpeg" alt="Fidali 1982" width="720" height="293" decoding="async" loading="lazy">
       </div>
+      <!-- Trzy pozycje, tak jak w stopce strony głównej: prawa autorskie, podpis i wejście
+           organizatora. Odsyłacz do panelu jest tu z tego samego powodu co tam — cichy,
+           ostatni i nieoznaczony niczym ponad własną nazwą. To nie zabezpieczenie: panel bez
+           hasła z ROSTER_KEY nie czyta niczego, a sprawdza to funkcja, nie ten odsyłacz.
+           `rel="nofollow"`, bo cała ta strona i tak jest `noindex`. -->
       <div class="footer__bottom">
         <span>© <span data-config-event-name>Carruleddhi Show 2026</span> · <span data-config-event-location>Santa Teresa Gallura</span></span>
         <span data-i18n="footer.credit">Progetto digitale Carruleddhi Show</span>
+        <a class="footer__admin" href="admin.html" rel="nofollow">Admin</a>
       </div>
     </div>
 

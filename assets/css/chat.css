@@ -380,6 +380,26 @@
 
 .chat-gate__form { display: grid; gap: 12px; }
 
+/* Adres, który już znamy: karta potwierdzenia zamiast dwóch pustych pól.
+   ---------------------------------------------------------------------------
+   Budowana z app.js (`knownGateOffer`), bo pojawia się tylko wtedy, gdy w tej przeglądarce
+   jest zapamiętany adres — a znacznik, który przez większość wizyt jest pusty, i tak
+   trzeba by chować skryptem. Wygląda jak reszta bramy, bo jest tą samą sprawą: zanim
+   zaczniemy rozmowę, ustalamy, dokąd odpiszemy.
+
+   Pastylki tej samej klasy co podpowiedzi pod rozmową (`.chat__chip`) — jeden kształt
+   „naciśnij, żeby odpowiedzieć" w całym czacie, zamiast drugiego wyglądu na to samo. */
+.chat-gate__known { display: grid; gap: 12px; }
+.chat-gate__choices { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Pastylka „to mój adres" prowadzi dalej, więc ma wagę pierwszego przycisku. Druga zostaje
+   zwykłym wyjściem — obie są równie dostępne, ale nie równie oczywiste. */
+.chat-gate__choices .chat__chip:first-child {
+  border-color: #071a3d;
+  background: var(--yellow, #ffc928);
+  font-weight: 700;
+}
+.chat-gate__choices .chat__chip:first-child:hover { background: #ffd75c; }
+
 /* One column on a phone, two on anything wider — the two fields are short and a full-width
    name box above a full-width e-mail box wastes the height the log needs. */
 @media (min-width: 560px) {

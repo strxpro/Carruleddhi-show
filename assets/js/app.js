@@ -2347,6 +2347,37 @@ import {
     return value;
   }
 
+  /* ADRES, KTÓRY GOŚĆ JUŻ NAM PODAŁ
+     ---------------------------------------------------------------------------
+     Zapis na wyścig, włączenie przypomnień i czat pytają o to samo: imię i adres. Każde
+     z nich trzymało odpowiedź u siebie albo wcale, więc ktoś, kto właśnie się zapisał,
+     w czacie dostawał puste pole „E-mail *". To jest pytanie „czy pamiętasz, co przed
+     chwilą wpisałeś".
+
+     Jedno miejsce na tę parę, wspólne dla wszystkich trzech dróg. Zostaje w tej
+     przeglądarce i nigdzie indziej — nic tego nie wysyła, a czat i tak potwierdza adres
+     pastylką, zanim go użyje (patrz `knownGateOffer`). Zapisywane DOPIERO po udanym
+     żądaniu: adres, którego serwer nie przyjął, nie jest adresem, który znamy. */
+  const PERSON_NAME_KEY = 'carruleddhi.person.name';
+  const PERSON_EMAIL_KEY = 'carruleddhi.person.email';
+
+  function rememberPerson(name, email) {
+    const address = String(email || '').trim().toLowerCase();
+    /* Ten sam wzorzec, którym pilnują się formularz zapisu i brama czatu. Bez niego
+       zapamiętalibyśmy literówkę i podsuwali ją do potwierdzenia przy każdej rozmowie. */
+    if (!/^[^s@]+@[^s@]+.[^s@]{2,}$/.test(address)) return;
+    storage.set(PERSON_EMAIL_KEY, address);
+    const person = String(name || '').trim().slice(0, 40);
+    if (person) storage.set(PERSON_NAME_KEY, person);
+  }
+
+  function knownPerson() {
+    return {
+      name: storage.get(PERSON_NAME_KEY, '') || '',
+      email: storage.get(PERSON_EMAIL_KEY, '') || ''
+    };
+  }
+
   async function loadGlobalCounts() {
     if (!config.endpoints.counts) return;
     /* Zdjęte PRZED zapisem nowych wartości. To jest cała naprawa tykającego licznika —
@@ -3738,6 +3769,7 @@ import {
           reminderSchedule: ['P7D', 'P1D', 'PT3H']
         }));
         storage.set('carruleddhi.reminder', '1');
+        rememberPerson(String(values.name || '').trim(), String(values.email || '').trim());
         $('[data-reminder-form-view]', modal)?.classList.add('is-hidden');
         $('[data-reminder-success]', modal)?.classList.add('is-visible');
         if (!state.attended) registerAttendance(false);
@@ -5024,6 +5056,10 @@ import {
         if (Number.isFinite(state.remotePilots)) state.remotePilots += 1;
         state.lastRegistration = { ...data, raceNumber, submittedAt: new Date().toISOString() };
         storage.set('carruleddhi.registrations', String(state.registrations));
+        /* Po UDANYM zapisie, nie przed: czat ma potem potwierdzić ten adres, a nie adres,
+           którego serwer odrzucił. Imię, nie imię z nazwiskiem — brama czatu pyta o to
+           samo, o co pole `given-name` w formularzu. */
+        rememberPerson(data.firstName, data.email);
         const number = $('[data-race-number]');
         if (number) number.textContent = raceNumber;
         form.hidden = true;
@@ -7705,6 +7741,9 @@ import {
       visitor.email = email;
       storage.set('carruleddhi.chat.name', name);
       storage.set('carruleddhi.chat.email', email);
+      /* Ta sama para, co po zapisie i po przypomnieniach — żeby następna droga do adresu
+         też już go znała. */
+      rememberPerson(name, email);
       applyGate();
       openThread();
       startPolling();
@@ -9098,7 +9137,18 @@ import {
          jest zgodą, więc te trzy wiersze mają wejść razem, po jednej porcji kropek. */
       sayLater(() => {
         sayNow('chat.sponsorConsentAsk');
-        consentDocs();
+        /* ODSYŁACZE TYLKO WTEDY, GDY NIE MA OKNA Z DOKUMENTEM.
+           ---------------------------------------------------------------------------
+           Stały tu zawsze: dwa fioletowe odsyłacze pod pytaniem o zgodę, a obok pastylka,
+           która otwiera ten sam dokument w oknie. Dwie drogi do jednej rzeczy, z czego
+           jedna wyprowadza z rozmowy do nowej karty w połowie kreatora — i to ta, która
+           wygląda na główną, bo jest napisana kolorem.
+
+           Zdjęte na prośbę, ale nie bezwarunkowo: gdy okna nie ma (starsza przeglądarka,
+           nieudane wczytanie dokumentu), pastylka nie ma czego pokazać i odsyłacze zostają
+           jedyną drogą do treści, na którą ktoś ma się zgodzić. Zgoda bez możliwości
+           przeczytania nie jest zgodą, więc w tym jednym wypadku wracają. */
+        if (typeof openConsentDocuments !== 'function') consentDocs();
       });
       /* ZGODA PO PRZECZYTANIU, NIE PO KLIKNIĘCIU.
          ---------------------------------------------------------------------------
@@ -9258,10 +9308,48 @@ import {
      *   przeglądarki przy każdym naciśnięciu i treść mieszana w raporcie bezpieczeństwa —
      *   za jeden odsyłacz sponsora, którego nikt nie sprawdzi ręcznie.
      */
+    /* Adres autora tej strony, nie organizatora wyścigu — i to jest cała różnica.
+       `config.contact.email` odpowiada na „mam pytanie o zawody". To odpowiada na „chcę
+       taką stronę u siebie", czyli na coś, czego organizator nie robi. Czytany z ustawień,
+       jeśli kiedyś tam trafi, żeby zmiana adresu nie znaczyła zmiany w tym pliku. */
+    const SITE_AUTHOR_EMAIL = String(config.contact?.webmaster || 'shardananuragici@gmail.com');
+
+    /**
+     * STRONA CZY SOCIAL — DWA PYTANIA, NIE JEDNO
+     * ---------------------------------------------------------------------------
+     * Stało tu jedno pytanie „odsyłacz do strony albo profilu?" i puste pole. To są dwie
+     * różne odpowiedzi i dwa różne zdania o tym, co wkleić: adres firmy zaczyna się od
+     * własnej domeny, a profil od facebook.com albo instagram.com. Jedno zdanie na oba
+     * przypadki nie mówi ani jednego, ani drugiego.
+     *
+     * Trzecia pastylka jest tą, po której jako jedyni coś dajemy zamiast prosić: kto nie ma
+     * ani strony, ani profilu, dostaje zaproszenie do kontaktu w sprawie własnej strony.
+     * Zgłoszenie sponsora idzie dalej niezależnie od tego — oferta nie jest warunkiem.
+     */
     function sponsorAskLink() {
       if (!flow) return;
-      flow.step = 'link';
+      flow.step = 'linkKind';
       flowSay('chat.sponsorAskLink');
+      flowChoices([
+        ['chat.sponsorLinkHasSite', async () => { if (flow) sponsorAskUrl('site'); }],
+        ['chat.sponsorLinkHasSocial', async () => { if (flow) sponsorAskUrl('social'); }],
+        ['chat.sponsorLinkNone', async () => {
+          if (!flow) return;
+          flow.siteUrl = '';
+          flow.linkKind = 'none';
+          sponsorNoSiteOffer();
+          sponsorNext(sponsorAskEmail);
+        }],
+        sponsorQuit()
+      ]);
+    }
+
+    /** Wklejenie adresu, już wiedząc czego: strony czy profilu. Sprawdza to samo. */
+    function sponsorAskUrl(kind) {
+      if (!flow) return;
+      flow.step = 'link';
+      flow.linkKind = kind;
+      flowSay(kind === 'social' ? 'chat.sponsorAskSocialUrl' : 'chat.sponsorAskSiteUrl');
       flowChoices([
         ['chat.sponsorLinkSkip', async () => {
           if (!flow) return;
@@ -9270,6 +9358,30 @@ import {
         }],
         sponsorQuit()
       ]);
+    }
+
+    /**
+     * „Nie mam żadnej" — jedyne miejsce w kreatorze, gdzie coś proponujemy.
+     *
+     * Adres jest odsyłaczem `mailto:`, a nie napisem do przepisania: to jest rozmowa na
+     * telefonie, gdzie przepisanie adresu z ekranu do poczty znaczy zwykle, że nikt nie
+     * napisze. Malowane razem ze zdaniem, w jednym zadaniu kolejki — tak samo jak
+     * `consentDocs`, i z tego samego powodu: dwa zadania to dwie porcje kropek na jedną myśl.
+     */
+    function sponsorNoSiteOffer() {
+      if (!log) return;
+      sayLater(() => {
+        sayNow('chat.sponsorNoSiteOffer');
+        const row = document.createElement('p');
+        row.className = 'chat__docs';
+        const link = document.createElement('a');
+        link.href = `mailto:${SITE_AUTHOR_EMAIL}`;
+        link.textContent = SITE_AUTHOR_EMAIL;
+        row.append(link);
+        const stick = atBottom();
+        log.appendChild(row);
+        if (stick) toBottom();
+      });
     }
 
     /**
@@ -9538,6 +9650,22 @@ import {
         /* Zdjęcia nie da się napisać. Kto pisze w tym kroku, albo szuka przycisku, albo chce
            pominąć — zdanie wskazuje jedno i drugie, zamiast brać wpisany tekst za nazwę pliku. */
         flowSay('chat.sponsorLogoUseButtons');
+        return;
+      }
+
+      if (flow.step === 'linkKind') {
+        const said = message.trim().slice(0, 300);
+        /* Ktoś wkleił adres, zamiast nacisnąć pastylkę. To jest odpowiedź na to samo
+           pytanie, tylko od razu — odrzucenie jej znaczyłoby „nie tak, najpierw guzik".
+           Bez tego warunku wpisany adres spadał do gałęzi na dole funkcji, gdzie jest
+           pytanie o e-mail, i wracał ze zdaniem, że to nie jest poprawny adres e-mail. */
+        if (SPONSOR_LINK.test(said)) {
+          flow.siteUrl = said;
+          flow.linkKind = 'site';
+          sponsorNext(sponsorAskEmail);
+          return;
+        }
+        flowSay('chat.sponsorAskLink');
         return;
       }
 
@@ -10035,6 +10163,122 @@ import {
       polling = 0;
     }
 
+    /**
+     * ADRES, KTÓRY JUŻ ZNAMY: POTWIERDZENIE ZAMIAST DRUGIEGO PYTANIA
+     * ---------------------------------------------------------------------------
+     * Brama czatu prosi o imię i adres, i ma po co: to, czego automat nie wie, kończy
+     * u człowieka, a człowiek odpisujący za trzy godziny musi mieć dokąd. Ale kto zapisał
+     * się na wyścig albo włączył przypomnienia, podał ten adres kwadrans temu — i dostawał
+     * dwa puste pola, jakby nikt nie słuchał.
+     *
+     * Więc: znany adres nie jest wpisywany za gościa po cichu. Jest POKAZANY, zamaskowany
+     * tak samo jak w bramce kodu, i potwierdzany jedną pastylką. „Zmień adres" oddaje
+     * zwykły formularz — bez tego wyjścia potwierdzenie byłoby pułapką na kogoś, kto pisze
+     * z cudzego telefonu.
+     *
+     * Imię pytane TYLKO wtedy, gdy go nie znamy. Adres bez imienia zdarza się, bo
+     * przypomnienia można włączyć samym adresem.
+     *
+     * Formularz jest chowany, nie usuwany: „zmień adres" ma go oddać w tym samym stanie,
+     * a nie odbudować drugą kopię z innymi zdarzeniami.
+     */
+    function knownGateOffer() {
+      if (!gate || identified() || ended) return false;
+      const known = knownPerson();
+      if (!known.email) return false;
+      if ($('[data-chat-gate-known]', gate)) return true;
+
+      const card = document.createElement('div');
+      card.className = 'chat-gate__known';
+      card.dataset.chatGateKnown = '';
+
+      const lead = document.createElement('p');
+      lead.className = 'chat-gate__lead';
+      card.append(lead);
+
+      let nameField = null;
+      let nameLabel = null;
+      if (!known.name) {
+        const holder = document.createElement('div');
+        holder.className = 'field';
+        nameField = document.createElement('input');
+        nameField.type = 'text';
+        nameField.id = 'chat-gate-known-name';
+        nameField.name = 'name';
+        nameField.autocomplete = 'given-name';
+        nameField.maxLength = 40;
+        nameField.placeholder = ' ';
+        nameField.required = true;
+        nameLabel = document.createElement('label');
+        nameLabel.htmlFor = nameField.id;
+        holder.append(nameField, nameLabel);
+        card.append(holder);
+      }
+
+      const row = document.createElement('div');
+      row.className = 'chat-gate__choices';
+      const chip = (key, onClick) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'chat__chip';
+        button.dataset.i18nKey = key;
+        button.addEventListener('click', onClick);
+        row.append(button);
+        return button;
+      };
+
+      const yes = chip('chat.gateKnownYes', () => {
+        const person = known.name || String(nameField?.value || '').trim();
+        /* Bez imienia nie ma kogo zawołać w wątku, więc pastylka nie idzie dalej — ale też
+           nie krzyczy: kursor ląduje w polu, które trzeba uzupełnić. */
+        if (person.length < 2) { nameField?.focus({ preventScroll: true }); return; }
+        visitor.name = person;
+        visitor.email = known.email;
+        storage.set('carruleddhi.chat.name', person);
+        storage.set('carruleddhi.chat.email', known.email);
+        rememberPerson(person, known.email);
+        card.remove();
+        applyGate();
+        openThread();
+        startPolling();
+        input?.focus({ preventScroll: true });
+        /* Karta znika, więc sekcja zmienia wysokość — a #contact decyduje o przypięciu
+           z własnej wysokości. Ten sam sygnał wysyła zwykła brama. */
+        window.dispatchEvent(new Event('carruleddhi:relayout'));
+      });
+
+      const change = chip('chat.gateKnownChange', () => {
+        card.remove();
+        if (gateForm) gateForm.hidden = false;
+        $('#chat-gate-name', gate)?.focus({ preventScroll: true });
+      });
+
+      card.append(row);
+
+      /* Przelot językowy nie omija karty zbudowanej z kodu: `translateDom` chodzi po
+         `data-i18n`, a te trzy napisy powstają tutaj. Bez tego zmiana języka zostawiłaby
+         pastylki po włosku nad polską rozmową. */
+      const paint = () => {
+        lead.textContent = interpolate('chat.gateKnownAsk', { email: gateMask(known.email) });
+        yes.textContent = text('chat.gateKnownYes') || 'OK';
+        change.textContent = text('chat.gateKnownChange') || '';
+        if (nameLabel) nameLabel.textContent = text('chat.gateName') || '';
+      };
+      paint();
+      window.addEventListener('carruleddhi:language', () => {
+        if (card.isConnected) paint();
+      });
+
+      if (gateForm) {
+        gateForm.hidden = true;
+        gateForm.before(card);
+      } else {
+        gate.append(card);
+      }
+      return true;
+    }
+
+    knownGateOffer();
     applyGate();
     paintChips();
 

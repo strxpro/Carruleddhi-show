@@ -2750,6 +2750,89 @@
     }
   };
 
+  /**
+   * ADRES, KTÓRY JUŻ ZNAMY, I PYTANIE O STRONĘ SPONSORA
+   * ---------------------------------------------------------------------------
+   * Dwie sprawy, jeden blok, bo obie wchodzą tą samą drogą: pastylką pod pytaniem.
+   *
+   * `chat.gateKnown*` służy rozmowie, która NIE pyta o adres drugi raz. Kto zapisał się na
+   * wyścig albo włączył przypomnienia, podał go już raz — pytanie o to samo jest pytaniem
+   * „czy pamiętasz, co przed chwilą wpisałeś". Zamiast pola jest zdanie z zamaskowanym
+   * adresem i dwie pastylki: to mój / zmień. `{email}` podstawia `interpolate`.
+   *
+   * `chat.sponsorLink*` rozbija jedno pytanie „strona albo social?" na wybór, bo to są dwie
+   * różne odpowiedzi i dwa różne zdania o tym, co wkleić. Trzecia pastylka — „nie mam" — jest
+   * jedyną, po której coś oferujemy, a nie o coś prosimy.
+   */
+  const chatKnownAndSiteExtras = {
+    it: {
+      'chat.gateKnownAsk': 'Ti rispondiamo a {email}. È il tuo indirizzo?',
+      'chat.gateKnownYes': 'Sì, è il mio',
+      'chat.gateKnownChange': 'Cambia indirizzo',
+      'chat.sponsorLinkHasSite': 'Ho un sito',
+      'chat.sponsorLinkHasSocial': 'Ho i social',
+      'chat.sponsorLinkNone': 'Non ho nulla',
+      'chat.sponsorAskSiteUrl': 'Incolla l’indirizzo completo del sito, con https:// davanti.',
+      'chat.sponsorAskSocialUrl': 'Incolla l’indirizzo completo del profilo — Facebook, Instagram, TikTok, quello che usi.',
+      'chat.sponsorNoSiteOffer': 'Nessun sito? Se ne vuoi uno tuo, fatto come questo, scrivici:'
+    },
+    pl: {
+      'chat.gateKnownAsk': 'Odpiszemy na {email}. To Twój adres?',
+      'chat.gateKnownYes': 'Tak, mój',
+      'chat.gateKnownChange': 'Zmień adres',
+      'chat.sponsorLinkHasSite': 'Mam stronę',
+      'chat.sponsorLinkHasSocial': 'Mam social media',
+      'chat.sponsorLinkNone': 'Nie mam żadnej',
+      'chat.sponsorAskSiteUrl': 'Wklej pełny adres strony, razem z https:// na początku.',
+      'chat.sponsorAskSocialUrl': 'Wklej pełny adres profilu — Facebook, Instagram, TikTok, czego używasz.',
+      'chat.sponsorNoSiteOffer': 'Nie masz strony? Jeśli chcesz własną, zrobioną tak jak ta, napisz do nas:'
+    },
+    en: {
+      'chat.gateKnownAsk': 'We will reply to {email}. Is that your address?',
+      'chat.gateKnownYes': 'Yes, that is mine',
+      'chat.gateKnownChange': 'Use another address',
+      'chat.sponsorLinkHasSite': 'I have a website',
+      'chat.sponsorLinkHasSocial': 'I have social media',
+      'chat.sponsorLinkNone': 'I have neither',
+      'chat.sponsorAskSiteUrl': 'Paste the full address of the site, with https:// at the front.',
+      'chat.sponsorAskSocialUrl': 'Paste the full address of the profile — Facebook, Instagram, TikTok, whichever you use.',
+      'chat.sponsorNoSiteOffer': 'No website? If you would like one of your own, built like this one, write to us:'
+    },
+    de: {
+      'chat.gateKnownAsk': 'Wir antworten an {email}. Ist das deine Adresse?',
+      'chat.gateKnownYes': 'Ja, meine',
+      'chat.gateKnownChange': 'Adresse ändern',
+      'chat.sponsorLinkHasSite': 'Ich habe eine Website',
+      'chat.sponsorLinkHasSocial': 'Ich habe Social Media',
+      'chat.sponsorLinkNone': 'Ich habe nichts davon',
+      'chat.sponsorAskSiteUrl': 'Füg die vollständige Adresse der Website ein, mit https:// davor.',
+      'chat.sponsorAskSocialUrl': 'Füg die vollständige Adresse des Profils ein — Facebook, Instagram, TikTok, was du nutzt.',
+      'chat.sponsorNoSiteOffer': 'Keine Website? Wenn du eine eigene möchtest, gebaut wie diese, schreib uns:'
+    },
+    es: {
+      'chat.gateKnownAsk': 'Te responderemos a {email}. ¿Es tu dirección?',
+      'chat.gateKnownYes': 'Sí, es la mía',
+      'chat.gateKnownChange': 'Cambiar dirección',
+      'chat.sponsorLinkHasSite': 'Tengo web',
+      'chat.sponsorLinkHasSocial': 'Tengo redes sociales',
+      'chat.sponsorLinkNone': 'No tengo ninguna',
+      'chat.sponsorAskSiteUrl': 'Pega la dirección completa de la web, con https:// delante.',
+      'chat.sponsorAskSocialUrl': 'Pega la dirección completa del perfil — Facebook, Instagram, TikTok, la que uses.',
+      'chat.sponsorNoSiteOffer': '¿Sin web? Si quieres una propia, hecha como esta, escríbenos:'
+    },
+    fr: {
+      'chat.gateKnownAsk': 'Nous répondrons à {email}. C’est bien votre adresse ?',
+      'chat.gateKnownYes': 'Oui, c’est la mienne',
+      'chat.gateKnownChange': 'Changer d’adresse',
+      'chat.sponsorLinkHasSite': 'J’ai un site',
+      'chat.sponsorLinkHasSocial': 'J’ai des réseaux sociaux',
+      'chat.sponsorLinkNone': 'Je n’ai ni l’un ni l’autre',
+      'chat.sponsorAskSiteUrl': 'Collez l’adresse complète du site, avec https:// devant.',
+      'chat.sponsorAskSocialUrl': 'Collez l’adresse complète du profil — Facebook, Instagram, TikTok, celui que vous utilisez.',
+      'chat.sponsorNoSiteOffer': 'Pas de site ? Si vous en voulez un à vous, fait comme celui-ci, écrivez-nous :'
+    }
+  };
+
   Object.keys(interactionExtras).forEach((locale) => Object.assign(extras[locale], interactionExtras[locale]));
   Object.keys(consentExtras).forEach((locale) => Object.assign(extras[locale], consentExtras[locale]));
   Object.keys(miscExtras).forEach((locale) => Object.assign(extras[locale], miscExtras[locale]));
@@ -2761,6 +2844,7 @@
   Object.keys(chatConsentExtras).forEach((locale) => Object.assign(extras[locale], chatConsentExtras[locale]));
   Object.keys(chatSponsorFormExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorFormExtras[locale]));
   Object.keys(chatSponsorOptionalExtras).forEach((locale) => Object.assign(extras[locale], chatSponsorOptionalExtras[locale]));
+  Object.keys(chatKnownAndSiteExtras).forEach((locale) => Object.assign(extras[locale], chatKnownAndSiteExtras[locale]));
   Object.keys(chatHandoverExtras).forEach((locale) => Object.assign(extras[locale], chatHandoverExtras[locale]));
   Object.keys(podiumResultsExtras).forEach((locale) => Object.assign(extras[locale], podiumResultsExtras[locale]));
 

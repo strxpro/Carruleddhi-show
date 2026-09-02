@@ -512,6 +512,116 @@ check('0035 opisuje tabele i kolumny komentarzem',
   /comment on table public\.sponsor_submissions is/i.test(ttlSponsors)
   && (ttlSponsors.match(/comment on column public\.sponsor_submissions/gi) || []).length >= 3);
 
+/* ============================================================================
+   0035 — TA SAMA LICZBA MINUT W TRZECH MIEJSCACH
+   ============================================================================
+   Ważność kodu jest zapisana w trzech plikach naraz i żaden z nich nie wie o pozostałych:
+   domyślna wartość kolumny w tej migracji, `CODE_TTL_MINUTES` w Workerze (który liczy
+   `expires_at` jawnie, więc to on decyduje) i zdanie w liście, po sześć razy w
+   `emails/copy.json` — bo renderer w Make podstawia ścieżki i nic więcej, nie umie ani
+   liczyć, ani odmieniać.
+
+   ROZJAZD TEJ LICZBY NIE KRZYCZY. Kod wygasły trzy minuty przed tym, co obiecuje list, dla
+   czytającego wygląda jak zepsuta strona, a nie jak upływ czasu — i nikt tego nie zgłosi
+   jako błędu, tylko jako „nie da się". Dlatego liczba jest tu WYCIĄGANA z każdego z trzech
+   źródeł i porównywana, a nie wpisana w ten plik czwarty raz.
+
+   Sprawdzane pod `npm run make`, czyli przy każdym przebiegu — `tools/add-copy-keys.mjs`
+   ma ten sam test u siebie, ale tamten skrypt woła się ręcznie i tylko przy dodawaniu
+   kluczy. Test, który biega raz na kwartał, nie strzeże niczego między tymi razami.
+   ========================================================================== */
+
+const ttlDefault = ttlSponsorsCode.match(/expires_at set default now\(\) \+ interval '(\d+) minutes'/i);
+const workerSource = readFileSync(resolve(root, 'worker/index.js'), 'utf8');
+const ttlConstant = workerSource.match(/const CODE_TTL_MINUTES\s*=\s*(\d+)/);
+
+check('0035 da sie odczytac liczbe minut z domyslnej wartosci kolumny', Boolean(ttlDefault));
+check('worker deklaruje CODE_TTL_MINUTES', Boolean(ttlConstant));
+if (ttlDefault && ttlConstant) {
+  check('0035 i worker mowia o tej samej liczbie minut', ttlDefault[1] === ttlConstant[1],
+    `migracja=${ttlDefault[1]} worker=${ttlConstant[1]}`);
+
+  /* Jednostka razem z liczbą, w każdym z sześciu języków. Wielkość liter ma znaczenie w
+     niemieckim (rzeczownik), więc porównanie jest dosłowne. Sprawdzane RAZEM z liczbą, bo
+     hurtowa podmiana „piętnaście" → „dziesięć" raz już zabrała samo słowo i została z
+     „Jest ważny 10 ." — zdaniem, które przechodzi każdy sprawdzian kompletności kluczy. */
+  const units = { it: 'minuti', pl: 'minut', en: 'minutes', de: 'Minuten', es: 'minutos', fr: 'minutes' };
+  const copy = JSON.parse(readFileSync(resolve(root, 'emails/copy.json'), 'utf8'));
+  for (const [lang, unit] of Object.entries(units)) {
+    for (const key of ['unsubCodeLead', 'entryCodeLead', 'quitCodeLead']) {
+      const text = String(copy?.[lang]?.[key] ?? '');
+      const says = text.includes(`${ttlConstant[1]} ${unit}`);
+      /* Koniec zdania pokazywany TYLKO przy odmowie: to tam stoi liczba i jednostka, więc
+         czytający widzi od razu, co naprawdę obiecuje list. Przy przejściu byłoby to
+         osiemnaście linii szumu w wyniku, który ma się czytać jednym spojrzeniem. */
+      check(`list ${lang}.${key} obiecuje ${ttlConstant[1]} ${unit}`, says,
+        says ? '' : `...${text.slice(-60)}`);
+    }
+  }
+}
+
+/* ============================================================================
+   0035 — TABELA ZGŁOSZEŃ I KOŃCÓWKA, KTÓRA Z NIEJ CZYTA
+   ============================================================================
+   Migracja zakłada tabelę, a Worker czyta z niej kolumny PO NAZWIE, wypisane w
+   `SPONSOR_LEAD_COLUMNS`. To dwa pliki i jedna lista nazw — czyli dokładnie ten układ, w
+   którym literówka nie jest błędem składni po żadnej ze stron. PostgREST odpowiada na
+   nieznaną kolumnę błędem 400, więc objawem jest pusta lista w panelu w dniu, w którym
+   zgłoszenie warte sto euro miało na niej stanąć.
+
+   Do tego rejestracja typu `sponsor-admin`. Ta końcówka rozstrzyga cudze zgłoszenia i oddaje
+   nazwiska, adresy i telefony firm, a pominięcie któregokolwiek z pięciu miejsc rejestracji
+   daje AWARIĘ WYGLĄDAJĄCĄ NA DZIAŁANIE: bez `ALLOWED_TYPES` odmowa przed handlerem, bez
+   `SUPABASE_TYPES` „Accepted" z Make i pusta lista, bez `PROTECTED_TYPES` otwarta książka
+   telefoniczna, bez `FIELD_WHITELIST` przycisk, który zawsze mówi „nie", bez wpisu w
+   routerze wpadnięcie w `wallAdmin` i komunikat o zupełnie innej sprawie.
+   ========================================================================== */
+
+const workerText = readFileSync(resolve(root, 'worker/index.js'), 'utf8');
+
+/* Kolumny, których żąda Worker, wyciągnięte z jego własnej stałej — nie przepisane tutaj
+   ręcznie, bo druga ręczna lista rozjeżdża się przy pierwszej zmianie i nikt tego nie widzi. */
+const workerColumns = workerText.match(/const SPONSOR_LEAD_COLUMNS\s*=\s*\r?\n?\s*'([^']+)'/);
+check('worker deklaruje SPONSOR_LEAD_COLUMNS', Boolean(workerColumns));
+if (workerColumns) {
+  const tableBlock = ttlSponsorsCode.slice(
+    ttlSponsorsCode.search(/create table if not exists public\.sponsor_submissions/i)
+  );
+  const definition = tableBlock.slice(0, tableBlock.indexOf(');') + 2);
+  for (const column of workerColumns[1].split(',').map((name) => name.trim()).filter(Boolean)) {
+    check(`0035 zaklada kolumne ${column}, ktorej zada worker`,
+      new RegExp(`\\b${column}\\b`).test(definition));
+  }
+}
+
+/* Rejestracja typu w pięciu miejscach. Sprawdzane po tekście, bo tak samo robi to
+   `tools/check-voting.mjs` dla `voting-admin` — i z tego samego powodu: żadne z tych miejsc
+   nie krzyczy, gdy zostanie pominięte. */
+const allowed = workerText.slice(
+  workerText.indexOf('const ALLOWED_TYPES'), workerText.indexOf('const SUPABASE_TYPES')
+);
+const supabaseTypes = workerText.slice(
+  workerText.indexOf('const SUPABASE_TYPES'), workerText.indexOf('const WALL_FAMILY')
+);
+const protectedTypes = workerText.slice(
+  workerText.indexOf('const PROTECTED_TYPES'), workerText.indexOf('const ROSTER_HEADER')
+);
+check('typ sponsor-admin jest na ALLOWED_TYPES', /'sponsor-admin'/.test(allowed));
+check('typ sponsor-admin odpowiada z Supabase, nie z Make', /'sponsor-admin'/.test(supabaseTypes));
+check('typ sponsor-admin jest za passphrase', /'sponsor-admin'/.test(protectedTypes));
+check('typ sponsor-admin ma wlasna liste pol',
+  /'sponsor-admin':\s*\[[^\]]*'action'[^\]]*'id'[^\]]*'status'[^\]]*'limit'[^\]]*\]/.test(workerText));
+check('trasa sponsor-admin prowadzi do handlera',
+  workerText.includes("if (type === 'sponsor-admin') return sponsorAdmin(env, payload, cors)"));
+/* Trzy akcje pod nazwami z kontraktu. Nieznana akcja MUSI być odmową: domyślna lista
+   zamieniłaby literówkę w `approve` w odpowiedź 200, czyli w przycisk bez skutku. */
+for (const action of ['list', 'approve', 'reject']) {
+  check(`sponsor-admin rozpoznaje akcje ${action}`,
+    new RegExp(`action === '${action}'`).test(workerText));
+}
+check('sponsor-admin odmawia przy nieznanej akcji',
+  /SPONSOR_UNKNOWN_ACTION/.test(workerText));
+
 /* --- wynik -------------------------------------------------------------- */
 
 let failed = 0;

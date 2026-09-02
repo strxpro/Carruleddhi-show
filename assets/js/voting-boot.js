@@ -3,12 +3,23 @@
  * ===========================================================================
  *
  * Odpowiednik pierwszych stu linii app.js, bez pozostałych pięciu tysięcy. Podstrona
- * potrzebuje dokładnie czterech rzeczy, żeby `voting-page.js` mogło działać:
+ * potrzebuje dokładnie tego, żeby `voting-page.js` mogło działać, a nagłówek i stopka
+ * zachowywały się tak jak na stronie głównej:
  *
  *   1. `window.CARRULEDDHI_ACTIVE_CONFIG` — skąd wziąć adres końcówki głosowania;
  *   2. `window.CARRULEDDHI_API` — wysyłka, pasek komunikatów, słownik (ze wspólnego szwu);
  *   3. przepisane napisy w znacznikach;
- *   4. przełącznik języka, który zapamiętuje wybór tym samym kluczem co strona główna.
+ *   4. przełącznik języka, który zapamiętuje wybór tym samym kluczem co strona główna;
+ *   5. obsługa wspólnego nagłówka: menu, rząd języków w panelu, chip z nazwą sekcji,
+ *      pasek postępu, wygaszanie odsyłaczy do wyłączonych sekcji.
+ *
+ * PUNKT 5 JEST TU, BO NA STRONIE GŁÓWNEJ SIEDZI W app.js
+ *   Nagłówek jest wspólny co do znacznika i co do stylu, ale jego zachowanie mieszka tam w
+ *   pliku, który buduje też galerię 3D, czat i czternaście przypiętych paneli. Wciągnięcie
+ *   tamtego modułu na stronę z listą wozów i suwakiem kosztowałoby więcej, niż waży cała ta
+ *   strona, a rozdzielenie go na kawałki to zmiana w app.js — pliku, którego ta tura nie
+ *   dotyka. Powtórzone jest więc TYLKO otwieranie i zamykanie: nieco ponad pięćdziesiąt
+ *   linii, każda widoczna w całości na jednym ekranie.
  *
  * DLACZEGO NIE app.js
  *   277 kB, które budują hero, galerię 3D, czat, licznik do dnia wydarzenia, formularz zapisów
@@ -36,6 +47,10 @@ const LANG_KEY = 'carruleddhi.lang';
 
 const config = getPublicSiteConfig();
 window.CARRULEDDHI_ACTIVE_CONFIG = config;
+
+/* Uchwyt do zamknięcia menu, podstawiany przez `setupMenu`. Zaślepka, a nie `null`: rząd
+   języków w panelu woła to bezwarunkowo, a strona bez przycisku menu nie ma czego zamykać. */
+let closeMenu = () => {};
 
 const readLang = () => {
   try { return localStorage.getItem(LANG_KEY); } catch (_) { return null; }
@@ -164,6 +179,15 @@ function applyLanguage(next, persist = true) {
   applyEventConfig();
   paintPicker();
 
+  /* Nazwa sekcji w chipie paska — ta sama rola, co `[data-current-section]` na stronie
+     głównej. Tam nazwę przepisuje obserwator sekcji, bo tam sekcji jest czternaście; tu strona
+     JEST jedną sekcją, więc nazwa jest stała i bierze się z tego samego napisu, który stoi jako
+     nadtytuł nad tytułem. Nie „Carruleddhi" wpisane w znacznik: chip po polsku i nadtytuł po
+     polsku, a między nimi włoska nazwa, to trzy języki w jednym spojrzeniu. */
+  document.querySelectorAll('[data-current-section]').forEach((slot) => {
+    slot.textContent = dict['voting.pageKicker'] || slot.textContent;
+  });
+
   /* Odsyłacz „wróć na stronę" niesie język dalej. Bez tego powrót ze strony po polsku na
      stronę główną gubiłby wybór u kogoś, kto wszedł tu z `?lang=` w mailu i nie ma nic
      zapisanego w przeglądarce. */
@@ -214,6 +238,28 @@ function paintPicker() {
       mark.innerHTML = flagSvg(value, { size: 22 });
       mark.dataset.svgFlag = '1';
     }
+  });
+
+  /* Rząd kodów ISO w rozwiniętym menu. `aria-pressed`, nie `aria-selected`: to zwykłe
+     przyciski przełączające, a nie lista wyboru — `role="listbox"` ma tylko ta w pasku. */
+  document.querySelectorAll('[data-menu-language]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.menuLanguage === lang));
+  });
+}
+
+/**
+ * Sekcje wyłączone w ustawieniach gasną także w menu i w stopce tej podstrony.
+ *
+ * Ta sama jedna linia co w app.js (`element.hidden = !enabled`) i to samo źródło prawdy
+ * (`config.features`). Bez tego menu podstrony obiecywałoby galerię, zapisy i „ci sarò" także
+ * wtedy, gdy strona główna te sekcje schowała — a odsyłacz do sekcji, której nie ma, kończy
+ * się na górze strony głównej i wygląda na zepsuty przeskok.
+ */
+function applyFeatureLinks() {
+  Object.entries(config.features || {}).forEach(([feature, enabled]) => {
+    document.querySelectorAll(`[data-feature-link="${feature}"]`).forEach((element) => {
+      element.hidden = !enabled;
+    });
   });
 }
 
@@ -266,6 +312,27 @@ function setupPicker() {
 }
 
 /**
+ * Rząd kodów języka w rozwiniętym menu, jak na stronie głównej.
+ *
+ * Osobna obsługa, bo to osobny znacznik — ale NIE osobna droga zmiany języka: przycisk woła
+ * dokładnie tę samą `applyLanguage`, co lista w pasku. Dwie ścieżki zmiany języka byłyby dwoma
+ * miejscami, w których trzeba pamiętać o zapisie wyboru i o przemalowaniu flagi.
+ *
+ * Menu zamyka się po wyborze: panel przykrywa całą stronę, a język zmienia się po to, żeby
+ * przeczytać to, co pod nim leży.
+ */
+function setupMenuLangs() {
+  const row = document.querySelector('[data-menu-langs]');
+  if (!row) return;
+  row.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-menu-language]');
+    if (!button) return;
+    applyLanguage(button.dataset.menuLanguage);
+    closeMenu();
+  });
+}
+
+/**
  * Baner DEMO na górze strony, dokładnie jak na stronie głównej.
  *
  * Brakowało go tutaj, i to była dziura w regule obowiązującej w całym projekcie: treść z demo
@@ -291,6 +358,7 @@ function setupScrollEffects() {
   const progress = document.querySelector('[data-scroll-progress]');
   const navProgress = document.querySelector('[data-nav-progress]');
   const glow = document.querySelector('[data-footer-glow]');
+  const header = document.querySelector('.site-header');
   if (!progress && !navProgress && !glow) return;
 
   let frame = 0;
@@ -305,7 +373,22 @@ function setupScrollEffects() {
     const max = Math.max(1, documentHeight - window.innerHeight);
     const ratio = Math.min(1, Math.max(0, window.scrollY / max));
     if (progress) progress.style.width = `${(ratio * 100).toFixed(2)}%`;
-    if (navProgress) navProgress.textContent = `${String(Math.round(ratio * 100)).padStart(2, '0')}%`;
+    /* W DÓŁ i co pięć procent, dokładnie jak `currentProgress` w app.js. Liczyło tu w GÓRĘ i
+       co jeden procent, czyli ten sam chip mówił na dwóch stronach dwie różne rzeczy: tam „ile
+       strony zostało", tu „ile przewinięto". Krok pięcioprocentowy nie jest przybliżeniem dla
+       oszczędności miejsca — to on decyduje, ile razy napis się zmienia, a każda zmiana
+       `textContent` w pasku unieważnia układ w trakcie przewijania listy, która sama doczytuje
+       kolejne kafelki. */
+    if (navProgress) {
+      const left = Math.round((100 - ratio * 100) / 5) * 5;
+      const label = `${String(left).padStart(2, '0')}%`;
+      if (navProgress.textContent !== label) navProgress.textContent = label;
+    }
+    /* Chip z nazwą sekcji gaśnie na samej górze — ten sam atrybut, którym gasi go app.js na
+       stronie głównej w hero. Powód jest ten sam: nad tytułem strony chip powtarzałby to, co
+       tytuł mówi większą czcionką, a zajmowałby środek paska. Progiem jest pierwsze
+       przewinięcie, nie nazwa sekcji: ta strona jest jedną sekcją, więc nie ma czego śledzić. */
+    header?.toggleAttribute('data-nav-at-top', window.scrollY < 24);
     if (glow) {
       const left = documentHeight - window.innerHeight - window.scrollY;
       const reveal = Math.min(1, Math.max(0, (glowHeight - left) / glowHeight));
@@ -327,6 +410,8 @@ function setupScrollEffects() {
 function boot() {
   paintDemoBanner();
   setupPicker();
+  setupMenuLangs();
+  applyFeatureLinks();
   setupScrollEffects();
   // Rok w stopce z zegara, nie wpisany: strona przeżyje sylwestra.
   document.querySelectorAll('[data-current-year]').forEach((slot) => {
@@ -397,6 +482,11 @@ function setupMenu() {
        jedzie pod otwartym panelem przy każdym ruchu palca. */
     document.body.classList.toggle('is-locked', open);
   };
+
+  /* Zamykanie wystawione na zewnątrz, bo potrzebuje go rząd języków w panelu. Przez uchwyt,
+     a nie przez `toggle.click()`: kliknięcie w przełącznik przy zamkniętym menu OTWORZYŁOBY
+     je — czyli „zamknij" zrobiłoby dokładnie odwrotność swojej nazwy. */
+  closeMenu = () => { setOpen(false); toggle.focus(); };
 
   toggle.addEventListener('click', () => setOpen(!menu.classList.contains('is-open')));
   backdrop?.addEventListener('click', () => { setOpen(false); toggle.focus(); });
