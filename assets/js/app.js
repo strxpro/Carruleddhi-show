@@ -1642,6 +1642,35 @@ import {
     scheduleUpdate();
   }
 
+  /**
+   * Zdjecie na karcie nagrody pokazuje sie DOPIERO, gdy plik naprawde sie wczytal.
+   * ===========================================================================
+   * Karty maja dzis rysunki wektorowe i maja dzialac dalej, takze zanim powstanie
+   * `prize-01.webp` … `prize-12.webp`. Dlatego oba stoja w znaczniku obok siebie, a o tym,
+   * ktore widac, rozstrzyga wynik wczytania — nie osobne wdrozenie i nie recznie
+   * przepisany znacznik.
+   *
+   * Zdjecie jest w HTML jako `hidden`, wiec przy braku pliku nie miga ani przez klatke:
+   * `hidden` odejmuje je z ukladu, a `complete && naturalWidth` mowi wprost, czy przegladarka
+   * ma obrazek, czy 404. Rysunek chowa sie dopiero PO tym sprawdzeniu, wiec karta nigdy nie
+   * zostaje pusta.
+   *
+   * Bez tej funkcji strona zachowuje sie tak jak dotad — a to jest wlasciwy stan zapasowy:
+   * rysunki sa gotowe i dobre, zdjecia sa ulepszeniem.
+   */
+  function setupPrizePhotos() {
+    $$('[data-prize-photo]').forEach((photo) => {
+      const pokaz = () => {
+        if (!photo.naturalWidth) return;
+        photo.classList.add('is-ready');
+        const rysunek = photo.parentElement?.querySelector('svg');
+        if (rysunek) rysunek.hidden = true;
+      };
+      if (photo.complete) pokaz();
+      else photo.addEventListener('load', pokaz, { once: true });
+    });
+  }
+
   function setupPrizeDeck() {
     const deck = $('[data-prize-deck]');
     const cards = $$('[data-prize-card]', deck || document);
@@ -10985,6 +11014,7 @@ import {
       ['sectionTransition', setupSectionTransition],
       ['cardStack', setupCardStack],
       ['prizeDeck', setupPrizeDeck],
+      ['prizePhotos', setupPrizePhotos],
       ['countdown', setupCountdown],
       /* Po `countdown`, bo dokowanie ma sens tylko wtedy, gdy liczby w kopii są już
          przepisane — inaczej pierwsza zadokowana klatka pokazałaby „00" z HTML-a. */

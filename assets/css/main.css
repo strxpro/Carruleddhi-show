@@ -1693,6 +1693,57 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   overflow: visible;
   transform-origin: center 70%;
 }
+
+/* ZDJECIE NAGRODY WTOPIONE W KARTE — BEZ ANI JEDNEJ WIDOCZNEJ KRAWEDZI.
+   ===========================================================================
+   Rysunki na tych kartach nie maja ramki: linie po prostu koncza sie w tle karty. Zdjecie
+   wstawione na ich miejsce ma prostokatny brzeg, wiec bez tego wygladaloby jak naklejka
+   przyklejona na kartonik — i to jest dokladnie ta roznica, o ktora chodzi w zgloszeniu.
+
+   `mask-image` z owalnym gradientem gasi zdjecie ku krawedziom: srodek pelny do 55% promienia,
+   potem miekkie przejscie do zera na 82%. Dwa gradienty przemnozone przez siebie
+   (`mask-composite: intersect`) daja gasniecie i po bokach, i u gory z dolem — sam owal
+   scinalby rogi za mocno przy kadrze 3:2.
+
+   DLACZEGO MASKA, A NIE OBRAMOWANIE Z CIENIEM
+     Cien rysuje sie NA karcie i zna tylko jeden kolor tla. Karty nagrod maja rozne tla
+     (patrz `.prize-card--*`), wiec cien pasowalby do jednej i odcinal sie na pozostalych.
+     Maska nie dodaje koloru — ona odbiera krycie, wiec zdjecie gasnie w KAZDE tlo tak samo.
+
+   `-webkit-` obok standardowego, bo Safari nadal czyta wylacznie prefiksowana wersje.
+   Bez obslugi maski zdjecie zostaje ostro obciete — i to jest dobry stan zapasowy: gorszy
+   wyglad, nie brak obrazka. */
+.prize-card__photo {
+  grid-area: 1 / 1;
+  /* NIEWIDOCZNE PRZEZ KRYCIE, A NIE PRZEZ `hidden` — I TO NIE JEST DROBIAZG.
+     ---------------------------------------------------------------------------
+     Pierwsza wersja miala `hidden` w znaczniku i zdjecia nie pokazywaly sie nigdy. `hidden`
+     znaczy `display: none`, a obrazka, ktorego nie renderuje, przegladarka przy
+     `loading="lazy"` po prostu NIE WCZYTUJE — wiec `load` nie pada, wiec podmiana sie nie
+     odpala. Zakleszczenie: czeka na zdarzenie, ktore nie ma prawa nadejsc.
+
+     Krycie zero zostawia obrazek w ukladzie, wiec leniwe wczytywanie dziala normalnie, a przy
+     404 zdjecie po prostu zostaje niewidoczne. Zajmuje te sama komorke siatki co rysunek,
+     wiec nic sie nie przesuwa. */
+  opacity: 0;
+  transition: opacity .45s ease;
+  width: min(100%, 430px);
+  max-height: 290px;
+  object-fit: cover;
+  border-radius: 18px;
+  -webkit-mask-image:
+    radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, transparent 82%),
+    linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+  mask-image:
+    radial-gradient(ellipse 78% 78% at 50% 50%, #000 55%, transparent 82%),
+    linear-gradient(to bottom, transparent 0, #000 12%, #000 88%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+/* Rysunek i zdjecie leza w tej samej komorce siatki, wiec podmiana nie przesuwa niczego
+   w karcie: to, ktore z nich widac, rozstrzyga `hidden`, a nie uklad. */
+.prize-card__photo.is-ready { opacity: 1; }
+.prize-card__art > svg { grid-area: 1 / 1; }
 /* ============================================================
    CIEŃ RYSUNKU TYLKO NA KARCIE, KTÓRĄ WIDAĆ. TRZECIA POZYCJA NA RACHUNKU PAMIĘCI.
    ============================================================
