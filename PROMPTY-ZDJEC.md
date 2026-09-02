@@ -143,108 +143,75 @@ będzie się rozpływać w połowie i wyglądać na błąd, a nie na zamysł.
 ## Blok stylu — dopisz go do KAŻDEGO z dwunastu
 
 ```
-Style: warm documentary photography, late afternoon Mediterranean light, low contrast
-film look, natural colours with a slight golden cast, 35mm lens, shallow but not extreme
-depth of field, visible grain.
-Location: small coastal town in northern Sardinia, whitewashed and sand-coloured buildings,
-narrow asphalt street descending towards a turquoise sea.
-Composition: ONE clear subject, centred, filling roughly the middle two thirds of the frame.
-The outer edges must stay calm and uncluttered — soft ground, plain wall, open sky or
-blurred background — because the image fades out towards its borders.
+Style: vibrant conceptual doodle art, flat vector illustration style, playful and associative, clean lines, solid bright colors, modern graphic design, not realistic, highly stylized, cool and eye-catching.
+Composition: ONE clear central graphic element, centered, filling roughly the middle two thirds of the frame.
+The outer edges must stay calm and uncluttered — solid or gently patterned abstract background — because the image fades out towards its borders.
 No strong lines, no bright objects and nothing important touching the edge of the frame.
-No text, no numbers, no signage, no logos, no watermarks.
-No recognisable faces: people appear from behind, from the side, or cropped below the head.
+No text, no numbers, no signage, no logos, no watermarks, no faces.
 ```
 
-Ostatnia linijka nie jest ostrożnością na wyrost. Karta pokazuje **nagrodę**, a twarz
-wygenerowana przez model, postawiona pod jej nazwą, czyta się jak zdjęcie prawdziwego
-zwycięzcy.
+Ostatnia linijka nie jest ostrożnością na wyrost. Karta pokazuje **nagrodę**, więc nie chcemy realistycznych twarzy.
 
 ## Dwanaście zdjęć, po kolei
 
 **01 · Najszybszy Classic**
 ```
-A wooden gravity cart running downhill, shot from a low side angle with the camera panning:
-the cart sharp, the road and wall behind it blurred into streaks. Rider crouched low, seen
-from behind. Bare wooden frame, solid wheels.
+A stylized doodle of a glowing wooden wheel with speed lines and a stopwatch floating, dynamic and fast.
 ```
 
 **02 · Najszybszy ART**
 ```
-A brightly painted homemade cart at speed on a descending street, low side angle, background
-blurred by the pan. The bodywork is folk-art colourful and clearly built from salvaged
-panels. Rider low over the frame, seen from behind.
+A colorful doodle of a paintbrush transforming into a rocket-powered cart, splashing vibrant paint.
 ```
 
 **03 · Carruleddhi Show**
 ```
-A village street closed for the event, seen from a first-floor window looking down the slope
-towards the sea: a few carts along one side, bunting overhead, small groups of people
-watching from doorways. Nobody in close-up, everyone small in the frame.
+A playful doodle of cheering stars and confetti raining over a small abstract racing track.
 ```
 
 **04 · Najbardziej Shardana**
 ```
-A handmade cart decorated with Sardinian folk motifs: hand-painted geometric patterns in
-red, black and cream along the deck, a strip of traditional woven cloth tied to the frame,
-a sprig of dried myrtle wedged behind the seat board. Parked against a plain whitewashed
-wall in low sun.
+A doodle of a traditional Sardinian geometric pattern forming the shape of a racing helmet.
 ```
 
 **05 · Najzabawniejszy Carruleddhu**
 ```
-A joyfully absurd homemade cart standing alone in a quiet square: a repurposed bathtub shell
-on mismatched bicycle wheels, a hand-lettered wooden fin at the tail, a rubber duck wired to
-the front axle. Bright mismatched paint, brush strokes visible. No rider.
+A comical doodle of a rubber duck wearing racing goggles inside a bathtub on wheels.
 ```
 
 **06 · Pokaz specjalny**
 ```
-A handmade cart caught mid-drift on a corner, rear wheels sliding, a low plume of dust rising
-behind it. Straw bales far back and out of focus. Rider seen from behind, one arm out for
-balance. The dust and the cart both well inside the frame.
+A dynamic doodle of a star shooting out of a cloud of sparkly dust, drifting sideways.
 ```
 
 **07 · Show Classic**
 ```
-A traditional wooden cart on the start line in the last minutes before its run: rope steering
-laid over the deck, a worn helmet resting on the plank, one hand adjusting a wheel at the
-edge of the group. Warm side light, long soft shadow on plain asphalt.
+A minimalist doodle of an elegant vintage wooden plank with a shining crown on it.
 ```
 
 **08 · Najmłodszy kierowca**
 ```
-A very small handmade cart beside a normal-sized one, its deck barely longer than a school
-bag, with a child-sized helmet resting on it. A child's legs and trainers visible at the top
-of the frame, face out of shot. Quiet, warm, unstaged.
+A cute doodle of a tiny racing helmet resting on top of a giant shiny trophy.
 ```
 
 **09 · Najstarszy kierowca**
 ```
-Weathered hands resting on the rope steering of an old wooden cart, close enough to read the
-grain of the wood and the wear on the rope. Face out of frame. Plain blurred background.
-The cart looks decades old and carefully kept.
+A wise-looking doodle of a vintage steering rope tied in an elegant, glowing knot.
 ```
 
 **10 · Najbardziej technologiczny**
 ```
-A handmade cart full of improvised engineering: a bicycle disc brake on the rear axle, a
-cable-operated steering linkage, a small dial taped to the deck, zip ties and hose clamps.
-Shot from slightly above so the mechanisms read clearly against plain ground.
+A technical doodle of glowing neon gears, microchips, and a wrench intersecting dynamically.
 ```
 
 **11 · Najwolniejszy**
 ```
-A heavy, slightly lopsided homemade cart standing still on a gentle part of the slope, one
-wheel visibly smaller than the others. Long afternoon shadow stretching ahead of it down an
-empty street. Nobody in the frame. Affectionate, not mocking.
+A cute and relaxed doodle of a sleepy snail wearing a racing helmet, smiling peacefully.
 ```
 
 **12 · Największy Carruleddhu**
 ```
-An unusually long handmade wooden cart parked in a square, long enough for two people,
-photographed from a low front three-quarter angle so its length reads against the small
-buildings behind. A folded jacket on the deck gives the scale. No rider.
+An exaggerated doodle of a ridiculously long stretch-cart that goes on and on, wrapping around a small star.
 ```
 
 ## Jak to sprawdzić po wgraniu
