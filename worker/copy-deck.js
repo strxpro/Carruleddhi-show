@@ -188,7 +188,8 @@ export const COPY_DECK = {
     "sponsorAckLogoYes": "allegato",
     "regPrintMine": "Hai scelto di stampare tu il modulo.",
     "regPrintOurs": "Hai chiesto a noi di stamparlo: lo troverai pronto alla partenza.",
-    "regPrintChange": "Hai cambiato idea? Scrivilo nella chat del sito — basta dire che non hai una stampante, o che invece ce l’hai."
+    "regPrintChange": "Hai cambiato idea? Scrivilo nella chat del sito — basta dire che non hai una stampante, o che invece ce l’hai.",
+    "chatRetry": "Mi si è inceppato qualcosa e non sono riuscito a rispondere. Riscrivimelo — ci riprovo subito."
   },
   "pl": {
     "regSubject": "Jesteś w wyścigu — Carruleddhi Show 2026, numer %RACENUMBER%",
@@ -367,7 +368,8 @@ export const COPY_DECK = {
     "sponsorAckLogoYes": "dołączone",
     "regPrintMine": "Wybrałeś, że formularz drukujesz sam.",
     "regPrintOurs": "Poprosiłeś, żebyśmy wydrukowali go my — będzie czekał na starcie.",
-    "regPrintChange": "Zmieniłeś zdanie? Napisz na czacie na stronie — wystarczy powiedzieć, że nie masz drukarki albo że jednak masz."
+    "regPrintChange": "Zmieniłeś zdanie? Napisz na czacie na stronie — wystarczy powiedzieć, że nie masz drukarki albo że jednak masz.",
+    "chatRetry": "Coś mi się zacięło i nie zdążyłem odpowiedzieć. Napisz to jeszcze raz — spróbuję od nowa."
   },
   "en": {
     "regSubject": "You are in — Carruleddhi Show 2026, race number %RACENUMBER%",
@@ -546,7 +548,8 @@ export const COPY_DECK = {
     "sponsorAckLogoYes": "attached",
     "regPrintMine": "You chose to print the form yourself.",
     "regPrintOurs": "You asked us to print it: it will be waiting for you at the start.",
-    "regPrintChange": "Changed your mind? Say so in the chat on the site — just tell it you have no printer, or that you do after all."
+    "regPrintChange": "Changed your mind? Say so in the chat on the site — just tell it you have no printer, or that you do after all.",
+    "chatRetry": "Something jammed and I did not manage to answer. Write it again — I will try once more."
   },
   "de": {
     "regSubject": "Du bist dabei — Carruleddhi Show 2026, Startnummer %RACENUMBER%",
@@ -725,7 +728,8 @@ export const COPY_DECK = {
     "sponsorAckLogoYes": "beigefügt",
     "regPrintMine": "Sie haben gewählt, das Formular selbst zu drucken.",
     "regPrintOurs": "Sie haben uns gebeten, es zu drucken: es liegt am Start für Sie bereit.",
-    "regPrintChange": "Meinung geändert? Schreiben Sie es im Chat auf der Website — sagen Sie einfach, dass Sie keinen Drucker haben, oder doch einen."
+    "regPrintChange": "Meinung geändert? Schreiben Sie es im Chat auf der Website — sagen Sie einfach, dass Sie keinen Drucker haben, oder doch einen.",
+    "chatRetry": "Da hat etwas geklemmt und ich konnte nicht antworten. Schreiben Sie es noch einmal — ich versuche es erneut."
   },
   "es": {
     "regSubject": "Estás dentro — Carruleddhi Show 2026, número %RACENUMBER%",
@@ -904,7 +908,8 @@ export const COPY_DECK = {
     "sponsorAckLogoYes": "adjunto",
     "regPrintMine": "Has elegido imprimir tú el formulario.",
     "regPrintOurs": "Nos has pedido que lo imprimamos nosotros: lo tendrás listo en la salida.",
-    "regPrintChange": "¿Has cambiado de idea? Dilo en el chat de la web: basta con decir que no tienes impresora, o que sí la tienes."
+    "regPrintChange": "¿Has cambiado de idea? Dilo en el chat de la web: basta con decir que no tienes impresora, o que sí la tienes.",
+    "chatRetry": "Algo se me ha atascado y no he logrado responder. Escríbemelo otra vez: lo intento de nuevo."
   },
   "fr": {
     "regSubject": "C'est validé — Carruleddhi Show 2026, numéro %RACENUMBER%",
@@ -1083,6 +1088,7 @@ export const COPY_DECK = {
     "sponsorAckLogoYes": "joint",
     "regPrintMine": "Vous avez choisi d’imprimer le formulaire vous-même.",
     "regPrintOurs": "Vous nous avez demandé de l’imprimer : il vous attendra au départ.",
-    "regPrintChange": "Vous avez changé d’avis ? Dites-le dans le chat du site — il suffit d’indiquer que vous n’avez pas d’imprimante, ou que si."
+    "regPrintChange": "Vous avez changé d’avis ? Dites-le dans le chat du site — il suffit d’indiquer que vous n’avez pas d’imprimante, ou que si.",
+    "chatRetry": "Quelque chose a coincé et je n’ai pas pu répondre. Réécrivez-le — je réessaie tout de suite."
   }
 };
