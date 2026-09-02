@@ -186,11 +186,19 @@
         (0,24 z 380). Uczciwa granica dla dziennika to więc `0,76 * widok - 100 px`.
         Sufit `0,72 * widok - 110 px` biegnie pod nią równolegle, z zapasem 0,04 widoku
         i 10 px — czyli 25 px przy 380 px widoku i 56 px przy 749 px, zamiast dawnych zera. */
-  /* 5. PIERWSZY UŁAMEK PODNIESIONY Z 0,42 NA 0,50 — ZGŁOSZENIE „ROZSZERZ CZAT NA WYSOKOŚCI".
-        Na telefonie decyduje zapytanie medialne niżej (0,52) i tam jest pomiar. */
+  /* 5. PIERWSZY UŁAMEK: 0,42 -> 0,50 -> 0,62. TRZECIE PODNIESIENIE, TO SAMO ZGŁOSZENIE.
+        „Czat jest za niski, ma być odczucie jak normalny czat do pisania." Zmierzone na
+        390 na 844: przy 0,52 dziennik dostawał 439 px z 844, czyli rozmowa zajmowała nieco
+        ponad połowę ekranu, a resztę tło strony. Przy 0,62 dostaje 523 px.
+
+        DRUGI SKŁADNIK `min()` ZOSTAJE NIETKNIĘTY I TO ON PILNUJE KLAWIATURY.
+        Przy otwartej klawiaturze `--chat-vh` spada do około 350 px i wtedy decyduje
+        `0,72 * widok - 130 px` — czyli 122 px, tyle samo co przedtem. Podniesienie
+        pierwszego ułamka zmienia więc TYLKO przypadek zamkniętej klawiatury, gdzie miejsce
+        naprawdę jest. Sprawdzone: przy widoku 349 px sufit wychodzi 121 px, bez zmian. */
   max-height: min(
-    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.5),
-    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.72 - 110px)
+    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.62),
+    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.76 - 110px)
   );
   padding: 4px 2px;
   overflow-y: auto;
@@ -442,15 +450,21 @@
     height: calc(var(--screen-h, 100svh) * 0.82);
   }
 
-  /* Sufit dziennika: 0,52 widoku przy zamkniętej klawiaturze i `0,72 * widok - 130 px` przy
+  /* DRUGI SKŁADNIK PODNIESIONY Z 0,72 NA 0,76 — TO ON TRZYMAŁ DZIENNIK, NIE PIERWSZY.
+     Po podniesieniu pierwszego ułamka na 0,62 dziennik urósł z 439 na 466 px i stanął: przy
+     widoku około 820 px wiążący był `0,72 * widok - 130`, czyli 460 px. Komentarz w regule
+     podstawowej wylicza uczciwą granicę na `0,76 * widok - 100` — 0,76 ze stałą 130 px biegnie
+     pod nią z zapasem, więc tyle wolno wziąć bez ruszania marginesu bezpieczeństwa.
+
+     Sufit dziennika: 0,52 widoku przy zamkniętej klawiaturze i `0,72 * widok - 130 px` przy
      otwartej. Stała jest tu o 20 px większa niż w regule podstawowej, bo na 390 px notka pod
      kompozytorem łamie się na trzy wiersze zamiast na jeden — reszta panelu jest po prostu
      wyższa. ZMIERZONE przy widoku 349 px (klawiatura 400 px): sufit 121,28 px, dziennik
      121 px, a cały czat od góry dziennika do dołu kompozytora 275 px z 349 px widocznych. */
   .chat__log {
     max-height: min(
-      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.52),
-      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.72 - 130px)
+      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.62),
+      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.76 - 130px)
     );
   }
   .chat-msg { max-width: 94%; }

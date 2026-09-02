@@ -10440,6 +10440,24 @@ import {
     }
     input?.addEventListener('input', sizeInput);
 
+    /**
+     * Rosnace pole zabiera miejsce dziennikowi — wiec dziennik ma zostac przy NAJNOWSZEJ
+     * wypowiedzi, a nie przy tej, ktora akurat wypadla na wysokosci oka.
+     *
+     * Bez tego dwuwierszowa wiadomosc zabiera dziennikowi czterdziesci pikseli u dolu i
+     * ostatnia wypowiedz wysuwa sie poza kadr — z boku wyglada to tak, jakby rozmowa
+     * uciekala do gory w chwili, w ktorej ktos zaczyna pisac. W kazdym komunikatorze jest
+     * odwrotnie: pole rosnie, a koniec rozmowy zostaje na miejscu.
+     *
+     * Przewijamy TYLKO wtedy, gdy dziennik i tak byl na dole. Ktos, kto cofnal sie do
+     * wczesniejszej wypowiedzi i zaczal pisac, ma zostac tam, gdzie czyta.
+     */
+    input?.addEventListener('input', () => {
+      if (!log) return;
+      const naDole = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
+      if (naDole) log.scrollTop = log.scrollHeight;
+    });
+
     /* --------------------------------------------------------------- chips */
     /* Every question the chips can offer, as i18n keys. The first six are the ones the FAQ
        dictionary answers instantly; the rest go to the model, and `askChange` and `askCancel`

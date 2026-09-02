@@ -743,22 +743,17 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
    Bez obrotu przy najezdzie: obrocone zdjecie odslania rogi tla pod spodem. Zostaje samo
    przyblizenie, i tylko tam, gdzie kursor istnieje — na dotyku :hover zostaje wcisniety
    po stuknieciu. */
-/* PANEL DOPASOWANY DO ZDJECIA, A NIE ZDJECIE PRZYCIETE DO PANELU.
+/* KADR ZDJECIA: PELNE POLE, PRZYCINANE OD SRODKA — I DLACZEGO NIE `aspect-ratio`.
    ---------------------------------------------------------------------------
-   Kolumna miala proporcje wynikajaca z podzialu `.85fr 1.15fr` i wysokosci karty — przy
-   1440 px wychodzilo 758 na 660, czyli 1.15. Zdjecia sa 1400 na 1050, czyli 1.33. Przy
-   `object-fit: cover` znaczylo to 14% scinane z bokow, w kazdej z trzech kart: wozkowi
-   uciekal dyszel za prawa krawedz, a kola wychodzily poza dol.
+   Zdjecia sa 4:3, a panel ma proporcje wynikajaca z podzialu kolumn i wysokosci karty, wiec
+   `cover` scina kilkanascie procent z bokow. Probowalem to zniesc, nadajac panelowi
+   `aspect-ratio: 4 / 3` — wtedy scinane bylo zero, ale panel przestal isc za szerokoscia
+   karty: przy 1100, 1280 i 1600 px mial te same 880 na 660, a nadmiar zabierala kolumna
+   z tekstem. Zglaszone jako „zdjecie przesuniete i zmniejszone", wiec wraca kadr pelnego pola.
 
-   `aspect-ratio` na panelu odwraca zaleznosc: to panel bierze proporcje zdjecia, a wysokosc
-   karty idzie za nim. `cover` zostaje, bo przy zgodnych proporcjach nie ma juz czego scinac
-   — i nadal broni przed zdjeciem o innej proporcji, gdyby ktos podmienil plik.
-
-   `min-height: 100%` jest tu po to, zeby panel nie stal sie NIZSZY od kolumny z tekstem na
-   waskich uklada, gdzie tekst jest wysoki: wtedy proporcja ustepuje, bo dziura pod zdjeciem
-   wyglada gorzej niz kilka procent kadru. */
-.stack-card__visual { aspect-ratio: 4 / 3; min-height: 100%; }
-
+   Nie znaczy to, ze przycinanie jest w porzadku — znaczy, ze poprawka ma isc od strony
+   PLIKOW, a nie ukladu: zdjecia w proporcji zblizonej do panelu nie beda scinane, a panel
+   zostanie tam, gdzie byl. */
 .stack-card__photo {
   width: 100%; height: 100%; object-fit: cover; display: block;
   transition: transform .8s var(--ease-out);
