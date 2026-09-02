@@ -79,33 +79,79 @@
 /* ------------------------------------------------------------------- shell */
 .chat { display: flex; flex-direction: column; gap: 12px; }
 
+/* ============================================================================
+   STAŁA WYSOKOŚĆ PANELU ROZMOWY — TO JEST NAPRAWA „DOTKNIĘCIE POLA PRZERZUCA
+   STRONĘ NA GÓRĘ I ZWIJA KLAWIATURĘ"
+   ============================================================================
+   CO BYŁO ZŁE
+     Klawiatura skraca `visualViewport`, app.js wpisuje z niego `--chat-vh`, a arkusz
+     skracał tą zmienną sufit dziennika i sufit pola. Wszystko trzy dobrze — tylko że czat
+     stoi w normalnym przepływie strony, więc SKRÓCENIE CZATU SKRACAŁO CAŁY DOKUMENT.
+     A dokument, który robi się niższy, ma niższe maksymalne przewinięcie, i przeglądarka
+     PRZYCINA do niego pozycję czytającego. Po zwinięciu klawiatury wysokość wraca,
+     przewinięcie NIE — bo nikt go nie przywraca. Bezpiecznik w index.html tu nie pomaga:
+     stoi na zdarzeniu `resize` OKNA, a klawiatura przy `interactive-widget=resizes-visual`
+     nie zmienia okna ani o piksel, tylko widok.
+
+     ZMIERZONE (`tools/probe-chat-flows.mjs`, okno 390x844, klawiatura 400 px, PRZED zmianą):
+       wysokość dokumentu   12733 px -> 12625 px -> 12733 px   (otwarcie / zwinięcie)
+     Sto osiem pikseli. Kto pisał wiadomość stojąc bliżej końca dokumentu niż 108 px — czyli
+     każdy, kto dojechał do sekcji kontaktu, bo pod nią jest już tylko stopka — dostawał
+     przycięcie i po zwinięciu klawiatury zostawał wyżej, niż był. To jest zgłoszone
+     „przeskakuje / teleportuje się do góry", a klawiatura zwijała się razem z tym, bo
+     przycięcie przewinięcia zabiera pole spod palca.
+
+   CO JEST TERAZ
+     Panel trwającej rozmowy ma STAŁĄ wysokość, liczoną z `--screen-h` (zamrożone `100svh`,
+     patrz `measureScreenHeight` w site-bridge.js), czyli z liczby, której klawiatura NIE
+     ZMIENIA. Dziennik w środku jest elementem elastycznym: rośnie i kurczy się w tej stałej
+     ramce (`flex: 1 1 auto`), a jego sufit dalej idzie z `--chat-vh`. Skutek: klawiatura
+     nadal skraca dziennik i podciąga kompozytor do góry, ale wysokość dokumentu zostaje
+     co do piksela ta sama — więc nie ma czego przycinać i nie ma skąd wracać.
+
+     W prezencie to samo naprawia dwie inne drogi do tej samej usterki: rosnące pole
+     wiadomości i rozwijany rząd podpowiedzi też zabierają teraz miejsce dziennikowi,
+     zamiast rozpychać dokument. Pisanie w czacie nie zmienia wysokości strony w ogóle.
+
+   DLACZEGO TYLKO `[data-chat-ready='yes']`
+     Trzy stany panelu: brama z imieniem i adresem, rozmowa, karta „rozmowa zakończona"
+     (patrz `applyGate` w app.js). Stała wysokość pasuje do jednego z nich — przy dwóch
+     pozostałych dziennik i kompozytor są schowane, a stała wysokość zostawiłaby pod kartą
+     kilkaset pikseli pustki.
+   ========================================================================== */
+.chat[data-chat-ready='yes'] {
+  /* Sufit w pikselach jest dla dużych ekranów: na monitorze 0,7 wysokości okna to karta
+     rozmowy wyższa od wszystkiego innego w tej sekcji, a na komputerze nie ma klawiatury
+     ekranowej, więc nie ma też problemu, który by to uzasadniał. Telefon dostaje swoją
+     liczbę w zapytaniu medialnym niżej. */
+  height: min(calc(var(--screen-h, 100svh) * 0.7), 560px);
+}
+
 .chat__log {
-  /* A fixed range rather than a fixed height: short conversations do not leave a void, and
-     long ones do not push the page down forever. */
+  /* ELASTYCZNY W STAŁEJ RAMCE — patrz blok wyżej.
+     `min-height: 0` nie jest ozdobą: element przewijalny w kolumnie flex ma domyślnie
+     `min-height: auto`, czyli „nie mniej niż treść", i wtedy nie kurczy się ani o piksel,
+     a wypycha kompozytor pod klawiaturę. To jest ta sama pułapka, którą raz już złapano
+     w tym pliku pod nazwą „minimalna wysokość WYGRYWA z maksymalną". */
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  /* DWIE POPRAWKI NA KLAWIATURĘ NA TELEFONIE. ZMIERZONE, NIE ZGADNIĘTE.
+  /* SUFIT DZIENNIKA. ZMIERZONY, NIE ZGADNIĘTY — I TO JUŻ TRZECI RAZ W TYM MIEJSCU,
+     więc historia zostaje, żeby nikt nie wrócił do żadnej z dwóch odrzuconych wersji.
      ---------------------------------------------------------------------------
-     Zgłoszone jako „na telefonie, gdy piszę wiadomość, pastylka na wiadomość się rozjeżdża".
-     Zmierzone na 390x844 z oknem skróconym do 444 px, czyli tyle, ile zostaje po otwarciu
-     klawiatury (CDP, `Emulation.setDeviceMetricsOverride`):
+     1. NIE MA TU MINIMALNEJ WYSOKOŚCI, I TO NIE JEST PRZEOCZENIE. Stało tu
+        `min-height: min(180px, ...)` i to ono było pierwszą wersją usterki „na telefonie
+        pastylka nad polem się rozjeżdża": `min-height` WYGRYWA z `max-height`, więc gdy
+        sufit schodził do 168 px, pudełko zostawało na 180 px. Dziennik nie kurczył się ani
+        o piksel, a rząd pastylek i kompozytor z przyciskiem wysyłki były wypychane pod
+        klawiaturę. Dziś dziennik i tak wypełnia stałą ramkę panelu (`flex: 1 1 auto`,
+        patrz blok wyżej), więc minimum nie ma czego pilnować — miałoby tylko co psuć.
 
-       `--screen-h`   844 px -> 444 px
-       sufit dziennika (max-height)   320,72 px -> 168,72 px
-       RZECZYWISTA wysokość dziennika    180 px -> 180 px   <-- sufit zignorowany
-       cały czat (dziennik + podpowiedzi + kompozytor + notka)   469 px przy 444 px okna
-
-     1. `min-height` WYGRYWA z `max-height` — tak mówi kaskada i tak to działało: sufit
-        schodził do 168 px, a pudełko zostawało na 180 px. Dziennik nie kurczył się więc ani
-        o piksel, a wszystko pod nim — rząd pastylek i kompozytor z przyciskiem wysyłki —
-        było wypychane poza widoczny obszar. Stąd „pastylka się rozjeżdża": jest, tylko pod
-        klawiaturą. Dlatego minimum też jest liczone od wysokości ekranu.
-
-     2. Sam ułamek wysokości ekranu nie wystarcza: 42% z 444 px to 186 px, a pod dziennikiem
-        musi się jeszcze zmieścić rząd pastylek, kompozytor i notka. Drugi sufit mówi wprost,
-        ile miejsca zostawić NA RESZTĘ PANELU — i na normalnym ekranie nie zmienia niczego
-        (przy 844 px pierwszy sufit to 354 px, drugi 584 px, więc wygrywa ten sam co dotąd). */
+     2. Sam ułamek widocznej wysokości też nie wystarcza: 42% z 444 px to 186 px, a pod
+        dziennikiem musi się jeszcze zmieścić rząd pastylek, kompozytor i notka. Dlatego
+        drugi sufit mówi wprost, ile miejsca zostawić NA RESZTĘ PANELU. */
   /* 3. LICZONE Z `--chat-vh`, NIE Z `--screen-h` — I TO JEST TA POPRAWKA, KTÓRA DZIAŁA
         NA PRAWDZIWYM TELEFONIE.
         `--screen-h` jest ZAMROŻONYM `100svh` (patrz `measureScreenHeight` w site-bridge.js)
@@ -125,16 +171,45 @@
         `--chat-vh` wpisuje app.js z `visualViewport` i widzi ją TYLKO czat. Zapas na
         `--screen-h` jest po to, żeby bez JavaScriptu (a wtedy nie ma i czatu) oraz w chwili
         przed pierwszym pomiarem sufit nadal był liczbą, a nie `auto`. */
-  min-height: min(180px, calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.22));
+  /* 4. DRUGI SUFIT LICZONY UŁAMKIEM, NIE STAŁĄ — I DLACZEGO 0,72 ORAZ 110 px.
+        ---------------------------------------------------------------------------
+        „Zostaw 260 px na resztę panelu" było liczbą wziętą z jednego pomiaru, a reszta
+        panelu NIE JEST stała: najwyższą jej częścią jest pole wiadomości, którego własny
+        sufit to `--chat-vh * 0,24` (patrz `.chat__composer textarea`). Reszta panelu rośnie
+        więc razem z widokiem, a odejmowanie od niej stałej dawało margines bezpieczeństwa
+        raz na 80 px, a raz na 0 — przy widoku ~420 px oba sufity wypadały co do piksela na
+        granicy tego, co się jeszcze mieści.
+
+        ZMIERZONE (`tools/probe-chat-ui.mjs`, `--chat-vh` podstawione na 380 px): przy
+        dzienniku 120 px cały czat od góry dziennika do dołu notki miał 311 px, czyli reszta
+        panelu to 191 px = 100 px stałych (rząd podpowiedzi, notka, odstępy) + 91 px pola
+        (0,24 z 380). Uczciwa granica dla dziennika to więc `0,76 * widok - 100 px`.
+        Sufit `0,72 * widok - 110 px` biegnie pod nią równolegle, z zapasem 0,04 widoku
+        i 10 px — czyli 25 px przy 380 px widoku i 56 px przy 749 px, zamiast dawnych zera. */
+  /* 5. PIERWSZY UŁAMEK PODNIESIONY Z 0,42 NA 0,50 — ZGŁOSZENIE „ROZSZERZ CZAT NA WYSOKOŚCI".
+        Na telefonie decyduje zapytanie medialne niżej (0,52) i tam jest pomiar. */
   max-height: min(
-    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.42),
-    calc(var(--chat-vh, var(--screen-h, 100svh)) - 260px)
+    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.5),
+    calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.72 - 110px)
   );
   padding: 4px 2px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
+
+/* Krótka rozmowa siedzi PRZY KOMPOZYTORZE, nie pod nagłówkiem.
+   ---------------------------------------------------------------------------
+   Odkąd dziennik wypełnia stałą ramkę, dwie pierwsze wiadomości pływałyby w górnej części
+   pustego pudełka wysokiego na trzysta kilkadziesiąt pikseli — a rozmowa czyta się od dołu,
+   bo tam jest jej najnowsza część i tam stoi pole do pisania.
+
+   `margin-top: auto` na pierwszym wierszu, a NIE `justify-content: flex-end` na dzienniku:
+   przy wyśrodkowaniu do końca w elemencie przewijalnym treść wystająca GÓRĄ staje się
+   w części przeglądarek nieosiągalna przewijaniem. Automatyczny odstęp znika sam w chwili,
+   w której treść przestaje się mieścić — czyli dokładnie wtedy, gdy przewijanie zaczyna mieć
+   znaczenie. */
+.chat__log > :first-child { margin-top: auto; }
 
 /* ---------------------------------------------------------------- messages */
 .chat-msg { display: flex; flex-direction: column; gap: 3px; max-width: 86%; }
@@ -329,16 +404,43 @@
      dotyczyły ani jednego telefonu, bo przegrywały z tą regułą przez większą swoistość
      zapytania medialnego.
 
-     ZMIERZONE (`tools/probe-chat-flows.mjs`, 390x844, klawiatura 400 px):
+     ZMIERZONE WTEDY (`tools/probe-chat-flows.mjs`, 390x844, klawiatura 400 px):
        PRZED: sufit dziennika 284,62 px przy 349 px widoku, dziennik 285 px, kompozytor
               kończył się 42 px pod dolną krawędzią widoku (po naprawie samego pola);
        PO:    sufit 99 px, dziennik 99 px, kompozytor cały nad klawiaturą.
-     Przy zamkniętej klawiaturze nic się nie zmienia: 0,38 z 749 px to 284,62 px, a drugi
-     sufit wypada wtedy na 499 px, więc wygrywa ten sam co dotąd. */
+     Ułamek 0,38 i stała 250 px są już historią — zastąpiły je dwie liczby niżej, razem ze
+     stałą wysokością panelu. Blok zostaje, bo tłumaczy, DLACZEGO sufit dziennika ma tu
+     w ogóle swoją własną regułę: bez niej poprawki w regule podstawowej nie dotyczą
+     ani jednego telefonu. */
+
+  /* CZAT NA TELEFONIE JEST WYŻSZY — TO JEST ZGŁOSZENIE „ROZSZERZ TEN CZAT NA WYSOKOŚCI".
+     ---------------------------------------------------------------------------
+     ZMIERZONE (`tools/probe-chat-flows.mjs`, okno 390x844, widoczna wysokość 749 px):
+       PRZED: dziennik 285 px w każdym stanie (wiązał go sufit), czyli 38% widoku;
+       PO:    389 px przy pustym polu (52% widoku) i 343 px przy polu rozrośniętym
+              do czterech wierszy — bo teraz wiąże go wysokość panelu, nie sufit.
+     Wysokość panelu to 0,82 widoku ekranu (614 px z 749 px). Dlaczego nie więcej: nad
+     panelem stoi jeszcze rząd zakładek („szybka wiadomość" / „czat na żywo", 56 px)
+     i nagłówek sekcji kontaktu, a karta, która wychodzi ponad ekran, znaczy, że do pola
+     wiadomości trzeba przewijać, zamiast je po prostu widzieć. Dlaczego nie mniej: przy
+     0,76 dziennik wypadał na 365 px, czyli poniżej połowy widoku, a właściciel zgłosił
+     dokładnie to, że czat jest za niski.
+
+     Liczba jest liczona z `--screen-h`, NIE z `--chat-vh` — i to jest cały mechanizm
+     naprawy przeskakiwania strony (blok „STAŁA WYSOKOŚĆ PANELU ROZMOWY" wyżej). */
+  .chat[data-chat-ready='yes'] {
+    height: calc(var(--screen-h, 100svh) * 0.82);
+  }
+
+  /* Sufit dziennika: 0,52 widoku przy zamkniętej klawiaturze i `0,72 * widok - 130 px` przy
+     otwartej. Stała jest tu o 20 px większa niż w regule podstawowej, bo na 390 px notka pod
+     kompozytorem łamie się na trzy wiersze zamiast na jeden — reszta panelu jest po prostu
+     wyższa. ZMIERZONE przy widoku 349 px (klawiatura 400 px): sufit 121,28 px, dziennik
+     121 px, a cały czat od góry dziennika do dołu kompozytora 275 px z 349 px widocznych. */
   .chat__log {
     max-height: min(
-      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.38),
-      calc(var(--chat-vh, var(--screen-h, 100svh)) - 250px)
+      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.52),
+      calc(var(--chat-vh, var(--screen-h, 100svh)) * 0.72 - 130px)
     );
   }
   .chat-msg { max-width: 94%; }

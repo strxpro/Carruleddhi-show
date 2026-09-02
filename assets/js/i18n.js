@@ -2769,6 +2769,10 @@
       'chat.gateKnownAsk': 'Ti rispondiamo a {email}. È il tuo indirizzo?',
       'chat.gateKnownYes': 'Sì, è il mio',
       'chat.gateKnownChange': 'Cambia indirizzo',
+      /* Nadpisuje tekst z chatSponsorOptionalExtras: tam pytanie brzmi „wpisz go tutaj
+         albo pomiń", a od kiedy pod spodem stoją trzy pastylki, nie ma czego wpisywać
+         przed wyborem. Zdanie i przyciski muszą mówić to samo. */
+      'chat.sponsorAskLink': 'Ultima cosa facoltativa: hai un sito o un profilo social da mostrare?',
       'chat.sponsorLinkHasSite': 'Ho un sito',
       'chat.sponsorLinkHasSocial': 'Ho i social',
       'chat.sponsorLinkNone': 'Non ho nulla',
@@ -2780,6 +2784,10 @@
       'chat.gateKnownAsk': 'Odpiszemy na {email}. To Twój adres?',
       'chat.gateKnownYes': 'Tak, mój',
       'chat.gateKnownChange': 'Zmień adres',
+      /* Nadpisuje tekst z chatSponsorOptionalExtras: tam pytanie brzmi „wpisz go tutaj
+         albo pomiń", a od kiedy pod spodem stoją trzy pastylki, nie ma czego wpisywać
+         przed wyborem. Zdanie i przyciski muszą mówić to samo. */
+      'chat.sponsorAskLink': 'Ostatnia rzecz opcjonalna: masz stronę albo profil w mediach społecznościowych, który mamy pokazać?',
       'chat.sponsorLinkHasSite': 'Mam stronę',
       'chat.sponsorLinkHasSocial': 'Mam social media',
       'chat.sponsorLinkNone': 'Nie mam żadnej',
@@ -2791,6 +2799,10 @@
       'chat.gateKnownAsk': 'We will reply to {email}. Is that your address?',
       'chat.gateKnownYes': 'Yes, that is mine',
       'chat.gateKnownChange': 'Use another address',
+      /* Nadpisuje tekst z chatSponsorOptionalExtras: tam pytanie brzmi „wpisz go tutaj
+         albo pomiń", a od kiedy pod spodem stoją trzy pastylki, nie ma czego wpisywać
+         przed wyborem. Zdanie i przyciski muszą mówić to samo. */
+      'chat.sponsorAskLink': 'One last optional thing: do you have a website or a social profile we can show?',
       'chat.sponsorLinkHasSite': 'I have a website',
       'chat.sponsorLinkHasSocial': 'I have social media',
       'chat.sponsorLinkNone': 'I have neither',
@@ -2802,6 +2814,10 @@
       'chat.gateKnownAsk': 'Wir antworten an {email}. Ist das deine Adresse?',
       'chat.gateKnownYes': 'Ja, meine',
       'chat.gateKnownChange': 'Adresse ändern',
+      /* Nadpisuje tekst z chatSponsorOptionalExtras: tam pytanie brzmi „wpisz go tutaj
+         albo pomiń", a od kiedy pod spodem stoją trzy pastylki, nie ma czego wpisywać
+         przed wyborem. Zdanie i przyciski muszą mówić to samo. */
+      'chat.sponsorAskLink': 'Letzte freiwillige Sache: hast du eine Website oder ein Social-Profil, das wir zeigen können?',
       'chat.sponsorLinkHasSite': 'Ich habe eine Website',
       'chat.sponsorLinkHasSocial': 'Ich habe Social Media',
       'chat.sponsorLinkNone': 'Ich habe nichts davon',
@@ -2813,6 +2829,10 @@
       'chat.gateKnownAsk': 'Te responderemos a {email}. ¿Es tu dirección?',
       'chat.gateKnownYes': 'Sí, es la mía',
       'chat.gateKnownChange': 'Cambiar dirección',
+      /* Nadpisuje tekst z chatSponsorOptionalExtras: tam pytanie brzmi „wpisz go tutaj
+         albo pomiń", a od kiedy pod spodem stoją trzy pastylki, nie ma czego wpisywać
+         przed wyborem. Zdanie i przyciski muszą mówić to samo. */
+      'chat.sponsorAskLink': 'Última cosa opcional: ¿tienes web o un perfil social que podamos mostrar?',
       'chat.sponsorLinkHasSite': 'Tengo web',
       'chat.sponsorLinkHasSocial': 'Tengo redes sociales',
       'chat.sponsorLinkNone': 'No tengo ninguna',
@@ -2824,6 +2844,10 @@
       'chat.gateKnownAsk': 'Nous répondrons à {email}. C’est bien votre adresse ?',
       'chat.gateKnownYes': 'Oui, c’est la mienne',
       'chat.gateKnownChange': 'Changer d’adresse',
+      /* Nadpisuje tekst z chatSponsorOptionalExtras: tam pytanie brzmi „wpisz go tutaj
+         albo pomiń", a od kiedy pod spodem stoją trzy pastylki, nie ma czego wpisywać
+         przed wyborem. Zdanie i przyciski muszą mówić to samo. */
+      'chat.sponsorAskLink': 'Dernière chose facultative : avez-vous un site ou un profil social à montrer ?',
       'chat.sponsorLinkHasSite': 'J’ai un site',
       'chat.sponsorLinkHasSocial': 'J’ai des réseaux sociaux',
       'chat.sponsorLinkNone': 'Je n’ai ni l’un ni l’autre',

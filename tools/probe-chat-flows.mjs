@@ -162,7 +162,11 @@ const probe = `
   const realFetch = window.fetch.bind(window);
   const stub = {
     sendDelay: 0, selfService: null, reply: 'Odpowiedź automatu.', mode: 'ai',
-    theirTyping: false, pollMessages: [], sends: 0, polls: 0
+    theirTyping: false, pollMessages: [], sends: 0, polls: 0,
+    /* Jednorazowa awaria wysyłki. Potrzebna, bo wiersz systemowy .chat__system jest
+       czwartą drogą dopisania czegoś do dziennika i ma trafiać na jego dół tak samo jak
+       trzy pozostałe — a najkrótszą pewną drogą do niego jest odpowiedź „ok: false". */
+    failNext: false
   };
   window.fetch = async (input, init) => {
     const url = String(typeof input === 'string' ? input : input?.url || '');
@@ -177,6 +181,11 @@ const probe = `
     if (payload.action === 'send') {
       stub.sends += 1;
       if (stub.sendDelay) await sleep(stub.sendDelay);
+      if (stub.failNext) {
+        stub.failNext = false;
+        return new Response(JSON.stringify({ ok: false, code: 'chat' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
       return answer({
         mode: stub.mode,
         reply: stub.selfService ? null : stub.reply,
@@ -502,9 +511,16 @@ const probe = `
     const composer = box('[data-chat-form]');
     const send = box('[data-chat-send]');
     const logBox = box('[data-chat-log]');
+    const noteBox = box('[data-chat-note]');
     const root = getComputedStyle(document.documentElement);
     return {
       label,
+      /* Od góry dziennika do dołu KOMPOZYTORA, nie do dołu notki. Notka jest napisem
+         objaśniającym, w który nikt nie klika; przy otwartej klawiaturze wolno jej zostać
+         pod nią. Obietnica dotyczy tego, czym się rozmawia: dziennika, podpowiedzi
+         i kompozytora z przyciskiem wysyłki. */
+      chatSpan: (logBox && composer) ? composer.bottom - logBox.top : -1,
+      note: noteBox,
       screenH: root.getPropertyValue('--screen-h').trim(),
       chatVh: root.getPropertyValue('--chat-vh').trim(),
       viewportH: Math.round(view ? view.height : window.innerHeight),
@@ -517,7 +533,20 @@ const probe = `
       logCap: getComputedStyle(document.querySelector('[data-chat-log]')).maxHeight,
       inputCap: getComputedStyle(document.querySelector('[data-chat-input]')).maxHeight,
       chipsBelow: chips ? chips.bottom - visibleBottom : null,
-      composerBelow: composer ? composer.bottom - visibleBottom : null
+      composerBelow: composer ? composer.bottom - visibleBottom : null,
+      /* POZYCJA PRZEWINIĘCIA DOKUMENTU I JEGO WYSOKOŚĆ, W KAŻDYM UJĘCIU.
+         ---------------------------------------------------------------------------
+         Bez tych trzech liczb sonda nie widzi zgłoszenia „dotknięcie pola przerzuca stronę
+         na górę". Mechanizm jest cichy: klawiatura skraca --chat-vh, arkusz skraca sufit
+         dziennika, dokument robi się NIŻSZY, a przeglądarka przycina przewinięcie do nowego
+         maksimum. Wysokość wraca po zwinięciu klawiatury, przewinięcie NIE — bo nikt go nie
+         przywraca, a zdarzenie resize na oknie (na którym stoi bezpiecznik w index.html)
+         przy interactive-widget=resizes-visual w ogóle nie leci. Widać to tylko wtedy, gdy
+         mierzy się scrollY RAZEM z scrollHeight. */
+      docY: Math.round(window.scrollY),
+      docH: Math.round(document.documentElement.scrollHeight),
+      docMax: Math.max(0, Math.round(document.documentElement.scrollHeight - window.innerHeight)),
+      focus: focusName()
     };
   };
 
@@ -527,9 +556,25 @@ const probe = `
   document.querySelector('[data-chat-chips]')?.classList.remove('is-open');
   document.querySelector('[data-chat-form]')?.scrollIntoView({ block: 'center' });
   await sleep(700);
+  /* Ujęcie ZERO: stan przed dotknięciem pola, z PUSTYM polem. To jest liczba, do której
+     porównuje się wszystkie następne — zgłoszenie brzmi „dotknięcie pola przerzuca stronę
+     na górę", więc bez pomiaru sprzed dotknięcia nie ma czego porównywać. Puste pole, bo
+     to jest też stan, w którym mierzy się WYSOKOŚĆ czatu ze zgłoszenia numer dwa: dziennik
+     przy pustym kompozytorze. */
+  out.keyboardBefore = shot('przed dotknieciem pola, pole puste');
+
   writeInput('Chcialbym zapytac o kask, o numer startowy i o to, czy moge zapisac sie z kolega '
     + 'oraz czy wozek musi miec hamulec z linka, bo buduje go z tata w garazu.');
-  document.querySelector('[data-chat-input]')?.focus({ preventScroll: true });
+  await sleep(300);
+
+  /* focus() BEZ preventScroll, i to jest celowe.
+     ---------------------------------------------------------------------------
+     Reszta strony woła focus({ preventScroll: true }), bo tam fokus przekłada KOD.
+     Tu fokus zakłada PALEC — a palec nie ma flagi. Pole jest w tej chwili całe w kadrze
+     (kompozytor przewinięty na środek widoku wyżej), więc przeglądarka nie ma powodu
+     niczego przewijać; jeśli przewinie, to jest dokładnie ta usterka, którą mierzymy.
+     preventScroll w tym miejscu ukrywałby ją przed sondą. */
+  document.querySelector('[data-chat-input]')?.focus();
   await sleep(400);
   out.keyboardClosed = shot('klawiatura zamknieta');
 
@@ -541,6 +586,70 @@ const probe = `
   await sleep(400);
   out.keyboardBack = shot('klawiatura zwinieta');
   writeInput('');
+
+  /* ======================================================================
+     9. PO DOPISANIU WIADOMOŚCI DZIENNIK STOI NA JEJ DOLE
+     ======================================================================
+     Przewijany jest WYŁĄCZNIE .chat__log, czyli element z własnym overflow-y: auto.
+     Przewinięcie dokumentu byłoby dokładnie tą usterką z punktu 1, więc pozycja dokumentu
+     jest tu mierzona razem z pozycją dziennika — „ostatnia wiadomość na dole" osiągnięte
+     przewinięciem strony nie jest naprawą, jest zamianą jednej usterki na drugą.
+
+     Mierzone trzy stany, bo obietnica ma trzy części:
+       a) po wysłaniu własnej wiadomości dziennik stoi na dole,
+       b) po ręcznym przewinięciu w górę i wiadomości OD ORGANIZATORA widok NIE skacze,
+       c) po wysłaniu własnej wiadomości z pozycji „przewinięty w górę" — skacze, bo to
+          właściciel widoku właśnie coś napisał i chce to zobaczyć.
+     ====================================================================== */
+  const logEl = document.querySelector('[data-chat-log]');
+  /** Ile pikseli brakuje dziennikowi do dołu. Zero znaczy „stoi na ostatniej wiadomości". */
+  const logGap = () => (logEl
+    ? Math.round(logEl.scrollHeight - logEl.clientHeight - logEl.scrollTop)
+    : -1);
+  const scrollUpInLog = async () => {
+    if (!logEl) return;
+    logEl.scrollTop = 0;
+    logEl.dispatchEvent(new Event('scroll'));
+    await sleep(260);
+  };
+
+  stub.mode = 'ai';
+  stub.reply = 'Odpowiedz o kasku.';
+  out.stick = {
+    /* Dziennik musi mieć co przewijać: pudełko krótsze od treści. Bez tego wszystkie trzy
+       pomiary dawałyby zero i sonda przechodziłaby na czacie, który nic nie przewija. */
+    scrollable: logEl ? logEl.scrollHeight - logEl.clientHeight > 80 : false,
+    docYBefore: Math.round(window.scrollY)
+  };
+
+  await scrollUpInLog();
+  out.stick.gapScrolledUp = logGap();
+  await say('Czy kask musi miec homologacje?', 1500);
+  out.stick.gapAfterOwnSend = logGap();
+  out.stick.docYAfterOwnSend = Math.round(window.scrollY);
+
+  await scrollUpInLog();
+  out.stick.gapBeforeOrganiser = logGap();
+  stub.mode = 'human';
+  stub.pollMessages = [{ id: 'org-2', author: 'organiser',
+    body: 'Dopisuje sie do watku, sprawdzam liste.', at: new Date().toISOString() }];
+  await sleep(4800);
+  out.stick.gapAfterOrganiser = logGap();
+  out.stick.organiserShown = logText().includes('Dopisuje sie do watku');
+  out.stick.docYAfterOrganiser = Math.round(window.scrollY);
+
+  /* Wiersz systemowy: czwarta droga do dziennika, obok bąbelka gościa, automatu
+     i organizatora. Wywoływany najkrótszą pewną drogą — nieudaną wysyłką, po której czat
+     dopisuje .chat__system z „nie udało się wysłać". Gdyby ta droga miała własne,
+     osobne przewijanie (albo nie miała żadnego), zdanie o błędzie stawałoby poniżej
+     widocznego dołu: gość widziałby wiadomość, która po prostu nic nie zrobiła. */
+  stub.mode = 'ai';
+  stub.pollMessages = [];
+  stub.failNext = true;
+  await say('Wiadomosc, ktora nie dojdzie.', 1600);
+  out.stick.gapAfterSystem = logGap();
+  out.stick.systemShown = Boolean(document.querySelector('.chat__system'));
+  out.stick.docYAfterSystem = Math.round(window.scrollY);
 
   /* Na koniec dwa naciśnięcia, których wcześniej celowo nie dokończyliśmy: potwierdzenie
      zakończenia rozmowy i „nowa rozmowa". Oba zmieniają całą zawartość panelu, więc są
@@ -729,12 +838,49 @@ try {
 
   /* ------------------------------------------------------- 5. klawiatura na telefonie */
   console.log('');
-  const shots = [r.keyboardClosed, r.keyboardOpen, r.keyboardBack].filter(Boolean);
+  const shots = [r.keyboardBefore, r.keyboardClosed, r.keyboardOpen, r.keyboardBack].filter(Boolean);
   for (const s of shots) {
     console.log(`      ${s.label}: widok ${s.viewportH} px (okno ${s.innerH}), --screen-h ${s.screenH}`
       + `, --chat-vh ${s.chatVh || '(brak)'}, sufit dziennika ${s.logCap}`);
     console.log(`         dziennik ${s.log ? s.log.height : '-'} px, pastylki do ${s.chips ? s.chips.bottom : '-'} px`
       + `, kompozytor do ${s.composer ? s.composer.bottom : '-'} px, dolna krawędź widoku ${s.visibleBottom} px`);
+    console.log(`         dokument ${s.docH} px (maks. przewinięcie ${s.docMax}), przewinięcie ${s.docY} px`
+      + `, fokus ${s.focus}, czat od dziennika do kompozytora ${s.chatSpan} px`);
+  }
+
+  /* ----------------------------- 1b. dotknięcie pola nie rusza przewinięcia dokumentu */
+  console.log('');
+  if (r.keyboardBefore && r.keyboardOpen && r.keyboardBack) {
+    const before = r.keyboardBefore;
+    const closed = r.keyboardClosed;
+    const open = r.keyboardOpen;
+    const back = r.keyboardBack;
+    check(before.docY === closed.docY,
+      `wpisanie długiej wiadomości i dotknięcie pola nie ruszają strony:`
+      + ` ${before.docY} -> ${closed.docY} px`);
+    check(before.docY === open.docY,
+      `otwarcie klawiatury nie rusza strony: ${before.docY} -> ${open.docY} px`);
+    check(before.docY === back.docY,
+      `zwinięcie klawiatury zostawia stronę tam, gdzie była: ${before.docY} -> ${back.docY} px`);
+    /* Wysokość dokumentu mierzona osobno od przewinięcia, bo to ONA jest przyczyną:
+       dokument, który przy klawiaturze robi się niższy, przycina przewinięcie i nikt go
+       potem nie przywraca. Ta asercja pilnuje przyczyny, tamte trzy — skutku. */
+    check(closed.docH === before.docH,
+      `rosnące pole wiadomości nie zmienia wysokości dokumentu:`
+      + ` ${before.docH} -> ${closed.docH} px`);
+    check(open.docH === before.docH,
+      `klawiatura nie zmienia wysokości dokumentu: ${before.docH} -> ${open.docH} px`);
+    check(back.docH === before.docH,
+      `i po jej zwinięciu wysokość jest ta sama: ${before.docH} -> ${back.docH} px`);
+    /* Klawiatura ZOSTAJE OTWARTA. Bez tego warunku „strona nie drgnęła" dałoby się
+       spełnić najgorszym sposobem: zdjęciem fokusa z pola, czyli zwinięciem klawiatury
+       w połowie pisania. */
+    check(open.focus.startsWith('TEXTAREA'),
+      `przy otwartej klawiaturze fokus siedzi w polu wiadomości: ${open.focus}`);
+    check(back.focus.startsWith('TEXTAREA'),
+      `i nie spada z niego po zmianie widoku: ${back.focus}`);
+  } else {
+    check(false, 'pomiar dotknięcia pola się nie wykonał');
   }
   if (r.keyboardOpen && r.keyboardOpen.chips && r.keyboardOpen.composer) {
     const k = r.keyboardOpen;
@@ -763,6 +909,79 @@ try {
       + `${r.keyboardBack.composerBelow} px, pastylki ${r.keyboardBack.chipsBelow} px od krawędzi)`);
     check(Number.parseFloat(r.keyboardBack.logCap) >= Number.parseFloat(r.keyboardOpen.logCap),
       `sufit dziennika wraca po zwinięciu klawiatury: ${r.keyboardOpen.logCap} -> ${r.keyboardBack.logCap}`);
+  }
+
+  /* --------------------------------------------------- 2. czat wyższy, ale nadal w kadrze */
+  console.log('');
+  if (r.keyboardBefore && r.keyboardBefore.log
+      && r.keyboardClosed && r.keyboardClosed.log && r.keyboardOpen && r.keyboardOpen.log) {
+    const idle = r.keyboardBefore;
+    const closed = r.keyboardClosed;
+    const open = r.keyboardOpen;
+    /* Liczby wzięte z pomiaru, nie z sufitu.
+       ---------------------------------------------------------------------------
+       Przy 390x844 widoczna wysokość to 749 px (pasek adresu zabiera 95 px). PRZED zmianą
+       dziennik miał 285 px w każdym stanie, bo wiązał go sufit — 38% widoku, zgłoszone jako
+       „za niski". Teraz wiąże go stała wysokość panelu (0,82 widoku ekranu), więc dziennik
+       bierze wszystko, czego nie potrzebuje reszta: 405 px przy pustym polu, 343 px przy
+       polu rozrośniętym do czterech wierszy. Progi 380 i 330 px stoją tuż pod tymi dwoma
+       pomiarami — mają złapać cofnięcie tej poprawki, a nie pojedynczy piksel różnicy
+       w łamaniu napisu. */
+    check(idle.log.height >= 380,
+      `przy zamkniętej klawiaturze i pustym polu dziennik ma co najmniej 380 px:`
+      + ` ${idle.log.height} px`
+      + ` (${Math.round((idle.log.height / idle.viewportH) * 100)}% widoku ${idle.viewportH} px)`);
+    /* Druga liczba pilnuje TEGO SAMEGO, co asercja o wysokości dokumentu wyżej, tylko od
+       drugiej strony: pole rosnące z tekstem zabiera miejsce DZIENNIKOWI, a nie stronie. */
+    check(closed.log.height >= 330,
+      `z długą wiadomością w polu dziennik nadal ma co najmniej 330 px: ${closed.log.height} px`);
+    check(open.log.height >= 90,
+      `przy otwartej klawiaturze dziennik nie znika: ${open.log.height} px`);
+    check(open.log.height < closed.log.height,
+      `i naprawdę ustępuje miejsca klawiaturze: ${closed.log.height} -> ${open.log.height} px`);
+    /* Warunek nienaruszalny ze zgłoszenia, sprawdzony jako WYSOKOŚĆ, nie jako pozycja:
+       cały czat, którym się rozmawia (dziennik + podpowiedzi + kompozytor), musi się
+       zmieścić w tym, co widać przy otwartej klawiaturze. Pozycję pilnują asercje
+       o `chipsBelow` i `composerBelow` wyżej, ale one zależą od tego, gdzie stoi
+       przewinięcie; ta jest od niego niezależna. */
+    check(open.chatSpan > 0 && open.chatSpan <= open.viewportH,
+      `przy otwartej klawiaturze cały czat mieści się w widoku: ${open.chatSpan} px`
+      + ` z ${open.viewportH} px`);
+  } else {
+    check(false, 'pomiar wysokości dziennika się nie wykonał');
+  }
+
+  /* ----------------------------------- 3. dziennik stoi na najnowszej wiadomości */
+  console.log('');
+  if (r.stick) {
+    const s = r.stick;
+    console.log(`      dziennik przewijalny: ${s.scrollable}, brak do dołu po przewinięciu w górę:`
+      + ` ${s.gapScrolledUp} px`);
+    console.log(`      po własnej wysyłce ${s.gapAfterOwnSend} px, po wiadomości organizatora`
+      + ` ${s.gapAfterOrganiser} px (przed nią ${s.gapBeforeOrganiser} px),`
+      + ` po wierszu systemowym ${s.gapAfterSystem} px`);
+    check(s.scrollable === true,
+      'dziennik ma co przewijać — treść jest wyższa od pudełka');
+    check(s.gapScrolledUp > 60,
+      `ręczne przewinięcie w górę naprawdę zdjęło widok z dołu: ${s.gapScrolledUp} px`);
+    check(s.gapAfterOwnSend <= 4,
+      `po wysłaniu własnej wiadomości dziennik stoi na dole: ${s.gapAfterOwnSend} px do dołu`);
+    check(s.docYAfterOwnSend === s.docYBefore,
+      `i dociągnięty jest DZIENNIK, nie strona: ${s.docYBefore} -> ${s.docYAfterOwnSend} px`);
+    check(s.gapBeforeOrganiser > 60,
+      `przed wiadomością organizatora czytający jest wyżej: ${s.gapBeforeOrganiser} px do dołu`);
+    check(s.organiserShown === true, 'wiadomość organizatora naprawdę weszła do dziennika');
+    check(s.gapAfterOrganiser > 60,
+      `i NIE wyrwała widoku czytającemu, który był wyżej: ${s.gapAfterOrganiser} px do dołu`);
+    check(s.docYAfterOrganiser === s.docYBefore,
+      `ani nie ruszyła strony: ${s.docYBefore} -> ${s.docYAfterOrganiser} px`);
+    check(s.systemShown === true, 'wiersz systemowy naprawdę stanął w dzienniku');
+    check(s.gapAfterSystem <= 4,
+      `wiersz systemowy też ląduje na widocznym dole: ${s.gapAfterSystem} px do dołu`);
+    check(s.docYAfterSystem === s.docYBefore,
+      `i on też nie rusza strony: ${s.docYBefore} -> ${s.docYAfterSystem} px`);
+  } else {
+    check(false, 'pomiar dociągania dziennika się nie wykonał');
   }
 
   console.log(`\n${fails ? `${fails} niezaliczonych` : 'wszystko zaliczone'}`);

@@ -7810,10 +7810,80 @@ import {
       return row;
     };
 
-    /* Scrolled to the bottom only when the reader was already there. Yanking somebody back
-       down while they are reading further up is the thing every chat gets wrong. */
+    /* ========================================================================
+       DOCIĄGANIE DZIENNIKA DO DOŁU — JEDNO MIEJSCE NA CAŁY CZAT
+       ========================================================================
+       ZGŁOSZENIE: „jak się wysyła wiadomość, to okienko jest zawsze tam na ostatniej
+       wiadomości na dole". Czyli: po dopisaniu czegokolwiek widok ma stać na najnowszym
+       wierszu, a nie tam, gdzie stał przed dopisaniem.
+
+       CO BYŁO ZŁE — I DLACZEGO DZIAŁAŁO DOKŁADNIE ODWROTNIE, NIŻ MIAŁO
+         Ta sama para linijek („zapamiętaj, czy jesteśmy na dole" / „appendChild" / „jeśli
+         tak, to na dół") była PRZEPISANA SZEŚĆ RAZY: w `append`, w `noteLine`, w
+         `showTyping`, przy wierszu z polem na kod, przy odsyłaczach do dokumentów i przy
+         podsumowaniu zgłoszenia. Dwie z tych kopii różniły się od pozostałych — `noteLine`
+         ciągnęła na dół BEZ WARUNKU — a skutek dał się zmierzyć i był idealnie odwrotny do
+         zgłoszenia:
+
+         ZMIERZONE (`tools/probe-chat-flows.mjs`, okno 390x844, PRZED zmianą; „brak" to
+         `scrollHeight - clientHeight - scrollTop`, czyli ile brakuje do dołu):
+           po wysłaniu WŁASNEJ wiadomości            brak 2279 px   <-- widok został w górze
+           po wiadomości organizatora, gdy czytający
+             przewinął dziennik w górę                brak    0 px   <-- widok mu wyrwany
+         Czyli jedyny wiersz, przy którym dociągnięcie jest OCZYWISTE (własna wysyłka), nie
+         dociągał; a jedyny, przy którym trzeba spytać, czy nie przerywamy komuś czytania,
+         dociągał zawsze. Pierwsze brało się z tego, że `atBottom()` pytano PRZED dopisaniem,
+         a przy „wysyłam z pozycji przewiniętej w górę" odpowiedź jest „nie". Drugie —
+         z bezwarunkowego `toBottom()` w `noteLine`, którą woła `setMode`, gdy odczyt
+         przynosi wieść o przekazaniu rozmowy człowiekowi.
+
+       CO JEST TERAZ
+         Jeden pomocnik, `addRow`, i jedna reguła w jednym miejscu. Nie ma już ani jednego
+         `log.appendChild` poza nim, więc kolejny rodzaj wiersza (bramka, kreator, cokolwiek)
+         dostaje właściwe zachowanie z samego faktu, że przechodzi tą drogą.
+
+       REGUŁA, I DLACZEGO MA WYJĄTEK, A NIE JEST BEZWARUNKOWA
+         Dociągamy, gdy czytający BYŁ JUŻ BLISKO DOŁU (60 px) — albo gdy wiersz jest jego
+         własną wypowiedzią (`force`). Bezwarunkowe „zawsze na dół" wyrywałoby widok komuś,
+         kto przewinął dziennik w górę, żeby przeczytać starsze wiadomości: dokładnie w chwili,
+         w której organizator odpisze, tekst uciekałby mu w pół zdania. Własna wysyłka jest
+         wyjątkiem, bo to on właśnie ją napisał i chce ją zobaczyć — a nie ma innego sposobu,
+         żeby zobaczyć, czy poszła.
+
+       PRZEWIJANY JEST WYŁĄCZNIE `.chat__log`, NIGDY DOKUMENT
+         `.chat__log` ma własne `overflow-y: auto`, więc `scrollTop` na nim nie rusza strony.
+         `scrollIntoView` na bąbelku albo na kompozytorze przewinąłby DOKUMENT — a to jest
+         dokładnie usterka „czat przeskakuje do góry", którą naprawia `--chat-vh` i stała
+         wysokość panelu (patrz `.chat[data-chat-ready='yes']` w chat.css). Jedna usterka
+         zamieniona na drugą nie jest naprawą.
+       ======================================================================== */
     const atBottom = () => !log || log.scrollHeight - log.scrollTop - log.clientHeight < 60;
-    const toBottom = () => { if (log) log.scrollTop = log.scrollHeight; };
+    const toBottom = () => {
+      if (!log) return;
+      log.scrollTop = log.scrollHeight;
+      /* Druga próba w następnej klatce, bo wysokość wiersza nie zawsze jest już znana.
+         Bąbelek ze zdjęciem rośnie, gdy obrazek się zdekoduje, a `<dl>` podsumowania
+         dostaje ostateczną wysokość po przeliczeniu układu. Bez tej drugiej próby
+         najwyższe wiersze czatu — te ze zdjęciem — kończyły o kilkadziesiąt pikseli
+         poniżej widocznego dołu. Klatka później, więc nikt nie zdąży w tym czasie
+         przewinąć dziennika ręcznie. */
+      requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+    };
+
+    /**
+     * Jedyna droga, którą cokolwiek trafia do dziennika.
+     *
+     * @param {Node|null} node wiersz do dopisania
+     * @param {boolean} force dociągnij na dół nawet wtedy, gdy czytający był wyżej.
+     *        Prawda tylko dla wypowiedzi gościa: to on właśnie nacisnął „wyślij".
+     */
+    const addRow = (node, force) => {
+      if (!log || !node) return node;
+      const stick = force || atBottom();
+      log.appendChild(node);
+      if (stick) toBottom();
+      return node;
+    };
 
     const append = (message, pending) => {
       if (!log) return null;
@@ -7822,11 +7892,12 @@ import {
          na ekran wcześniej niż jego identyfikator: sprawdzany jest sam dziennik. */
       if (message.id && log.querySelector(`[data-mid="${message.id}"]`)) return null;
       if (message.id) seen.add(message.id);
-      const stick = atBottom();
       const node = bubble(message.author, message.body, pending, message.image || '');
       if (message.id) node.dataset.mid = message.id;
-      log.appendChild(node);
-      if (stick) toBottom();
+      /* Autor rozstrzyga o wyjątku, i nie potrzeba do tego drugiego argumentu w kilkunastu
+         wywołaniach: bąbelek gościa powstaje TYLKO wtedy, gdy gość coś zrobił — nacisnął
+         „wyślij" albo pastylkę. Wiadomość automatu i organizatora przychodzi sama. */
+      addRow(node, message.author === 'visitor');
       if (message.at && message.at > lastAt) lastAt = message.at;
       return node;
     };
@@ -7845,8 +7916,12 @@ import {
       const row = document.createElement('p');
       row.className = 'chat__system';
       row.textContent = line || '';
-      log.appendChild(row);
-      toBottom();
+      /* Przez `addRow`, czyli z tą samą regułą co wszystko inne. Wcześniej stało tu
+         bezwarunkowe `toBottom()` i to ono wyrywało widok czytającemu: `setMode` woła tę
+         funkcję, gdy ODCZYT przynosi wieść o przekazaniu rozmowy człowiekowi, czyli
+         w chwili, której gość nie wywołał. Wiersz systemowy po własnej czynności gościa
+         i tak trafia na dół, bo jego wypowiedź przed chwilą tam widok ustawiła. */
+      addRow(row);
     };
 
     const note = (key) => noteLine(text(key) || '');
@@ -7898,9 +7973,7 @@ import {
       dots.className = 'chat-typing__dots';
       dots.append(document.createElement('i'), document.createElement('i'), document.createElement('i'));
       typingRow.appendChild(dots);
-      const stick = atBottom();
-      log.appendChild(typingRow);
-      if (stick) toBottom();
+      addRow(typingRow);
     };
     const hideTyping = () => {
       typingRow?.remove();
@@ -8428,9 +8501,7 @@ import {
         if (event.key === 'Enter') event.preventDefault();
       });
 
-      const stick = atBottom();
-      log?.appendChild(row);
-      if (stick) toBottom();
+      addRow(row);
       handle.focus();
       return handle;
     }
@@ -9120,9 +9191,7 @@ import {
         link.textContent = text(key) || href;
         row.append(link);
       });
-      const stick = atBottom();
-      log.appendChild(row);
-      if (stick) toBottom();
+      addRow(row);
       return row;
     }
 
@@ -9389,9 +9458,7 @@ import {
         link.href = `mailto:${SITE_AUTHOR_EMAIL}`;
         link.textContent = SITE_AUTHOR_EMAIL;
         row.append(link);
-        const stick = atBottom();
-        log.appendChild(row);
-        if (stick) toBottom();
+        addRow(row);
       });
     }
 
@@ -9455,9 +9522,7 @@ import {
         shot.append(picture);
         list.append(shot);
       }
-      const stick = atBottom();
-      log.appendChild(list);
-      if (stick) toBottom();
+      addRow(list);
       return list;
     }
 
@@ -10000,6 +10065,23 @@ import {
          iOS przy otwarciu klawiatury wysyła na widoku `resize` ORAZ `scroll`, a przy zwijaniu
          bywa, że tylko `scroll`. Sonda wysyła oba i oba są tu obsłużone: pomiar jest tani
          (jeden odczyt) i zapisuje zmienną tylko wtedy, gdy liczba jest inna.
+
+       CZEGO TA ZMIENNA NIE WOLNO, ŻEBY DOTKNĘŁA — I DLACZEGO
+         `--chat-vh` czyta WYŁĄCZNIE arkusz czatu, i to tylko w regułach `.chat*`. Gdyby
+         weszła gdziekolwiek indziej — a zwłaszcza w wysokość sekcji, bo one na tej stronie
+         liczą się od wysokości ekranu — otwarcie klawiatury zmieniałoby wysokość CAŁEGO
+         dokumentu, przewinięcie zostałoby przycięte do nowego maksimum i nikt by go nie
+         przywrócił (bezpiecznik w index.html stoi na `resize` OKNA, którego klawiatura przy
+         `interactive-widget=resizes-visual` nie wysyła). To był objaw „dotknięcie pola
+         przerzuca stronę na górę i zwija klawiaturę".
+
+         Dlatego nawet w samym czacie skracanie dziennika NIE jest już widoczne dla wysokości
+         dokumentu: panel trwającej rozmowy ma stałą wysokość liczoną z zamrożonego
+         `--screen-h`, a dziennik kurczy się w tej ramce (patrz `.chat[data-chat-ready='yes']`
+         i `.chat__log` w chat.css). ZMIERZONE `tools/probe-chat-flows.mjs`, okno 390x844,
+         klawiatura 400 px: wysokość dokumentu 12733 -> 12625 -> 12733 px PRZED, a 12791 px
+         w każdym z trzech stanów PO. Przewinięcie: 11080 px przed dotknięciem pola, przy
+         otwartej klawiaturze i po jej zwinięciu.
        ====================================================================== */
     const CHAT_VH_FLOOR = 240;
     let lastChatVh = 0;
