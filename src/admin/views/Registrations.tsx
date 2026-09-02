@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, Printer, Search, ShieldAlert, Trash2, X } from 'lucide-react';
+import { Download, Loader2, Pencil, Printer, Search, ShieldAlert, Trash2, X } from 'lucide-react';
 import { cn, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import {
   deleteRegistration,
+  fetchFormsBundle,
   fetchRoster,
   updateRegistration,
   type RosterEdit,
@@ -84,6 +85,41 @@ export function Registrations({
     }
   };
 
+  /**
+   * Pobranie wypelnionych formularzy.
+   *
+   * `ids` puste znaczy „wszyscy" — tak wola przycisk nad tabela. Jeden identyfikator to
+   * strzalka przy jednej osobie. W obu przypadkach wraca JEDEN plik: przy kilkunastu
+   * zawodnikach osobne pliki znaczylyby kilkanascie okien drukowania zamiast jednego.
+   *
+   * `busyId` trzyma to, co sie wlasnie pobiera ('all' albo identyfikator), zeby zakrecic
+   * mozna bylo tylko ten jeden przycisk — reszta tabeli zostaje klikalna.
+   */
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [bundleError, setBundleError] = useState<string | null>(null);
+
+  const downloadForms = useCallback(async (ids: string[], marker: string) => {
+    setBusyId(marker);
+    setBundleError(null);
+    try {
+      const blob = await fetchFormsBundle(apiKey, ids);
+      /* Adres obiektu zyje tylko do momentu, w ktorym przegladarka zapisze plik. Bez
+         `revokeObjectURL` kazde pobranie zostawialoby w pamieci karty caly PDF. */
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = ids.length === 1 ? 'carruleddhi-formularz.pdf' : 'carruleddhi-formularze.pdf';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (problem) {
+      setBundleError(problem instanceof Error ? problem.message : String(problem));
+    } finally {
+      setBusyId(null);
+    }
+  }, [apiKey]);
+
   return (
     <div className="mx-auto max-w-6xl">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -91,19 +127,42 @@ export function Registrations({
           <h2 className="text-2xl font-bold tracking-tight text-foreground">{t('reg.title')}</h2>
           <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">{t('reg.lead')}</p>
         </div>
-        {/* Disabled until the entries are loaded. Printing a list that has not arrived yet
-            produces a sheet with a header and nothing under it, and the only way to find that
-            out is at the printer. */}
-        <button
-          type="button"
-          disabled={!rows || rows.length === 0}
-          onClick={() => window.print()}
-          className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:opacity-40"
-        >
-          <Printer className="size-3.5" />
-          {t('reg.print')}
-        </button>
+        {/* Dwa przyciski, jeden rzad, ta sama wysokosc i ten sam ksztalt — jak w Ustawieniach.
+            Wczesniej stal tu sam „Drukuj karty" i wygladal na doczepiony do naglowka.
+
+            Kolejnosc jest kolejnoscia uzycia: najpierw sciaga sie formularze (to jest plik,
+            ktory idzie na drukarke i wraca podpisany), potem drukuje sie sama liste startowa.
+            Oba wylaczone, dopoki zgloszenia nie doszly: wydruk listy, ktorej nie ma, to
+            kartka z samym naglowkiem, a to widac dopiero przy drukarce. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={!rows || rows.length === 0 || busyId !== null}
+            onClick={() => void downloadForms([], 'all')}
+            className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-40"
+          >
+            {busyId === 'all'
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <Download className="size-3.5" />}
+            {t('reg.downloadAll')}
+          </button>
+          <button
+            type="button"
+            disabled={!rows || rows.length === 0}
+            onClick={() => window.print()}
+            className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:border-foreground/40 hover:text-foreground disabled:opacity-40"
+          >
+            <Printer className="size-3.5" />
+            {t('reg.print')}
+          </button>
+        </div>
       </div>
+
+      {bundleError ? (
+        <p className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-xs text-destructive">
+          {t('reg.downloadFailed')} <span className="font-mono opacity-70">{bundleError}</span>
+        </p>
+      ) : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <label className="relative min-w-0 flex-1">
@@ -239,6 +298,20 @@ export function Registrations({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1.5">
+                      {/* Strzalka pierwsza, bo to jest czynnosc wykonywana najczesciej: przed
+                          zawodami kazdy formularz trzeba wydrukowac. Edycja i usuwanie sa
+                          rzadsze i stoja dalej od palca. */}
+                      <button
+                        type="button"
+                        disabled={busyId !== null}
+                        onClick={() => void downloadForms([row.id], row.id)}
+                        title={pl ? 'Pobierz wypełniony formularz' : 'Scarica il modulo compilato'}
+                        className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+                      >
+                        {busyId === row.id
+                          ? <Loader2 className="size-4 animate-spin" strokeWidth={1.5} />
+                          : <Download className="size-4" strokeWidth={1.5} />}
+                      </button>
                       <button
                         type="button"
                         onClick={() => setEditing(row)}

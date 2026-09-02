@@ -166,7 +166,9 @@ export const pl = {
   'reg.guardian': 'Opiekun',
   'reg.empty': 'Nikt się jeszcze nie zapisał.',
   'reg.count': 'zgłoszeń',
-  'reg.print': 'Drukuj karty',
+  'reg.print': 'Drukuj listę',
+  'reg.downloadAll': 'Pobierz wszystkie formularze',
+  'reg.downloadFailed': 'Nie udało się pobrać formularzy.',
 
   'chat.title': 'Czat na żywo',
   'chat.lead': 'Rozmowy ze strony. Te oznaczone kolorem czekają na człowieka.',
@@ -769,7 +771,9 @@ export const it: Dict = {
   'reg.guardian': 'Chi firma',
   'reg.empty': 'Nessuna iscrizione per ora.',
   'reg.count': 'iscrizioni',
-  'reg.print': 'Stampa le schede',
+  'reg.print': 'Stampa l’elenco',
+  'reg.downloadAll': 'Scarica tutti i moduli',
+  'reg.downloadFailed': 'Non sono riuscito a scaricare i moduli.',
 
   'chat.title': 'Chat dal vivo',
   'chat.lead': 'Conversazioni dal sito. Quelle evidenziate aspettano una persona.',

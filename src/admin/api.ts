@@ -227,6 +227,29 @@ export interface SiteStats {
   signupTotal: number;
 }
 
+/**
+ * Wypelnione formularze jako JEDEN plik PDF, gotowy do druku.
+ * ---------------------------------------------------------------------------
+ * Nie przez `call()` i nie przez `/api/carruleddhi/...`: tamta droga wraca JSON-em przez
+ * runtime Edge, a tu wraca kilkaset kilobajtow pliku sklejanego przez pdf-lib — dlatego
+ * osobna funkcja `api/forms-bundle.js` na Node. Naglowek z haslem jest ten sam.
+ *
+ * Pusta lista `ids` znaczy „wszyscy zapisani": tak dziala przycisk nad tabela.
+ */
+export async function fetchFormsBundle(key: string, ids: string[]): Promise<Blob> {
+  const response = await fetch('/api/forms-bundle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', [ROSTER_HEADER]: key },
+    body: JSON.stringify(ids.length ? { ids } : { all: true })
+  });
+  if (!response.ok) {
+    let code = `HTTP ${response.status}`;
+    try { code = (await response.json())?.code || code; } catch { /* nie JSON, zostaje status */ }
+    throw new Error(code);
+  }
+  return response.blob();
+}
+
 export const fetchStats = (key: string, hours: number) =>
   call<{ ok: true; stats: SiteStats }>('stats', key, { hours });
 
