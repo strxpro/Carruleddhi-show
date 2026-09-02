@@ -1,6 +1,8 @@
 /**
- * Regulamin w sześciu językach, z jednego pliku danych.
+ * Dokumenty prawne w sześciu językach, z jednego pliku danych na dokument.
  * ===========================================================================
+ * Obsługuje regulamin, politykę prywatności i politykę cookie. Który dokument — mówi
+ * strona atrybutem `data-legal-source` na znaczniku <html>; patrz `SOURCE` niżej.
  *
  * Do tej pory `regolamento.html` był jedną stroną po włosku. Reszta serwisu chodzi w sześciu
  * językach, więc odsyłacz w stopce i link w każdym mailu — `regolamento.html?lang=pl` —
@@ -22,7 +24,17 @@
 (function () {
   'use strict';
 
-  const SOURCE = 'assets/legal/regolamento.json';
+  /**
+   * KTORY DOKUMENT — pyta o to strona, nie ten plik.
+   * ---------------------------------------------------------------------------
+   * Ten sam skrypt obsluguje teraz trzy strony prawne: regulamin, polityke prywatnosci
+   * i polityke cookie. Rozniva je wylacznie plik z trescia, wiec nazwa pliku jest jedyna
+   * rzecza, ktora strona musi podac — przez `data-legal-source` na znaczniku <html>.
+   *
+   * Domyslny regulamin zostaje dla zgodnosci: strona, ktora tego atrybutu nie ma, zachowuje
+   * sie dokladnie tak, jak przed rozdzieleniem.
+   */
+  const SOURCE = document.documentElement.dataset.legalSource || 'assets/legal/regolamento.json';
   const DEFAULT_LOCALE = 'it';
 
   /* Te same sześć języków co i18n.js i co LOCALES w Workerze. Kolejność jest kolejnością

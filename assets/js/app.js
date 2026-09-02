@@ -4047,6 +4047,7 @@ import {
      jest, a nie sięgnąć po plik po raz drugi.
      ======================================================================== */
   const LEGAL_RULES_SOURCE = 'assets/legal/regolamento.json';
+  const LEGAL_PRIVACY_SOURCE = 'assets/legal/privacy.json';
   const legalCache = { rules: null, privacy: null };
 
   /**
@@ -4088,22 +4089,23 @@ import {
       return response.json();
     }));
 
-  /* Polityka prywatności nadal jest zdejmowana z `privacy.html`, bo nie istnieje jej wersja
-     przetłumaczona — a wymyślanie tłumaczenia informacji RODO nie jest zadaniem tego pliku.
-     Gdy powstanie `assets/legal/privacy.json`, ta funkcja zmieni się w bliźniaka powyższej.
+  /* Polityka prywatności we wszystkich sześciu językach, dokładnie tak samo jak regulamin.
+     ---------------------------------------------------------------------------
+     Wcześniej była tu inna droga: `fetch('privacy.html')` i wycięcie `.legal-content` ze
+     strony. Nie z lenistwa — po prostu przetłumaczonej wersji nie było, a strona jest po
+     włosku. Skutkiem było okno zgody, w którym regulamin szedł w języku gościa, a polityka
+     prywatności zaraz pod nim po włosku. Zapowiedź stała w tym komentarzu: „gdy powstanie
+     assets/legal/privacy.json, ta funkcja zmieni się w bliźniaka powyższej". Powstał.
 
-     `same-origin`, nie `omit`: to strona tego samego serwisu, a `omit` znaczyło żądanie bez
-     ciasteczka, które czytelnik już trzyma — brama hasłem odpowiadała wtedy 401 i dialog
-     pokazywał „nie mogę wczytać dokumentu" dla obu dokumentów naraz. */
-  const legalPrivacy = () => legalOnce('privacy', () => fetch('privacy.html', { credentials: 'same-origin' })
+     Bliźniak znaczy tu dosłownie to samo zachowanie: jeden plik JSON z sześcioma językami,
+     wybór po `state.lang`, włoski jako wersja oficjalna i jako zapas, gdy tłumaczenia dla
+     danego języka nie ma. Dzięki temu oba dokumenty w oknie zgody wczytują się tą samą
+     drogą i nie mogą się rozjechać — a `privacyBlock()` niżej jest teraz odbiciem
+     `rulesBlock()`, zamiast być osobnym przypadkiem. */
+  const legalPrivacy = () => legalOnce('privacy', () => fetch(LEGAL_PRIVACY_SOURCE, { credentials: 'same-origin' })
     .then((response) => {
       if (!response.ok) throw new Error(String(response.status));
-      return response.text();
-    })
-    .then((markup) => {
-      const article = new DOMParser().parseFromString(markup, 'text/html').querySelector('.legal-content');
-      if (!article) throw new Error('no .legal-content');
-      return sanitizeLegal(article);
+      return response.json();
     }));
 
   let legalPrefetched = false;
@@ -4222,13 +4224,22 @@ import {
     }
 
     async function privacyBlock() {
+      const lang = state.lang;
       try {
-        /* Klon, nie oryginał. W pamięci leży jeden przetworzony artykuł, a wstawienie go do
-           dialogu przeniosłoby go tam — drugie otwarcie zastałoby pustą pamięć. */
-        return docBlock('consent.privacyHeading', (await legalPrivacy()).cloneNode(true));
+        const all = await legalPrivacy();
+        /* Włoski, gdy tłumaczenia dla tego języka nie ma — z tego samego powodu co przy
+           regulaminie: polityka prywatności po włosku jest polityką prywatności, a jej brak
+           nie jest niczym. */
+        const doc = all[lang] || all.it;
+        if (!doc?.html) throw new Error(`no privacy for ${lang}`);
+        /* Świeży rozbiór przy każdym otwarciu, więc nie ma czego klonować: w pamięci leży
+           teraz tekst dokumentu, a nie gotowy węzeł DOM, który wstawienie do dialogu
+           przenosiłoby z pamięci na ekran. */
+        const parsed = new DOMParser().parseFromString(`<article class="legal-content">${doc.html}</article>`, 'text/html');
+        return docBlock('consent.privacyHeading', sanitizeLegal(parsed.querySelector('.legal-content')));
       } catch (error) {
         console.warn('Consent privacy could not be inlined:', error);
-        return docFallback('privacy.html');
+        return docFallback(`privacy.html?lang=${lang}`);
       }
     }
 

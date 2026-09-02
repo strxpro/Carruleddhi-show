@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="it" data-legal-source="assets/legal/cookies.json">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,7 +11,7 @@
 <body>
   <a class="skip-link" href="#main">Vai al contenuto</a>
   <div class="noise" aria-hidden="true"></div>
-  <header class="site-header"><div class="nav-shell"><a class="brand" href="index.html"><span class="brand__name">Carruleddhi</span><span class="brand__date">17 · 10 · 2026</span></a><a class="btn btn--small btn--yellow" href="index.html">← Torna al sito</a></div></header>
+  <header class="site-header"><div class="nav-shell"><a class="brand" href="index.html"><span class="brand__name">Carruleddhi</span><span class="brand__date">17 · 10 · 2026</span></a><a class="btn btn--small btn--yellow" href="index.html" data-legal-back>← Torna al sito</a></div></header>
 
   <main class="legal-page" id="main">
     <div class="container">
@@ -21,6 +21,13 @@
         <p class="lead">Versione 1.0 · aggiornata il 18 agosto 2026</p>
       </header>
 
+      <!-- Sześć języków, jeden dokument. Puste, bo buduje to legal-doc.js; bez JavaScriptu
+           nie ma tu nic do klikania i strona zostaje po włosku, czyli w wersji oficjalnej. -->
+      <nav class="legal-langs" data-legal-languages aria-label="Lingua"></nav>
+
+      <!-- Włoski tekst poniżej jest treścią domyślną, nie zapasową kopią: to on jest widoczny
+           bez JavaScriptu i on zostaje na ekranie, gdy plik z tłumaczeniami nie dojdzie.
+           legal-doc.js go podmienia na wybrany język. -->
       <article class="legal-content">
         <p class="legal-note"><strong>Configurazione attuale:</strong> il sito non installa cookie pubblicitari e non carica strumenti analitici. Usa solo memoria locale tecnica del browser. L’eventuale attivazione futura dell’analisi richiede consenso preventivo.</p>
 
@@ -73,5 +80,11 @@
       <img class="patron__logo" src="/assets/images/fidali.jpeg" alt="Fidali 1982" width="720" height="293" decoding="async" loading="lazy">
     </div>
   <footer class="site-footer"><div class="container footer__bottom"><span>© 2026 Carruleddhi Show</span><span><a href="privacy.html">Privacy policy</a> · <a href="regolamento.html">Regolamento</a></span></div></footer>
+
+  <!-- Moduł, jak w regolamento.html. Zwykłe `<script src>` Vite zostawia nietknięte, więc
+       import przez moduł jest tym, co przechodzi przez build. -->
+  <script type="module">
+    import './assets/js/legal-doc.js';
+  </script>
 </body>
 </html>
