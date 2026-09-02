@@ -5664,6 +5664,68 @@ import {
     hero.addEventListener('pointerleave', () => { content.style.transform = 'translate(0, 0)'; });
   }
 
+  /**
+   * HERO POZA WIDOKIEM PRZESTAJE SIĘ ANIMOWAĆ (TELEFON).
+   * ===========================================================================
+   * OBJAW, KTÓREGO TO DOTYCZY
+   *   „Strona na telefonie sama się odświeża w okolicy sekcji dwunastu nagród." W kodzie nie ma
+   *   ani jednego `location.reload()` ani service workera, a sonda błędów przechodzi tę okolicę
+   *   bez wyjątku, bez odrzuconej obietnicy i bez spadku liczby klatek (36 klatek na 600 ms w
+   *   każdym punkcie pomiaru). Zostaje jedno: przeglądarka mobilna ubija proces renderujący z
+   *   braku pamięci i wczytuje dokument od nowa. Takie zabicie nie zostawia śladu w konsoli,
+   *   więc jedyne, co da się zmierzyć i obniżyć, to ZUŻYCIE, które do niego prowadzi. Rachunek
+   *   jest zbierany w kilku miejscach naraz — `backdrop-filter`, cienie paneli i ziarno na całym
+   *   ekranie (carnival.css), cień rysunku nagrody (main.css), warstwy karuzeli (gallery-3d.js),
+   *   warstwy stosu kart (wyżej w tym pliku). To jest pozycja, która trwa NAJDŁUŻEJ: do końca
+   *   wizyty.
+   *
+   * CO TU BYŁO, ZMIERZONE
+   *   Hero ma cztery animacje NIESKOŃCZONE i żadna z nich nie pyta, czy hero jest na ekranie.
+   *   Pomiar (tools/probe-c-prizes-memory.js na 390x844 plus osobny przebieg liczący animacje po
+   *   nazwie; ekran ustawiony na sekcji nagród, scrollY 7324, próbki po 1,4 s / 3 s / 6 s):
+   *
+   *     animacji `running` w 1,4 s po dojściu do sekcji:   180  (162 poza ekranem)
+   *     w 3 s i w 6 s, czyli w stanie spokoju:              16  (wszystkie nieskończone)
+   *     z tych 16 poza ekranem, w hero:                      4
+   *       float-orb  @ section.hero          390x869 = 338 892 px2
+   *       marquee    @ div.marquee__track   2108x24  =  50 598 px2
+   *       fx-jitter  @ span.fx-jitter        119x44  =   5 088 px2
+   *       spin       @ span.hero__kicker-dot  30x30  =   1 030 px2
+   *     suma:                                              395 608 px2 (0,40 Mpx)
+   *
+   *   Czyli jedna czwarta wszystkich animacji działających w chwili, gdy czytelnik stoi w talii
+   *   nagród, należy do sekcji sprzed kilku tysięcy pikseli — a `float-orb` animuje pudełko
+   *   wielkości całego hero (0,34 Mpx z tych 0,40). Trwająca animacja transformacji dostaje w
+   *   Chrome własną warstwę kompozytora i przelicza ją w każdej klatce; nieskończona nie kończy
+   *   się nigdy.
+   *
+   * DLACZEGO `IntersectionObserver`, A NIE NASŁUCH `scroll`
+   *   Wersja na `scroll` musiałaby wołać `getBoundingClientRect()` na hero przy każdym zdarzeniu,
+   *   czyli wymuszać przeliczenie układu w trakcie przewijania — dokładnie ten błąd, który jest
+   *   rozpisany przy `measure()` w setupPanels i przy dokowaniu licznika. Obserwator odpowiada na
+   *   to samo pytanie bez ani jednego pomiaru w naszym kodzie.
+   *
+   * `rootMargin` HOJNY Z ROZMYSŁU
+   *   Trzydzieści procent ekranu zapasu: ruch wraca, ZANIM hero wjedzie w kadr, więc pierwsza
+   *   klatka, którą czytelnik widzi po powrocie na górę, jest już animowana. Przy sekcji nagród,
+   *   która leży kilka ekranów niżej, ten zapas nie obowiązuje.
+   *
+   * TYLKO WĄSKI EKRAN ALBO PALEC
+   *   Na pulpicie pamięci i mocy jest dość, a strona ma tam wyglądać dokładnie tak jak dotąd —
+   *   ten sam warunek stawiają wszystkie bloki obniżające koszt warstw w carnival.css. Zapytanie
+   *   jest czytane RAZ, bez nasłuchu na zmianę: obrót telefonu nie przenosi nikogo z jednej
+   *   klasy urządzeń do drugiej, a nasłuch to kolejny stan do utrzymania.
+   */
+  function setupHeroAmbient() {
+    const hero = $('.section-card--hero');
+    if (!hero || !('IntersectionObserver' in window)) return;
+    if (!window.matchMedia('(max-width: 760px), (pointer: coarse)').matches) return;
+    const nearby = new IntersectionObserver((entries) => {
+      hero.classList.toggle('is-offscreen', !entries.some((entry) => entry.isIntersecting));
+    }, { rootMargin: '30% 0px 30% 0px', threshold: 0 });
+    nearby.observe(hero);
+  }
+
   /* Set by setupRouteDraw once the road geometry is known, called by setupRouteZoom on every
      frame the section is on screen. Null until then, and null for good if the route has no
      path configured — the zoom checks before calling, so a missing road costs a missing cart
@@ -7087,10 +7149,78 @@ import {
       return;
     }
 
+    /**
+     * WEJŚCIE LITER, KTÓREGO NIKT NIE WIDZI, KOŃCZY SIĘ NATYCHMIAST (TELEFON).
+     * =========================================================================
+     * OBJAW, KTÓREGO TO DOTYCZY
+     *   „Strona na telefonie sama się odświeża w okolicy sekcji dwunastu nagród." To nie jest
+     *   awaria kodu — sonda błędów przechodzi tę okolicę czysto — a ubicie karty z braku pamięci,
+     *   które nie zostawia śladu w konsoli. Mierzalne jest tylko zużycie prowadzące do niego, a
+     *   TU jest jego SZCZYT, i to z dużym odstępem od wszystkiego innego.
+     *
+     * ZMIERZONE, tools/probe-c-prizes-memory.js na 390x844, ekran ustawiony na sekcji nagród:
+     *   liczba animacji `running`         1,4 s po dojściu:  180
+     *                                     3 s i 6 s później:  16
+     *   z tych 180 poza ekranem:                             162
+     *   liczba elementów proszących o własną warstwę
+     *   kompozytora, w tej samej chwili:                     227  (z tego 193 to animacje)
+     *
+     *   Rozbicie tych 162 po sekcjach, których w danej chwili NIE MA na ekranie:
+     *     attendance 37, story 25, categories 25, route 19, faq 19, contact 19, signup 6,
+     *     gallery 4, wall 4 — wszystko `fx-rise`/`fx-jump` na `span.fx-unit`, czyli po jednej
+     *     animacji NA LITERĘ albo NA SŁOWO nagłówka.
+     *
+     * SKĄD SIĘ BIERZE 180 NARAZ
+     *   Sekcje tej strony są `position: sticky` i przy szybkim przewijaniu wchodzą w kadr niemal
+     *   jednocześnie. Obserwator wyżej odpala wtedy wejście liter w kilku nagłówkach w tej samej
+     *   klatce, każde trwa 0,62 s plus opóźnienie do 0,96 s — i przez te ~1,6 s kompozytor trzyma
+     *   po jednej warstwie na każdą literę. To jest dokładnie ten kształt zdarzenia, który tłumaczy
+     *   objaw: nie stałe wysokie zużycie, ale kilkusekundowy skok w chwili szybkiego przewijania,
+     *   po którym karta wraca odświeżona.
+     *
+     * CO ROBIMY
+     *   Nagłówek, który zaczął wejście, a NIE JEST na ekranie, dostaje `is-settled` — klasę, którą
+     *   text-effects.css definiuje jako „tekst na miejscu, w stanie końcowym, bez animacji". To
+     *   jest zdjęcie animacji z czegoś, czego w tej chwili nie widać, a nie zmiana wyglądu: litery
+     *   są wtedy widoczne (`opacity: 1`), więc nagłówek nigdy nie zostaje pusty.
+     *
+     * DLACZEGO `is-settled`, A NIE ZDJĘCIE `is-playing`
+     *   `is-playing` to klasa, która NADAJE animację, ale reszta kodu czyta ją jako „ten nagłówek
+     *   ma już swoje wejście za sobą" (patrz przebudowa po zmianie języka niżej). Zdjęcie jej
+     *   znaczyłoby, że po zmianie języka nagłówek animuje się od zera. `is-settled` stoi OBOK i
+     *   mówi tylko o animacji — dokładnie to, o co tu chodzi.
+     *
+     * DLACZEGO TO NIE PSUJE NAGŁÓWKA, KTÓRY DOPIERO WEJDZIE W KADR
+     *   Obserwator wyżej odpala wejście z `rootMargin: 0px 0px -10% 0px`, czyli gdy nagłówek jest
+     *   już naprawdę w kadrze. Ten obserwator pyta o to samo pudełko bez marginesu, więc
+     *   nagłówek, do którego czytelnik dojechał normalnie, animuje się w całości. Gasną tylko te,
+     *   które przemknęły — i te, które odpalił awaryjny timer 2,5 s przy zagłodzonym obserwatorze,
+     *   gdzie „widoczny tekst od razu" jest zachowaniem pożądanym, nie stratą.
+     *
+     * TYLKO WĄSKI EKRAN ALBO PALEC
+     *   Ten sam warunek, co we wszystkich blokach obniżających koszt warstw w carnival.css: na
+     *   pulpicie pamięci jest dość i strona ma tam działać dokładnie jak dotąd. Zapytanie czytane
+     *   raz — obrót telefonu nie przenosi nikogo między klasami urządzeń.
+     */
+    const narrowOrTouch = window.matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+    const settler = narrowOrTouch
+      ? new IntersectionObserver((records) => {
+        for (const record of records) {
+          if (record.isIntersecting) continue;
+          record.target.classList.add('is-settled');
+          settler.unobserve(record.target);
+        }
+      }, { threshold: 0 })
+      : null;
+
     const play = (element) => {
       element.classList.add('is-playing');
       window.clearTimeout(Number(element.dataset.fxTimer) || 0);
       delete element.dataset.fxTimer;
+      /* Po `is-playing`, nigdy przed: `is-settled` bez `is-playing` przegrywa specyficznością z
+         regułą `is-armed:not(.is-playing) .fx-unit { opacity: 0 }` (0,4,0 wobec 0,3,0) i litery
+         zostałyby niewidoczne. Kolejność tych dwóch linijek jest tu warunkiem czytelności tekstu. */
+      settler?.observe(element);
     };
 
     const watcher = new IntersectionObserver((records) => {
@@ -10778,6 +10908,10 @@ import {
       ['cursor', setupCursor],
       ['magneticButtons', setupMagneticButtons],
       ['heroMotion', setupHeroMotion],
+      /* Zaraz po `heroMotion`, bo dotyczy tej samej sekcji i tego samego pytania „czy hero jest
+         na ekranie" — tylko z drugiej strony: tamto dodaje ruch pod wskaźnikiem na pulpicie, to
+         zabiera ruch, którego na telefonie nikt nie widzi. */
+      ['heroAmbient', setupHeroAmbient],
       ['routeDraw', setupRouteDraw],
       ['sponsors', setupSponsors],
       ['gallery3d', setupGalleryCarousel],

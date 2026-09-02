@@ -815,6 +815,18 @@
 .prizes.is-offscreen .prize-card__art svg {
   will-change: auto !important;
 }
+/* Razem z warstwami staje też unoszenie rysunku.
+   ---------------------------------------------------------------------------
+   `prize-float` (main.css) jest animacją NIESKOŃCZONĄ na rysunku wierzchniej karty. Dopóki
+   biegnie, kompozytor ma dla tego elementu żywą warstwę i przelicza ją w każdej klatce — także
+   wtedy, gdy sekcja nagród jest kilka ekranów wyżej albo niżej. Zmierzone sondą
+   tools/probe-c-prizes-memory.js na 390x844: w punkcie „gora strony" wśród animacji
+   działających jest rysunek nagrody, którego z tej pozycji nie widać ani w jednym pikselu.
+
+   `animation-play-state: paused`, a nie `animation: none`: pauza zachowuje fazę, więc rysunek
+   po powrocie sekcji na ekran podejmuje unoszenie tam, gdzie stanął. `none` cofnęłoby go do
+   klatki zerowej, czyli do skoku w tej samej chwili, w której czytelnik patrzy na kartę. */
+.prizes.is-offscreen .prize-card__art svg { animation-play-state: paused; }
 
 @media (prefers-reduced-motion: reduce) {
   .prize-card { transition: none; }
@@ -3289,6 +3301,143 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
    nadpisanie działa bez `!important`.
    ============================================================ */
 .card-stack.is-offscreen .stack-card { will-change: auto; }
+
+/* ============================================================
+   ZIARNO NA CAŁYM EKRANIE — CZWARTA POZYCJA NA TYM SAMYM RACHUNKU PAMIĘCI,
+   I NA TELEFONIE NAJDROŻSZA Z DOTYCHCZASOWYCH.
+   ============================================================
+   OBJAW
+     „Strona na telefonie sama się odświeża w okolicy sekcji dwunastu nagród." Sonda błędów
+     przechodzi tę okolicę bez wyjątku, bez odrzuconej obietnicy i bez spadku liczby klatek
+     (36 klatek na 600 ms w każdym punkcie pomiaru), więc nie ma tu awarii JavaScriptu. Zostaje
+     jedno wyjaśnienie: przeglądarka mobilna ubija proces renderujący z braku pamięci i wczytuje
+     dokument od nowa. To nie zostawia śladu w konsoli, więc mierzalne jest tylko ZUŻYCIE.
+
+   CO TU BYŁO, ZMIERZONE
+     `.noise` (main.css) to nakładka `position: fixed; inset: 0` z `mix-blend-mode: multiply`
+     i szumem w tle. Pomiar sondą tools/probe-c-prizes-memory.js na 390x844, w punkcie „sekcja
+     nagrod w widoku":
+
+       elementów z `mix-blend-mode` innym niż `normal`:   1   <- to jest właśnie `.noise`
+       jego pudełko:                                     390x844 = 329 160 px2 (0,33 Mpx)
+       cała powierzchnia warstw `position: fixed`:        0,50 Mpx, z czego `.noise` to 0,33
+
+     Czyli JEDEN element to dwie trzecie powierzchni wszystkich warstw przypiętych do ekranu i
+     całe 100% mieszania na stronie.
+
+   DLACZEGO MIESZANIE JEST DROŻSZE, NIŻ WYGLĄDA
+     `mix-blend-mode` znaczy: „policz mnie z tym, co jest pode mną". Przeglądarka musi więc mieć
+     TO, CO POD SPODEM, jako gotową teksturę — czyli do warstwy nakładki dochodzi druga,
+     odczytana wstecz z tła, i to przy każdej klatce, w której cokolwiek się rusza. Na stronie o
+     czternastu przypiętych sekcjach „cokolwiek się rusza" znaczy zawsze, a nakładka jest
+     `fixed`, więc jej rachunek nie schodzi z ekranu nigdy.
+
+     Sonda mierzy przy `deviceScaleFactor: 1`. Telefon ma 3, a tekstura rośnie z kwadratem:
+     390x844 px CSS to 1170x2532 px urządzenia, czyli 2,96 Mpx po 4 bajty = ~11,8 MB na samą
+     nakładkę i tyle samo na odczytane tło. Około 24 MB pamięci graficznej za ziarno o
+     `opacity: .045`, którego przy trzykrotnej gęstości pikseli nie widać.
+
+   CO ZAMIAST
+     Poniżej 760 px ziarna nie ma wcale. Nie ma czym go zastąpić i nie ma po co — to jedyny
+     element na tej stronie, który nic nie komunikuje ani nie prowadzi, a kosztuje najwięcej.
+
+   TYLKO PONIŻEJ 760 px
+     Na pulpicie ziarno jest widoczne (gęstość pikseli 1-2), pamięci jest dość i jest częścią
+     wyglądu tej strony. Zabranie go tam byłoby stratą bez powodu.
+   ============================================================ */
+@media (max-width: 760px) {
+  .noise { display: none; }
+}
+
+/* ============================================================
+   SZÓSTE ROZMYCIE TŁA, KTÓREGO TAMTA LISTA NIE OBJĘŁA: BANNER COOKIE.
+   ============================================================
+   Blok „Telefon: rozmycie tła znika tam, gdzie kosztuje przy każdej klatce" (wyżej w tym
+   arkuszu) wymienia pięć elementów widocznych przez cały czas i zdejmuje im `backdrop-filter`.
+   Banner cookie nie wszedł na tamtą listę, bo został policzony jako „okno, które jest
+   zamknięte". Pomiar mówi coś innego.
+
+   ZMIERZONE, tools/probe-c-prizes-memory.js na 390x844, punkt „sekcja nagrod w widoku",
+   wejście na stronę bez wcześniejszej zgody, czyli dokładnie ta wizyta, w której zgłaszane jest
+   przeładowanie:
+
+     elementów z `backdrop-filter` innym niż `none`:      3
+     z tego o niezerowym pudełku:                         1  -> aside.cookie-banner 370x375
+     powierzchnia tego jednego:                           138 750 px2 (0,14 Mpx)
+     powierzchnia dwóch pozostałych:                      0x0 (zamknięty lightbox i modal)
+
+   Czyli po naprawach z bloków wyżej banner jest JEDYNYM widocznym rozmyciem tła na telefonie i
+   odpowiada za 100% tego rachunku. Jest `position: fixed`, więc trwa przez całe przewijanie — a
+   `backdrop-filter: blur(16px)` znaczy odczyt i rozmycie tego, co pod nim, w każdej klatce, w
+   której przesuwa się którakolwiek z przypiętych sekcji.
+
+   CO ZAMIAST, I DLACZEGO WYGLĄDA TAK SAMO
+     Tło bannera to już `rgba(7, 26, 61, .96)` (main.css). Przy nieprzezroczystości 96% rozmycie
+     dokłada do każdego piksela cztery procent — to jest różnica, której nie widać, płacona
+     warstwą, którą widać w pomiarze. Tło idzie na .985, żeby te cztery procent nie zrobiły się
+     smugą tam, gdzie pod bannerem leży jasne zdjęcie.
+
+   TYLKO PONIŻEJ 760 px, z tego samego powodu co lista wyżej.
+   ============================================================ */
+@media (max-width: 760px) {
+  .cookie-banner {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: rgba(7, 26, 61, .985);
+  }
+}
+
+/* ============================================================
+   HERO POZA WIDOKIEM PRZESTAJE SIĘ ANIMOWAĆ — PIĄTA POZYCJA RACHUNKU I OSTATNIA,
+   KTÓRA TRWA PRZEZ CAŁĄ WIZYTĘ.
+   ============================================================
+   Klasę `is-offscreen` zakłada i zdejmuje obserwator widoczności w `setupHeroAmbient()`
+   (app.js) — pełny powód i uzasadnienie `rootMargin` stoją tam. Tu liczby i to, co z nich
+   wynika dla arkusza.
+
+   ZMIERZONE, tools/probe-c-prizes-memory.js oraz osobny przebieg liczący animacje po nazwie
+   (390x844, ekran ustawiony na sekcji nagród, scrollY 7324, trzy próbki: 1,4 s / 3 s / 6 s):
+
+     animacji `running` w 1,4 s po dojściu do sekcji:   180  (162 poza ekranem)
+     w 3 s i w 6 s:                                      16  (wszystkie nieskończone)
+     z tych 16 poza ekranem, w hero:                      4
+       float-orb  @ section.hero          390x869 = 338 892 px2
+       marquee    @ div.marquee__track   2108x24  =  50 598 px2
+       fx-jitter  @ span.fx-jitter        119x44  =   5 088 px2
+       spin       @ span.hero__kicker-dot  30x30  =   1 030 px2
+     suma:                                              395 608 px2 (0,40 Mpx)
+
+   Czyli w stanie spokoju, gdy czytelnik stoi w talii nagród, jedna czwarta wszystkich
+   działających animacji należy do sekcji, która została kilka tysięcy pikseli wyżej — a
+   `float-orb` animuje pudełko wielkości CAŁEGO hero (0,34 Mpx z tych 0,40). Trwająca animacja
+   transformacji dostaje w Chrome własną warstwę kompozytora i przelicza ją w każdej klatce, a
+   nieskończona nie kończy się nigdy: to jest pamięć i praca GPU wydawana do końca wizyty za
+   ruch, którego nikt nie widzi.
+
+   `animation-play-state: paused`, NIE `animation: none`
+     Pauza zachowuje fazę. Marquee wraca tam, gdzie stanął, a nie do klatki zerowej — inaczej
+     powrót na górę strony pokazywałby przeskok napisu. Nic z tego nie jest widoczne w chwili
+     pauzy (element jest poza ekranem), więc jedyne, co może być widoczne, to właśnie moment
+     powrotu, i o niego tu chodzi.
+
+   `*`, A NIE LISTA CZTERECH SELEKTORÓW
+     Lista zestarzałaby się przy pierwszej nowej ozdobie w hero i nikt by o niej nie pamiętał.
+     Reguła mówi to, co ma znaczyć: w hero, którego nie ma na ekranie, nic się nie rusza.
+
+   `::before` I `::after` WYPISANE OSOBNO, BO `*` ICH NIE OBEJMUJE
+     I to nie jest drobiazg: NAJDROŻSZA z czterech animacji siedzi właśnie na pseudoelemencie.
+     `float-orb` jest nadana `.hero::before` (main.css), czyli plamie tła wielkości 390x869 px.
+     Pierwsza wersja tej reguły miała tylko `.section-card--hero.is-offscreen *` i pomiar to
+     złapał: sonda dalej pokazywała `float-orb @ section.hero` jako działającą animację w każdym
+     z pięciu punktów pomiaru, a 0,34 Mpx z 0,40 Mpx zostawało nietknięte. Selektor
+     uniwersalny dopasowuje wyłącznie prawdziwe elementy — pseudoelement trzeba nazwać.
+   ============================================================ */
+.section-card--hero.is-offscreen,
+.section-card--hero.is-offscreen::before,
+.section-card--hero.is-offscreen::after,
+.section-card--hero.is-offscreen *,
+.section-card--hero.is-offscreen *::before,
+.section-card--hero.is-offscreen *::after { animation-play-state: paused; }
 
 /* ============================================================
    18b. Dolny dok — hierarchia i wejście

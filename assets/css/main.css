@@ -221,6 +221,16 @@ img, svg { display: block; max-width: 100%; }
 }
 .skip-link:focus { transform: none; }
 
+/* Ziarno na całym ekranie — NA TELEFONIE TEGO NIE MA, i to nie jest przypadek.
+   ---------------------------------------------------------------------------
+   `position: fixed` przez całą wizytę plus `mix-blend-mode: multiply` znaczy dwie warstwy
+   kompozytora wielkości ekranu (nakładka i odczytane wstecz tło), przeliczane w każdej klatce,
+   w której cokolwiek się rusza — a przy czternastu przypiętych sekcjach rusza się zawsze.
+   Zmierzone na 390x844: 329 160 px2, czyli dwie trzecie powierzchni wszystkich warstw `fixed`
+   na stronie i całe 100% mieszania. Przy gęstości pikseli telefonu to ~24 MB pamięci graficznej
+   za ziarno o `opacity: .045`, którego na takim ekranie nie widać.
+   Wyłączenie poniżej 760 px, razem z pełnym pomiarem i uzasadnieniem, stoi w carnival.css
+   („ZIARNO NA CAŁYM EKRANIE — CZWARTA POZYCJA NA TYM SAMYM RACHUNKU PAMIĘCI"). */
 .noise {
   position: fixed;
   inset: 0;
@@ -1163,6 +1173,9 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .modal__form.is-hidden { display: none; }
 .success-check { display: grid; width: 100px; height: 100px; margin: 0 auto 24px; place-items: center; border-radius: 50%; background: var(--green); color: var(--white); font-size: 50px; animation: pop .65s var(--ease-snap) both; }
 
+/* Rozmycie tła bannera schodzi poniżej 760 px — zmierzone 370x375 px warstwy kompozytora
+   trwającej przez całą pierwszą wizytę, czyli tę, w której zgłaszane jest przeładowanie karty.
+   Pomiar i uzasadnienie w carnival.css („SZÓSTE ROZMYCIE TŁA, KTÓREGO TAMTA LISTA NIE OBJĘŁA"). */
 .cookie-banner { position: fixed; z-index: 1050; right: 18px; bottom: 18px; display: none; width: min(470px,calc(100vw - 36px)); padding: 24px; border: 1px solid rgba(255,255,255,.2); border-radius: 27px; background: rgba(7,26,61,.96); color: var(--white); box-shadow: 0 25px 80px rgba(7,26,61,.42); backdrop-filter: blur(16px); animation: cookie-in .65s var(--ease-out) both; }
 .cookie-banner.is-visible { display: block; }
 .cookie-banner h2 { margin: 0 0 9px; font-family: var(--font-display); font-size: 23px; font-weight: 400; }

@@ -331,11 +331,11 @@ export function Chat({
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
+              <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
                 <button
                   type="button"
                   onClick={() => setActive(null)}
-                  className="lg:hidden mr-1 rounded-full bg-white/10 p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
+                  className="lg:hidden shrink-0 mr-1 rounded-full bg-white/10 p-1.5 text-white/70 hover:bg-white/20 hover:text-white"
                   aria-label="Wróć do listy"
                 >
                   <ArrowLeft className="size-4" />
@@ -351,7 +351,7 @@ export function Chat({
 
                 <span
                   className={cn(
-                    'rounded-full px-2.5 py-1 text-[11px] font-bold',
+                    'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold',
                     current.mode === 'human'
                       ? 'bg-coral/20 text-coral'
                       : current.mode === 'closed'
@@ -370,7 +370,7 @@ export function Chat({
                   <button
                     type="button"
                     onClick={() => changeMode('human')}
-                    className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/70 hover:border-white/50 hover:text-white"
+                    className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/70 hover:border-white/50 hover:text-white"
                   >
                     {t('chat.reopen')}
                   </button>
@@ -379,14 +379,14 @@ export function Chat({
                     <button
                       type="button"
                       onClick={() => changeMode('ai')}
-                      className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/70 hover:border-white/50 hover:text-white"
+                      className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/70 hover:border-white/50 hover:text-white"
                     >
                       {t('chat.handBack')}
                     </button>
                     <button
                       type="button"
                       onClick={() => changeMode('closed')}
-                      className="rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/70 hover:border-white/50 hover:text-white"
+                      className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-[11px] font-semibold text-white/70 hover:border-white/50 hover:text-white"
                     >
                       {t('chat.close')}
                     </button>

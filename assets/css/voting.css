@@ -968,7 +968,7 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 /* Pierścienie zamiast obwódki kafelka. `box-shadow` z zerowym rozmyciem, nie `border`:
    obramowanie zmieniłoby pudełko zdjęcia i przesunęło kadr o dwa piksele przy każdej zmianie
    stanu. */
-.vote-card.is-voted .vote-card__photo { box-shadow: 0 0 0 3px #1fa971, 0 18px 34px -24px rgb(0 0 0 / .7); }
+/* .vote-card.is-voted photo box-shadow moved to the end of file for priority */
 .vote-card__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vote-card__blank {
   display: grid; width: 100%; height: 100%; place-items: center;
@@ -992,12 +992,7 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 }
 /* Plakietka „twój głos" na zdjęciu, na dole: kafelek z oddanym głosem ma być rozpoznawalny z
    odległości rzutu okiem po siatce, a nie po przeczytaniu podpisu. */
-.vote-card__mine {
-  position: absolute; right: 8px; bottom: 8px;
-  padding: 5px 10px; border-radius: 999px;
-  background: #1fa971; color: var(--white);
-  font: 900 9.5px/1 var(--font-meta); letter-spacing: .1em; text-transform: uppercase;
-}
+/* .vote-card__mine moved to the end of file for priority */
 
 /* Trzy pierwsze miejsca po zamknięciu: pierścień wokół zdjęcia w kolorze medalu. */
 .vote-card.is-place-1 .vote-card__photo { box-shadow: 0 0 0 3px #e9a11b, 0 20px 38px -22px rgb(233 161 27 / .75); }
@@ -1592,10 +1587,23 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    ekran. Rozpoznawalność niesie zielony pierścień wokół ZDJĘCIA (`.vote-card.is-voted
    .vote-card__photo` wyżej) — ten sam, który był tam od początku. */
 .vote-card.is-voted {
-  border-color: #1fa971;
+  border-color: var(--coral, #ee625f);
   background:
-    linear-gradient(165deg, rgb(31 169 113 / .22), rgb(31 169 113 / .1)),
-    rgb(255 255 255 / .8);
+    linear-gradient(165deg, rgb(238 98 95 / .22), rgb(238 98 95 / .1)),
+    rgb(255 255 255 / .9);
+  box-shadow: 0 0 0 3px var(--coral, #ee625f), 0 16px 32px rgb(238 98 95 / .25);
+  transform: translateY(-4px);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.vote-card.is-voted .vote-card__photo {
+  box-shadow: 0 0 0 4px var(--coral, #ee625f), 0 18px 34px -24px rgb(0 0 0 / .7);
+}
+.vote-card__mine {
+  position: absolute; right: 8px; bottom: 8px;
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--coral, #ee625f); color: var(--white);
+  font: 900 12px/1 var(--font-meta); letter-spacing: .1em; text-transform: uppercase;
+  box-shadow: 0 4px 12px rgb(238 98 95 / .5);
 }
 .vote-card__number { border: 2px solid #fff; }
 .vote-card__body { padding: 16px; }
@@ -2197,10 +2205,18 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
      w treści — bez ramki tęczowe tło rozlewałoby się w akapit. */
   border: 3px solid var(--navy-950);
   border-radius: clamp(14px, 1.8vw, 20px);
-  background: linear-gradient(100deg, #ffd75e, #ff83ae 42%, #8d76ff 82%);
+  background: linear-gradient(100deg, #ffd75e, #ff83ae, #8d76ff, #37c9a5, #ffd75e);
+  background-size: 400% 400%;
   color: var(--navy-950);
   text-align: center;
-  box-shadow: 5px 5px 0 rgb(7 26 61 / .18);
+  box-shadow: 0 12px 32px rgb(7 26 61 / .15);
+  justify-self: center;
+  animation: vote-timer-bg 8s ease infinite;
+}
+@keyframes vote-timer-bg {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 .vote-timer[hidden] { display: none; }
 .vote-timer__label {
@@ -2344,10 +2360,12 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   display: grid;
   place-items: center;
   /* Wypisane WPROST, mimo że `place-items: center` wyżej wygląda, jakby już to mówiło.
-     Nie mówi: o położeniu pigułki w wysokim kadrze decyduje `align-content` (rozkład ścieżki
-     wiersza w siatce), a nie `align-items` (rozkład elementu w ścieżce). Bez tej deklaracji
-     nadpisania niżej — `[data-pill]` — nie miałyby czego nadpisać i pigułka zostawałaby na
-     środku, czyli pod palcem. Patrz komentarz przy `[data-pill]`. */
+     Nie mówi: o położeniu ścieżki wiersza w wysokim kadrze decyduje `align-content`, a
+     `align-items` rozkłada tylko element W ścieżce. Trzymane tu jedną deklaracją na WSPÓLNYM
+     rodzicu, bo pigułka i wyrastający z niej rząd ocen muszą stać w tym samym miejscu kadru —
+     inaczej „rozsuwanie się z guzika" (animacja `vote-morph` niżej) zamieni się w przyjazd
+     drugiego pudełka skądinąd. Pozycjonowanie bezwzględne na samej pigułce rozjechałoby się
+     z suwakiem przy pierwszej zmianie jego wysokości. */
   align-content: center;
   padding: 10px;
   /* Przygaszenie od dołu mocniejsze, bo tam leży podpis — biały tekst musi trzymać kontrast
@@ -2389,32 +2407,46 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    w voting-page.js) i zostawiała dwa dotknięcia. Ta zmiana usuwa PRZYCZYNĘ, a nie skutek:
    pigułka jest widoczna, zanim ktokolwiek dotknie zdjęcia, więc pierwsze dotknięcie trafia
    w widoczny przycisk i cała arytmetyka „w której połowie kadru wylądował palec" przestaje
-   mieć po co istnieć. Razem z nią zniknęły reguły `[data-pill]` — kto je będzie przywracał,
-   niech najpierw sprawdzi, czy pigułka znowu nie jest ukryta.
+   mieć po co istnieć. Razem z nią zniknęły reguły `.vote-veil[data-pill='top'|'bottom']` —
+   kto je będzie przywracał, niech najpierw sprawdzi, czy pigułka znowu nie jest ukryta,
+   bo tylko wtedy miały sens.
 
-   DLACZEGO NA DOLE KADRU, A NIE NA ŚRODKU
+   DLACZEGO NA ŚRODKU KADRU, A NIE NA DOLE PRZY KCIUKU
    ---------------------------------------------------------------------------
-   Środek zdjęcia to wóz, po który ktoś tu przyszedł — pigułka zasłaniałaby na stałe dokładnie
-   to, co ma pomóc ocenić. Dół kadru jest wolny (podpis stoi POD zdjęciem, nie na nim), jest
-   bliżej kciuka i ma naturalne przygaszenie, na którym żółta pigułka czyta się jak podpis
-   zdjęcia, a nie jak plama. Rząd ocen wyrasta potem TĄ SAMĄ krawędzią — `align-content: end`
-   ustawia w jednej własności i pigułkę, i suwak, więc „rozsuwanie się z guzika"
-   (animacja `vote-morph` niżej) zostaje rozsuwaniem, a nie przyjazdem pudełka skądinąd.
+   Dół kadru jest zajęty, i to treścią, po którą ktoś tu przyszedł: podpis zdjęcia
+   (`.vote-card__caption`) stoi `bottom: 12px` NA zdjęciu i niesie plakietkę z imieniem, nazwę
+   wozu i wiersz „nazwisko · kategoria". ZMIERZONE sondą probe-voting-mobile.mjs na 390×844:
+   podpis zajmuje dolne 89 px kadru 173 px, czyli ponad połowę. Pigułka 44 px postawiona przy
+   dolnej krawędzi wylądowałaby więc na NAZWIE WOZU — jedynym miejscu, w którym ta nazwa jest,
+   a głosuje się właśnie na nią. Górna krawędź też jest zajęta: w narożniku stoi numer startowy
+   (`.vote-card__number`).
+
+   Środek jest jedynym miejscem, które zostaje — i jest przy tym dokładnie tym miejscem, w
+   którym pigułkę pokazuje mysz. Jedno położenie dla obu wskaźników znaczy, że rząd ocen
+   wyrasta stamtąd samo (`place-items: center`, bez żadnego nadpisania), a pigułka nie
+   przeskakuje między urządzeniami.
+
+   CO ŚRODEK KOSZTUJE, ZMIERZONE: pigułka nachodzi na podpis 25 px, a na nazwę wozu 0 px —
+   zakrywa więc plakietkę z imieniem, i tylko ją. To samo imię stoi w wierszu pod nazwą wozu,
+   więc nic z kafelka nie ginie. Sonda pilnuje tego warunkiem „pigułka nie zakrywa nazwy wozu":
+   kto przesunie pigułkę niżej albo ją rozciągnie, dowie się o tym z pomiaru, a nie ze
+   zgłoszenia „nie widać, na co głosuję".
 
    KONTRAST: PRZYGASZENIE POD NAPISEM, NIE SAM NAPIS NA FOTOGRAFII
    ---------------------------------------------------------------------------
    Biały tekst rzucony na fotografię jest czytelny na jednym zdjęciu i niewidoczny na drugim.
-   Pigułka niesie własne tło: żółte wypełnienie (#ffc928) z granatowym napisem (#071a3d) daje
-   kontrast 11.1:1 NIEZALEŻNIE od zdjęcia pod nią, a leżące pod nią przygaszenie odcina ją od
-   szczegółów fotografii i domyka trzypikselową obwódkę. Gradient jest przy tym SŁABSZY niż
-   przy odsłoniętej nakładce i sięga tylko dolnej części kadru: siatka ma nadal wyglądać jak
-   galeria wozów, a nie jak dwie kolumny przygaszonych prostokątów. */
+   Pigułka niesie więc własne tło: żółte wypełnienie (#ffc928) z granatowym napisem (#071a3d)
+   daje kontrast 11.1:1 NIEZALEŻNIE od tego, co jest pod nią. Do tego przygaszenie ułożone
+   PASEM PRZEZ ŚRODEK kadru — tam, gdzie stoi pigułka — które odcina jej obwódkę od szczegółów
+   zdjęcia. Pas, a nie równe przyciemnienie całego kadru: siatka ma nadal wyglądać jak galeria
+   wozów, a nie jak dwie kolumny przygaszonych prostokątów, więc narożniki zostają czyste.
+   Pełne przygaszenie wchodzi dopiero po dotknięciu, razem z rzędem ocen. */
 @media (hover: none) {
   .vote-veil {
     opacity: 1;
-    align-content: end;
     background: linear-gradient(180deg,
-      transparent 30%, rgb(7 26 61 / .24) 54%, rgb(7 26 61 / .74) 100%);
+      transparent 6%, rgb(7 26 61 / .16) 24%, rgb(7 26 61 / .56) 50%,
+      rgb(7 26 61 / .16) 76%, transparent 94%);
     /* WYPISANE WPROST, mimo że tak samo brzmi wartość domyślna wyżej.
        Nakładka jest tu WIDOCZNA, a widoczna warstwa na całym zdjęciu wygląda, jakby miała
        łapać dotknięcia — i nie może, bo w spoczynku celem jest `.vote-card__hit` pod nią
@@ -2519,8 +2551,8 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 .vote-veil__cancel:focus-visible { outline: 3px solid var(--blue-600); outline-offset: 2px; }
 
 /* Reguły `.vote-card__hit` stoją wyżej, w sekcji kafelka — tutaj zostaje tylko to, czego tam
-   nie było: przycisk musi dać się schować, gdy nakładka jest już odsłonięta, żeby następne
-   dotknięcie trafiło w „Zagłosuj", a nie znowu w warstwę nad nim. */
+   nie było: przycisk musi dać się schować, gdy na zdjęciu stoi już rząd ocen, żeby następne
+   dotknięcie trafiło w suwak i w „Wyślij głos", a nie w warstwę nad nimi. */
 .vote-card__hit[hidden] { display: none; }
 
 /* Kafelek z odsłoniętą nakładką jest wyraźnie wybrany, a nie po prostu przygaszony. */
@@ -2555,7 +2587,10 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
      — „zamknij" przenosi się do narożnika zdjęcia jako okrągły cel 44×44 px, więc nie
        zabiera już wysokości wierszowi z przyciskiem wysyłki.
 
-   Po zmianie okno oceny ma 158 px w kadrze 173 px — mieści się w całości, bez obcinania.
+   Po zmianie okno oceny ma 172 px w kadrze 173 px — mieści się w całości, bez obcinania, i to
+   jest ZMIERZONE ponownie po przejściu na widoczną pigułkę (sonda probe-voting-mobile.mjs,
+   „krok 2: … mieszczą się w kadrze zdjęcia"). Zapas to jeden piksel, więc reguła
+   `.vote-card.is-picking .vote-card__photo { overflow: visible }` niżej nie jest ozdobą.
    `display: contents` na wierszu suwaka: to on trzymał suwak i liczbę obok siebie, a tutaj oba
    mają stanąć w innych miejscach siatki. Znika z układu, nie z drzewa — więc żadna zmiana
    w JavaScripcie nie jest do tego potrzebna. */
@@ -2604,8 +2639,8 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
   }
 
   /* Zdjęcie przestaje obcinać DOKŁADNIE w chwili, gdy stoi na nim wybór oceny.
-     Układ wyżej mieści się w kadrze z zapasem (zmierzone: 168 px w 173 px), ale zapas jest
-     mały, a napis na przycisku wysyłki bywa dłuższy w innym języku. Bez tego zabezpieczenia
+     Układ wyżej mieści się w kadrze (ZMIERZONE: 172 px w 173 px), ale zapas to jeden piksel,
+     a napis na przycisku wysyłki bywa dłuższy w innym języku. Bez tego zabezpieczenia
      jedno zawinięcie wyrazu wystarczyłoby, żeby wysyłka znowu wyjechała pod krawędź i przestała
      przyjmować dotknięcia — czyli żeby wróciła naprawiana tu usterka.
      Obwódka zdjęcia wędruje na sam obrazek, bo do tej pory zaokrąglenie robiło właśnie
@@ -3010,14 +3045,12 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    pole, gdyby siatka miała się układać sama. */
 @media (min-width: 701px) {
   .vote-head {
-    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: clamp(18px, 3vw, 40px);
+    text-align: center;
   }
-  .vote-head > .eyebrow { grid-column: 1; grid-row: 1; }
-  .vote-head > h1 { grid-column: 1; grid-row: 2; }
-  .vote-head > .lead { grid-column: 1; grid-row: 3; }
-  .vote-head > .vote-timer { grid-column: 2; grid-row: 1 / -1; margin: 0; align-self: center; }
+  .vote-head > .lead {
+    margin: 0 auto;
+  }
 }
 
 /* ===========================================================================

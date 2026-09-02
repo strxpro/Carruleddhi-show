@@ -32,6 +32,8 @@ export function ActionButton({
   reason,
   tone,
   icon,
+  confirmLabel,
+  confirmTone,
   onPress
 }: {
   label: string;
