@@ -6,1164 +6,1542 @@
 export const FORM_FIELDS = {
  "Carruleddhi-modulo-it": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 774.67,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 793.42,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 694.1,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 704.6,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 694.1,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 704.6,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 661.72,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 672.22,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 661.72,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 672.22,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 629.34,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 639.84,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 629.34,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 639.84,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 570.59,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 581.09,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 570.59,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 581.09,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 538.21,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 548.71,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 538.21,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 548.71,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-minori-it": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 777.31,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 775.61,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 789.86,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 728.31,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 737.79,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 714,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 723.86,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 699.69,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 709.55,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 685.38,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 695.24,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 671.07,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 680.93,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 638.52,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 648,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 624.21,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 634.07,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 609.9,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 619.76,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 595.59,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 605.45,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 581.29,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 591.14,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 566.98,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 576.83,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 516.96,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 526.44,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 502.65,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 512.51,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 488.34,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 498.2,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 474.04,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 483.89,
+   "frameH": 14.31
   }
  },
  "Carruleddhi-modulo-pl": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 734.13,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 752.88,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 653.55,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 653.55,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 621.17,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 588.79,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 588.79,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 530.04,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 530.04,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 497.67,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 497.67,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-minori-pl": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 751.47,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 749.77,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 764.02,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 702.47,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 711.95,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 688.16,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 698.02,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 673.85,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 683.71,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 659.54,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 669.4,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 645.23,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 655.09,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 612.68,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 622.16,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 598.37,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 608.23,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 584.06,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 593.92,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 569.75,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 579.61,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 555.45,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 565.3,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 541.14,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 550.99,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 491.12,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 500.6,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 476.81,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 486.67,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 462.5,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 472.36,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 448.2,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 458.05,
+   "frameH": 14.31
   }
  },
  "Carruleddhi-modulo-en": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 734.13,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 752.88,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 653.55,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 653.55,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 621.17,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 588.79,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 588.79,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 530.04,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 530.04,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 497.67,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 497.67,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-minori-en": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 751.47,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 749.77,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 764.02,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 702.47,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 711.95,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 688.16,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 698.02,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 673.85,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 683.71,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 659.54,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 669.4,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 645.23,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 655.09,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 612.68,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 622.16,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 598.37,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 608.23,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 584.06,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 593.92,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 569.75,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 579.61,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 555.45,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 565.3,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 541.14,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 550.99,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 491.12,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 500.6,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 476.81,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 486.67,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 462.5,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 472.36,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 448.2,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 458.05,
+   "frameH": 14.31
   }
  },
  "Carruleddhi-modulo-de": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 722.07,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 740.82,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 641.49,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 651.99,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 641.49,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 651.99,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 609.11,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 619.61,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 609.11,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 619.61,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 576.73,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 587.23,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 576.73,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 587.23,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 517.99,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 528.49,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 517.99,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 528.49,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 485.61,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 496.11,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 485.61,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 496.11,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-minori-de": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 741.27,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 739.57,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 753.82,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 692.27,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 701.75,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 677.97,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 687.82,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 663.66,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 673.51,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 649.35,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 659.2,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 635.04,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 644.89,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 602.48,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 611.97,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 588.18,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 598.03,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 573.87,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 583.72,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 559.56,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 569.41,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 545.25,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 555.11,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 530.94,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 540.8,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 480.93,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 490.41,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 466.62,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 476.47,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 452.31,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 462.16,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 438,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 447.86,
+   "frameH": 14.31
   }
  },
  "Carruleddhi-modulo-es": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 734.13,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 752.88,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 653.55,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 653.55,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 621.17,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 588.79,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 588.79,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 530.04,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 530.04,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 497.67,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 497.67,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-minori-es": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 741.27,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 739.57,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 753.82,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 692.27,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 701.75,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 677.97,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 687.82,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 663.66,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 673.51,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 649.35,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 659.2,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 635.04,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 644.89,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 602.48,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 611.97,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 588.18,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 598.03,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 573.87,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 583.72,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 559.56,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 569.41,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 545.25,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 555.11,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 530.94,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 540.8,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 480.93,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 490.41,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 466.62,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 476.47,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 452.31,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 462.16,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 438,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 447.86,
+   "frameH": 14.31
   }
  },
  "Carruleddhi-modulo-fr": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 734.13,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 752.88,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 653.55,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 653.55,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 664.05,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 621.17,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 631.67,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 588.79,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 588.79,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 599.29,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 530.04,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 530.04,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 540.54,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 497.67,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 497.67,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 508.17,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-minori-fr": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 751.47,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 749.77,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 764.02,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 702.47,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 711.95,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 688.16,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 698.02,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 673.85,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 683.71,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 659.54,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 669.4,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 645.23,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 655.09,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 612.68,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 622.16,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 598.37,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 608.23,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 584.06,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 593.92,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 569.75,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 579.61,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 555.45,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 565.3,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 541.14,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 550.99,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 491.12,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 500.6,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 476.81,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 486.67,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 462.5,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 472.36,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 448.2,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 458.05,
+   "frameH": 14.31
   }
  },
  "Carruleddhi-modulo": {
   "RACE_NUMBER": {
-   "x": 509.35,
+   "x": 497.56,
    "y": 774.67,
-   "width": 36.25,
-   "size": 21
+   "width": 53.71,
+   "size": 21,
+   "frameY": 793.42,
+   "frameH": 21
   },
   "FULL_NAME": {
    "x": 34.02,
    "y": 694.1,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 704.6,
+   "frameH": 13.39
   },
   "BIRTH_DATE": {
    "x": 308.97,
    "y": 694.1,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 704.6,
+   "frameH": 13.39
   },
   "POSTAL_CODE": {
    "x": 34.02,
    "y": 661.72,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 672.22,
+   "frameH": 13.39
   },
   "PHONE": {
    "x": 308.97,
    "y": 661.72,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 672.22,
+   "frameH": 13.39
   },
   "EMAIL": {
    "x": 34.02,
    "y": 629.34,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 639.84,
+   "frameH": 13.39
   },
   "ADDRESS": {
    "x": 308.97,
    "y": 629.34,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 639.84,
+   "frameH": 13.39
   },
   "CART_NAME": {
    "x": 34.02,
    "y": 570.59,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 581.09,
+   "frameH": 13.39
   },
   "CATEGORY": {
    "x": 308.97,
    "y": 570.59,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 581.09,
+   "frameH": 13.39
   },
   "TEAM": {
    "x": 34.02,
    "y": 538.21,
    "width": 252.28,
-   "size": 10
+   "size": 10,
+   "frameY": 548.71,
+   "frameH": 13.39
   },
   "CART_NOTES": {
    "x": 308.97,
    "y": 538.21,
    "width": 252.29,
-   "size": 10
+   "size": 10,
+   "frameY": 548.71,
+   "frameH": 13.39
   }
  },
  "Carruleddhi-modulo-minori": {
   "RACE_NUMBER": {
-   "x": 522.42,
-   "y": 777.31,
-   "width": 28.76,
-   "size": 16
+   "x": 508.82,
+   "y": 775.61,
+   "width": 48.04,
+   "size": 16,
+   "frameY": 789.86,
+   "frameH": 16
   },
   "FULL_NAME": {
    "x": 153.07,
    "y": 728.31,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 737.79,
+   "frameH": 13.93
   },
   "BIRTH_DATE": {
    "x": 153.07,
    "y": 714,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 723.86,
+   "frameH": 14.31
   },
   "RIDER_AGE": {
    "x": 153.07,
    "y": 699.69,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 709.55,
+   "frameH": 14.31
   },
   "POSTAL_CODE": {
    "x": 153.07,
    "y": 685.38,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 695.24,
+   "frameH": 14.31
   },
   "ADDRESS": {
    "x": 153.07,
    "y": 671.07,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 680.93,
+   "frameH": 14.31
   },
   "GUARDIAN_NAME": {
    "x": 153.07,
    "y": 638.52,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 648,
+   "frameH": 13.93
   },
   "GUARDIAN_RELATION": {
    "x": 153.07,
    "y": 624.21,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 634.07,
+   "frameH": 14.31
   },
   "GUARDIAN_EMAIL": {
    "x": 153.07,
    "y": 609.9,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 619.76,
+   "frameH": 14.31
   },
   "GUARDIAN_PHONE": {
    "x": 153.07,
    "y": 595.59,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 605.45,
+   "frameH": 14.31
   },
   "MOTHER_NAME": {
    "x": 153.07,
    "y": 581.29,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 591.14,
+   "frameH": 14.31
   },
   "FATHER_NAME": {
    "x": 153.07,
    "y": 566.98,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 576.83,
+   "frameH": 14.31
   },
   "CART_NAME": {
    "x": 153.07,
    "y": 516.96,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 526.44,
+   "frameH": 13.93
   },
   "CATEGORY": {
    "x": 153.07,
    "y": 502.65,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 512.51,
+   "frameH": 14.31
   },
   "TEAM": {
    "x": 153.07,
    "y": 488.34,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 498.2,
+   "frameH": 14.31
   },
   "CART_NOTES": {
    "x": 153.07,
    "y": 474.04,
    "width": 413.78,
-   "size": 8
+   "size": 8,
+   "frameY": 483.89,
+   "frameH": 14.31
   }
  }
 };

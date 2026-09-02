@@ -61,7 +61,22 @@
   .head__event { font-size: 7.5pt; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
   .head__title { margin: 1mm 0 0; font-size: 17pt; font-weight: 900; letter-spacing: -.4pt; line-height: 1.05; }
   .head__meta { margin: 1mm 0 0; font-size: 9pt; color: #45577a; }
-  .num { flex: none; padding: 2.5mm 5mm; border: 1.6pt solid #071a3d; border-radius: 2.5mm; text-align: center; }
+  /* STALA SZEROKOSC, BO INACZEJ PUSTY FORMULARZ MA INNA RAMKE NIZ ZMIERZONY WZORZEC.
+     ---------------------------------------------------------------------------
+     `.num` jest elementem `flex: none`, czyli dopasowuje sie do zawartosci. Mapa pol
+     (worker/form-fields.js) mierzona jest na WZORCU, w ktorym stoi „039"; tekst dopisujemy
+     pozniej na PUSTYM formularzu, w ktorym stoja trzy twarde spacje — wezsze od cyfr. Ramka
+     w pliku byla wiec wezsza i przesunieta wzgledem tej, ktora zmierzyl generator.
+
+     Zmierzone ramka debugowa narysowana na gotowym PDF: komorka z mapy zaczynala sie 3,9 pt
+     na lewo od prawdziwej krawedzi i miala 36,25 pt zamiast okolo 19 pt. Skutek widziany na
+     wydruku: numer przyklejony do lewej krawedzi kwadratu i wychodzacy poza nia.
+
+     Stala szerokosc znosi zaleznosc od tresci: wzorzec i pusty formularz maja teraz ten sam
+     kwadrat, wiec zmierzone wspolrzedne pasuja do miejsca, w ktorym naprawde rysujemy. Przy
+     okazji numer jedno-, dwu- i trzycyfrowy dostaje kwadrat tej samej wielkosci, co na
+     wydruku wyglada jak jedna seria, a nie trzy rozne formularze. */
+  .num { flex: none; width: 26mm; padding: 2.5mm 3mm; border: 1.6pt solid #071a3d; border-radius: 2.5mm; text-align: center; }
   .num small { display: block; font-size: 6.5pt; font-weight: 800; letter-spacing: .16em; }
   .num b { display: block; font-size: 21pt; line-height: 1; }
 

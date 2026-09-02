@@ -375,6 +375,13 @@ const COLLECT = `(() => {
     const descent = metrics.fontBoundingBoxDescent || metrics.actualBoundingBoxDescent || 0;
     out[el.dataset.pdfField] = {
       cellX: cell.left, cellW: cell.width,
+      /* Gora i wysokosc komorki, nie tylko linia bazowa.
+         ---------------------------------------------------------------------------
+         Linia bazowa mowi, GDZIE POSTAWIC napis w polu, ktore jest linia do pisania — i do
+         wszystkich pol formularza to wystarcza. Nie wystarcza do numeru startowego, bo on
+         nie stoi na linii, tylko siedzi w ramce, a ramke da sie wysrodkowac dopiero wtedy,
+         gdy sie wie, gdzie ma gore i dol. Patrz galaz dla numeru w worker/fill-form.js. */
+      cellTop: cell.top, cellH: cell.height,
       baseline: box.bottom - descent,
       size: parseFloat(style.fontSize)
     };
@@ -416,7 +423,11 @@ async function measureFields(documents) {
         x: round(box.originXPt + field.cellX * PT_PER_PX),
         y: round(box.originYPt - field.baseline * PT_PER_PX),
         width: round(field.cellW * PT_PER_PX),
-        size: round(field.size * PT_PER_PX)
+        size: round(field.size * PT_PER_PX),
+        /* Gorna krawedz komorki i jej wysokosc, w punktach PDF. Uzywa ich tylko numer
+           startowy — jedyne pole, ktore jest ramka, a nie linia. */
+        frameY: round(box.originYPt - field.cellTop * PT_PER_PX),
+        frameH: round(field.cellH * PT_PER_PX)
       }]));
     } finally {
       rmSync(temp, { force: true });

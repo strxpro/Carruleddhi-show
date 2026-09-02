@@ -49,6 +49,26 @@ const LIFT = 2;
 const MAX_LINES = 2;
 
 /**
+ * Ile miejsca w ramce numeru startowego wolno zająć cyfrom.
+ *
+ * 0.82, nie 1.0, i to jest cała różnica między „mieści się" a „wygląda na wyśrodkowane".
+ * Zmierzone: „039" dobierało 18,75 pt i wychodziło 35,79 pt szerokości w ramce 36,25 pt,
+ * czyli 0,23 pt luzu z każdej strony — cyfry dotykały obu krawędzi i na wydruku czytało się
+ * to jak napis wychodzący poza pudełko. Przy 0.82 zostaje po ~3 pt z każdej strony.
+ */
+const NUMBER_FILL = 0.82;
+
+/**
+ * Wysokość cyfr w stosunku do stopnia pisma, dla DejaVu Sans.
+ *
+ * Cyfry nie mają wydłużeń ani ogonków, więc ich wysokość to wysokość wersalika: w DejaVu Sans
+ * 1493 jednostek na 2048 w kwadracie firmowym. Ta liczba jest przywiązana do TEGO kroju —
+ * jest jedynym, który tu osadzamy (patrz api/dejavu-sans.js), a zmiana kroju bez zmiany tej
+ * stałej przesunęłaby numer w pionie.
+ */
+const DIGIT_CAP = 1493 / 2048;
+
+/**
  * Rozmiar, przy którym napis mieści się w szerokości pola — albo `null`, gdy nie mieści się
  * w żadnym rozsądnym.
  */
@@ -100,11 +120,39 @@ export async function fillForm(blankPdf, fontBytes, stem, values) {
     const text = String(values[key] ?? '').trim();
     if (!text) continue;
 
-    /* Numer startowy jest wyśrodkowany w swojej ramce i pisany dużym stopniem — jedyne pole,
-       które nie jest linią do pisania, więc jedyne z własną regułą. */
-    const centred = key === 'RACE_NUMBER';
-    const start = Math.min(box.size, centred ? box.size : box.size * 0.92);
+    /* NUMER STARTOWY SIEDZI W RAMCE, A NIE STOI NA LINII — I DLATEGO MA WŁASNĄ REGUŁĘ.
+       ---------------------------------------------------------------------------
+       Każde inne pole formularza jest kreską do pisania: napis siada na niej z lewej strony
+       i tyle. Numer jest kwadratem z obramowaniem, więc „dobrze" znaczy tu co innego —
+       wyśrodkowany w poziomie ORAZ w pionie, z widocznym zapasem przy krawędziach.
 
+       Poprzednia wersja robiła tylko połowę tego. W poziomie środkowała, ale w pełnej
+       szerokości komórki, więc cyfry dotykały obu krawędzi (zmierzone: 35,79 pt w ramce
+       36,25 pt). W pionie nie środkowała wcale: baseline szedł z pomiaru linii pisania i
+       numer leżał przy dolnej krawędzi ramki.
+
+       Teraz jedno i drugie liczy się z ramki zmierzonej przez generator (`frameY`, `frameH`),
+       a nie z linii bazowej. `LIFT` tu nie wchodzi: podnosi napis znad kreski, a tu żadnej
+       kreski nie ma. */
+    const centred = key === 'RACE_NUMBER';
+
+    if (centred && box.frameH) {
+      const room = box.width * NUMBER_FILL;
+      const size = fitSize(font, text, room, box.size) || MIN_SIZE;
+      const width = font.widthOfTextAtSize(text, size);
+      /* Środek ramki, potem zejście o pół wysokości cyfry — cyfry rosną od linii bazowej
+         w górę, więc baseline musi stanąć niżej niż środek. */
+      const middle = box.frameY - box.frameH / 2;
+      page.drawText(text, {
+        x: box.x + (box.width - width) / 2,
+        y: middle - (DIGIT_CAP * size) / 2,
+        size,
+        font
+      });
+      continue;
+    }
+
+    const start = centred ? box.size : box.size * 0.92;
     const single = fitSize(font, text, box.width, start);
     if (single) {
       const width = font.widthOfTextAtSize(text, single);
