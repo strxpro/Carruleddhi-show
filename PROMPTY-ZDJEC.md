@@ -124,129 +124,120 @@ przy zdjęciu w tle prawdopodobnie trzeba będzie dołożyć przyciemniającą n
 
 ---
 
-# Dwanaście nagród — prompty do kart
+# Dwanaście nagród — kolorowe doodle, nie zdjęcia
 
-Karty nagród mają dziś grafiki wektorowe (`prizes.svg#prize-01` … `#prize-12`) w kadrze
-`480 × 320`, czyli **3:2**. Generuj **1500 × 1000** i zapisuj jako WebP.
+Karty nagród mają dziś rysunki wektorowe w `public/assets/images/prizes.svg`, w kadrze
+`480 × 320`, czyli **3:2**. I one już są tym, o co chodzi: grube granatowe kontury, płaskie
+plamy koloru, zaokrąglone końce linii. Te prompty mają dać **więcej tego samego** — nie
+fotografię i nie wizerunek samej nagrody, tylko wesoły, karnawałowy rysunek, który przy niej
+pasuje.
 
-**Do każdego promptu dopisz wspólny blok stylu z góry tego pliku.** Bez niego dwanaście
-kart wyjdzie z dwunastu różnych światów — a mają wyglądać jak jedna seria zdjęć z jednego
-popołudnia.
+Generuj **1500 × 1000**, zapisuj jako WebP albo SVG.
 
-**Trzy rzeczy wspólne dla wszystkich dwunastu**, dopisane do bloku stylu:
+## Blok stylu — dopisz go do KAŻDEGO z dwunastu
 
-```
-Composition: single clear subject, generous empty space around it, nothing important
-in the outer 12% of the frame — a rounded card crops the edges.
-No text, no numbers, no signage, no logos anywhere in the image.
-No recognisable faces in close-up: shoot from behind, from the side, or from the waist down.
-```
-
-Ostatnia linijka nie jest ostrożnością na wyrost. Te karty pokazują nagrody, a nie
-konkretnych ludzi — twarz wygenerowana przez model, postawiona przy nazwie nagrody,
-czyta się jak zdjęcie prawdziwego zwycięzcy.
-
-## 01 · Najszybszy Classic
+To jest najważniejsza część. Bez niego dwanaście kart wyjdzie z dwunastu różnych światów,
+a mają wyglądać jak jedna talia.
 
 ```
-A wooden gravity cart mid-run on a descending asphalt street, shot from a low side angle
-with the camera panning so the road blurs and the cart stays sharp. Bare wooden frame,
-solid wheels, rider crouched low and seen from behind. Late afternoon light raking across
-the tarmac.
+Style: flat vector doodle illustration, hand-drawn feel but clean. Thick uniform outlines
+in deep navy (#071a3d), rounded line caps and joins, no gradients, no shading, no texture.
+Flat fills from this palette only: warm yellow (#ffc928), coral red (#f6494f),
+bright blue (#2469d8), deep blue (#174ea6), cream (#fff6e7), white.
+Cream background. Festive carnival energy: confetti flecks, little motion dashes,
+small stars and sparks scattered around the subject.
+Composition: one clear subject centred, generous empty margin, nothing important in the
+outer 12% of the frame — the card has rounded corners and crops the edges.
+No text, no numbers, no letters, no logos, no signage anywhere in the image.
+No human faces: people appear only as simple silhouettes or from behind.
 ```
 
-## 02 · Najszybszy ART
+Ostatnie dwie linijki nie są ostrożnością na wyrost. Cyfra wygenerowana przez model wyląduje
+obok prawdziwego numeru nagrody i będzie się z nim kłócić, a twarz postawiona przy nazwie
+nagrody czyta się jak portret prawdziwego zwycięzcy.
 
-```
-A brightly painted homemade cart at full speed on a descending street, seen from a low
-side angle with motion blur in the background. The bodywork is folk-art colourful,
-clearly hand-built from salvaged panels. Rider low over the frame, seen from behind.
-```
+## Dwanaście motywów
 
-## 03 · Carruleddhi Show
+Każdy jest *skojarzeniem* z nagrodą, nie jej ilustracją — dokładnie o to prosiłeś.
 
+**01 · Najszybszy Classic**
 ```
-A wide view of a village street closed for the event: carts lined along one side, bunting
-between the buildings, people watching from doorways and low walls. Shot from a first-floor
-window looking down the slope towards the sea. Nobody in close-up.
+A wooden gravity cart drawn in simple flat shapes, tilted forward as if flying downhill,
+with three long speed dashes trailing behind it and a small spark at each wheel.
 ```
 
-## 04 · Największy Carruleddhu
-
+**02 · Najszybszy ART**
 ```
-An unusually large handmade wooden cart parked in a square, long enough that two people
-would fit on it, photographed from a low front three-quarter angle so its length reads
-against the small buildings behind. A folded jacket on the deck gives the scale.
+A patchwork cart made of mismatched coloured panels, leaning into a curve, with a ribbon
+of confetti streaming behind it in a long arc.
 ```
 
-## 05 · Najzabawniejszy Carruleddhu
-
+**03 · Carruleddhi Show**
 ```
-A joyfully absurd homemade cart standing alone in a square: a bathtub shell mounted on
-bicycle wheels, a painted wooden fin at the tail, a rubber duck wired to the front axle.
-Bright mismatched colours, brush strokes visible. No rider.
+A row of festive bunting flags strung across the frame, with three tiny carts rolling
+beneath it and confetti falling through the whole scene.
 ```
 
-## 06 · Pokaz specjalny
-
+**04 · Najbardziej Shardana**
 ```
-A handmade cart caught mid-drift on a corner, rear wheels sliding, a plume of dust rising
-behind it. Straw bales and a marshal's yellow vest blurred at the edge of the frame.
-Rider seen from behind, one arm out for balance.
+A cart deck decorated with Sardinian folk geometry — simple repeating diamonds and zigzags
+in coral, navy and cream — with a sprig of myrtle drawn as a few flat leaves at the corner.
 ```
 
-## 07 · Show Classic
-
+**05 · Najzabawniejszy Carruleddhu**
 ```
-A traditional wooden cart standing on the start line in the last minutes before the run:
-rope steering laid neatly over the deck, a worn helmet resting on the plank, one hand
-adjusting a wheel at the edge of the frame. Warm side light, long shadow.
+An absurd cart built from a bathtub on mismatched wheels, a rubber duck on the nose and a
+wobbly fin at the tail, with three little laughter squiggles floating above it.
 ```
 
-## 08 · Najmłodszy kierowca
-
+**06 · Pokaz specjalny**
 ```
-A very small handmade cart beside a normal one, its deck barely longer than a school bag,
-with a child-sized helmet sitting on it. A child's legs and trainers visible at the top
-edge of the frame, face out of shot. Quiet and warm, not staged.
+A cart mid-drift, rear wheels sliding sideways, with a curl of dust drawn as flat rounded
+puffs and a scatter of stars along the arc of the slide.
 ```
 
-## 09 · Najstarszy kierowca
-
+**07 · Show Classic**
 ```
-Weathered hands resting on the rope steering of an old wooden cart, photographed close
-enough to read the grain of the wood and the wear on the rope. Face out of frame.
-The cart looks decades old and well kept.
+A wooden cart standing still in three-quarter view, a helmet resting on its deck and a
+coiled steering rope beside it, with a soft halo of small dashes around the whole group.
 ```
 
-## 10 · Najbardziej technologiczny
-
+**08 · Najmłodszy kierowca**
 ```
-A handmade cart bristling with improvised engineering: a bicycle disc brake on the rear
-axle, a cable-operated steering linkage, a speedometer taped to the deck, zip ties and
-hose clamps everywhere. Shot from above at a slight angle so the mechanisms read clearly.
+A very small cart beside a normal-sized one, with a child-sized helmet sitting on the small
+deck and a pair of tiny shoes drawn next to it. Nobody in the frame.
 ```
 
-## 11 · Najwolniejszy
-
+**09 · Najstarszy kierowca**
 ```
-A heavy, slightly lopsided homemade cart standing still on a gentle part of the slope,
-one wheel visibly smaller than the others. Long afternoon shadow stretching ahead of it
-down the empty street. Nobody in the frame. Affectionate, not mocking.
+An old wooden cart with visible plank lines and a well-worn rope, a flat cap resting on the
+seat board, and a few small stars above it. Nobody in the frame.
 ```
 
-## 12 · Najbardziej Shardana
-
+**10 · Najbardziej technologiczny**
 ```
-A handmade cart decorated in Sardinian folk motifs: hand-painted geometric patterns in
-red, black and cream along the deck, a strip of traditional woven cloth tied to the frame,
-a sprig of dried myrtle wedged behind the seat board. Parked against a whitewashed wall
-in low sun.
+A cart bristling with improvised engineering drawn as clean flat shapes: a disc brake, a
+cable linkage, a dial taped to the deck, three cog wheels floating above it.
 ```
 
-## Po wygenerowaniu
+**11 · Najwolniejszy**
+```
+A heavy lopsided cart standing still, one wheel smaller than the rest, with a snail drawn
+beside it and a single tiny motion dash behind. Affectionate, not mocking.
+```
 
-Karty biorą dziś grafikę z jednego pliku `prizes.svg` przez `<use href="#prize-01">`.
-Podmiana na zdjęcia to zmiana w znaczniku każdej karty w `index.html` (`<svg><use>` na
-`<img>`) plus styl na nowej klasie — czyli osobne zadanie, nie samo wrzucenie plików.
-Zdjęcia zapisz w `public/assets/images/` jako `prize-01.webp` … `prize-12.webp`.
+**12 · Największy Carruleddhu**
+```
+An extra-long cart filling the width of the frame, with a tiny silhouette figure beside it
+for scale and a measuring-tape arrow drawn as a simple line with arrowheads underneath.
+```
+
+## Zanim wrzucisz pliki
+
+Karty biorą dziś grafikę przez `<use href="#prize-01">` z jednego `prizes.svg`. Podmiana na
+osobne obrazy to zmiana znacznika w każdej z dwunastu kart plus nowy styl — czyli osobne
+zadanie, nie samo wrzucenie plików.
+
+**Najprościej jednak zostać przy SVG:** jeżeli poprosisz model o wynik wektorowy, nowe rysunki
+wchodzą jako kolejne `<symbol id="prize-01">` w tym samym pliku i nie trzeba ruszać ani
+jednej linijki `index.html`. Zachowaj `viewBox="0 0 480 320"` w każdym symbolu.
