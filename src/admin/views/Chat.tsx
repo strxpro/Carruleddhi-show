@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Highlighter } from './Highlighter';
 import { ArrowDown, ArrowLeft, Bot, Loader2, Send, User } from 'lucide-react';
 import { cn, formatAgo, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
@@ -251,9 +252,9 @@ export function Chat({
   const current = threads?.find((thread) => thread.id === active) ?? null;
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <h2 className="text-2xl font-bold tracking-tight text-white">{t('chat.title')}</h2>
-      <p className="mt-1.5 text-sm text-white/55">{t('chat.lead')}</p>
+    <div className="mx-auto max-w-6xl flex flex-col h-full">
+      <h2 className="shrink-0 text-2xl font-bold tracking-tight text-white">{t('chat.title')}</h2>
+      <p className="shrink-0 mt-1.5 text-sm text-white/55">{t('chat.lead')}</p>
 
       {error ? (
         <p className="mt-3 rounded-xl border border-coral/30 bg-coral/10 px-4 py-2.5 text-sm text-white/80">
@@ -261,13 +262,13 @@ export function Chat({
         </p>
       ) : null}
 
-      <div className="mt-5 flex lg:grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] items-start">
+      <div className="mt-5 flex-1 min-h-0 flex lg:grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)] items-stretch">
         {/* ---- list ---- */}
-        <div className={cn("w-full rounded-2xl border border-white/10 bg-white/4", active ? "hidden lg:block" : "block")}>
-          <div className="border-b border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/40">
+        <div className={cn("flex flex-col w-full rounded-2xl border border-white/10 bg-white/4", active ? "hidden lg:flex" : "flex")}>
+          <div className="shrink-0 border-b border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-white/40">
             {t('chat.threads')}
           </div>
-          <ul className="max-h-[62vh] overflow-y-auto overscroll-contain">
+          <ul className="flex-1 min-h-0 overflow-y-auto overscroll-none">
             {threads === null ? (
               /* Three lines per row, the same three the real thread has: name, address and
                  how long ago. The list keeps its height while it loads, so the conversation
@@ -304,7 +305,7 @@ export function Chat({
                   >
                     <span className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
-                        {thread.name || t('chat.visitor')}
+                        <Highlighter text={thread.name || t('chat.visitor')} query={highlightQuery} />
                       </span>
                       {thread.unread > 0 ? (
                         <span className="grid min-w-4 place-items-center rounded-full bg-coral px-1 text-[10px] font-bold text-white">
@@ -313,7 +314,7 @@ export function Chat({
                       ) : null}
                     </span>
                     <span className="truncate text-[11px] text-white/40">
-                      {thread.email || t('chat.noEmail')} · {thread.locale.toUpperCase()}
+                      <Highlighter text={thread.email || t('chat.noEmail')} query={highlightQuery} /> · {thread.locale.toUpperCase()}
                     </span>
                     <span className="text-[11px] text-white/30">
                       {formatAgo(thread.lastAt, t('locale.rel'))}
@@ -326,7 +327,7 @@ export function Chat({
         </div>
 
         {/* ---- conversation ---- */}
-        <div className={cn("w-full flex-col min-h-[62vh] rounded-2xl border border-white/10 bg-white/4", active ? "flex" : "hidden lg:flex")}>
+        <div className={cn("flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-navy-900 shadow-2xl", !active ? "hidden lg:flex" : "flex w-full")}>
           {!current ? (
             <div className="grid flex-1 place-items-center px-6 text-center text-sm text-white/40">
               {t('chat.pick')}

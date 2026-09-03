@@ -522,6 +522,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             label={t('vote.saveSchedule')}
             reason={reasonSaveSchedule}
             tone="bg-yellow text-navy-950 hover:bg-white"
+            busy={busy}
             onPress={() => commitSchedule(t('vote.saved'))}
           />
           <ActionButton
@@ -530,6 +531,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             tone="bg-emerald-400/15 text-emerald-200 hover:bg-emerald-400/25"
             icon={<RotateCcw size={13} />}
             confirmLabel={t('vote.restoreConfirm')}
+            busy={busy}
             onPress={() => commitSchedule(t('vote.restored'))}
           />
           {/* WRÓĆ DO ODLICZANIA.
@@ -575,12 +577,14 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                 stillClosed
               );
             }}
+            busy={busy}
           />
           <ActionButton
             label={t('vote.openNow')}
             reason={reasonOpenNow}
             tone="bg-blue-600 text-white hover:bg-blue-500"
             icon={<Play size={13} />}
+            busy={busy}
             onPress={() => void run(() => openVoting(apiKey, duration))}
           />
           {/* ZAMKNIJ TERAZ.
@@ -601,6 +605,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             tone="bg-white/10 text-white hover:bg-white/20"
             icon={<Square size={13} />}
             confirmLabel={t('vote.closeConfirm')}
+            busy={busy}
             onPress={() => void run(() => closeVoting(apiKey))}
           />
         </div>
@@ -631,6 +636,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               tone="border border-coral/40 text-coral hover:bg-coral hover:text-white"
               icon={<Eraser size={13} />}
               confirmLabel={t('vote.clearConfirm')}
+              busy={busy}
               onPress={() => void run(() => clearVoting(apiKey), t('vote.cleared'))}
             />
             <ActionButton
@@ -639,6 +645,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               tone="bg-yellow text-navy-950 hover:bg-white"
               icon={<Trophy size={13} />}
               confirmLabel={t('vote.winnersConfirm')}
+              busy={busy}
               onPress={() => void (async () => {
                 setBusy(true);
                 setError(null);

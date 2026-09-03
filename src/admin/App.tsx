@@ -258,26 +258,26 @@ export default function App() {
     }
     const needle = query.trim().toLowerCase();
     try {
-      const [roster, sponsors, threads] = await Promise.all([
-        fetchRoster(key, 500).catch(() => ({ roster: [] })),
-        fetchSponsorLeads(key, 100).catch(() => ({ leads: [] })),
-        fetchThreads(key, 100).catch(() => ({ threads: [] }))
+      const [rosterRes, sponsorsRes, threadsRes] = await Promise.all([
+        fetchRoster(key, 500).catch(() => ({ ok: true, rows: [] })),
+        fetchSponsorLeads(key, 100).catch(() => ({ ok: true, submissions: [] })),
+        fetchThreads(key, 100).catch(() => ({ ok: true, threads: [] }))
       ]);
       const results: NavItemData[] = [];
       
-      roster.roster?.forEach(p => {
-        if (p.name.toLowerCase().includes(needle) || p.email?.toLowerCase().includes(needle)) {
+      rosterRes.rows?.forEach((p: any) => {
+        if (p.firstName?.toLowerCase().includes(needle) || p.lastName?.toLowerCase().includes(needle) || p.email?.toLowerCase().includes(needle)) {
           results.push({
             id: `searchResult:registrations:${needle}`,
-            title: p.name || '?',
+            title: `${p.firstName} ${p.lastName}` || '?',
             subtitle: t('nav.registrations') + (p.email ? ` • ${p.email}` : ''),
             icon: ListChecks
           });
         }
       });
 
-      sponsors.leads?.forEach(l => {
-        if (l.name.toLowerCase().includes(needle) || l.contact_person?.toLowerCase().includes(needle)) {
+      (sponsorsRes.submissions as any[])?.forEach((l: any) => {
+        if (l.name?.toLowerCase().includes(needle) || l.contact_person?.toLowerCase().includes(needle)) {
           results.push({
             id: `searchResult:settings:${needle}`,
             title: l.name || '?',
@@ -287,7 +287,7 @@ export default function App() {
         }
       });
 
-      threads.threads?.forEach(tItem => {
+      threadsRes.threads?.forEach((tItem: any) => {
         if (tItem.name?.toLowerCase().includes(needle) || tItem.email?.toLowerCase().includes(needle)) {
           results.push({
             id: `searchResult:chat:${needle}`,
@@ -310,6 +310,12 @@ export default function App() {
       }
       if (id === 'search') {
         setPaletteOpen(true);
+        return;
+      }
+      if (id.startsWith('searchResult:')) {
+        const parts = id.split(':');
+        setTab(parts[1] as TabId);
+        setPaletteOpen(false);
         return;
       }
       // `audience` is a group heading, not a screen. Pressing it opens the group; if it
@@ -470,6 +476,11 @@ export default function App() {
         onSelect={go}
         placeholder={t('nav.searchPlaceholder')}
         emptyLabel={t('nav.searchEmpty')}
+        externalResults={searchResults}
+        onSearchChange={(q) => {
+          setHighlightQuery(q);
+          handleGlobalSearch(q);
+        }}
       />
     </div>
   );

@@ -19,6 +19,9 @@
 /* Głosowanie: własne komponenty, żadnych nadpisań cudzych reguł, więc miejsce w łańcuchu
    nie ma tu znaczenia — poza tym, że jest przed text-effects.css, które ma zostać ostatnie. */
 @import './voting.css';
+/* Transmisja: własne komponenty i nic nadpisanego, więc miejsce dowolne — byle przed
+   text-effects.css, które ma zostać ostatnie. */
+@import './live.css';
 /* Last, so the effect rules win over a section's own heading styles. They only ever
    touch elements carrying a data-text-* attribute, so nothing else is affected. */
 @import './text-effects.css';

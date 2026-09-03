@@ -2035,15 +2035,13 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
    przed odsłonięciem bywa niska — a zdrapka wysokości trzech centymetrów nie jest zaproszeniem. */
 .podium-scratch {
   position: absolute;
-  inset: 0;
+  inset: -15px -15px -20px -15px;
   z-index: 6;
   display: grid;
   place-items: center;
   min-height: clamp(220px, 34vw, 320px);
   overflow: hidden;
-  border: 3px solid var(--navy-950);
   border-radius: 26px;
-  box-shadow: 8px 8px 0 rgb(7 26 61 / .18);
 }
 .podium-scratch[hidden] { display: none; }
 

@@ -294,7 +294,7 @@ export function SettingsView({
   setLocale: (locale: PanelLocale) => void;
   onForget: () => void;
   apiKey: string;
-  highlightQuery?: string;
+  highlightQuery?: string; // highlightQuery may be unused in SettingsView because SponsorLeads consumes it and it suppresses TS6133
   /* Comes from the inbox poll, which the panel already runs every ten seconds — rather than a
      call of its own. Undefined until the first poll lands, and the section simply is not drawn
      until then; a settings screen that flashes "the key is missing" while it finds out would be
@@ -1092,7 +1092,7 @@ export function SettingsView({
           Zatwierdzenie zapisuje się samo, po stronie Workera; `onApproved` wnosi oddane przez
           niego ustawienia do stanu tego ekranu, żeby lista niżej odrysowała się od razu i nie
           mogła się rozjechać z bazą — uzasadnienie przy `absorbApproved`. */}
-      <SponsorLeads t={t} apiKey={apiKey} onApproved={absorbApproved} />
+      <SponsorLeads t={t} apiKey={apiKey} onApproved={absorbApproved} highlightQuery={highlightQuery} />
 
       {/* ---------------------------------------------------------- sponsors */}
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">

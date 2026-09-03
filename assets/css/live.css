@@ -1,0 +1,255 @@
+/**
+ * Transmisja na żywo.
+ * ===========================================================================
+ * Sekcja, która przez większość roku jest `hidden`, i pasek sterowania, który leży NA obrazie.
+ * Wszystko poniżej dotyczy tylko `#live` i przycisków, które do niej prowadzą — nic tu nie
+ * nadpisuje reguł innych sekcji, więc miejsce tego pliku w łańcuchu importów jest dowolne.
+ */
+
+/* --------------------------------------------------------------- zaproszenia do transmisji */
+
+/* Czerwony, jako jedyny na tej stronie.
+   ---------------------------------------------------------------------------
+   Żółty należy do wyników, niebieski do zapisów, a gwiazdka do głosowania. Czerwony nie
+   znaczy tu „uwaga, błąd" — znaczy „nadaje", i to jest jedyny kolor, który w tej roli czyta
+   się bez podpisu, bo tak wygląda każdy odtwarzacz, jakiego ci ludzie używają. */
+.btn--live {
+  background: #e11d48;
+  color: #fff;
+  border-color: transparent;
+}
+.btn--live:hover,
+.btn--live:focus-visible {
+  background: #fff;
+  color: #9f1239;
+}
+
+/* Kropka pulsuje, bo „na żywo" jest stanem, a nie nazwą.
+   Cień, nie skala: powiększanie samej kropki w pasku podskakiwałoby całym rzędem przycisków
+   przy każdym uderzeniu — to jest dokładnie ta usterka, którą naprawiliśmy w chipie nagłówka. */
+.btn__live-dot,
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+  animation: live-pulse 1.8s ease-out infinite;
+}
+.btn--live .btn__live-dot { background: #fff; }
+.live-dot { background: #e11d48; }
+
+@keyframes live-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(225, 29, 72, .55); }
+  70%  { box-shadow: 0 0 0 7px rgba(225, 29, 72, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+}
+
+.menu-link--live { color: #ff6b8a; }
+
+/* ------------------------------------------------------------------------------- nagłówek */
+
+.eyebrow--live {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  color: #ff6b8a;
+}
+
+.live__head { max-width: 46rem; }
+.live__lead {
+  margin-top: .85rem;
+  color: rgba(255, 255, 255, .72);
+  font-size: clamp(.95rem, .4vw + .85rem, 1.05rem);
+}
+
+/* --------------------------------------------------------------------------- odtwarzacz */
+
+/* `position: relative` na scenie, bo wszystko poniżej — warstwa do stukania, serca i pasek —
+   jest wobec niej pozycjonowane. Scena, a nie sama ramka, wchodzi też na pełny ekran. */
+.live__stage {
+  position: relative;
+  margin-top: 2.2rem;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+}
+
+/* Proporcja z `aspect-ratio`, nie sztuczką z paddingiem: ramka ma wtedy prawdziwą wysokość,
+   więc pasek i serca nad nią wiedzą, gdzie są, bez czytania geometrii z JavaScriptu. */
+.live__frame {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+.live__video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #000;
+}
+
+/* Warstwa do stukania leży na całej ramce.
+   ---------------------------------------------------------------------------
+   Musi być NAD ramką, inaczej stuknięcie trafia w YouTube'a i strona nigdy się o nim nie
+   dowie. Kosztem jest to, że stuknięcie nie zatrzymuje odtwarzania — i tak ma być: obraz
+   z wyścigu ma lecieć dalej, a stukanie jest brawami, nie pauzą. Pauza i głośność siedzą
+   w pasku samego odtwarzacza, do którego wchodzi się z jego własnego rogu. */
+.live__tap,
+.live__hearts {
+  position: absolute;
+  inset: 0;
+}
+.live__tap { z-index: 2; }
+/* Serca nie łapią palca — inaczej stuknięcie w lecące serce nie liczyłoby się jako brawo. */
+.live__hearts {
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------------- serca */
+
+.live-heart {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  color: #ff4d6d;
+  animation: live-heart-up 1.5s cubic-bezier(.22, .61, .36, 1) forwards;
+  will-change: transform, opacity;
+}
+.live-heart svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .45));
+}
+
+/* Lot w górę z odchyleniem w bok. `--drift` i `--tilt` losuje stream.js, żeby dwa serca
+   z tego samego miejsca nie leciały jednym torem. */
+@keyframes live-heart-up {
+  0%   { transform: translate3d(0, 0, 0) scale(calc(var(--scale, 1) * .4)) rotate(0deg); opacity: 0; }
+  14%  { opacity: 1; }
+  100% { transform: translate3d(var(--drift, 0), -190px, 0) scale(var(--scale, 1)) rotate(var(--tilt, 0deg)); opacity: 0; }
+}
+
+/* ------------------------------------------------------------------------ pasek na obrazie */
+
+/* Gaśnie sam po chwili i wraca po dotknięciu — tak jak w każdym odtwarzaczu. Ale nigdy nie
+   znika dla klawiatury: `:focus-within` trzyma go na wierzchu, bo inaczej przycisk, na
+   którym stoi fokus, byłby niewidoczny. */
+.live__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+  padding: 1.6rem .9rem .9rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, .78), transparent);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .25s ease, transform .25s ease;
+}
+.live__stage.is-showing-bar .live__bar,
+.live__stage:hover .live__bar,
+.live__bar:focus-within {
+  opacity: 1;
+  transform: none;
+}
+
+.live__count {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .75rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .5);
+  color: #fff;
+  font-size: .85rem;
+  /* Cyfry tej samej szerokości: bez tego licznik rosnący co pół sekundy przesuwa przyciski
+     obok siebie za każdym razem, gdy 9 zmienia się w 10. */
+  font-variant-numeric: tabular-nums;
+}
+
+.live__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  /* 44 px wysokości to dolna granica celu dla palca; bez tego pasek na telefonie ma przyciski
+     wysokie na 30 px i trafia się w nie za trzecim razem. */
+  min-height: 44px;
+  padding: .45rem .85rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .14);
+  color: #fff;
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.live__btn:hover,
+.live__btn:focus-visible { background: rgba(255, 255, 255, .3); }
+.live__btn--wide { margin-left: auto; }
+
+.live__note {
+  margin-top: 1rem;
+  color: rgba(255, 255, 255, .5);
+  font-size: .82rem;
+}
+
+/* --------------------------------------------------------------------------- pełny ekran */
+
+/* Rozłożenie na całe okno, gdy przeglądarka nie da prawdziwego pełnego ekranu — a nie da go
+   przy obrocie telefonu, bo obrót nie jest gestem użytkownika, i nie da go wcale na iPhonie
+   dla elementów innych niż wideo. Patrz `enterFullscreen` w stream.js.
+
+   Wygląda tak samo jak prawdziwy: czarne tło, obraz na środku, pasek u dołu. */
+.live__stage.is-faux-full {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  margin: 0;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.live__stage.is-faux-full .live__frame {
+  width: 100%;
+  max-height: 100%;
+  /* `contain`, nie `cover`: obcięty obraz zjazdu to obcięty zjazd. Czarne pasy po bokach są
+     tym, czego ludzie się po pełnym ekranie spodziewają. */
+  aspect-ratio: 16 / 9;
+  max-width: calc(100vh * 16 / 9);
+}
+
+/* Prawdziwy pełny ekran: ta sama zasada, ale rozkłada go przeglądarka, więc ustawiamy tylko
+   środkowanie. */
+.live__stage:fullscreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.live__stage:fullscreen .live__frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-width: calc(100vh * 16 / 9);
+}
+
+/* Przy obróconym telefonie pasek strony leżałby NA obrazie rozłożonym na całe okno. */
+html:has(.live__stage.is-faux-full) .site-header { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn__live-dot,
+  .live-dot { animation: none; }
+  .live__bar { transition: none; }
+}

@@ -1,4 +1,3 @@
-import React from 'react';
 
 export function Highlighter({ text, query }: { text: string; query?: string }) {
   if (!query || !text) return <>{text}</>;

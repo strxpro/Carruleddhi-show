@@ -1,4 +1,5 @@
 import { useId, useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -34,6 +35,7 @@ export function ActionButton({
   icon,
   confirmLabel,
   confirmTone,
+  busy,
   onPress
 }: {
   label: string;
@@ -44,6 +46,7 @@ export function ActionButton({
   icon?: ReactNode;
   confirmLabel?: string;
   confirmTone?: string;
+  busy?: boolean;
   onPress: () => void;
 }) {
   const off = reason !== '';
@@ -73,15 +76,15 @@ export function ActionButton({
     <span className="inline-flex max-w-[19rem] flex-col gap-1">
       <button
         type="button"
-        disabled={off}
+        disabled={off || busy}
         aria-describedby={off ? describedBy : undefined}
         onClick={click}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-[0.97] active:opacity-80',
+          'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-[0.97] active:opacity-80 disabled:opacity-50 disabled:pointer-events-none',
           off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70 active:scale-100 active:opacity-100' : armed ? (confirmTone || 'bg-coral text-white border border-coral') : tone
         )}
       >
-        {icon}
+        {busy ? <Loader2 className="size-4 animate-spin" /> : icon}
         {armed && confirmLabel ? confirmLabel : label}
       </button>
       {off ? (

@@ -1246,6 +1246,7 @@ import {
     const currentProgress = $('[data-nav-progress]');
     const sections = $$('main section[id]').filter((section) => !section.hidden);
     const labelKeys = {
+      live: 'stream.cta',
       story: 'nav.race',
       categories: 'nav.categories',
       route: 'nav.route',

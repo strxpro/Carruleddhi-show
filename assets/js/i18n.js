@@ -35,11 +35,11 @@
     'nav.faq': 'FAQ',
     'nav.contact': 'Contatti',
     'nav.signup': 'Iscriviti',
-    'nav.attend': 'Ci sarò',
+    'nav.attend': 'Ci sarò per assistere al grande spettacolo',
     'hero.kicker': '%DATE% · %PLACE%',
     'hero.tagline': 'Nessun motore. Solo la discesa.',
     'hero.signup': 'Iscriviti alla gara',
-    'hero.attend': 'Ci sarò',
+    'hero.attend': 'Ci sarò per assistere al grande spettacolo',
     'hero.pilots': 'piloti iscritti',
     'hero.people': 'persone ci saranno',
     'hero.scroll': 'Scopri la gara',
@@ -237,8 +237,8 @@
     'meta.title': '%EVENT% — %PLACE%',
     'meta.description': 'Najbardziej widowiskowy wyścig ręcznie budowanych pojazdów na Sardynii. %DATE%.',
     'a11y.skip': 'Przejdź do treści', 'a11y.menu': 'Otwórz menu', 'a11y.close': 'Zamknij',
-    'nav.race': 'Wyścig', 'nav.categories': 'Kategorie', 'nav.route': 'Trasa', 'nav.program': 'Program', 'nav.prizes': 'Nagrody', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Zapisz się', 'nav.attend': 'Będę tam',
-    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Bez silnika. Tylko w dół.', 'hero.signup': 'Zapisz się do wyścigu', 'hero.attend': 'Będę tam', 'hero.pilots': 'zapisanych zawodników', 'hero.people': 'osób będzie na miejscu', 'hero.scroll': 'Poznaj wyścig',
+    'nav.race': 'Wyścig', 'nav.categories': 'Kategorie', 'nav.route': 'Trasa', 'nav.program': 'Program', 'nav.prizes': 'Nagrody', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Zapisz się', 'nav.attend': 'Będę tam na wielkim widowisku',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Bez silnika. Tylko w dół.', 'hero.signup': 'Zapisz się do wyścigu', 'hero.attend': 'Będę tam na wielkim widowisku', 'hero.pilots': 'zapisanych zawodników', 'hero.people': 'osób będzie na miejscu', 'hero.scroll': 'Poznaj wyścig',
     'count.days': 'dni', 'count.hours': 'godzin', 'count.minutes': 'minut', 'count.seconds': 'sekund',
     'count.daysShort': 'd', 'count.hoursShort': 'g', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Zbuduj · Wejdź · Zjedź · Hamuj · Uśmiechnij się',
@@ -272,8 +272,8 @@
 
   const en = {
     'a11y.skip': 'Skip to content', 'a11y.menu': 'Open menu', 'a11y.close': 'Close',
-    'nav.race': 'The race', 'nav.categories': 'Categories', 'nav.route': 'Route', 'nav.program': 'Schedule', 'nav.prizes': 'Prizes', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': 'Sign up', 'nav.attend': "I'll be there",
-    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'No engine. Just downhill.', 'hero.signup': 'Enter the race', 'hero.attend': "I'll be there", 'hero.pilots': 'registered riders', 'hero.people': 'people are coming', 'hero.scroll': 'Discover the race',
+    'nav.race': 'The race', 'nav.categories': 'Categories', 'nav.route': 'Route', 'nav.program': 'Schedule', 'nav.prizes': 'Prizes', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': 'Sign up', 'nav.attend': "I'll be there for the great show",
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'No engine. Just downhill.', 'hero.signup': 'Enter the race', 'hero.attend': "I'll be there for the great show", 'hero.pilots': 'registered riders', 'hero.people': 'people are coming', 'hero.scroll': 'Discover the race',
     'count.days': 'days', 'count.hours': 'hours', 'count.minutes': 'minutes', 'count.seconds': 'seconds',
     'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Build · Climb · Race · Brake · Smile',
@@ -305,8 +305,8 @@
 
   const de = {
     'a11y.skip': 'Zum Inhalt', 'a11y.menu': 'Menü öffnen', 'a11y.close': 'Schließen',
-    'nav.race': 'Das Rennen', 'nav.categories': 'Kategorien', 'nav.route': 'Strecke', 'nav.program': 'Programm', 'nav.prizes': 'Preise', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Anmelden', 'nav.attend': 'Ich bin dabei',
-    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Kein Motor. Nur bergab.', 'hero.signup': 'Zum Rennen anmelden', 'hero.attend': 'Ich bin dabei', 'hero.pilots': 'angemeldete Fahrer', 'hero.people': 'Personen kommen', 'hero.scroll': 'Rennen entdecken',
+    'nav.race': 'Das Rennen', 'nav.categories': 'Kategorien', 'nav.route': 'Strecke', 'nav.program': 'Programm', 'nav.prizes': 'Preise', 'nav.faq': 'FAQ', 'nav.contact': 'Kontakt', 'nav.signup': 'Anmelden', 'nav.attend': 'Dabei beim großen Spektakel',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Kein Motor. Nur bergab.', 'hero.signup': 'Zum Rennen anmelden', 'hero.attend': 'Dabei beim großen Spektakel', 'hero.pilots': 'angemeldete Fahrer', 'hero.people': 'Personen kommen', 'hero.scroll': 'Rennen entdecken',
     'count.days': 'Tage', 'count.hours': 'Stunden', 'count.minutes': 'Minuten', 'count.seconds': 'Sekunden',
     /* „Std/Min/Sek" byłoby poprawniejsze, ale to trzy razy szerzej niż jest miejsca w pasku;
        h/min/s to jednostki SI i po niemiecku czyta się je bez zastanowienia. */
@@ -336,8 +336,8 @@
 
   const es = {
     'a11y.skip': 'Ir al contenido', 'a11y.menu': 'Abrir menú', 'a11y.close': 'Cerrar',
-    'nav.race': 'La carrera', 'nav.categories': 'Categorías', 'nav.route': 'Recorrido', 'nav.program': 'Programa', 'nav.prizes': 'Premios', 'nav.faq': 'FAQ', 'nav.contact': 'Contacto', 'nav.signup': 'Inscríbete', 'nav.attend': 'Estaré allí',
-    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Sin motor. Solo cuesta abajo.', 'hero.signup': 'Inscríbete en la carrera', 'hero.attend': 'Estaré allí', 'hero.pilots': 'pilotos inscritos', 'hero.people': 'personas asistirán', 'hero.scroll': 'Descubre la carrera',
+    'nav.race': 'La carrera', 'nav.categories': 'Categorías', 'nav.route': 'Recorrido', 'nav.program': 'Programa', 'nav.prizes': 'Premios', 'nav.faq': 'FAQ', 'nav.contact': 'Contacto', 'nav.signup': 'Inscríbete', 'nav.attend': 'Allí estaré para el gran espectáculo',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Sin motor. Solo cuesta abajo.', 'hero.signup': 'Inscríbete en la carrera', 'hero.attend': 'Allí estaré para el gran espectáculo', 'hero.pilots': 'pilotos inscritos', 'hero.people': 'personas asistirán', 'hero.scroll': 'Descubre la carrera',
     'count.days': 'días', 'count.hours': 'horas', 'count.minutes': 'minutos', 'count.seconds': 'segundos',
     'count.daysShort': 'd', 'count.hoursShort': 'h', 'count.minutesShort': 'm', 'count.secondsShort': 's',
     'marquee': 'Construye · Sube · Baja · Frena · Sonríe',
@@ -365,8 +365,8 @@
 
   const fr = {
     'a11y.skip': 'Aller au contenu', 'a11y.menu': 'Ouvrir le menu', 'a11y.close': 'Fermer',
-    'nav.race': 'La course', 'nav.categories': 'Catégories', 'nav.route': 'Parcours', 'nav.program': 'Programme', 'nav.prizes': 'Prix', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': "S'inscrire", 'nav.attend': 'Je serai là',
-    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Aucun moteur. Seulement la descente.', 'hero.signup': "S'inscrire à la course", 'hero.attend': 'Je serai là', 'hero.pilots': 'pilotes inscrits', 'hero.people': 'personnes seront là', 'hero.scroll': 'Découvrir la course',
+    'nav.race': 'La course', 'nav.categories': 'Catégories', 'nav.route': 'Parcours', 'nav.program': 'Programme', 'nav.prizes': 'Prix', 'nav.faq': 'FAQ', 'nav.contact': 'Contact', 'nav.signup': "S'inscrire", 'nav.attend': 'Je serai là pour le grand spectacle',
+    'hero.kicker': '%DATE% · %PLACE%', 'hero.tagline': 'Aucun moteur. Seulement la descente.', 'hero.signup': "S'inscrire à la course", 'hero.attend': 'Je serai là pour le grand spectacle', 'hero.pilots': 'pilotes inscrits', 'hero.people': 'personnes seront là', 'hero.scroll': 'Découvrir la course',
     'count.days': 'jours', 'count.hours': 'heures', 'count.minutes': 'minutes', 'count.seconds': 'secondes',
     /* „j" dla dnia, nie „d" — po francusku dzień to `jour`. Ta jedna litera jest powodem,
        dla którego skróty są kluczami i18n, a nie obcięciem pełnej nazwy w JavaScripcie. */
@@ -1310,6 +1310,89 @@
    * `already` mówi „w tej kategorii", nie „już głosowałeś": limit jest na kategorię, a bez
    * tego doprecyzowania ktoś, kto ocenił jeden pojazd, uznałby, że skończył z całą stroną.
    */
+  /**
+   * Transmisja na żywo.
+   *
+   * OSOBNY BLOK, JAK `votingExtras` I Z TEGO SAMEGO POWODU
+   *   Dziewięć napisów razy sześć języków to pięćdziesiąt cztery wpisy, które istnieją tylko
+   *   w tym jednym dniu w roku. Wsypane w główne słowniki rozłożyłyby się po sześciu miejscach
+   *   oddalonych o dwieście linii i pierwsza zmiana treści rozjechałaby połowę z nich.
+   *
+   * `qualityNote` MÓWI O CUDZYM PRZYCISKU, I TAK MA BYĆ
+   *   Ramka jest z innej domeny, więc jakości obrazu nie da się przestawić z tej strony —
+   *   ani suwakiem, ani niczym innym. Zamiast udawać, że się da, napis kieruje do kółka
+   *   zębatego w rogu samego odtwarzacza. Bez tego zdania ludzie szukają suwaka, którego nie
+   *   ma, i uznają, że transmisja jest zepsuta.
+   */
+  const streamExtras = {
+    it: {
+      'stream.cta': 'Guarda la diretta',
+      'stream.badge': 'In diretta ora',
+      'stream.title': 'La discesa, mentre succede.',
+      'stream.lead': 'Il segnale arriva dal traguardo. Tocca lo schermo per applaudire.',
+      'stream.clap': 'Applaudi',
+      'stream.share': 'Condividi',
+      'stream.fullscreen': 'Schermo intero',
+      'stream.qualityNote': 'Per la qualità video usa l’ingranaggio dentro il player. Sul telefono, gira lo schermo: il video si apre a tutto schermo da solo.',
+      'stream.shareText': 'Il Carruleddhi Show è in diretta adesso.'
+    },
+    pl: {
+      'stream.cta': 'Oglądaj na żywo',
+      'stream.badge': 'Trwa transmisja',
+      'stream.title': 'Zjazd, w chwili gdy się dzieje.',
+      'stream.lead': 'Obraz leci spod mety. Stuknij w ekran, żeby bić brawo.',
+      'stream.clap': 'Bij brawo',
+      'stream.share': 'Udostępnij',
+      'stream.fullscreen': 'Pełny ekran',
+      'stream.qualityNote': 'Jakość obrazu ustawisz kółkiem zębatym w samym odtwarzaczu. Na telefonie obróć ekran — obraz rozłoży się na cały sam.',
+      'stream.shareText': 'Carruleddhi Show leci właśnie na żywo.'
+    },
+    en: {
+      'stream.cta': 'Watch live',
+      'stream.badge': 'Live right now',
+      'stream.title': 'The descent, as it happens.',
+      'stream.lead': 'The signal comes from the finish line. Tap the screen to applaud.',
+      'stream.clap': 'Applaud',
+      'stream.share': 'Share',
+      'stream.fullscreen': 'Full screen',
+      'stream.qualityNote': 'Video quality is set with the gear icon inside the player. On a phone, turn the screen sideways — the video goes full screen on its own.',
+      'stream.shareText': 'The Carruleddhi Show is live right now.'
+    },
+    de: {
+      'stream.cta': 'Live ansehen',
+      'stream.badge': 'Jetzt live',
+      'stream.title': 'Die Abfahrt, während sie passiert.',
+      'stream.lead': 'Das Signal kommt vom Ziel. Tippe auf den Bildschirm, um zu applaudieren.',
+      'stream.clap': 'Applaudieren',
+      'stream.share': 'Teilen',
+      'stream.fullscreen': 'Vollbild',
+      'stream.qualityNote': 'Die Bildqualität stellst du über das Zahnrad im Player ein. Am Handy einfach quer drehen — das Video geht von selbst auf Vollbild.',
+      'stream.shareText': 'Die Carruleddhi Show läuft gerade live.'
+    },
+    es: {
+      'stream.cta': 'Ver en directo',
+      'stream.badge': 'En directo ahora',
+      'stream.title': 'La bajada, mientras ocurre.',
+      'stream.lead': 'La señal llega desde la meta. Toca la pantalla para aplaudir.',
+      'stream.clap': 'Aplaudir',
+      'stream.share': 'Compartir',
+      'stream.fullscreen': 'Pantalla completa',
+      'stream.qualityNote': 'La calidad del vídeo se ajusta con la rueda dentada del propio reproductor. En el móvil, gira la pantalla: el vídeo pasa a pantalla completa solo.',
+      'stream.shareText': 'El Carruleddhi Show está en directo ahora mismo.'
+    },
+    fr: {
+      'stream.cta': 'Voir en direct',
+      'stream.badge': 'En direct maintenant',
+      'stream.title': 'La descente, pendant qu’elle se passe.',
+      'stream.lead': 'Le signal vient de l’arrivée. Touchez l’écran pour applaudir.',
+      'stream.clap': 'Applaudir',
+      'stream.share': 'Partager',
+      'stream.fullscreen': 'Plein écran',
+      'stream.qualityNote': 'La qualité vidéo se règle avec la roue dentée dans le lecteur. Sur téléphone, tournez l’écran : la vidéo passe en plein écran toute seule.',
+      'stream.shareText': 'Le Carruleddhi Show est en direct en ce moment.'
+    }
+  };
+
   const votingExtras = {
     it: {
       'voting.cta': 'Vota il partecipante',
@@ -2863,6 +2946,7 @@
   Object.keys(wallAskExtras).forEach((locale) => Object.assign(extras[locale], wallAskExtras[locale]));
   Object.keys(samePersonExtras).forEach((locale) => Object.assign(extras[locale], samePersonExtras[locale]));
   Object.keys(votingExtras).forEach((locale) => Object.assign(extras[locale], votingExtras[locale]));
+  Object.keys(streamExtras).forEach((locale) => Object.assign(extras[locale], streamExtras[locale]));
   Object.keys(chatEndExtras).forEach((locale) => Object.assign(extras[locale], chatEndExtras[locale]));
   Object.keys(chatGateExtras).forEach((locale) => Object.assign(extras[locale], chatGateExtras[locale]));
   Object.keys(chatConsentExtras).forEach((locale) => Object.assign(extras[locale], chatConsentExtras[locale]));

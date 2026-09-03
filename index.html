@@ -176,6 +176,12 @@
              i prowadzi do niczego, jest gorszy niż brak przycisku. Odsłania go voting.js po
              odczycie fazy z serwera — zegar przeglądarki nie decyduje o tym, kiedy trwa
              wyścig, bo bywa przestawiony. -->
+        <!-- To samo zaproszenie w pasku, zeby bylo osiagalne z kazdego miejsca strony,
+             a nie tylko z gory. Ten sam atrybut co w hero, wiec odslania je jedno
+             przypisanie w stream.js — dwa miejsca do pomylenia byloby o jedno za duzo. -->
+        <a class="btn btn--small btn--live nav-live" href="#live" data-stream-cta hidden>
+          <span class="btn__live-dot" aria-hidden="true"></span><span data-i18n="stream.cta">Guarda la diretta</span>
+        </a>
         <a class="btn btn--small nav-vote" href="votazione.html" data-vote-cta hidden>
           <span data-i18n="voting.cta">Vota il partecipante</span>
         </a>
@@ -235,6 +241,11 @@
       <div class="menu-panel__grid">
         <div class="menu-panel__links">
           <a href="#hero" data-section-link="hero"><span class="menu-link__index">01</span><span>Carruleddhi</span><span class="menu-link__arrow">↗</span></a>
+          <!-- Bez numeru porzadkowego: reszta listy jest ponumerowana od 01 do 11 i
+               wstawienie tu „02" przesunuloby dziewiec pozostalych numerow za kazdym
+               razem, gdy transmisja sie wlacza i wylacza. Zamiast numeru — kropka,
+               ktora i tak mowi wiecej. -->
+          <a class="menu-link--live" href="#live" data-section-link="live" data-stream-cta hidden><span class="menu-link__index" aria-hidden="true">●</span><span data-i18n="stream.cta">Guarda la diretta</span><span class="menu-link__arrow">↗</span></a>
           <a href="#story" data-section-link="story"><span class="menu-link__index">02</span><span data-i18n="nav.race">La gara</span><span class="menu-link__arrow">↗</span></a>
           <a href="#categories" data-section-link="categories"><span class="menu-link__index">03</span><span data-i18n="nav.categories">Categorie</span><span class="menu-link__arrow">↗</span></a>
           <a href="#route" data-section-link="route"><span class="menu-link__index">04</span><span data-i18n="nav.route">Percorso</span><span class="menu-link__arrow">↗</span></a>
@@ -290,6 +301,16 @@
                  działa, i człowiek naciska go dwa razy, zanim uwierzy. „Zapisz się" w chwili,
                  gdy wózki już jadą, oraz „będę tam" w chwili, gdy trzeba już tam być, nie mają
                  czego dotyczyć. Odsłania i chowa je voting.js po odczycie fazy z serwera. -->
+            <!-- Zaproszenie do transmisji stoi PRZED zaproszeniem do glosowania i przed
+                 wszystkim innym: w chwili, w ktorej transmisja trwa, nie ma na tej stronie
+                 niczego pilniejszego. Ukryty w znaczniku, nie w CSS — dokladnie z tego
+                 samego powodu co przycisk glosowania obok: odsylacz do transmisji, ktora
+                 sie nie odbywa, jest gorszy niz brak odsylacza. Odslania go stream.js po
+                 odczycie stanu z serwera. Kropka pulsuje, zeby bylo widac, ze to jest
+                 „teraz", a nie „bedzie". -->
+            <a class="btn btn--live magnetic" href="#live" data-stream-cta data-section-link="live" hidden>
+              <span class="btn__live-dot" aria-hidden="true"></span><span data-i18n="stream.cta">Guarda la diretta</span>
+            </a>
             <a class="btn btn--vote magnetic" href="votazione.html" data-vote-cta hidden>
               <span data-i18n="voting.cta">Vota il partecipante</span><span class="btn__icon" aria-hidden="true">★</span>
             </a>
@@ -377,6 +398,76 @@
 
          Rysunek jest jednym SVG i podnosi się animacją rysowania kreski. Trzy schodki są
          nierówne z premedytacją: równe wyglądają jak wykres, a nie jak podium. -->
+    <!-- ======================================================================= TRANSMISJA
+         Sekcja, ktorej przez wiekszosc roku NIE MA.
+         =========================================================================
+         `hidden` w znaczniku, zdejmowane przez stream.js dopiero po odczycie z serwera.
+         To jest ta sama zasada, co przy podium i archiwum obok: sekcja, ktora stoi na
+         stronie pusta przez jedenascie miesiecy, uczy odwiedzajacych, ze nie warto tu
+         zagladac — i w tym jednym dniu, kiedy warto, nikt nie zagladnie.
+
+         RAMKA NIE MA ADRESU, DOPOKI TRANSMISJA NIE TRWA
+         `<iframe>` stoi tu bez `src`. Adres wpisuje stream.js w chwili wlaczenia i ZDEJMUJE
+         przy wylaczeniu. Ramka z adresem YouTube'a wczytuje ich skrypty, ustawia ich
+         ciasteczka i liczy wyswietlenie — na kazdej odslonie strony glownej, przez caly
+         rok, dla odtwarzacza, ktorego nikt nie oglada. Serwer zreszta i tak nie oddaje
+         adresu przy zamknietej transmisji (patrz `streamPublic` w Workerze), wiec nie ma
+         tu czego wpisac. -->
+    <section class="section section-card live" id="live" aria-labelledby="live-title" data-stream-section hidden>
+      <div class="container">
+        <div class="live__head reveal">
+          <span class="eyebrow eyebrow--live"><span class="live-dot" aria-hidden="true"></span><span data-i18n="stream.badge">In diretta ora</span></span>
+          <h2 class="section-title section-title--medium" id="live-title" data-i18n="stream.title" data-text-effect="rise">La discesa, mentre succede.</h2>
+          <p class="live__lead" data-stream-title data-i18n="stream.lead">Il segnale arriva dal traguardo. Tocca lo schermo per applaudire.</p>
+        </div>
+
+        <!-- Odtwarzacz i wszystko, co na nim lezy.
+             `data-stream-stage` jest tym, co wchodzi na pelny ekran — nie sama ramka:
+             inaczej serca, licznik i pasek zostalyby POD odtwarzaczem i na pelnym ekranie
+             zniknelyby razem z reszta strony. -->
+        <div class="live__stage reveal" data-delay="1" data-stream-stage>
+          <div class="live__frame">
+            <iframe class="live__video" data-stream-frame title="Carruleddhi Show" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          </div>
+
+          <!-- Warstwa do stukania. Nad ramka, ale POZA nia — do wnetrza ramki z innej
+               domeny nie siega zadne zdarzenie i nie ma sposobu, zeby siegalo.
+               `aria-hidden` i brak fokusu: to jest gest, nie przycisk. Ta sama czynnosc
+               ma osiagalny przycisk w pasku nizej, i to on jest droga z klawiatury. -->
+          <div class="live__tap" data-stream-tap aria-hidden="true"></div>
+          <div class="live__hearts" data-stream-hearts aria-hidden="true"></div>
+
+          <!-- Pasek sterowania. Pojawia sie po stuknieciu i gasnie po chwili — tak jak
+               w kazdym odtwarzaczu, ktorego ci ludzie uzywaja na co dzien. -->
+          <div class="live__bar" data-stream-bar>
+            <span class="live__count" data-stream-count-wrap>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 12a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4Zm0 1.8c-3.4 0-7 1.7-7 3.9v2.5h14v-2.5c0-2.2-3.6-3.9-7-3.9Z" fill="currentColor"/></svg>
+              <strong data-stream-count>0</strong>
+            </span>
+            <button class="live__btn" type="button" data-stream-clap>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 21s-7.6-4.7-9.6-9.1C.8 8.3 2.8 5 6.2 5c2 0 3.4 1.1 4.3 2.3l.7.9.7-.9C12.8 6.1 14.2 5 16.2 5c3.4 0 5.4 3.3 3.8 6.9C17.9 16.3 12 21 12 21Z" fill="currentColor"/></svg>
+              <span data-i18n="stream.clap">Applaudi</span>
+            </button>
+            <button class="live__btn" type="button" data-stream-share hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M13 3v8.6l3.3-3.3 1.4 1.4-5.7 5.7-5.7-5.7 1.4-1.4L11 11.6V3h2ZM4 17h16v4H4v-4Z" fill="currentColor"/></svg>
+              <span data-i18n="stream.share">Condividi</span>
+            </button>
+            <button class="live__btn live__btn--wide" type="button" data-stream-full>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M4 9V4h5v2H6v3H4Zm11-5h5v5h-2V6h-3V4ZM4 15h2v3h3v2H4v-5Zm14 0h2v5h-5v-2h3v-3Z" fill="currentColor"/></svg>
+              <span data-i18n="stream.fullscreen">Schermo intero</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Jakosc obrazu nalezy do odtwarzacza, nie do nas.
+             Ramka jest z innej domeny — nic z tej strony nie moze siegnac do jej srodka
+             i przestawic rozdzielczosci. YouTube i Twitch maja wlasne kolko zebate w rogu
+             obrazu i to ono jest tu jedyna droga. Napis o tym stoi na stronie, bo bez niego
+             ludzie szukaja suwaka, ktorego nie ma. -->
+        <p class="live__note reveal" data-delay="2" data-i18n="stream.qualityNote">Per la qualita video usa l’ingranaggio dentro il player.</p>
+      </div>
+    </section>
+
     <section class="section section-card podium" id="podium" aria-labelledby="podium-title" data-podium hidden>
       <div class="container">
         <header class="section-head">
@@ -2190,6 +2281,9 @@
        przy wykonaniu app.js. Odwrotna kolejność znaczy moduł, który nie ma czym wysłać
        żądania i milczy o tym, bo brak API czyta jako tryb demo. */
     import './assets/js/voting.js';
+    /* Po voting.js z tego samego powodu, co voting.js po app.js: stream.js sięga po
+       window.CARRULEDDHI_API i po pomocnicze z voting-core.js. */
+    import './assets/js/stream.js';
 
     /* Rząd języków w rozwiniętym menu — podpięty pod listę w pasku, nie obok niej.
        ---------------------------------------------------------------------------

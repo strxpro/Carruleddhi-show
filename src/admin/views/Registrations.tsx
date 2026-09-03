@@ -239,7 +239,7 @@ export function Registrations({
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-foreground">
-                      {`${row.firstName} ${row.lastName}`.trim() || '—'}
+                      <Highlighter text={`${row.firstName} ${row.lastName}`.trim() || '—'} query={highlightQuery || query} />
                     </div>
                     {row.isMinor ? (
                       <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-destructive/20 px-2 py-0.5 text-[11px] font-bold text-destructive">
@@ -265,9 +265,9 @@ export function Registrations({
                     ) : null}
                   </td>
                   <td className="px-4 py-3 text-foreground/80">
-                    {row.cartName || '—'}
+                    <Highlighter text={row.cartName || '—'} query={highlightQuery || query} />
                     {row.teamName ? (
-                      <div className="text-[11px] text-muted-foreground">{row.teamName}</div>
+                      <div className="text-[11px] text-muted-foreground"><Highlighter text={row.teamName} query={highlightQuery || query} /></div>
                     ) : null}
                   </td>
                   <td className="px-4 py-3">
@@ -284,7 +284,7 @@ export function Registrations({
                     <div className="mt-1 text-[11px] uppercase text-muted-foreground">{row.status}</div>
                   </td>
                   <td className="px-4 py-3 text-[12px] text-muted-foreground">
-                    <div className="break-all">{row.email || '—'}</div>
+                    <div className="break-all"><Highlighter text={row.email || '—'} query={highlightQuery || query} /></div>
                     {/* More than one rider on this address. Worth a badge: three entries from
                         one inbox are a family, not three strangers who happen to be adjacent
                         in the list — and it changes who you ring when one of them has a
@@ -296,7 +296,7 @@ export function Registrations({
                           : `${row.emailGroupSize} iscritti da questo indirizzo`}
                       </div>
                     ) : null}
-                    <div>{row.phone}</div>
+                    <div><Highlighter text={row.phone} query={highlightQuery || query} /></div>
                     <div className="uppercase opacity-70">{row.locale}</div>
                   </td>
                   <td className="px-4 py-3">

@@ -124,7 +124,17 @@ export const DEFAULT_SITE_CONFIG = Object.freeze({
        Domyślne, jak `chat` i `settings`, i z tego samego powodu: nie ma tu czego
        konfigurować, a puste znaczyłoby stronę, która w dniu wyścigu nie otwiera
        głosowania i wygląda przy tym dokładnie tak, jak wyglądała zawsze. */
-    voting: '/api/carruleddhi/voting'
+    voting: '/api/carruleddhi/voting',
+
+    /* Transmisja na żywo. Dwie ścieżki, bo to są dwie zupełnie różne rzeczy:
+         stream       odczyt stanu — czy trwa, czym leci, ile serc;
+         streamHeart  stuknięcie w obraz, jedno albo paczka.
+
+       Domyślne z tego samego powodu co `voting`: nie ma tu czego konfigurować, a puste
+       znaczyłoby stronę, która w dniu wyścigu nie pokazuje transmisji i wygląda przy tym
+       dokładnie tak, jak wyglądała zawsze — czyli usterkę nie do zauważenia. */
+    stream: '/api/carruleddhi/stream',
+    streamHeart: '/api/carruleddhi/stream-heart'
   }
 });
 

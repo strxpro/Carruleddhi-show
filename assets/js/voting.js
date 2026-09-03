@@ -68,6 +68,8 @@ import {
   let demoPhase = 'scheduled';
   /** Ustawiane, gdy dane na ekranie pochodzą z demo, a nie z serwera. */
   let demoDriven = false;
+  /** Ustawiane po pierwszym narysowaniu cokołu — kolejny odczyt stanu nie przebudowuje listy. */
+  let podiumPainted = false;
   /** Ustawiane, gdy licznik dobiegł zera i wysłano po nowy stan — żeby nie wysłać dziesięć razy. */
   let awaitingPhase = false;
 
@@ -105,6 +107,7 @@ import {
           /* Cokół wznosi się raz, więc przy powrocie do tej fazy trzeba zdjąć klasę,
              inaczej drugie wejście pokazuje gotowy cokół bez animacji. */
           $('[data-podium-stage]')?.classList.remove('is-drawn');
+          podiumPainted = false;
           pull();
         },
         onSkip: () => {
@@ -614,6 +617,14 @@ import {
   function paintPodium() {
     const list = $('[data-podium-winners]');
     if (!list) return;
+
+    /* Gdy cokoł został już zbudowany, nie przebudowujemy go przy każdym odczycie fazy.
+       pull() co 30 s wywoływa paint() → paintPodium() i bez tej flagi replaceChildren()
+       rozbierałby i składał DOM, resetując animację wznoszenia bloków. */
+    if (podiumPainted && state.phase === 'closed') {
+      setupScratch();
+      return;
+    }
     /* Liczone z pełnej stawki, nie z tych trzech wierszy — patrz tieNotes(). Remis trzeciego
        z czwartym jest jedynym, o który ktoś zapyta, a z samej trójki go nie widać. */
     const ties = tieNotes(standingsRows());
@@ -731,6 +742,7 @@ import {
     /* Klasa na scenie, nie na rysunku: rysunku SVG już nie ma, a wznoszenie bloków i
        lądowanie kart są animacjami potomków tej scenki. */
     if (!reducedMotion) $('[data-podium-stage]')?.classList.add('is-drawn');
+    podiumPainted = true;
     setupScratch();
   }
 
