@@ -2477,10 +2477,22 @@ body { font-variation-settings: 'opsz' 16; }
    rzeczy szuka. Do stopki dociera ułamek odwiedzających, więc sama stopka by nie
    wystarczyła; samo hero znikałoby po pierwszym przewinięciu.
 
-   ZNAK JEST CZARNY NA BIAŁYM I TO ZMIENIA OPRAWĘ
-     Stał tu wcześniej baner z własnym, mocno niebieskim tłem. Ten znak jest przeciwieństwem:
-     czarny rysunek na białym prostokącie, w pliku JPEG, czyli BEZ przezroczystości — białego
-     tła nie da się z niego zdjąć bez przerysowania pliku.
+   DWA ZNAKI OBOK SIEBIE, ZRÓWNANE WYSOKOŚCIĄ — NIE SZEROKOŚCIĄ
+     Shardana Nuragici i Fidali 1982 stoją w jednym rzędzie. Zrównanie ich szerokością
+     (`max-width` po równo, jak było przy jednym znaku) dałoby dwa pola tej samej szerokości
+     i RÓŻNEJ wysokości, bo proporcje plików nie są identyczne: 2,322 i 2,457. Rząd znaków
+     czyta się linią górną i dolną, więc to właśnie wysokość musi się zgadzać — stąd
+     `height` z `width: auto`, a nie odwrotnie.
+
+     Zmierzone na 390 px: przy wysokości 56 px szerokości wychodzą 130 i 138 px, razem
+     z odstępem 278 px w kolumnie o 342 px — mieszczą się w jednym rzędzie na telefonie
+     i nie trzeba ich tam łamać. `flex-wrap` zostaje mimo to, bo przy największym kroju
+     pisma w ustawieniach dostępności etykieta i odstępy rosną i wtedy złamanie jest
+     lepsze niż wyjechanie poza kolumnę.
+
+   ZNAKI SĄ CZARNE NA BIAŁYM I TO ZMIENIA OPRAWĘ
+     Oba są rysunkiem na własnym, nieprzezroczystym tle w pliku JPEG — tego tła nie da się
+     z nich zdjąć bez przerysowania plików.
 
      Białe pole na granatowej stopce jest mocne, ale to jest właściwe zachowanie: tak wygląda
      każdy znak podany na kartce i tak się go czyta. Zaokrąglenie i obwódka zostają, bo bez
@@ -2488,9 +2500,9 @@ body { font-variation-settings: 'opsz' 16; }
      obwódka jest ciemna, na granatowej stopce jasna — jasna kreska na kremie jest
      niewidoczna, a ciemna na granacie tak samo.
 
-     Wymiary w znaczniku (671×289) to PRAWDZIWE wymiary pliku, nie zaokrąglenie: razem
-     z `height: auto` niżej trzymają proporcje i rezerwują miejsce w dobrym kształcie,
-     więc nic nie przeskakuje w chwili wczytania. */
+     Wymiary w znacznikach (671×289 i 720×293) to PRAWDZIWE wymiary plików, nie zaokrąglenia:
+     przeglądarka zna z nich proporcję, więc rezerwuje miejsce w dobrym kształcie i nic nie
+     przeskakuje w chwili wczytania — mimo że o rozmiarze rozstrzyga tu wysokość z CSS. */
 .patron {
   display: grid;
   justify-items: start;
@@ -2507,14 +2519,21 @@ body { font-variation-settings: 'opsz' 16; }
   opacity: .62;
 }
 
-/* `width: 100%` z `max-width`, a nie sama szerokość: na wąskim telefonie baner ma się
-   zmieścić, a nie wystawać poza kolumnę. `height: auto` przy podanych `width`/`height` w
-   znaczniku trzyma proporcje i rezerwuje miejsce, więc nic nie przeskakuje przy wczytaniu. */
+.patron__logos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(10px, 1.4vw, 16px);
+}
+
 .patron__logo {
   display: block;
-  width: 100%;
-  max-width: 210px;
-  height: auto;
+  /* Wysokość rozstrzyga, szerokość idzie za proporcją pliku — patrz komentarz wyżej.
+     `max-width: 100%` jest zabezpieczeniem na wypadek złamania rzędu: znak ma się wtedy
+     zmieścić w kolumnie, a nie z niej wyjechać. */
+  height: clamp(56px, 7vw, 78px);
+  width: auto;
+  max-width: 100%;
   border-radius: 12px;
   border: 2px solid transparent;
   box-shadow: 0 10px 24px -16px rgb(0 0 0 / .55);
@@ -2531,5 +2550,8 @@ body { font-variation-settings: 'opsz' 16; }
 .site-footer .patron--footer + .footer__bottom { margin-top: clamp(18px, 2.4vw, 26px); }
 
 @media (max-width: 560px) {
-  .patron__logo { max-width: 180px; }
+  /* Odstęp schodzi, wysokość nie: dwa znaki obok siebie mieszczą się na 390 px z zapasem
+     (zmierzone: 278 px w kolumnie o 342 px), a zmniejszanie ich tutaj robiłoby je nieczytelnymi
+     dokładnie tam, gdzie ekran jest najmniejszy. */
+  .patron__logos { gap: 10px; }
 }
