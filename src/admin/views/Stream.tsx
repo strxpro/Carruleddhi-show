@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link2, Loader2, PlayCircle, RefreshCw, Square, Heart } from 'lucide-react';
+import { Link2, Loader2, PlayCircle, RefreshCw, Square, Heart, ExternalLink } from 'lucide-react';
 import type { TranslateKey } from '../i18n';
 import { fetchStreamAdmin, saveStream, setStreamLive, resetStreamHearts, type StreamState } from '../api';
 import { ActionButton } from './ActionButton';
@@ -18,6 +18,26 @@ import { ActionButton } from './ActionButton';
  * transmisję, zakładka pojawiałaby się na stronie w połowie ustawiania — a to jest ten
  * rodzaj pomyłki, którego nie da się cofnąć przed publicznością, bo ona już to zobaczyła.
  */
+/**
+ * Adres do OBEJRZENIA, złożony z identyfikatora — nigdy z tego, co wklejono.
+ * ---------------------------------------------------------------------------
+ * Ta sama zasada, co przy `embedUrl` w Workerze, i z tego samego powodu: serwer zapamiętuje
+ * wyłącznie identyfikator, więc wszystko, co pokazujemy, ma być z niego wyliczone. Różnica
+ * jest w przeznaczeniu — `embedUrl` robi adres dla ramki odtwarzacza, ten robi adres, który
+ * człowiek może kliknąć i zobaczyć, czy zapisał to, co chciał.
+ *
+ * Round-trip jest tu warunkiem, a nie miłym dodatkiem: ten napis wraca do pola i przy
+ * następnym „Zapisz" jedzie z powrotem do Workera. `streamIdFrom` rozbiera oba kształty —
+ * `?v=` dla YouTube i pierwszy człon ścieżki dla Twitcha — więc zapisanie drugi raz daje ten
+ * sam identyfikator, a nie pusty.
+ */
+function watchUrl(provider: StreamState['provider'], id: string) {
+  if (!id) return '';
+  return provider === 'twitch'
+    ? `https://www.twitch.tv/${id}`
+    : `https://www.youtube.com/watch?v=${id}`;
+}
+
 export function Stream({ t, apiKey, pl }: {
   t: (key: TranslateKey) => string;
   apiKey: string;
@@ -35,10 +55,18 @@ export function Stream({ t, apiKey, pl }: {
     setState(next);
     setProvider(next.provider === 'twitch' ? 'twitch' : 'youtube');
     setTitle(next.title);
-    /* Pole adresu pokazuje IDENTYFIKATOR, nie to, co wklejono. Serwer i tak zapamiętał tylko
-       jego (patrz `streamIdFrom` w Workerze), więc pokazanie tu poprzedniego wklejenia
-       obiecywałoby, że przechowujemy coś, czego nie przechowujemy. */
-    setUrl(next.videoId);
+    /* Pole pokazuje PEŁNY ADRES, złożony z zapamiętanego identyfikatora.
+       ---------------------------------------------------------------------------
+       Stał tu sam identyfikator — `dQw4w9WgXcQ` — z uzasadnieniem, że serwer i tak nie
+       przechowuje wklejenia, więc pokazanie go obiecywałoby coś, czego nie robimy. Powód był
+       dobry, wniosek zły: po zapisaniu w polu zostawał napis, który nie wygląda na adres, nie
+       da się go kliknąć i nie da się na oko sprawdzić, czy to ta transmisja. Zgłoszone jako
+       „wpisuję link, a pokazuje mi się jakieś id".
+
+       Adres jest WYLICZANY z identyfikatora, więc nie obiecuje niczego ponad to, co naprawdę
+       zapamiętaliśmy — a przy następnym zapisie wraca do Workera i rozbiera się z powrotem na
+       ten sam identyfikator. Samo id nadal widać niżej, przy „Zapisany identyfikator". */
+    setUrl(watchUrl(next.provider === 'twitch' ? 'twitch' : 'youtube', next.videoId));
   }, []);
 
   const load = useCallback(async () => {
@@ -149,9 +177,22 @@ export function Stream({ t, apiKey, pl }: {
             onPress={() => void load()}
           />
         </div>
+        {/* Identyfikator ORAZ odsyłacz. Jedno mówi, co dokładnie zapamiętał serwer, drugie
+            pozwala to sprawdzić bez przepisywania — a sprawdzenie „czy to na pewno ta
+            transmisja" przed naciśnięciem włącznika jest jedyną rzeczą, której z samego
+            ciągu znaków zrobić się nie da. */}
         {state?.videoId ? (
-          <p className="mt-3 text-xs text-muted-foreground">
-            {t('stream.savedId')} <span className="font-mono text-foreground">{state.videoId}</span>
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>{t('stream.savedId')}</span>
+            <span className="font-mono text-foreground">{state.videoId}</span>
+            <a
+              href={watchUrl(state.provider, state.videoId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-semibold text-foreground underline underline-offset-2 hover:text-primary"
+            >
+              {t('stream.openLink')} <ExternalLink size={12} />
+            </a>
           </p>
         ) : null}
       </section>
