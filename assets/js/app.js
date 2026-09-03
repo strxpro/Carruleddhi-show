@@ -2376,6 +2376,10 @@ import {
       quickButton.classList.toggle('is-complete', state.attended);
       quickButton.setAttribute('aria-pressed', String(state.attended));
     });
+    $$('.nav-attend').forEach((navButton) => {
+      navButton.textContent = text(state.attended ? 'nav.attended' : 'nav.attend');
+      navButton.classList.toggle('is-complete', state.attended);
+    });
   }
 
   function createBurst(origin) {
