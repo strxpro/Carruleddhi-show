@@ -2470,18 +2470,27 @@ body { font-variation-settings: 'opsz' 16; }
 }
 
 /* ===========================================================================
-   Podziękowanie dla Fidali 1982
+   Podziękowanie dla Shardana Nuragici
    ===========================================================================
    Bez nich nie ma imprezy — i to jest cała treść tego bloku. Stoi w dwóch miejscach na
    każdej stronie serwisu: w hero, bo tam trafia każdy, i w stopce, bo tam się takich
    rzeczy szuka. Do stopki dociera ułamek odwiedzających, więc sama stopka by nie
    wystarczyła; samo hero znikałoby po pierwszym przewinięciu.
 
-   Baner jest gotową grafiką z własnym, mocno niebieskim tłem — nie logo na przezroczystości.
-   Dlatego dostaje zaokrąglenie i obwódkę: bez nich na granatowej stopce zlewa się z nią w
-   jeden prostokąt, a na jasnym hero wygląda jak wklejony zrzut ekranu. Obwódka jest inna w
-   każdym z tych dwóch miejsc, bo jasna kreska na kremowym tle jest niewidoczna, a ciemna na
-   granacie tak samo. */
+   ZNAK JEST CZARNY NA BIAŁYM I TO ZMIENIA OPRAWĘ
+     Stał tu wcześniej baner z własnym, mocno niebieskim tłem. Ten znak jest przeciwieństwem:
+     czarny rysunek na białym prostokącie, w pliku JPEG, czyli BEZ przezroczystości — białego
+     tła nie da się z niego zdjąć bez przerysowania pliku.
+
+     Białe pole na granatowej stopce jest mocne, ale to jest właściwe zachowanie: tak wygląda
+     każdy znak podany na kartce i tak się go czyta. Zaokrąglenie i obwódka zostają, bo bez
+     nich prostokąt kończy się ostrą krawędzią i wygląda jak dziura w tle. Na kremowym hero
+     obwódka jest ciemna, na granatowej stopce jasna — jasna kreska na kremie jest
+     niewidoczna, a ciemna na granacie tak samo.
+
+     Wymiary w znaczniku (671×289) to PRAWDZIWE wymiary pliku, nie zaokrąglenie: razem
+     z `height: auto` niżej trzymają proporcje i rezerwują miejsce w dobrym kształcie,
+     więc nic nie przeskakuje w chwili wczytania. */
 .patron {
   display: grid;
   justify-items: start;
