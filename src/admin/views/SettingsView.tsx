@@ -280,7 +280,8 @@ function toMinuteKey(iso: string): string {
   return iso.slice(0, 16);
 }
 
-export function SettingsView({\n  highlightQuery,
+export function SettingsView({
+  highlightQuery,
   t,
   locale,
   setLocale,
@@ -293,6 +294,7 @@ export function SettingsView({\n  highlightQuery,
   setLocale: (locale: PanelLocale) => void;
   onForget: () => void;
   apiKey: string;
+  highlightQuery?: string;
   /* Comes from the inbox poll, which the panel already runs every ten seconds — rather than a
      call of its own. Undefined until the first poll lands, and the section simply is not drawn
      until then; a settings screen that flashes "the key is missing" while it finds out would be

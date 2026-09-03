@@ -330,7 +330,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
     'w-full rounded-xl bg-white/5 border border-white/15 px-3 py-2 text-sm text-white outline-none '
     + 'focus-visible:outline-2 focus-visible:outline-yellow focus-visible:outline-offset-2';
   const chip =
-    'rounded-full px-4 py-2 text-xs font-extrabold transition-colors disabled:opacity-45 disabled:cursor-not-allowed';
+    'rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-[0.97] active:opacity-80 disabled:opacity-45 disabled:active:scale-100 disabled:active:opacity-100 disabled:cursor-not-allowed';
 
   /* ---------------------------------------------------------------- czas: co wolno kliknąć
 

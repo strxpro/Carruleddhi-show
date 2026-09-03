@@ -77,8 +77,8 @@ export function ActionButton({
         aria-describedby={off ? describedBy : undefined}
         onClick={click}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-colors',
-          off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70' : armed ? (confirmTone || 'bg-coral text-white border border-coral') : tone
+          'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-[0.97] active:opacity-80',
+          off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70 active:scale-100 active:opacity-100' : armed ? (confirmTone || 'bg-coral text-white border border-coral') : tone
         )}
       >
         {icon}
