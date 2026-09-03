@@ -47,6 +47,7 @@ export function ActionButton({
   confirmLabel?: string;
   confirmTone?: string;
   busy?: boolean;
+  isCurrent?: boolean;
   onPress: () => void;
 }) {
   const off = reason !== '';
@@ -80,8 +81,10 @@ export function ActionButton({
         aria-describedby={off ? describedBy : undefined}
         onClick={click}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-[0.97] active:opacity-80 disabled:opacity-50 disabled:pointer-events-none',
-          off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70 active:scale-100 active:opacity-100' : armed ? (confirmTone || 'bg-coral text-white border border-coral') : tone
+          'inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-xs font-extrabold transition-all active:scale-[0.97] active:opacity-80 disabled:pointer-events-none',
+          isCurrent ? cn(tone, 'opacity-60 shadow-inner saturate-50 cursor-default pointer-events-none ring-2 ring-inset ring-black/20')
+          : off ? 'cursor-not-allowed border border-white/20 bg-white/[0.08] text-white/70 active:scale-100 active:opacity-100 disabled:opacity-50'
+          : armed ? (confirmTone || 'bg-coral text-white border border-coral') : cn(tone, 'disabled:opacity-50')
         )}
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : icon}

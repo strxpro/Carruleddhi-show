@@ -522,6 +522,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             label={t('vote.saveSchedule')}
             reason={reasonSaveSchedule}
             tone="bg-yellow text-navy-950 hover:bg-white"
+            isCurrent={state?.status === 'scheduled'}
             busy={busy}
             onPress={() => commitSchedule(t('vote.saved'))}
           />
@@ -559,6 +560,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             label={t('vote.showCountdown')}
             reason={reasonCountdown}
             tone="bg-blue-400/15 text-blue-100 hover:bg-blue-400/25"
+            isCurrent={state?.phase === 'countdown'}
             icon={<Hourglass size={13} />}
             onPress={() => {
               /* Ostatnia linia obrony jest wspólna dla obu dróg: jeżeli po zapisie Worker
@@ -583,6 +585,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             label={t('vote.openNow')}
             reason={reasonOpenNow}
             tone="bg-blue-600 text-white hover:bg-blue-500"
+            isCurrent={state?.phase === 'open'}
             icon={<Play size={13} />}
             busy={busy}
             onPress={() => void run(() => openVoting(apiKey, duration))}
@@ -602,8 +605,9 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
           <ActionButton
             label={t('vote.closeNow')}
             reason={reasonCloseNow}
-            tone="bg-white/10 text-white hover:bg-white/20"
-            icon={<Square size={13} />}
+            tone="bg-coral text-white hover:bg-coral/80"
+            isCurrent={state?.status === 'closed'}
+            icon={<Square size={13} fill="currentColor" />}
             confirmLabel={t('vote.closeConfirm')}
             busy={busy}
             onPress={() => void run(() => closeVoting(apiKey))}
@@ -1184,7 +1188,7 @@ function ParticipantRow({
           onClick={() => onSave({ active: !row.active })}
           className={cn(
             chip,
-            row.active ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-blue-600 text-white hover:bg-blue-500'
+            row.active ? 'bg-white/10 text-white/50 hover:bg-white/20 shadow-inner ring-1 ring-inset ring-black/40' : 'bg-blue-600 text-white hover:bg-blue-500'
           )}
         >
           {row.active ? t('vote.active') : t('vote.inactive')}
