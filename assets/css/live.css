@@ -27,8 +27,7 @@
 /* Kropka pulsuje, bo „na żywo" jest stanem, a nie nazwą.
    Cień, nie skala: powiększanie samej kropki w pasku podskakiwałoby całym rzędem przycisków
    przy każdym uderzeniu — to jest dokładnie ta usterka, którą naprawiliśmy w chipie nagłówka. */
-.btn__live-dot,
-.live-dot {
+.btn__live-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -37,7 +36,6 @@
   animation: live-pulse 1.8s ease-out infinite;
 }
 .btn--live .btn__live-dot { background: #fff; }
-.live-dot { background: #e11d48; }
 
 @keyframes live-pulse {
   0%   { box-shadow: 0 0 0 0 rgba(225, 29, 72, .55); }
@@ -49,16 +47,40 @@
 
 /* ------------------------------------------------------------------------------- nagłówek */
 
-.eyebrow--live {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  color: #ff6b8a;
+/* SEKCJA JEST CIEMNA, WIĘC MUSI TO POWIEDZIEĆ SAMA — jak `.prizes` w main.css.
+   ---------------------------------------------------------------------------
+   `.section-card` nie maluje tła: sekcje jasne mają własne, a te bez niego pokazują ciemną
+   stronę pod spodem. `.section-title` z kolei nie ma własnego koloru, tylko dziedziczy.
+   Bez tych dwóch linijek nagłówek tej sekcji był granatowy NA GRANATOWYM — zmierzone
+   `rgb(7, 26, 61)` na jednym i drugim, czyli tytuł, którego fizycznie nie da się przeczytać.
+   Obraz z transmisji jest czarny, więc ciemne tło jest tu jedynym sensownym wyborem. */
+.live {
+  background: var(--navy-900);
+  color: var(--white);
 }
 
+/* Plakietka zostaje tą samą żółtą pigułką, co w każdej innej sekcji — pulsuje tylko jej
+   kropka. Własny kolor napisu robił z niej różowy tekst na żółtym tle. */
+.live .eyebrow::before { animation: live-pulse 1.8s ease-out infinite; }
+
 .live__head { max-width: 46rem; }
+
+/* Nazwa transmisji wpisana w panelu. Osobno od zdania niżej, a nie zamiast niego: zdanie
+   „stuknij w ekran, żeby bić brawo" jest instrukcją i musi zostać, bo bez niej nikt nie
+   odkrywa gestu, o który w tej sekcji chodzi. */
+.live__name {
+  display: block;
+  margin-top: .9rem;
+  color: var(--yellow);
+  font-family: var(--font-meta);
+  font-size: .95rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.live__name:empty { display: none; }
+
 .live__lead {
-  margin-top: .85rem;
+  margin-top: .6rem;
   color: rgba(255, 255, 255, .72);
   font-size: clamp(.95rem, .4vw + .85rem, 1.05rem);
 }
@@ -146,6 +168,16 @@
   right: 0;
   bottom: 0;
   z-index: 4;
+  /* PASEK NIE ŁAPIE PALCA — ŁAPIĄ GO TYLKO PRZYCISKI W NIM.
+     ---------------------------------------------------------------------------
+     Zmierzone na 390×844: ramka 16:9 ma tam 206 px wysokości, a pasek z gradientem 100 px.
+     Prawie połowa obrazu, i to ta środkowa. Bez tej reguły stuknięcie w środek transmisji
+     trafiało w pasek zamiast w warstwę braw — czyli gest, o który w tej sekcji chodzi,
+     nie działał dokładnie tam, gdzie każdy w niego celuje.
+
+     Sam gradient jest przezroczysty dla wskaźnika, przyciski nie. Dzięki temu jedna warstwa
+     robi obie rzeczy: przyciemnia dół obrazu pod napisami i nie zabiera pod sobą braw. */
+  pointer-events: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -162,6 +194,9 @@
   opacity: 1;
   transform: none;
 }
+
+.live__count,
+.live__btn { pointer-events: auto; }
 
 .live__count {
   display: inline-flex;
@@ -197,6 +232,23 @@
 .live__btn:hover,
 .live__btn:focus-visible { background: rgba(255, 255, 255, .3); }
 .live__btn--wide { margin-left: auto; }
+
+/* Na wąskim ekranie pasek musi zmieścić się w JEDNYM rzędzie.
+   Cztery elementy z napisami zawijały się na 390 px do dwóch rzędów i pasek rósł do 100 px
+   na 206-pikselowej ramce. Zostają same ikony i licznik — te trzy rzeczy są rozpoznawalne
+   bez podpisu, a napisy i tak powtarzają to, co mówi zdanie pod odtwarzaczem. */
+@media (max-width: 560px) {
+  .live__bar { padding: 1.2rem .6rem .6rem; gap: .4rem; }
+  .live__btn { padding: .45rem .7rem; }
+  .live__btn span:not([class]) {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 
 .live__note {
   margin-top: 1rem;
@@ -250,6 +302,6 @@ html:has(.live__stage.is-faux-full) .site-header { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .btn__live-dot,
-  .live-dot { animation: none; }
+  .live .eyebrow::before { animation: none; }
   .live__bar { transition: none; }
 }

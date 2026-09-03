@@ -48,16 +48,30 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
   const heartLayer = $('[data-stream-hearts]', section);
   const bar = $('[data-stream-bar]', section);
   const countLabel = $('[data-stream-count]', section);
-  const titleLine = $('[data-stream-title]', section);
+  const nameLine = $('[data-stream-name]', section);
 
   let live = false;
   let embed = '';
+
+  /* LICZNIK SERC: SERWEROWA LICZBA PLUS TO, CO JESZCZE DO NIEGO NIE DOLECIAŁO.
+     ---------------------------------------------------------------------------
+     Trzy liczby zamiast jednej, i każda odpowiada na inne pytanie:
+
+       hearts    ile naliczył serwer — jedyna prawda, wspólna dla wszystkich oglądających;
+       pending   moje stuknięcia, które czekają na wysyłkę;
+       inFlight  moje stuknięcia, które właśnie lecą i nie ma ich jeszcze w `hearts`.
+
+     Na ekranie stoi ich suma. Dzięki temu licznik podskakuje pod palcem natychmiast (licznik,
+     który rusza dopiero po locie tam i z powrotem, czyta się jak zepsuty przycisk), a przy
+     każdej odpowiedzi serwera wraca do prawdy, ZAMIAST się z nią rozjeżdżać.
+
+     Wcześniej stała tu jedna liczba pilnowana przez `Math.max`, żeby nie drgała w dół. To
+     działało do chwili, w której organizator naciska „Wyzeruj licznik" w panelu: serwer
+     mówił 0, `Math.max` zostawiał starą wartość i licznik na stronie zostawał na niej
+     DO KOŃCA TRANSMISJI, bez sposobu na powrót. */
   let hearts = 0;
-  /* Ile serc pokazujemy. Rośnie natychmiast po stuknięciu, jeszcze zanim serwer odpowie —
-     licznik, który reaguje dopiero po locie tam i z powrotem, czyta się jak zepsuty przycisk.
-     Serwerowa liczba wchodzi na jego miejsce przy najbliższym odczycie. */
-  let shown = 0;
   let pending = 0;
+  let inFlight = 0;
   let flushTimer = 0;
   let pollTimer = 0;
 
@@ -80,10 +94,9 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
 
   /* --------------------------------------------------------------------------- rysowanie */
 
-  function paintCount(value) {
-    shown = Math.max(shown, value);
+  function paintCount() {
     if (!countLabel) return;
-    const label = String(shown);
+    const label = String(hearts + pending + inFlight);
     if (countLabel.textContent !== label) countLabel.textContent = label;
   }
 
@@ -98,9 +111,13 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
 
     const nowLive = Boolean(state.live && state.embed);
     hearts = Number(state.hearts) || 0;
-    paintCount(hearts);
+    paintCount();
 
-    if (titleLine && state.title) titleLine.textContent = state.title;
+    /* Nazwa transmisji wchodzi w OSOBNY wiersz, a nie na miejsce zdania z instrukcją: to
+       zdanie jest jedynym miejscem, z którego ktokolwiek dowiaduje się o stukaniu w obraz.
+       Pusty łańcuch, gdy organizator nazwy nie wpisał — `:empty` w live.css zwija wtedy
+       wiersz do zera, więc nie zostaje po nim odstęp. */
+    if (nameLine) nameLine.textContent = state.title || '';
 
     if (nowLive === live && state.embed === embed) return;
 
@@ -159,8 +176,15 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
     const count = Math.min(pending, CLAP_MAX);
     if (!count) return;
     pending -= count;
+    inFlight += count;
     const result = await ask('stream-heart', { count });
-    if (result) paintCount(Number(result.hearts) || 0);
+    inFlight -= count;
+    /* Odpowiedź NOSI nową sumę, więc bierzemy ją zamiast dodawać sobie samemu — w tej
+       liczbie są już cudze brawa z ostatniej sekundy. Przy nieudanej wysyłce nie robimy nic:
+       te stuknięcia przepadają, i to jest właściwe zachowanie, bo alternatywą jest kolejka
+       braw, która po odzyskaniu sieci wysypuje trzydzieści serc naraz. */
+    if (result) hearts = Number(result.hearts) || hearts;
+    paintCount();
     /* Reszta paczki, jeśli ktoś stukał szybciej niż dwadzieścia razy na dziewięćset
        milisekund. Idzie następną turą, a nie ginie. */
     if (pending > 0 && !flushTimer) flushTimer = window.setTimeout(flushClaps, CLAP_FLUSH_MS);
@@ -169,9 +193,8 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
   function clap(x, y) {
     if (!live) return;
     spawnHeart(x, y);
-    shown += 1;
-    paintCount(shown);
     pending += 1;
+    paintCount();
     if (!flushTimer) flushTimer = window.setTimeout(flushClaps, CLAP_FLUSH_MS);
   }
 
@@ -202,7 +225,9 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
     window.clearTimeout(barTimer);
     barTimer = window.setTimeout(() => stage?.classList.remove('is-showing-bar'), 3200);
   }
-  bar?.addEventListener('pointerdown', (event) => event.stopPropagation());
+  /* Bez `stopPropagation` na pasku: on nie jest przodkiem warstwy braw, więc naciśnięcie
+     przycisku i tak nigdy do niej nie docierało. Tym, co zabierało brawa, było samo pudełko
+     paska leżące na obrazie — i to rozstrzyga teraz `pointer-events` w live.css. */
   stage?.addEventListener('pointerenter', showBar);
 
   /* --------------------------------------------------------------------------- pełny ekran */
@@ -223,17 +248,90 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
    */
   const supportsFullscreen = typeof stage?.requestFullscreen === 'function';
 
+  /**
+   * Przodkowie, którzy nie pozwalają rozłożyć odtwarzacza na całe okno.
+   *
+   * `position: fixed` przestaje znaczyć „względem okna", gdy nad elementem stoi przodek
+   * z którąś z tych własności. Dwie przeszkody, obie zmierzone na 844×390:
+   *
+   *   PRZEKSZTAŁCENIE  `transform`, `filter`, `perspective` przenoszą punkt odniesienia na
+   *                    siebie. Sekcje tej strony są przypinane przekształceniem.
+   *   PRZYCIĘCIE       `overflow: clip` na `#live` (z `.section-card`), `clip-path` i
+   *                    `contain: paint` przycinają nawet potomka `fixed`.
+   *   WŁASNY KONTEKST  `isolation: isolate` na `#live` i `#main`, ale też samo
+   *                    `position: sticky` + `z-index: 2` na `#live` — pozycjonowany element
+   *                    z numerem ZAKŁADA własną warstwę i zamyka w niej `z-index: 9999`
+   *                    odtwarzacza. Numer przestaje wtedy znaczyć cokolwiek wobec sekcji,
+   *                    które w tym samym stosie paneli mają numery wyższe niż 2 i malują się
+   *                    NA odtwarzaczu. Dlatego oprócz zdejmowania własności PODNOSIMY numer
+   *                    każdemu pozycjonowanemu przodkowi — patrz `PODNIESIONY` niżej.
+   *
+   * Wszystkie trzy przeszkody dają na ekranie ten sam obraz i dlatego trzeba było ich szukać
+   * po kolei: zmierzone na 844×390 pudełko odtwarzacza pokazywało już całe okno (844×390 od 0),
+   * a mimo to widać było czarny obraz do 62% wysokości i niebieską stopkę pod spodem.
+   *
+   * Wszystko zdejmujemy inline i przywracamy przy wyjściu. Inline, a nie klasą: nie wiadomo
+   * z góry, ilu tych przodków jest ani którą z siedmiu własności ma który, a reguła
+   * z `!important` po całej drodze trafiałaby też w sekcje, o które tu nie chodzi.
+   */
+  const BLOKUJACE = ['transform', 'filter', 'perspective', 'overflow', 'clipPath', 'contain', 'isolation'];
+  const OBOJETNE = {
+    transform: 'none', filter: 'none', perspective: 'none',
+    overflow: 'visible', clipPath: 'none', contain: 'none', isolation: 'auto'
+  };
+
+  /* Wyżej niż cokolwiek na tej stronie, ale nie `2147483647`: zostawiamy zapas, żeby coś,
+     co MA być nad odtwarzaczem (okno zgody, komunikat), dało się jeszcze podnieść. */
+  const PODNIESIONY = '2147480000';
+
+  let zdjete = [];
+
+  function odepnijPrzodkow() {
+    zdjete = [];
+    for (let node = stage?.parentElement; node && node !== document.documentElement; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      const winne = BLOKUJACE.filter((name) => style[name] !== OBOJETNE[name]);
+      /* Pozycjonowany przodek z numerem zakłada własną warstwę i zamyka w niej wszystko,
+         co pod nim. Nie da się tego cofnąć bez ruszania układu, więc zamiast tego CAŁA ta
+         warstwa idzie na wierzch — skutek jest ten sam, a strona pod spodem stoi, gdzie stała. */
+      const wlasnaWarstwa = style.position !== 'static' && style.zIndex !== 'auto';
+      if (!winne.length && !wlasnaWarstwa) continue;
+      const zapas = {};
+      winne.forEach((name) => {
+        zapas[name] = node.style[name];
+        node.style[name] = OBOJETNE[name];
+      });
+      if (wlasnaWarstwa) {
+        zapas.zIndex = node.style.zIndex;
+        node.style.zIndex = PODNIESIONY;
+      }
+      zdjete.push({ node, zapas });
+    }
+  }
+
+  function przypnijPrzodkow() {
+    zdjete.forEach(({ node, zapas }) => {
+      Object.keys(zapas).forEach((name) => { node.style[name] = zapas[name]; });
+    });
+    zdjete = [];
+  }
+
   function enterFullscreen(fromGesture) {
     if (!stage) return;
     if (fromGesture && supportsFullscreen && !document.fullscreenElement) {
-      stage.requestFullscreen().catch(() => stage.classList.add('is-faux-full'));
+      /* Prawdziwy pełny ekran wyjmuje element z układu strony, więc przekształceń przodków
+         nie trzeba ruszać — i nie ruszamy ich, bo każda taka zmiana to jedna rzecz więcej
+         do cofnięcia. Dopiero gdy przeglądarka odmówi, schodzimy na rozłożenie na okno. */
+      stage.requestFullscreen().catch(() => { odepnijPrzodkow(); stage.classList.add('is-faux-full'); });
       return;
     }
+    odepnijPrzodkow();
     stage.classList.add('is-faux-full');
   }
 
   function leaveFullscreen() {
     stage?.classList.remove('is-faux-full');
+    przypnijPrzodkow();
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
   }
 
@@ -312,7 +410,7 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
 
   async function tick() {
     if (!document.hidden) {
-      if (demoMode) paint({ live: true, hearts: shown, title: '', embed: 'about:blank' });
+      if (demoMode) paint({ live: true, hearts, title: '', embed: 'about:blank' });
       else paint(await ask('stream'));
     }
     pollTimer = window.setTimeout(tick, live ? POLL_LIVE_MS : POLL_CLOSED_MS);

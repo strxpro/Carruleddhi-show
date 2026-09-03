@@ -416,9 +416,10 @@
     <section class="section section-card live" id="live" aria-labelledby="live-title" data-stream-section hidden>
       <div class="container">
         <div class="live__head reveal">
-          <span class="eyebrow eyebrow--live"><span class="live-dot" aria-hidden="true"></span><span data-i18n="stream.badge">In diretta ora</span></span>
+          <span class="eyebrow" data-i18n="stream.badge">In diretta ora</span>
           <h2 class="section-title section-title--medium" id="live-title" data-i18n="stream.title" data-text-effect="rise">La discesa, mentre succede.</h2>
-          <p class="live__lead" data-stream-title data-i18n="stream.lead">Il segnale arriva dal traguardo. Tocca lo schermo per applaudire.</p>
+          <strong class="live__name" data-stream-name></strong>
+          <p class="live__lead" data-i18n="stream.lead">Il segnale arriva dal traguardo. Tocca lo schermo per applaudire.</p>
         </div>
 
         <!-- Odtwarzacz i wszystko, co na nim lezy.
@@ -449,7 +450,7 @@
               <span data-i18n="stream.clap">Applaudi</span>
             </button>
             <button class="live__btn" type="button" data-stream-share hidden>
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M13 3v8.6l3.3-3.3 1.4 1.4-5.7 5.7-5.7-5.7 1.4-1.4L11 11.6V3h2ZM4 17h16v4H4v-4Z" fill="currentColor"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M18 16.1c-.8 0-1.5.3-2 .8l-7.1-4.2c.1-.2.1-.5.1-.7s0-.5-.1-.7l7-4.1c.5.5 1.2.8 2.1.8a2.9 2.9 0 1 0-2.9-2.9c0 .3 0 .5.1.7L8.1 9.9A2.9 2.9 0 1 0 6 14.9c.8 0 1.5-.3 2.1-.8l7.1 4.2c-.1.2-.1.4-.1.6a2.8 2.8 0 1 0 2.9-2.8Z" fill="currentColor"/></svg>
               <span data-i18n="stream.share">Condividi</span>
             </button>
             <button class="live__btn live__btn--wide" type="button" data-stream-full>
