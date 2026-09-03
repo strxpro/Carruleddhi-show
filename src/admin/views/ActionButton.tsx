@@ -36,6 +36,7 @@ export function ActionButton({
   confirmLabel,
   confirmTone,
   busy,
+  isCurrent,
   onPress
 }: {
   label: string;
