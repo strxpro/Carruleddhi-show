@@ -3,6 +3,7 @@ import {
   Activity,
   Award,
   BarChart3,
+  Radio,
   // `Bell` is still here as the sidebar icon for the reminders tab. The bell in the header
   // and its `BellRing` variant moved into NotificationBell together with the dropdown.
   Bell,
@@ -38,6 +39,7 @@ import { Registrations } from './views/Registrations';
 import { Voting } from './views/Voting';
 import { Prizes } from './views/Prizes';
 import { Stats } from './views/Stats';
+import { Stream } from './views/Stream';
 import { Season } from './views/Season';
 import { Chat } from './views/Chat';
 import { Wall } from './views/Wall';
@@ -55,6 +57,7 @@ const INBOX_INTERVAL_MS = 10_000;
 type TabId =
   | 'dashboard'
   | 'stats'
+  | 'stream'
   | 'season'
   | 'registrations'
   | 'voting'
@@ -164,6 +167,10 @@ export default function App() {
              wydarzenia, które się prowadzi. Bez plakietki — statystyki nie mają stanu
              „nowe od ostatniego razu", mają zakres czasu wybierany na miejscu. */
           { id: 'stats', title: t('nav.stats'), icon: BarChart3 },
+          /* Transmisja obok statystyk, a nie w grupie „wydarzenie": to jest przelacznik,
+             ktory wlacza i wylacza zakladke WSZYSTKIM odwiedzajacym naraz, wiec ma stac
+             tam, gdzie sie na niego patrzy przed startem, a nie miedzy listami. */
+          { id: 'stream', title: t('nav.stream'), icon: Radio },
           /* Podsumowanie sezonu — obok statystyk, z tego samego powodu i z tą samą zasadą.
              To jest ODCZYT o wydarzeniu, a nie prowadzenie wydarzenia: wchodzi się tu po
              zawodach albo rok później, żeby przeczytać rocznik. Świadomie NIE w „Głosowaniu",
@@ -431,6 +438,7 @@ export default function App() {
             <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} highlightQuery={highlightQuery} />
           ) : null}
           {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
+          {tab === 'stream' ? <Stream t={t} apiKey={key} pl={locale === 'pl'} /> : null}
           {tab === 'season' ? <Season t={t} apiKey={key} /> : null}
           {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
           {tab === 'awards' ? <Prizes t={t} apiKey={key} /> : null}

@@ -252,6 +252,30 @@ export async function fetchFormsBundle(key: string, ids: string[]): Promise<Blob
   return response.blob();
 }
 
+/** Stan transmisji widziany przez organizatora — razem z licznikiem serc. */
+export interface StreamState {
+  ok: true;
+  live: boolean;
+  provider: 'youtube' | 'twitch';
+  videoId: string;
+  title: string;
+  hearts: number;
+  startedAt: string | null;
+}
+
+export const fetchStreamAdmin = (key: string) =>
+  call<StreamState>('stream-admin', key, { action: 'state' });
+
+/** Zapisuje adres i NIE otwiera transmisji — to dwie osobne decyzje, patrz views/Stream.tsx. */
+export const saveStream = (key: string, provider: 'youtube' | 'twitch', url: string, title: string) =>
+  call<StreamState>('stream-admin', key, { action: 'save', provider, url, title });
+
+export const setStreamLive = (key: string, live: boolean) =>
+  call<StreamState>('stream-admin', key, { action: live ? 'open' : 'close' });
+
+export const resetStreamHearts = (key: string) =>
+  call<StreamState>('stream-admin', key, { action: 'reset-hearts' });
+
 export const fetchStats = (key: string, hours: number) =>
   call<{ ok: true; stats: SiteStats }>('stats', key, { hours });
 

@@ -389,7 +389,13 @@ export function CommandPalette({
   onClose,
   onSelect,
   placeholder,
-  emptyLabel
+  emptyLabel,
+  /* Te dwie nazwy byly zadeklarowane w typie propsow, ale nie tutaj — a `results` i tak
+     siegalo po `externalResults`. Nieodebrany props nie jest w JavaScripcie zmienna, wiec
+     pierwsze wyliczenie listy konczylo sie `ReferenceError` i cala tresc panelu znikala
+     zaraz po zalogowaniu. Odbieramy je tu, zeby istnialy. */
+  externalResults,
+  onSearchChange
 }: {
   items: NavItemData[];
   open: boolean;
