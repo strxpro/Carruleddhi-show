@@ -163,7 +163,7 @@ export function Stream({ t, apiKey, pl }: {
         <div className="mt-4 flex flex-wrap gap-2">
           <ActionButton
             label={t('stream.open')}
-            reason={busy ? t('vote.whyBusy') : state?.videoId ? (live ? t('stream.whyAlreadyOpen') : '') : t('stream.whyNoUrl')}
+            reason={busy ? t('vote.whyBusy') : state?.videoId ? (live ? t('stream.whyAlreadyOpen') : '') : url.trim() ? t('stream.whyNotSaved') : t('stream.whyNoUrl')}
             tone="bg-blue-600 text-white hover:bg-blue-500"
             icon={busy ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
             onPress={() => void run(() => setStreamLive(apiKey, true), t('stream.opened'))}
