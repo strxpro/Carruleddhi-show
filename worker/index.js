@@ -125,7 +125,11 @@ const ALLOWED_TYPES = new Set([
   'sponsor-admin',
 
   // Public voting and organiser controls. The latter is protected below.
-  'voting', 'voting-admin'
+  'voting', 'voting-admin',
+
+  /* Transmisja na zywo. Odczyt i serca bez hasla — to jest widok dla publicznosci; sterowanie
+     za haslem, bo otwiera i zamyka zakladke dla wszystkich naraz. */
+  'stream', 'stream-heart', 'stream-admin'
 ]);
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
@@ -146,7 +150,8 @@ const SUPABASE_TYPES = new Set([
      passphrase check and then went to the Make webhook, which answers with "Accepted" and no
      rows. See the comment above the roster() function. */
   'roster', 'subscribers',
-  'voting', 'voting-admin'
+  'voting', 'voting-admin',
+  'stream', 'stream-heart', 'stream-admin'
 ]);
 
 /**
@@ -190,7 +195,10 @@ const PROTECTED_TYPES = new Set([
   /* `stats` tak, `visit` NIE. Sondę wysyła przeglądarka każdego zwiedzającego, więc hasło
      musiałoby stać w kodzie strony — czyli nie byłoby hasłem. Odczyt statystyk to co innego:
      to są liczby organizatora i nikt poza nim nie ma powodu ich widzieć. */
-  'stats'
+  'stats',
+  /* Otwarcie i zamkniecie transmisji widza wszyscy odwiedzajacy naraz, wiec ten przelacznik
+     nalezy do organizatora. Sam ODCZYT stanu jest publiczny — patrz `stream` wyzej. */
+  'stream-admin'
 ]);
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
@@ -9051,6 +9059,167 @@ async function votingAdmin(env, payload, cors) {
   return json({ ok: false, code: 'VOTING_UNKNOWN_ACTION' }, 400, cors);
 }
 
+/* ============================================================================
+   Transmisja na zywo
+   ============================================================================
+   Wideo hostuje YouTube albo Twitch; ta strona trzyma przy nim trzy rzeczy, ktorych tam nie
+   ma: decyzje, czy zakladka w ogole istnieje, wlasny licznik serc i wlasny jezyk.
+
+   ADRES DO RAMKI SKLADAMY TUTAJ, Z IDENTYFIKATORA — NIGDY Z TEGO, CO WKLEJONO
+   Organizator wkleja w panelu adres transmisji, ale do bazy trafia z niego wylacznie
+   IDENTYFIKATOR, a do przegladarki adres zlozony z niego przez `embedUrl()`. Gdyby do
+   `<iframe src>` szedl napis wpisany w panelu, jedna pomylka albo jeden zly wklej stawialby
+   obca strone wewnatrz naszej. Identyfikator przechodzi przez wzorzec i nic poza nim.
+   ========================================================================= */
+
+const STREAM_ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
+
+/**
+ * Identyfikator wyluskany z tego, co organizator wklei.
+ *
+ * Ludzie wklejaja rozne rzeczy i wszystkie sa poprawne z ich punktu widzenia: caly adres
+ * z paskiem, sam skrocony link, nazwe kanalu, albo goly identyfikator. Rozpoznajemy ksztalty,
+ * ktore naprawde wychodza z YouTube'a i Twitcha, a wszystko inne odrzucamy — cicha zamiana
+ * niezrozumianego wklejenia na pusty ekran byla by gorsza niz odmowa z komunikatem.
+ */
+function streamIdFrom(raw, provider) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  if (STREAM_ID_RE.test(text) && !text.includes('/')) return text;
+
+  let url;
+  try { url = new URL(text.startsWith('http') ? text : `https://${text}`); }
+  catch { return ''; }
+
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (provider === 'twitch') {
+    /* Twitch osadza sie KANALEM, nie nagraniem: `player.twitch.tv/?channel=nazwa`. */
+    return parts[0] && STREAM_ID_RE.test(parts[0]) ? parts[0] : '';
+  }
+  /* YouTube ma cztery ksztalty na to samo: ?v=, youtu.be/, /live/ i /embed/. */
+  const v = url.searchParams.get('v');
+  if (v && STREAM_ID_RE.test(v)) return v;
+  const last = parts[parts.length - 1] || '';
+  if (['live', 'embed'].includes(parts[parts.length - 2]) && STREAM_ID_RE.test(last)) return last;
+  if (url.hostname.endsWith('youtu.be') && STREAM_ID_RE.test(last)) return last;
+  return '';
+}
+
+/** Adres do ramki, zlozony z identyfikatora — nigdy z tego, co wklejono. */
+function embedUrl(provider, id, host = '') {
+  if (!id || !STREAM_ID_RE.test(id)) return '';
+  if (provider === 'twitch') {
+    /* Twitch wymaga `parent` z domena strony osadzajacej, inaczej odmawia odtwarzania. */
+    const parent = String(host || '').split(':')[0] || 'www.carruleddhishow.com';
+    return `https://player.twitch.tv/?channel=${id}&parent=${parent}`;
+  }
+  return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`;
+}
+
+async function readStream(env) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/stream_state`);
+  url.searchParams.set('select', 'is_live,provider,video_id,title,hearts,started_at');
+  url.searchParams.set('limit', '1');
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  if (!response.ok) return null;
+  const rows = await response.json().catch(() => []);
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+/**
+ * Stan transmisji dla strony.
+ *
+ * Adres do ramki wychodzi WYLACZNIE wtedy, gdy transmisja trwa. Zamknieta transmisja nie
+ * oddaje identyfikatora ani adresu: dopoki zakladki nie ma, nikt nie ma powodu znac linku,
+ * a proba zaosczedzenia jednego zapytania przez wyslanie go „na zapas" znaczylaby, ze
+ * kazdy odwiedzajacy widzi adres jeszcze niepublicznej transmisji.
+ */
+async function streamPublic(env, request, cors) {
+  const row = await readStream(env);
+  if (!row) return json({ ok: true, live: false, hearts: 0 }, 200, cors);
+  const live = Boolean(row.is_live) && Boolean(row.video_id);
+  return json({
+    ok: true,
+    live,
+    hearts: Number(row.hearts) || 0,
+    title: live ? String(row.title || '') : '',
+    provider: live ? row.provider : '',
+    embed: live ? embedUrl(row.provider, row.video_id, request.headers.get('host') || '') : '',
+    startedAt: live ? row.started_at || null : null
+  }, 200, cors);
+}
+
+/** Serca. Paczka klikniec jednym zapisem — patrz `bump_stream_hearts` w migracji 0040. */
+async function streamHeart(env, payload, cors) {
+  const row = await readStream(env);
+  /* Serca tylko przy trwajacej transmisji: licznik pod zamknietym oknem nie ma czego liczyc,
+     a otwarta koncowka bez tego warunku jest przyciskiem do nabijania liczby o kazdej porze. */
+  if (!row || !row.is_live) return json({ ok: false, code: 'STREAM_CLOSED' }, 409, cors);
+
+  const asked = Number.parseInt(payload.count, 10);
+  const delta = Number.isFinite(asked) ? Math.min(Math.max(asked, 1), 20) : 1;
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/bump_stream_hearts`, {
+    method: 'POST',
+    headers: supabaseHeaders(env),
+    body: JSON.stringify({ delta })
+  });
+  if (!response.ok) return json({ ok: false, code: 'STREAM_HEART_FAILED' }, 502, cors);
+  const hearts = await response.json().catch(() => null);
+  return json({ ok: true, hearts: Number(hearts) || 0 }, 200, cors);
+}
+
+/**
+ * Sterowanie transmisja z panelu.
+ *
+ * `save` zapisuje adres i nie otwiera niczego — organizator przygotowuje transmisje wczesniej,
+ * a otwiera ja w chwili, w ktorej naprawde zaczyna. Dwie osobne czynnosci, bo to sa dwie
+ * osobne decyzje i pomylenie ich znaczy zakladke, ktora pojawia sie na stronie w polowie
+ * ustawiania.
+ */
+async function streamAdmin(env, payload, cors) {
+  const action = String(payload.action || 'state');
+  if (action === 'state') {
+    const row = await readStream(env);
+    return json({
+      ok: true,
+      live: Boolean(row?.is_live),
+      provider: row?.provider || 'youtube',
+      videoId: row?.video_id || '',
+      title: row?.title || '',
+      hearts: Number(row?.hearts) || 0,
+      startedAt: row?.started_at || null
+    }, 200, cors);
+  }
+
+  const patch = { updated_at: new Date().toISOString() };
+
+  if (action === 'save') {
+    const provider = payload.provider === 'twitch' ? 'twitch' : 'youtube';
+    const id = streamIdFrom(payload.url ?? payload.videoId, provider);
+    if (!id) return json({ ok: false, code: 'STREAM_BAD_URL' }, 422, cors);
+    Object.assign(patch, { provider, video_id: id, title: trimmed(payload.title) || '' });
+  } else if (action === 'open') {
+    const row = await readStream(env);
+    /* Nie otwieramy transmisji bez adresu: zakladka bez czego ogladac jest gorsza niz jej brak. */
+    if (!row?.video_id) return json({ ok: false, code: 'STREAM_NO_URL' }, 409, cors);
+    Object.assign(patch, { is_live: true, started_at: new Date().toISOString() });
+  } else if (action === 'close') {
+    Object.assign(patch, { is_live: false });
+  } else if (action === 'reset-hearts') {
+    Object.assign(patch, { hearts: 0 });
+  } else {
+    return json({ ok: false, code: 'STREAM_UNKNOWN_ACTION' }, 400, cors);
+  }
+
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/stream_state?id=eq.true`, {
+    method: 'PATCH',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    body: JSON.stringify(patch)
+  });
+  if (!response.ok) return json({ ok: false, code: 'STREAM_WRITE_FAILED' }, 502, cors);
+  return streamAdmin(env, { action: 'state' }, cors);
+}
+
 /**
  * Two totals and the initials of the four most recent riders, in one request.
  *
@@ -9487,6 +9656,9 @@ export default {
       if (type === 'entry-lookup') return entryLookup(env, payload, cors);
       if (type === 'entry-code') return entryCode(env, payload, cors);
       if (type === 'entry-manage') return entryManage(env, payload, cors);
+      if (type === 'stream') return streamPublic(env, request, cors);
+      if (type === 'stream-heart') return streamHeart(env, payload, cors);
+      if (type === 'stream-admin') return streamAdmin(env, payload, cors);
       if (type === 'roster') return roster(env, payload, cors);
       if (type === 'subscribers') return subscribers(env, payload, cors);
       if (type === 'voting') return voting(env, payload, cors);
