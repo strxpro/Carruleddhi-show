@@ -9120,7 +9120,7 @@ async function readStream(env) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/stream_state`);
   url.searchParams.set('select', 'is_live,provider,video_id,title,hearts,started_at');
   url.searchParams.set('limit', '1');
-  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  const response = await fetch(url, { headers: supabaseHeaders(env), cache: 'no-store' });
   if (!response.ok) return null;
   const rows = await response.json().catch(() => []);
   return Array.isArray(rows) ? rows[0] || null : null;
