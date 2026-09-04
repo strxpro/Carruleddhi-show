@@ -1307,7 +1307,19 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 @media (max-width: 1050px) {
   .site-nav { display: none; }
   .nav-shell { justify-content: space-between; }
-  .nav-actions .btn { display: none; }
+  /* „Będę tam" ZOSTAJE w pasku także na telefonie.
+     ---------------------------------------------------------------------------
+     Stało tu `.nav-actions .btn { display: none }`, czyli reguła na WSZYSTKIE przyciski
+     paska naraz. Na telefonie zostawała po niej marka, flaga i „Menu" — a jedyna rzecz,
+     po którą ktoś sięga w pasku przed wyścigiem, czyli potwierdzenie obecności, była
+     dostępna dopiero po otwarciu menu. Na najwęższym ekranie przycisk schodzi do samego
+     napisu (patrz reguła przy 470 px), ale nie znika.
+
+     Przycisk głosowania zostaje schowany: pojawia się tylko na czas głosowania i ma
+     własny, duży odpowiednik w sekcji z uczestnikami — dwa przyciski obok siebie na
+     370 px szerokości znaczą, że oba są za małe. */
+  .nav-actions .btn--vote,
+  .nav-actions .nav-vote { display: none; }
   .menu-toggle { display: grid; }
   .mobile-nav { position: fixed; z-index: 890; top: 96px; left: 14px; right: 14px; display: grid; gap: 8px; padding: 20px; border-radius: 28px; background: var(--navy-950); color: var(--white); box-shadow: var(--shadow-lg); opacity: 0; visibility: hidden; transform: translateY(-20px); transition: opacity .3s, transform .3s, visibility .3s; }
   .mobile-nav.is-open { opacity: 1; visibility: visible; transform: none; }
@@ -1613,7 +1625,9 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 @keyframes nav-pulse { to { transform: scale(1.8); opacity: 0; } }
 
 @media (max-width: 1050px) {
-  .nav-attend { display: none; }
+  /* Bez `display: none` — patrz reguła wyżej w tym pliku. Zamiast znikać, przycisk
+     oddaje szerokość: krótszy padding i mniejsza czcionka mieszczą go obok marki. */
+  .nav-attend { min-width: 0; padding-inline: 14px; font-size: 12px; }
   .menu-panel__grid { grid-template-columns: 1fr; }
   .menu-panel__event { position: static; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; }
   .menu-panel__event > strong { grid-row: 2; }
@@ -1653,6 +1667,10 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 
 @media (max-width: 470px) {
   .nav-current { display: none; }
+  /* Na 390 px w pasku muszą się zmieścić cztery rzeczy: marka, „Będę tam", flaga
+     i „Menu". Data pod marką schodzi (jest w nagłówku strony i w menu), a przycisk
+     dostaje ciaśniejszy padding — to wystarcza, żeby nic się nie zawinęło. */
+  .nav-attend { padding-inline: 11px; font-size: 11px; letter-spacing: .04em; }
   .brand { min-width: 0; margin-right: auto; }
   .brand__date { display: none; }
 }
