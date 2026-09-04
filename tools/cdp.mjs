@@ -12,7 +12,7 @@
  *                                   [--full] [--wait 1500]
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,6 +37,26 @@ const waitMs = Number(flag('wait', 1800));
 const origin = String(flag('origin', 'http://localhost:5199'));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Profil przegladarki na jeden przebieg — i USUWANY po nim.
+   ---------------------------------------------------------------------------
+   Swiezy profil jest konieczny: zapamietane `localStorage` sprawialo, ze przycisk obecnosci
+   przychodzil juz nacisniety i cichu unieważnial nastepny pomiar. Ale kazdy taki profil to
+   kilkanascie do kilkudziesieciu megabajtow, a nic ich nie kasowalo.
+
+   ZMIERZONE 04.09: 147 katalogow `.cdp-profile-*` i `.cdp-touch-*` w node_modules, razem
+   2,8 GB — dysk doszedl do 100% i zapis pliku w trakcie edycji SKROCIL GO DO ZERA. Sonda,
+   ktora zapelnia dysk, potrafi zniszczyc plik, ktory wlasnie mierzy.
+
+   `maxRetries` i `force`, bo Chrome na Windowsie zwalnia uchwyty z opoznieniem i pierwsza
+   proba usuniecia bywa odrzucona. Niepowodzenie jest przelykane: sprzatanie nie ma prawa
+   przewrocic przebiegu, ktorego wynik wlasnie zostal wypisany. */
+const profileDir = resolve(root, 'node_modules/.cdp-profile-' + Date.now());
+
+function removeProfile() {
+  try { rmSync(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 120 }); }
+  catch { /* zostanie na dysku; lepiej to niz wywrocony pomiar */ }
+}
 
 async function launch() {
   const child = spawn(
@@ -70,7 +90,8 @@ async function launch() {
       `--remote-debugging-port=${PORT}`,
       // A fresh profile every run: a persisted localStorage made the attendance
       // button arrive already pressed and silently voided the next measurement.
-      `--user-data-dir=${resolve(root, 'node_modules/.cdp-profile-' + Date.now())}`,
+      // Sprzatany po sobie w `finally` na dole — patrz `profileDir`.
+      `--user-data-dir=${profileDir}`,
       `--window-size=${width},${height}`,
       'about:blank'
     ],
@@ -258,6 +279,8 @@ async function withPage(fn) {
       spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
     } catch { /* Chrome mógł się już zamknąć sam */ }
     child.kill();
+    /* Po zabiciu drzewa, nie przed: dopoki Chrome zyje, trzyma pliki profilu otwarte. */
+    removeProfile();
   }
 }
 

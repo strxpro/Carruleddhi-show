@@ -1447,6 +1447,32 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .nav-current__progress { color: var(--blue-200); font-family: var(--font-meta); font-size: 11px; letter-spacing: .1em; }
 .nav-actions { flex: none; }
 .nav-attend { min-width: 102px; }
+
+/* „Będę tam" w pasku: kontrolka, nie plakat.
+   ---------------------------------------------------------------------------
+   Przycisk dziedziczy `.btn`, czyli pełne koralowe tło — to samo, którym woła do siebie
+   wielki przycisk w hero i przycisk w sekcji obecności. W pasku, obok żółtego „Menu",
+   dawało to dwa krzyczące kafle obok siebie na 370 px szerokości i czytało się jak baner
+   doklejony do nagłówka, a nie jak część paska. Zgłoszone jako „ten czerwony guzik wystaje".
+
+   Zostaje sam napis w obwódce: ta sama wysokość, to samo miejsce, ta sama czynność — tylko
+   głosem paska, a nie hero. Kolor wraca pod palcem i przy fokusie, więc nie ginie
+   informacja, że to jest przycisk, a nie etykieta.
+
+   Zakres celowo `.site-header`: wielki koralowy przycisk w hero i w sekcji obecności
+   zostaje nietknięty. Tam jest jedyną rzeczą na ekranie i ma krzyczeć. */
+.site-header .nav-attend {
+  border: 1px solid rgba(255,255,255,.34);
+  background: rgba(255,255,255,.06);
+  color: var(--white);
+  box-shadow: none;
+}
+.site-header .nav-attend:hover,
+.site-header .nav-attend:focus-visible {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--navy-950);
+}
 .menu-toggle {
   display: inline-flex !important;
   min-width: 112px;
