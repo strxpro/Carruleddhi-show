@@ -256,7 +256,7 @@ export async function fetchFormsBundle(key: string, ids: string[]): Promise<Blob
 export interface StreamState {
   ok: true;
   live: boolean;
-  provider: 'youtube' | 'twitch';
+  provider: 'youtube' | 'twitch' | 'facebook';
   videoId: string;
   title: string;
   hearts: number;
@@ -267,7 +267,7 @@ export const fetchStreamAdmin = (key: string) =>
   call<StreamState>('stream-admin', key, { action: 'state' });
 
 /** Zapisuje adres i NIE otwiera transmisji — to dwie osobne decyzje, patrz views/Stream.tsx. */
-export const saveStream = (key: string, provider: 'youtube' | 'twitch', url: string, title: string) =>
+export const saveStream = (key: string, provider: 'youtube' | 'twitch' | 'facebook', url: string, title: string) =>
   call<StreamState>('stream-admin', key, { action: 'save', provider, url, title });
 
 export const setStreamLive = (key: string, live: boolean) =>

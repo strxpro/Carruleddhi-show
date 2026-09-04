@@ -9072,59 +9072,110 @@ async function votingAdmin(env, payload, cors) {
    obca strone wewnatrz naszej. Identyfikator przechodzi przez wzorzec i nic poza nim.
    ========================================================================= */
 
-const STREAM_ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
+/* Wzorce SA ROZNE DLA KAZDEGO DOSTAWCY, i to jest cala poprawka.
+   ---------------------------------------------------------------------------
+   Stal tu jeden luzny wzorzec dla wszystkiego: 3-64 znaki, litery, cyfry, podkreslnik. Skutek widac bylo w
+   panelu: wpisane "test" przechodzilo jako identyfikator filmu, zapisywalo sie i zostawalo
+   na ekranie jako "zapisany identyfikator", a wlacznik obok nie mial czego wlaczyc.
+
+   Identyfikator YouTube ma DOKLADNIE 11 znakow. Kanal Twitcha 4-25 i bez myslnika. Adres
+   Facebooka nie jest identyfikatorem w ogole — wtyczka wideo potrzebuje calego adresu — wiec
+   ma wlasna droge, z lista dozwolonych domen. Trzy ksztalty, trzy wzorce. */
+const YOUTUBE_ID_RE = /^[A-Za-z0-9_-]{11}$/;
+const TWITCH_CHANNEL_RE = /^[A-Za-z0-9_]{4,25}$/;
+/* Domeny, z ktorych przyjmujemy adres transmisji Facebooka. Lista, nie `includes`:
+   "facebook.com.zly-serwis.pl" zawiera "facebook.com" i przeszloby przez `includes`. */
+const FACEBOOK_HOSTS = new Set([
+  'facebook.com', 'www.facebook.com', 'm.facebook.com', 'web.facebook.com',
+  'fb.watch', 'www.fb.watch'
+]);
 
 /**
  * Identyfikator wyluskany z tego, co organizator wklei.
  *
  * Ludzie wklejaja rozne rzeczy i wszystkie sa poprawne z ich punktu widzenia: caly adres
  * z paskiem, sam skrocony link, nazwe kanalu, albo goly identyfikator. Rozpoznajemy ksztalty,
- * ktore naprawde wychodza z YouTube'a i Twitcha, a wszystko inne odrzucamy — cicha zamiana
- * niezrozumianego wklejenia na pusty ekran byla by gorsza niz odmowa z komunikatem.
+ * ktore naprawde wychodza od trzech dostawcow, a wszystko inne ODRZUCAMY.
+ *
+ * ODRZUCAMY, A NIE PRZEPUSZCZAMY — TO JEST ROZNICA MIEDZY BLEDEM A DZIURA
+ *   Przez chwile ta funkcja przy nierozpoznanym wklejeniu oddawala wpisany tekst, a
+ *   `embedUrl` wstawiala go do `<iframe src>`. To znaczy, ze kazdy adres wpisany w panelu
+ *   — takze `javascript:` i dowolna obca strona — ladowal w ramce na stronie wydarzenia.
+ *   Dokladnie to opisuje komentarz w migracji 0040 jako ksztalt, ktorego ma nie byc.
+ *   Odmowa z komunikatem jest tansza niz cicha zgoda na wszystko.
  */
 function streamIdFrom(raw, provider) {
   const text = String(raw || '').trim();
   if (!text) return '';
-  if (STREAM_ID_RE.test(text) && !text.includes('/')) return text;
+
+  if (provider === 'facebook') return facebookVideoUrl(text);
+
+  const bare = provider === 'twitch' ? TWITCH_CHANNEL_RE : YOUTUBE_ID_RE;
+  if (!text.includes('/') && bare.test(text)) return text;
 
   let url;
   try { url = new URL(text.startsWith('http') ? text : `https://${text}`); }
-  catch { return text; }
-  
-  if (url.hostname.includes('facebook.com') || url.hostname.includes('fb.watch')) return text;
+  catch { return ''; }
 
   const parts = url.pathname.split('/').filter(Boolean);
   if (provider === 'twitch') {
     /* Twitch osadza sie KANALEM, nie nagraniem: `player.twitch.tv/?channel=nazwa`. */
-    return parts[0] && STREAM_ID_RE.test(parts[0]) ? parts[0] : text;
+    return parts[0] && TWITCH_CHANNEL_RE.test(parts[0]) ? parts[0] : '';
   }
   /* YouTube ma cztery ksztalty na to samo: ?v=, youtu.be/, /live/ i /embed/. */
   const v = url.searchParams.get('v');
-  if (v && STREAM_ID_RE.test(v)) return v;
+  if (v && YOUTUBE_ID_RE.test(v)) return v;
   const last = parts[parts.length - 1] || '';
-  if (['live', 'embed'].includes(parts[parts.length - 2]) && STREAM_ID_RE.test(last)) return last;
-  if (url.hostname.endsWith('youtu.be') && STREAM_ID_RE.test(last)) return last;
-  return text;
+  if (['live', 'embed'].includes(parts[parts.length - 2]) && YOUTUBE_ID_RE.test(last)) return last;
+  if (url.hostname.endsWith('youtu.be') && YOUTUBE_ID_RE.test(last)) return last;
+  return '';
+}
+
+/**
+ * Facebook: przechowujemy CALY ADRES, bo wtyczka wideo innego nie przyjmuje — ale tylko
+ * taki, ktory sami rozebralismy i zlozylismy z powrotem.
+ *
+ * Zwraca kanoniczny `https://www.facebook.com/...` albo pusty napis. Nic, co nie pochodzi
+ * z listy domen wyzej, nie ma prawa wyjsc z tej funkcji — a `embedUrl` i tak wstawia to
+ * dopiero jako WARTOSC parametru `href`, nie jako sam adres ramki.
+ */
+function facebookVideoUrl(raw) {
+  let url;
+  try { url = new URL(String(raw).startsWith('http') ? String(raw) : `https://${raw}`); }
+  catch { return ''; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+  if (!FACEBOOK_HOSTS.has(url.hostname.toLowerCase())) return '';
+  /* Sciezka i ewentualne `?v=` — reszta zapytania (zrodla kliknienia, identyfikatory sesji)
+     leci do kosza: nie jest potrzebna do odtworzenia, a bywa danymi osobowymi w adresie. */
+  const keep = url.searchParams.get('v');
+  /* Bez wyrazenia regularnego: koncowy ukosnik zdejmujemy petla, bo ta funkcja i tak
+     nie potrzebuje wzorca, a jeden wzorzec mniej to jedno miejsce mniej na pomylke. */
+  let path = url.pathname;
+  while (path.endsWith('/')) path = path.slice(0, -1);
+  if (!path || path === '/') return '';
+  const host = url.hostname.toLowerCase() === 'fb.watch' || url.hostname.toLowerCase() === 'www.fb.watch'
+    ? 'fb.watch'
+    : 'www.facebook.com';
+  return `https://${host}${path}${keep ? `?v=${encodeURIComponent(keep)}` : ''}`;
 }
 
 /** Adres do ramki, zlozony z identyfikatora — nigdy z tego, co wklejono. */
 function embedUrl(provider, id, host = '') {
   if (!id) return '';
-  
-  if (id.includes('facebook.com') || id.includes('fb.watch')) {
-    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(id)}&show_text=false&width=auto`;
+  if (provider === 'facebook') {
+    /* Jeszcze raz przez te sama bramke. Wiersz w bazie moze pochodzic sprzed tej poprawki,
+       a wtedy trzyma napis, ktorego nikt nie sprawdzil. */
+    const page = facebookVideoUrl(id);
+    if (!page) return '';
+    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(page)}&show_text=false&width=auto`;
   }
-  
-  if (id.includes('/') || id.includes(':') || id.includes('.')) {
-    return id.startsWith('http') ? id : `https://${id}`;
-  }
-
-  if (!STREAM_ID_RE.test(id)) return '';
   if (provider === 'twitch') {
+    if (!TWITCH_CHANNEL_RE.test(id)) return '';
     /* Twitch wymaga `parent` z domena strony osadzajacej, inaczej odmawia odtwarzania. */
     const parent = String(host || '').split(':')[0] || 'www.carruleddhishow.com';
     return `https://player.twitch.tv/?channel=${id}&parent=${parent}`;
   }
+  if (!YOUTUBE_ID_RE.test(id)) return '';
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`;
 }
 
@@ -9206,7 +9257,9 @@ async function streamAdmin(env, payload, cors) {
   const patch = { updated_at: new Date().toISOString() };
 
   if (action === 'save') {
-    const provider = payload.provider === 'twitch' ? 'twitch' : 'youtube';
+    /* Trzeci dostawca. Lista, nie warunek trojkatny z dwoma galeziami: dopisanie czwartego
+       ma byc dopisaniem slowa, a nie przepisywaniem wyrazenia. */
+    const provider = ['twitch', 'facebook'].includes(payload.provider) ? payload.provider : 'youtube';
     const id = streamIdFrom(payload.url ?? payload.videoId, provider);
     if (!id) return json({ ok: false, code: 'STREAM_BAD_URL' }, 422, cors);
     Object.assign(patch, { provider, video_id: id, title: trimmed(payload.title) || '' });

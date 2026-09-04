@@ -33,9 +33,13 @@ import { ActionButton } from './ActionButton';
  */
 function watchUrl(provider: StreamState['provider'], id: string) {
   if (!id) return '';
-  return provider === 'twitch'
-    ? `https://www.twitch.tv/${id}`
-    : `https://www.youtube.com/watch?v=${id}`;
+  /* Facebook trzyma CALY adres, nie identyfikator — wtyczka wideo innego nie przyjmuje.
+     Doklejenie go po `?v=` dawaloby napis w rodzaju
+     `https://www.youtube.com/watch?v=https://www.facebook.com/...`, czyli dokladnie to,
+     co zglaszano jako "zapisuje sie jakies dziwne id". */
+  if (provider === 'facebook') return id.startsWith('http') ? id : `https://${id}`;
+  if (provider === 'twitch') return `https://www.twitch.tv/${id}`;
+  return `https://www.youtube.com/watch?v=${id}`;
 }
 
 export function Stream({ t, apiKey, pl }: {
@@ -46,14 +50,16 @@ export function Stream({ t, apiKey, pl }: {
   const [state, setState] = useState<StreamState | null>(null);
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
-  const [provider, setProvider] = useState<'youtube' | 'twitch'>('youtube');
+  const [provider, setProvider] = useState<StreamState['provider']>('youtube');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const absorb = useCallback((next: StreamState) => {
     setState(next);
-    setProvider(next.provider === 'twitch' ? 'twitch' : 'youtube');
+    /* Trzy wartosci, nie dwie: przy `=== 'twitch' ? ... : 'youtube'` transmisja z Facebooka
+       wracala z serwera jako YouTube i pierwszy zapis po odswiezeniu ja gubil. */
+    setProvider(next.provider === 'twitch' || next.provider === 'facebook' ? next.provider : 'youtube');
     setTitle(next.title);
     /* Pole pokazuje PEŁNY ADRES, złożony z zapamiętanego identyfikatora.
        ---------------------------------------------------------------------------
@@ -66,7 +72,7 @@ export function Stream({ t, apiKey, pl }: {
        Adres jest WYLICZANY z identyfikatora, więc nie obiecuje niczego ponad to, co naprawdę
        zapamiętaliśmy — a przy następnym zapisie wraca do Workera i rozbiera się z powrotem na
        ten sam identyfikator. Samo id nadal widać niżej, przy „Zapisany identyfikator". */
-    setUrl(watchUrl(next.provider === 'twitch' ? 'twitch' : 'youtube', next.videoId));
+    setUrl(watchUrl(next.provider, next.videoId));
   }, []);
 
   const load = useCallback(async () => {
@@ -105,6 +111,23 @@ export function Stream({ t, apiKey, pl }: {
     }
   };
 
+  /**
+   * Kod bledu zamieniony na zdanie, ktore mowi CO ZROBIC.
+   * ---------------------------------------------------------------------------
+   * Panel wypisywal sam kod — `STREAM_BAD_URL` — i to jest komunikat dla programisty, nie
+   * dla organizatora stojacego na zboczu. Zgloszenie brzmialo "podaje link i nie chce sie
+   * zapisac", bo ekran nie mowil ani co jest nie tak, ani czy to wina adresu, bazy, czy
+   * panelu. Kod zostaje pod spodem, mniejsza czcionka: gdy zdanie nie wystarczy, jest po
+   * czym szukac.
+   */
+  const errorSentence = (code: string | null) => {
+    if (!code) return null;
+    if (code.includes('STREAM_BAD_URL')) return t('stream.errBadUrl');
+    if (code.includes('STREAM_NO_URL')) return t('stream.errNoUrl');
+    if (code.includes('STREAM_WRITE_FAILED')) return t('stream.errWriteFailed');
+    return null;
+  };
+
   const live = Boolean(state?.live);
 
   return (
@@ -132,7 +155,7 @@ export function Stream({ t, apiKey, pl }: {
         <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{t('stream.sourceHint')}</p>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {(['youtube', 'twitch'] as const).map((one) => (
+          {(['youtube', 'twitch', 'facebook'] as const).map((one) => (
             <button
               key={one}
               type="button"
@@ -243,7 +266,8 @@ export function Stream({ t, apiKey, pl }: {
       ) : null}
       {error ? (
         <p className="mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-xs text-destructive">
-          {pl ? 'Nie udało się: ' : 'Non è riuscito: '}<span className="font-mono opacity-70">{error}</span>
+          {errorSentence(error) ?? (pl ? 'Nie udało się.' : 'Non è riuscito.')}
+          <span className="mt-1 block font-mono text-[10px] opacity-60">{error}</span>
         </p>
       ) : null}
     </div>
