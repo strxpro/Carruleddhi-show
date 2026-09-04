@@ -126,6 +126,9 @@ export function Stream({ t, apiKey, pl }: {
     if (code.includes('STREAM_BAD_URL')) return t('stream.errBadUrl');
     if (code.includes('STREAM_NO_URL')) return t('stream.errNoUrl');
     if (code.includes('STREAM_WRITE_FAILED')) return t('stream.errWriteFailed');
+    /* Dwa rozne niepowodzenia, dwa rozne zdania: baza odmowila, albo baza przyjela
+       i nic nie zmienila. Drugie jest gorsze, bo wyglada jak sukces. */
+    if (code.includes('STREAM_NOT_STORED') || code.includes('STREAM_ROW_MISSING')) return t('stream.errNotStored');
     return null;
   };
 

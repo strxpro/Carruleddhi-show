@@ -9312,13 +9312,64 @@ async function streamAdmin(env, payload, cors) {
     return json({ ok: false, code: 'STREAM_UNKNOWN_ACTION' }, 400, cors);
   }
 
+  const { row, code } = await writeStream(env, patch);
+  if (!row) return json({ ok: false, code: code || 'STREAM_WRITE_FAILED' }, 502, cors);
+  /* WERYFIKACJA, NIE ZAUFANIE: to, co wrocilo z bazy, musi byc tym, o co prosilismy.
+     Bez tego zapis, ktory nie trafil w zaden wiersz, wraca jako sukces ze STARA wartoscia —
+     a panel pokazuje ja jako "zapisano" i czlowiek widzi, ze pole samo zmienilo mu sie
+     z powrotem. Zgloszenie brzmialo doslownie tak. */
+  if (action === 'save' && String(row.video_id || '') !== String(patch.video_id || '')) {
+    return json({ ok: false, code: 'STREAM_NOT_STORED' }, 502, cors);
+  }
+  return json({
+    ok: true,
+    live: Boolean(row.is_live),
+    provider: row.provider || 'youtube',
+    videoId: row.video_id || '',
+    title: row.title || '',
+    hearts: Number(row.hearts) || 0,
+    startedAt: row.started_at || null
+  }, 200, cors);
+}
+
+/**
+ * ZAPIS, KTORY WIE, CZY COS ZAPISAL.
+ * ---------------------------------------------------------------------------
+ * Stalo tu `Prefer: return=minimal` i jeden warunek na `response.ok`. To jest za malo, i to
+ * jest DOKLADNIE ta klasa bledu, ktora w tym projekcie wracala piec razy w ciagu doby:
+ * funkcja zglasza sukces i nic nie robi.
+ *
+ * PostgREST na PATCH, ktory nie trafil w ZADEN wiersz, odpowiada 204 — czyli `ok`. Zapis
+ * przechodzil wiec jako udany, funkcja czytala stan z powrotem i oddawala STARA wartosc,
+ * a panel pokazywal ja jako zapisana. Na ekranie wygladalo to tak, ze pole samo wraca do
+ * poprzedniego identyfikatora, bez zadnego bledu.
+ *
+ * Teraz baza oddaje zmieniony wiersz (`return=representation`) i to on jest odpowiedzia.
+ * Pusta tablica znaczy, ze wiersza-singletona nie ma — wtedy go zakladamy zamiast odmawiac,
+ * bo brak wiersza to stan bazy sprzed migracji 0040, a nie blad organizatora.
+ */
+async function writeStream(env, patch) {
   const response = await fetch(`${env.SUPABASE_URL}/rest/v1/stream_state?id=eq.true`, {
     method: 'PATCH',
-    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+    headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
     body: JSON.stringify(patch)
   });
-  if (!response.ok) return json({ ok: false, code: 'STREAM_WRITE_FAILED' }, 502, cors);
-  return streamAdmin(env, { action: 'state' }, cors);
+  if (!response.ok) return { row: null, code: 'STREAM_WRITE_FAILED' };
+  const rows = await response.json().catch(() => []);
+  if (Array.isArray(rows) && rows.length) return { row: rows[0], code: '' };
+
+  /* Zero trafionych wierszy. Zakladamy singletona i od razu wpisujemy w niego to, o co
+     poproszono — `merge-duplicates`, zeby wyscig dwoch takich zadan nie skonczyl sie
+     bledem klucza glownego. */
+  const created = await fetch(`${env.SUPABASE_URL}/rest/v1/stream_state`, {
+    method: 'POST',
+    headers: supabaseHeaders(env, { Prefer: 'return=representation,resolution=merge-duplicates' }),
+    body: JSON.stringify({ id: true, ...patch })
+  });
+  if (!created.ok) return { row: null, code: 'STREAM_ROW_MISSING' };
+  const madeRows = await created.json().catch(() => []);
+  if (Array.isArray(madeRows) && madeRows.length) return { row: madeRows[0], code: '' };
+  return { row: null, code: 'STREAM_ROW_MISSING' };
 }
 
 /**
