@@ -122,6 +122,7 @@ export function Stream({ t, apiKey, pl }: {
    */
   const errorSentence = (code: string | null) => {
     if (!code) return null;
+    if (code.includes('STREAM_YT_CHANNEL_LINK')) return t('stream.errChannelLink');
     if (code.includes('STREAM_BAD_URL')) return t('stream.errBadUrl');
     if (code.includes('STREAM_NO_URL')) return t('stream.errNoUrl');
     if (code.includes('STREAM_WRITE_FAILED')) return t('stream.errWriteFailed');

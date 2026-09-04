@@ -9104,6 +9104,12 @@ const FACEBOOK_HOSTS = new Set([
  *   Dokladnie to opisuje komentarz w migracji 0040 jako ksztalt, ktorego ma nie byc.
  *   Odmowa z komunikatem jest tansza niz cicha zgoda na wszystko.
  */
+const YOUTUBE_HOSTS = new Set([
+  'youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com',
+  'studio.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com',
+  'youtu.be', 'www.youtu.be'
+]);
+
 function streamIdFrom(raw, provider) {
   const text = String(raw || '').trim();
   if (!text) return '';
@@ -9122,12 +9128,39 @@ function streamIdFrom(raw, provider) {
     /* Twitch osadza sie KANALEM, nie nagraniem: `player.twitch.tv/?channel=nazwa`. */
     return parts[0] && TWITCH_CHANNEL_RE.test(parts[0]) ? parts[0] : '';
   }
-  /* YouTube ma cztery ksztalty na to samo: ?v=, youtu.be/, /live/ i /embed/. */
-  const v = url.searchParams.get('v');
-  if (v && YOUTUBE_ID_RE.test(v)) return v;
-  const last = parts[parts.length - 1] || '';
-  if (['live', 'embed'].includes(parts[parts.length - 2]) && YOUTUBE_ID_RE.test(last)) return last;
-  if (url.hostname.endsWith('youtu.be') && YOUTUBE_ID_RE.test(last)) return last;
+
+  /* YOUTUBE: SZUKAMY eleven-znakowego identyfikatora, GDZIEKOLWIEK JEST W ADRESIE.
+     ---------------------------------------------------------------------------
+     Wczesniej stala tu lista czterech ksztaltow: `?v=`, `youtu.be/`, `/live/` i `/embed/`.
+     YouTube ma ich wiecej, i to nie sa przypadki brzegowe — to sa adresy, ktore czlowiek
+     ma w pasku, kiedy patrzy na wlasna transmisje:
+
+       youtube.com/live/ID?si=...            udostepnianie transmisji
+       youtube.com/shorts/ID                 pionowe nagranie
+       studio.youtube.com/video/ID/livestreaming    pokoj kontrolny nadawcy
+       music.youtube.com/watch?v=ID          gdy ktos ma domyslnie YouTube Music
+
+     Kazdy z nich niesie ten sam identyfikator i kazdy dawal wczesniej odmowe. Zamiast
+     dopisywac piaty i szosty ksztalt do listy, szukamy identyfikatora tam, gdzie moze byc:
+     w `?v=` i w czlonach sciezki. Zawezenie, ktore to trzyma, jest gdzie indziej i jest
+     mocniejsze niz lista ksztaltow: DOMENA musi byc YouTube'a, a token DOKLADNIE
+     jedenastoznakowy. */
+  if (!YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) return '';
+  const fromQuery = url.searchParams.get('v');
+  if (fromQuery && YOUTUBE_ID_RE.test(fromQuery)) return fromQuery;
+  /* Link do KANALU, nie do transmisji: youtube.com/@nazwa/live, /c/nazwa/live, /user/x/live.
+     Sprawdzane PRZED przeszukaniem sciezki, i to nie jest kosmetyka: nazwa kanalu bywa
+     jedenastoznakowa ("carruleddhi" ma dokladnie tyle), wiec skan czlonow braby ja za
+     identyfikator filmu i zapisywal adres, ktory nigdy nie zagra. Ksztalt `/live/ID` konczy
+     sie identyfikatorem, a nie slowem `live`, wiec te dwa przypadki sie nie mylą.
+
+     Osadzic sie tego nie da — ramka potrzebuje identyfikatora materialu, a w takim adresie
+     go nie ma i nie da sie go wyliczyc bez pytania YouTube'a. Oddajemy wlasny znacznik
+     zamiast pustego napisu, zeby panel mogl powiedziec CO ZROBIC, a nie tylko ze sie nie da. */
+  if (parts[parts.length - 1] === 'live') return '@channel';
+
+  const fromPath = parts.find((part) => YOUTUBE_ID_RE.test(part));
+  if (fromPath) return fromPath;
   return '';
 }
 
@@ -9261,6 +9294,9 @@ async function streamAdmin(env, payload, cors) {
        ma byc dopisaniem slowa, a nie przepisywaniem wyrazenia. */
     const provider = ['twitch', 'facebook'].includes(payload.provider) ? payload.provider : 'youtube';
     const id = streamIdFrom(payload.url ?? payload.videoId, provider);
+    /* Osobny kod, bo osobna rada: przy linku do kanalu nie trzeba poprawiac literowki,
+       tylko wejsc w sama transmisje i skopiowac adres stamtad. */
+    if (id === '@channel') return json({ ok: false, code: 'STREAM_YT_CHANNEL_LINK' }, 422, cors);
     if (!id) return json({ ok: false, code: 'STREAM_BAD_URL' }, 422, cors);
     Object.assign(patch, { provider, video_id: id, title: trimmed(payload.title) || '' });
   } else if (action === 'open') {
