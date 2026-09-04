@@ -2377,7 +2377,18 @@ import {
       quickButton.setAttribute('aria-pressed', String(state.attended));
     });
     $$('.nav-attend').forEach((navButton) => {
-      navButton.textContent = text(state.attended ? 'nav.attended' : 'nav.attend');
+      /* W PASKU ZAWSZE KROTKI NAPIS — NIGDY `nav.attended`.
+         =====================================================================
+         Po nacisnieciu przycisk zamienial napis na cale zdanie: „Bede tam na wielkim
+         widowisku". W hero, gdzie przycisk zajmuje pol ekranu, to sie broni. W pasku na
+         telefonie zdanie nie miesci sie w 100 px, wiec albo lamie sie na dwie linie i
+         rozpycha pasek na wysokosc, albo nachodzi na sasiada. Zgloszone jako „guzik jest
+         wielki i rozwalony, najezdza na siebie".
+
+         Fakt, ze ktos juz nacisnal, niesie `is-complete` — kolor, nie dluzsze zdanie.
+         Kontrolka w pasku ma zostac tej samej szerokosci przed i po nacisnieciu; element
+         interfejsu, ktory rosnie od klikniecia, przestawia wszystko obok siebie. */
+      navButton.textContent = text('nav.attend');
       navButton.classList.toggle('is-complete', state.attended);
     });
   }

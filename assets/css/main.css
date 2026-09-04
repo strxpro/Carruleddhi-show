@@ -762,6 +762,12 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   .stack-card:hover .stack-card__photo { transform: scale(1.05); }
 }
 @media (prefers-reduced-motion: reduce) {
+  /* Dok i jego przyciski maja wjezdzac tylko wtedy, gdy ruch jest mile widziany.
+     Przy „reduce" po prostu sa — bez wjazdu i bez skalowania przy dotknieciu. */
+  .quick-actions, .quick-action, .quick-action.is-complete { animation: none !important; }
+  .quick-action:active { transform: none; }
+  .quick-action:active .quick-action__icon { transform: none; }
+
   .stack-card__photo { transition: none; }
   .stack-card:hover .stack-card__photo { transform: none; }
 }
@@ -1448,30 +1454,51 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 .nav-actions { flex: none; }
 .nav-attend { min-width: 102px; }
 
-/* „Będę tam" w pasku: kontrolka, nie plakat.
+/* „Będę tam" w pasku: czerwony, ale WIELKOSCI PASKA.
    ---------------------------------------------------------------------------
-   Przycisk dziedziczy `.btn`, czyli pełne koralowe tło — to samo, którym woła do siebie
-   wielki przycisk w hero i przycisk w sekcji obecności. W pasku, obok żółtego „Menu",
-   dawało to dwa krzyczące kafle obok siebie na 370 px szerokości i czytało się jak baner
-   doklejony do nagłówka, a nie jak część paska. Zgłoszone jako „ten czerwony guzik wystaje".
+   Kolor zostaje koralowy — to jest zaproszenie i ma byc widoczne. Zmienia sie to, co
+   naprawde psulo pasek: rozmiar i zachowanie napisu.
 
-   Zostaje sam napis w obwódce: ta sama wysokość, to samo miejsce, ta sama czynność — tylko
-   głosem paska, a nie hero. Kolor wraca pod palcem i przy fokusie, więc nie ginie
-   informacja, że to jest przycisk, a nie etykieta.
+   `white-space: nowrap` plus krotki napis (patrz refreshAttendanceLabels w app.js)
+   daja kontrolke o STALEJ szerokosci: taka sama przed nacisnieciem i po. Wczesniej napis
+   zmienial sie na cale zdanie, lamal sie na dwie linie i rozpychal pasek na wysokosc, az
+   przyciski zachodzily na siebie.
 
-   Zakres celowo `.site-header`: wielki koralowy przycisk w hero i w sekcji obecności
-   zostaje nietknięty. Tam jest jedyną rzeczą na ekranie i ma krzyczeć. */
+   `is-complete` na zielono, tak samo jak w doku na dole — jeden kolor znaczy
+   „zrobione" w calym serwisie, wiec nie trzeba tego pisac slowami. */
 .site-header .nav-attend {
-  border: 1px solid rgba(255,255,255,.34);
-  background: rgba(255,255,255,.06);
-  color: var(--white);
-  box-shadow: none;
+  flex: none;
+  max-width: 42vw;
+  padding-inline: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.site-header .nav-attend:hover,
-.site-header .nav-attend:focus-visible {
-  border-color: var(--yellow);
-  background: var(--yellow);
-  color: var(--navy-950);
+.site-header .nav-attend.is-complete {
+  background: var(--green);
+  color: var(--white);
+}
+
+/* Pasek nie ma prawa sie zlepic ani przelamac.
+   `flex-wrap: nowrap` zamiast domyslnego zawijania: przy zawijaniu ostatni przycisk
+   spadal pod spod i pasek rosl dwukrotnie. `min-width: 0` na kontenerze, bo bez tego
+   element w flexie nie da sie sciesnic ponizej swojej zawartosci i to on wypycha sasiadow
+   poza ekran — najczestsza przyczyna „przyciski najezdzaja na siebie". */
+.site-header .nav-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+@media (max-width: 430px) {
+  .site-header .nav-attend { max-width: 38vw; padding-inline: 11px; font-size: 11px; letter-spacing: .06em; }
+  .site-header .nav-actions { gap: 6px; }
+}
+@media (max-width: 360px) {
+  .site-header .nav-attend { max-width: 34vw; padding-inline: 9px; font-size: 10px; }
+  .site-header .nav-actions { gap: 5px; }
 }
 .menu-toggle {
   display: inline-flex !important;
@@ -2468,6 +2495,53 @@ body { font-variation-settings: 'opsz' 16; }
     text-decoration: none;
     text-transform: uppercase;
   }
+  /* WEJSCIE DOKU I PRZYCISKOW.
+     -------------------------------------------------------------------------
+     Dok pojawial sie natychmiast, w pelnej postaci, w tej samej klatce co reszta strony —
+     wygladalo to, jakby element interfejsu doklejil sie po fakcie, a nie jakby przyjechal.
+     Zglaszane jako „napraw animacje wyswietlania tych dwoch dolnych guzikow".
+
+     Dok wjezdza z dolu i dochodzi do skali 1; kazdy przycisk osobno, jeden po drugim, z
+     drobnym opoznieniem. Opoznienie ustawiane jest ODDZIELNIE dla kolejnych dzieci, bo dok
+     ma od dwoch do czterech przyciskow zaleznie od fazy wyscigu, a jedno wspolne opoznienie
+     dawaloby wrazenie, ze wchodza w kupie.
+
+     `backwards` w wypelnieniu animacji jest tu konieczne: bez niego przycisk z
+     opoznieniem jest widoczny w pelni PRZED startem swojej animacji i mruga. */
+  @keyframes quick-dock-in {
+    from { opacity: 0; transform: translateY(26px) scale(.94); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes quick-action-in {
+    from { opacity: 0; transform: translateY(10px) scale(.9); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  /* `backwards`, NIE `both`. Po zakonczeniu animacji `both` zostawia na elemencie
+     ostatnia klatke — czyli wlasny `transform` — a animacja bije zwykle deklaracje.
+     Dok uzywa `transform` do stanu zwinietego i do przesuniec (--dock-nudge-x w
+     carnival.css), wiec `both` unieruchomiloby jedno i drugie na zawsze po wejsciu.
+     `backwards` daje to samo wejscie i oddaje `transform` z powrotem arkuszowi. */
+  .quick-actions { animation: quick-dock-in .52s var(--ease-out) backwards; }
+  .quick-action { animation: quick-action-in .42s var(--ease-out) backwards; }
+  .quick-actions > .quick-action:nth-child(1) { animation-delay: .10s; }
+  .quick-actions > .quick-action:nth-child(2) { animation-delay: .17s; }
+  .quick-actions > .quick-action:nth-child(3) { animation-delay: .24s; }
+  .quick-actions > .quick-action:nth-child(4) { animation-delay: .31s; }
+
+  /* Odpowiedzi na dotkniecie NIE ma tutaj celowo: carnival.css ma juz `:active` ze skala
+     i obrotem ikony, w tej samej sekcji doku. Druga taka regula tylko wygrywalaby kolejnoscia
+     i po cichu kasowala obrot — a dwa miejsca opisujace to samo dotkniecie to jedno za duzo. */
+
+  /* Zaznaczenie „zrobione" ma byc zauwazone. Jednorazowe powiekszenie w chwili, gdy klasa
+     wchodzi — nie petla, bo dok stoi na ekranie caly czas, a pulsujacy przycisk przy
+     czytaniu tekstu jest nie do zniesienia. */
+  @keyframes quick-action-done {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+  .quick-action.is-complete { animation: quick-action-done .42s var(--ease-out); }
+
   .quick-action--attend { background: var(--yellow); cursor: pointer; }
   .quick-action--attend.is-complete { background: var(--green); color: var(--white); }
   .quick-action--signup { background: var(--coral); color: var(--white); }
