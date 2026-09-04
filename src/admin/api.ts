@@ -270,6 +270,39 @@ export const fetchStreamAdmin = (key: string) =>
 export const saveStream = (key: string, provider: 'youtube' | 'twitch' | 'facebook', url: string, title: string) =>
   call<StreamState>('stream-admin', key, { action: 'save', provider, url, title });
 
+/** Jeden adres na liscie powiadomienia o starcie transmisji. */
+export interface StreamRecipient {
+  email: string;
+  name: string;
+  locale: string;
+  /** 'reminders' = zasiany z listy przypomnien, 'manual' = dopisany recznie w panelu. */
+  source: 'reminders' | 'manual';
+  /** Niepuste znaczy: ten adres juz dostal list i nie dostanie go drugi raz. */
+  sentAt: string | null;
+}
+
+export interface StreamAudience {
+  ok: true;
+  recipients: StreamRecipient[];
+  /** Ilu jeszcze nie dostalo. To jest liczba, ktora pojdzie w swiat po nacisnieciu wyslij. */
+  pending: number;
+}
+
+/* Lista jest KOPIA ROBOCZA na jedna wysylke, nie zrodlem: dopisanie adresu tutaj nie
+   zapisuje nikogo na przypomnienia, a usuniecie nie wypisuje go z niczego. Patrz
+   migracja 0042 i komentarz przy streamAudience w worker/index.js. */
+export const fetchStreamAudience = (key: string) =>
+  call<StreamAudience>('stream-admin', key, { action: 'audience' });
+
+export const addStreamRecipient = (key: string, email: string, locale: string) =>
+  call<StreamAudience>('stream-admin', key, { action: 'audience-add', email, locale });
+
+export const removeStreamRecipient = (key: string, email: string) =>
+  call<StreamAudience>('stream-admin', key, { action: 'audience-remove', email });
+
+export const notifyStreamStart = (key: string) =>
+  call<{ ok: true; sent: number; failed: number }>('stream-admin', key, { action: 'notify' });
+
 export const setStreamLive = (key: string, live: boolean) =>
   call<StreamState>('stream-admin', key, { action: live ? 'open' : 'close' });
 

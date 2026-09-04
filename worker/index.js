@@ -9287,6 +9287,12 @@ async function streamAdmin(env, payload, cors) {
     }, 200, cors);
   }
 
+  /* ------------------------------------------------- powiadomienie o starcie */
+  if (action === 'audience') return streamAudience(env, cors);
+  if (action === 'audience-add') return streamAudienceAdd(env, payload, cors);
+  if (action === 'audience-remove') return streamAudienceRemove(env, payload, cors);
+  if (action === 'notify') return streamNotify(env, cors);
+
   const patch = { updated_at: new Date().toISOString() };
 
   if (action === 'save') {
@@ -9330,6 +9336,167 @@ async function streamAdmin(env, payload, cors) {
     hearts: Number(row.hearts) || 0,
     startedAt: row.started_at || null
   }, 200, cors);
+}
+
+/* ============================================================================
+   POWIADOMIENIE "TRANSMISJA WYSTARTOWALA"
+   ============================================================================
+   DLACZEGO RECZNIE, A NIE MINUTE PO WLACZENIU TRANSMISJI
+     Bo to jest list do kilkuset ludzi i nie da sie go cofnac. Wysylka na zegar znaczy, ze
+     pomylkowe nacisniecie "Otworz transmisje" — albo proba na sucho dzien wczesniej —
+     konczy sie skrzynkami wszystkich zapisanych. Przycisk, ktory pokazuje LISTE ODBIORCOW
+     i dopiero potem wysyla, kosztuje jedno klikniecie wiecej i zdejmuje caly ten koszt.
+
+   LISTA JEST KOPIA ROBOCZA, NIE ZRODLEM
+     Zasiewana z reminder_subscribers (ludzie, ktorzy sami poprosili o wiadomosci
+     o wydarzeniu), potem swobodnie edytowalna. Dopisanie adresu tutaj NIE zapisuje nikogo
+     na przypomnienia, a usuniecie NIE wypisuje go z niczego — patrz migracja 0042.
+   ========================================================================= */
+
+/** Napisy listu. Inline, a nie w emails/copy.json: to szesc krotkich zdan, a tamten plik
+    jest zrodlem dla generatora szablonow i ma wlasny cykl budowania. */
+const STREAM_LETTER = {
+  it: { subject: 'Siamo in diretta!', lead: 'La diretta del Carruleddhi Show e appena iniziata.', cta: 'Guarda ora' },
+  pl: { subject: 'Jedziemy na zywo!', lead: 'Transmisja z Carruleddhi Show wlasnie sie zaczela.', cta: 'Ogladaj teraz' },
+  en: { subject: 'We are live!', lead: 'The Carruleddhi Show live stream has just started.', cta: 'Watch now' },
+  de: { subject: 'Wir sind live!', lead: 'Der Livestream der Carruleddhi Show hat gerade begonnen.', cta: 'Jetzt ansehen' },
+  es: { subject: 'Estamos en directo!', lead: 'La retransmision del Carruleddhi Show acaba de empezar.', cta: 'Ver ahora' },
+  fr: { subject: 'Nous sommes en direct !', lead: 'La diffusion du Carruleddhi Show vient de commencer.', cta: 'Regarder' }
+};
+
+function streamLetter(locale) {
+  const copy = STREAM_LETTER[locale] || STREAM_LETTER.it;
+  const link = `${publicSiteUrl()}/#live`;
+  const html = [
+    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#071a3d">',
+    `<p>${copy.lead}</p>`,
+    `<p><a href="${link}" style="display:inline-block;padding:12px 22px;border-radius:999px;`,
+    `background:#f6494f;color:#fff;text-decoration:none;font-weight:700">${copy.cta}</a></p>`,
+    `<p style="font-size:13px;color:#5b6b86">${link}</p>`,
+    '</div>'
+  ].join('');
+  return { subject: copy.subject, html };
+}
+
+/** Wiersze listy, po zasianiu brakujacych adresow z listy przypomnien. */
+async function streamAudience(env, cors) {
+  /* Zasiew: kazdy czynny subskrybent przypomnien, ktorego jeszcze tu nie ma.
+     ignore-duplicates, wiec ponowne otwarcie zakladki nic nie psuje i nie cofa recznych
+     zmian — w tym usuniec. */
+  const source = new URL(`${env.SUPABASE_URL}/rest/v1/reminder_subscribers`);
+  source.searchParams.set('select', 'email,name,locale');
+  source.searchParams.set('status', 'eq.active');
+  source.searchParams.set('limit', '2000');
+  const found = await fetch(source, { headers: supabaseHeaders(env), cache: 'no-store' });
+  if (found.ok) {
+    const rows = await found.json().catch(() => []);
+    const seed = (Array.isArray(rows) ? rows : [])
+      .filter((row) => row && row.email)
+      .map((row) => ({
+        email: String(row.email).trim().toLowerCase(),
+        name: String(row.name || ''),
+        locale: String(row.locale || 'it'),
+        source: 'reminders'
+      }));
+    if (seed.length) {
+      await fetch(`${env.SUPABASE_URL}/rest/v1/stream_notify_recipients`, {
+        method: 'POST',
+        headers: supabaseHeaders(env, { Prefer: 'resolution=ignore-duplicates,return=minimal' }),
+        body: JSON.stringify(seed)
+      }).catch(() => null);
+    }
+  }
+
+  const list = new URL(`${env.SUPABASE_URL}/rest/v1/stream_notify_recipients`);
+  list.searchParams.set('select', 'email,name,locale,source,sent_at');
+  list.searchParams.set('order', 'email.asc');
+  list.searchParams.set('limit', '2000');
+  const response = await fetch(list, { headers: supabaseHeaders(env), cache: 'no-store' });
+  if (!response.ok) return json({ ok: false, code: 'STREAM_AUDIENCE_FAILED' }, 502, cors);
+  const rows = await response.json().catch(() => []);
+  const all = Array.isArray(rows) ? rows : [];
+  return json({
+    ok: true,
+    recipients: all.map((row) => ({
+      email: row.email,
+      name: row.name || '',
+      locale: row.locale || 'it',
+      source: row.source || 'manual',
+      sentAt: row.sent_at || null
+    })),
+    pending: all.filter((row) => !row.sent_at).length
+  }, 200, cors);
+}
+
+async function streamAudienceAdd(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!/^[^s@]+@[^s@]+.[^s@]{2,}$/.test(email)) return json({ ok: false, code: 'STREAM_BAD_EMAIL' }, 422, cors);
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/stream_notify_recipients`, {
+    method: 'POST',
+    headers: supabaseHeaders(env, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify([{
+      email,
+      name: String(payload.name || '').slice(0, 80),
+      locale: LOCALES.has(payload.locale) ? payload.locale : 'it',
+      source: 'manual'
+    }])
+  });
+  if (!response.ok) return json({ ok: false, code: 'STREAM_AUDIENCE_FAILED' }, 502, cors);
+  return streamAudience(env, cors);
+}
+
+async function streamAudienceRemove(env, payload, cors) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!email) return json({ ok: false, code: 'STREAM_BAD_EMAIL' }, 422, cors);
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/stream_notify_recipients`);
+  url.searchParams.set('email', `eq.${email}`);
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: supabaseHeaders(env, { Prefer: 'return=minimal' })
+  });
+  if (!response.ok) return json({ ok: false, code: 'STREAM_AUDIENCE_FAILED' }, 502, cors);
+  return streamAudience(env, cors);
+}
+
+/**
+ * Wysylka. Tylko do tych, ktorzy jeszcze nie dostali, i tylko przy TRWAJACEJ transmisji.
+ *
+ * Warunek na is_live nie jest formalnoscia: list mowi "wlasnie sie zaczelo" i prowadzi do
+ * zakladki, ktorej przy wylaczonej transmisji na stronie NIE MA. Wyslanie go wczesniej
+ * znaczyloby kilkaset osob klikajacych w puste miejsce.
+ */
+async function streamNotify(env, cors) {
+  const row = await readStream(env);
+  if (!row || !row.is_live || !row.video_id) return json({ ok: false, code: 'STREAM_NOT_LIVE' }, 409, cors);
+
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/stream_notify_recipients`);
+  url.searchParams.set('select', 'email,locale');
+  url.searchParams.set('sent_at', 'is.null');
+  url.searchParams.set('limit', '2000');
+  const response = await fetch(url, { headers: supabaseHeaders(env), cache: 'no-store' });
+  if (!response.ok) return json({ ok: false, code: 'STREAM_AUDIENCE_FAILED' }, 502, cors);
+  const rows = await response.json().catch(() => []);
+  const pending = Array.isArray(rows) ? rows : [];
+
+  let sent = 0;
+  let failed = 0;
+  for (const person of pending) {
+    const letter = streamLetter(person.locale || 'it');
+    const ok = await sendThroughOutbox(env, { to: person.email, subject: letter.subject, html: letter.html });
+    if (!ok) { failed += 1; continue; }
+    /* Znacznik stawiany PO udanej wysylce i osobno dla kazdego adresu. Jeden zapis na koniec
+       znaczylby, ze przerwana wysylka albo oznacza wszystkich (i czesc nie dostanie nic przy
+       ponowieniu), albo nikogo (i czesc dostanie list drugi raz). */
+    const mark = new URL(`${env.SUPABASE_URL}/rest/v1/stream_notify_recipients`);
+    mark.searchParams.set('email', `eq.${person.email}`);
+    await fetch(mark, {
+      method: 'PATCH',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ sent_at: new Date().toISOString() })
+    }).catch(() => null);
+    sent += 1;
+  }
+  return json({ ok: true, sent, failed }, 200, cors);
 }
 
 /**
