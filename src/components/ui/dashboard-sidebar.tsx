@@ -429,9 +429,24 @@ export function CommandPalette({
     return [...found, ...(externalResults || [])];
   }, [items, query, externalResults]);
 
+  /* WYWOLANIE ZWROTNE W REFERENCJI, A NIE W ZALEZNOSCIACH — TU BYLA PETLA.
+     ---------------------------------------------------------------------------
+     `onSearchChange` przychodzi z gory jako funkcja tworzona przy kazdym renderze rodzica,
+     bo tak sie przekazuje wywolania zwrotne i nie ma w tym nic zlego. Ale z nia w tablicy
+     zaleznosci efekt uruchamial sie po KAZDYM renderze rodzica, wolal `onSearchChange`,
+     ten ustawial stan w rodzicu, rodzic renderowal sie od nowa i tworzyl kolejna funkcje.
+     Petla bez konca: "Maximum update depth exceeded" leci w konsoli od chwili otwarcia
+     panelu, a w wersji produkcyjnej konczy sie zamarznieciem albo pustym ekranem — na
+     ciemnym tle admin.html widac wtedy sam granat, zglaszany jako "niebieski ekran".
+
+     Komponent interfejsu nie ma prawa zapetlic sie dlatego, ze rodzic przekazal funkcje
+     wprost. Referencja trzyma zawsze najswiezsza wersje, a efekt zalezy juz tylko od tego,
+     co naprawde sie zmienia: od wpisanego zapytania. */
+  const searchChangeRef = useRef(onSearchChange);
+  useEffect(() => { searchChangeRef.current = onSearchChange; });
   useEffect(() => {
-    if (onSearchChange) onSearchChange(query);
-  }, [query, onSearchChange]);
+    searchChangeRef.current?.(query);
+  }, [query]);
 
   useEffect(() => {
     if (cursor >= results.length) setCursor(0);

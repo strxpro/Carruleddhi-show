@@ -253,7 +253,10 @@ export default function App() {
   const [searchResults, setSearchResults] = useState<NavItemData[]>([]);
   const handleGlobalSearch = useCallback(async (query: string) => {
     if (!query || query.trim().length < 2 || !key) {
-      setSearchResults([]);
+      /* Nowa pusta tablica przy kazdym wywolaniu to dla Reacta NOWA wartosc stanu, wiec
+         "wyczysc wyniki" wywolywalo render nawet wtedy, gdy wyniki juz byly puste — i to
+         byl drugi silnik tej samej petli. Czyscimy tylko wtedy, gdy jest co czyscic. */
+      setSearchResults((previous) => (previous.length ? [] : previous));
       return;
     }
     const needle = query.trim().toLowerCase();
@@ -301,6 +304,14 @@ export default function App() {
       setSearchResults(results);
     } catch (e) {}
   }, [key, t]);
+
+  /* Jedna, stala funkcja zamiast nowej przy kazdym renderze. Sama w sobie nie jest juz
+     warunkiem poprawnosci — paleta trzyma wywolanie zwrotne w referencji — ale nowa funkcja
+     przy kazdym renderze i tak kaze potomkowi robic robote bez powodu. */
+  const onPaletteSearch = useCallback((q: string) => {
+    setHighlightQuery(q);
+    void handleGlobalSearch(q);
+  }, [handleGlobalSearch]);
 
   const go = useCallback(
     (id: string) => {
@@ -477,10 +488,7 @@ export default function App() {
         placeholder={t('nav.searchPlaceholder')}
         emptyLabel={t('nav.searchEmpty')}
         externalResults={searchResults}
-        onSearchChange={(q) => {
-          setHighlightQuery(q);
-          handleGlobalSearch(q);
-        }}
+        onSearchChange={onPaletteSearch}
       />
     </div>
   );
