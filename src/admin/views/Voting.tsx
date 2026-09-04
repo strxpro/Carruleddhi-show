@@ -560,7 +560,19 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             label={t('vote.showCountdown')}
             reason={reasonCountdown}
             tone="bg-blue-400/15 text-blue-100 hover:bg-blue-400/25"
-            isCurrent={state?.phase === 'countdown'}
+            /* 'scheduled', nie 'countdown'.
+               ---------------------------------------------------------------------------
+               'countdown' to nazwa CZYNNOŚCI — akcji, którą ten przycisk wysyła do Workera
+               (`showCountdown` -> `action: 'countdown'`). Fazy nazywają się inaczej:
+               votingPhase() zna 'scheduled', 'voting' i 'closed', a po tej właśnie akcji
+               wychodzi mu 'scheduled', bo termin startu jest wtedy w przyszłości.
+
+               Porównanie nazwy akcji z nazwą fazy nie mogło wyjść prawdą NIGDY, więc
+               `isCurrent` stało tu na stałe na false: przycisk nigdy nie pokazywał, że to
+               jest bieżący stan, i dawał się naciskać wtedy, gdy nie było czego zmieniać.
+               Nic się przez to nie psuło — po prostu panel nie mówił, gdzie jesteś.
+               tsc widział to od początku (TS2367: te dwa typy nie mają części wspólnej). */
+            isCurrent={state?.phase === 'scheduled'}
             icon={<Hourglass size={13} />}
             onPress={() => {
               /* Ostatnia linia obrony jest wspólna dla obu dróg: jeżeli po zapisie Worker
@@ -585,7 +597,10 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
             label={t('vote.openNow')}
             reason={reasonOpenNow}
             tone="bg-blue-600 text-white hover:bg-blue-500"
-            isCurrent={state?.phase === 'open'}
+            /* 'voting', nie 'open' — ten sam błąd, co przy odliczaniu wyżej: 'open' jest
+               nazwą akcji (`openVoting` -> `action: 'open'`), a fazą, w której głosowanie
+               trwa, jest 'voting'. */
+            isCurrent={state?.phase === 'voting'}
             icon={<Play size={13} />}
             busy={busy}
             onPress={() => void run(() => openVoting(apiKey, duration))}
