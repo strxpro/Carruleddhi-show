@@ -98,10 +98,25 @@ export function Stream({ t, apiKey, pl }: {
     }
   }, []);
 
-  const load = useCallback(async () => {
+  /* WYSCIG, KTORY KASOWAL WKLEJONY ADRES.
+     =========================================================================
+     Odczyt stanu przy wejsciu w zakladke wolal `absorb(..., true)` — czyli „to jest
+     prosba czlowieka, wpisz wartosc z serwera do pola". Przy szybkim laczu odpowiedz
+     wracala, zanim ktokolwiek zdazyl cokolwiek wkleic, wiec nie bylo tego widac.
+
+     Przy wolnym laczu — a zgloszenie przyszlo z przegladarki na VPN-ie — kolejnosc jest
+     odwrotna: czlowiek zdazy wkleic adres, DOPIERO POTEM wraca odpowiedz z mountu i
+     nadpisuje pole tym, co serwer ma zapisane. A serwer nie ma nic, wiec wpisuje pustke.
+     Pole samo sie czysci sekunde po wklejeniu, przycisk „Zapisz zrodlo" gasnie (bo pole
+     jest puste) i nie da sie nic zapisac. Dokladnie to bylo zglaszane.
+
+     `fromUser` znaczy teraz to, co powinno bylo znaczyc od poczatku: ODPOWIEDZ NA
+     KLIKNIECIE. Wejscie w zakladke nie jest kliknieciem w „Odswiez" — pole jest wtedy
+     i tak puste, wiec brak nadpisania niczego nie kosztuje, a chroni przed wyscigiem. */
+  const load = useCallback(async (fromUser = false) => {
     setError(null);
     try {
-      absorb(await fetchStreamAdmin(apiKey), true);
+      absorb(await fetchStreamAdmin(apiKey), fromUser);
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : String(problem));
     }
@@ -239,7 +254,7 @@ export function Stream({ t, apiKey, pl }: {
             reason={busy ? t('vote.whyBusy') : ''}
             tone="bg-muted text-muted-foreground hover:text-foreground"
             icon={<RefreshCw size={13} />}
-            onPress={() => void load()}
+            onPress={() => void load(true)}
           />
         </div>
         {/* Identyfikator ORAZ odsyłacz. Jedno mówi, co dokładnie zapamiętał serwer, drugie
