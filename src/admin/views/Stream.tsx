@@ -389,6 +389,17 @@ export function Stream({ t, apiKey, pl }: {
         </div>
       </section>
 
+      {/* SKAD WIADOMO, CZY TO NOWA WERSJA I CZY SERWER ODPOWIADA.
+          Data budowania paczki oraz adres, pod ktory ida zadania. Dwie linijki, ktore
+          zastepuja pytanie „czy na pewno odswiezyles" — widac je na zrzucie ekranu. */}
+      <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground/70">
+        <span className="font-mono">{new Date(__BUILD_STAMP__).toLocaleString()}</span>
+        {' · '}
+        <span className="font-mono">{window.location.origin}</span>
+        {' · '}
+        <span className="font-mono">{state ? (state.videoId ? `id: ${state.videoId}` : 'serwer: brak adresu') : 'serwer nie odpowiedzial'}</span>
+      </p>
+
       {note ? (
         <p className="mt-4 rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-2.5 text-xs text-emerald-200">{note}</p>
       ) : null}

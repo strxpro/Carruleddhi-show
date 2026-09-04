@@ -17,6 +17,17 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
 
+  /* ZNACZNIK WERSJI, WSTRZYKIWANY PRZY BUDOWANIU.
+     ---------------------------------------------------------------------------
+     Powod jest praktyczny i kosztowal caly wieczor: przy kazdej poprawce panelu
+     wracalo pytanie „czy on w ogole widzi nowa wersje", i nie bylo jak na nie
+     odpowiedziec — ani jemu, ani mnie. Zrzut ekranu wyglada tak samo niezaleznie od
+     tego, ktora paczke trzyma przegladarka.
+
+     Teraz panel wypisuje date budowania. Jedno spojrzenie rozstrzyga, czy problem jest
+     w kodzie, czy w pamieci podrecznej. */
+  define: { __BUILD_STAMP__: JSON.stringify(new Date().toISOString()) },
+
   resolve: {
     alias: { '@': resolve(import.meta.dirname, 'src') }
   },
