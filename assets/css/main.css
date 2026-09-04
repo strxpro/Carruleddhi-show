@@ -1421,6 +1421,8 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 }
 .nav-current__copy { display: flex; min-width: 0; align-items: baseline; gap: 10px; }
 .nav-current__copy strong {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   max-width: 25ch;
   font-family: var(--font-meta);

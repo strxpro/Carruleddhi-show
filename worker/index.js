@@ -9089,12 +9089,14 @@ function streamIdFrom(raw, provider) {
 
   let url;
   try { url = new URL(text.startsWith('http') ? text : `https://${text}`); }
-  catch { return ''; }
+  catch { return text; }
+  
+  if (url.hostname.includes('facebook.com') || url.hostname.includes('fb.watch')) return text;
 
   const parts = url.pathname.split('/').filter(Boolean);
   if (provider === 'twitch') {
     /* Twitch osadza sie KANALEM, nie nagraniem: `player.twitch.tv/?channel=nazwa`. */
-    return parts[0] && STREAM_ID_RE.test(parts[0]) ? parts[0] : '';
+    return parts[0] && STREAM_ID_RE.test(parts[0]) ? parts[0] : text;
   }
   /* YouTube ma cztery ksztalty na to samo: ?v=, youtu.be/, /live/ i /embed/. */
   const v = url.searchParams.get('v');
@@ -9102,12 +9104,22 @@ function streamIdFrom(raw, provider) {
   const last = parts[parts.length - 1] || '';
   if (['live', 'embed'].includes(parts[parts.length - 2]) && STREAM_ID_RE.test(last)) return last;
   if (url.hostname.endsWith('youtu.be') && STREAM_ID_RE.test(last)) return last;
-  return '';
+  return text;
 }
 
 /** Adres do ramki, zlozony z identyfikatora — nigdy z tego, co wklejono. */
 function embedUrl(provider, id, host = '') {
-  if (!id || !STREAM_ID_RE.test(id)) return '';
+  if (!id) return '';
+  
+  if (id.includes('facebook.com') || id.includes('fb.watch')) {
+    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(id)}&show_text=false&width=auto`;
+  }
+  
+  if (id.includes('/') || id.includes(':') || id.includes('.')) {
+    return id.startsWith('http') ? id : `https://${id}`;
+  }
+
+  if (!STREAM_ID_RE.test(id)) return '';
   if (provider === 'twitch') {
     /* Twitch wymaga `parent` z domena strony osadzajacej, inaczej odmawia odtwarzania. */
     const parent = String(host || '').split(':')[0] || 'www.carruleddhishow.com';
