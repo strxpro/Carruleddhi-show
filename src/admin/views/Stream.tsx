@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link2, Loader2, PlayCircle, RefreshCw, Square, Heart, ExternalLink } from 'lucide-react';
 import type { TranslateKey } from '../i18n';
 import { fetchStreamAdmin, saveStream, setStreamLive, resetStreamHearts, type StreamState } from '../api';
@@ -55,7 +55,20 @@ export function Stream({ t, apiKey, pl }: {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const absorb = useCallback((next: StreamState) => {
+  /* POLE NALEZY DO CZLOWIEKA, KTORY W NIM PISZE.
+     ---------------------------------------------------------------------------
+     `absorb` wpisuje do pola to, co przyszlo z serwera — i to jest wlasciwe po zapisie
+     albo po nacisnieciu „Odswiez". Ale ta sama funkcja biegnie przy kazdym odczycie stanu,
+     takze przy wejsciu w zakladke i przy odpytywaniu w trakcie transmisji. Jesli ktos ma
+     wtedy wklejony adres i jeszcze go nie zapisal, tekst znika mu spod palca.
+     Zglaszane wielokrotnie jako „wklejam link i sie usuwa".
+
+     Znacznik jest podnoszony przy pierwszej zmianie w polu i opuszczany dopiero wtedy, gdy
+     to CZLOWIEK poprosil o wartosc z serwera: po udanym zapisie albo po „Odswiez". Odczyt
+     w tle nie ma prawa nadpisac niezapisanej pracy — nawet gdyby serwer mial racje. */
+  const touched = useRef(false);
+
+  const absorb = useCallback((next: StreamState, fromUser = false) => {
     setState(next);
     /* Trzy wartosci, nie dwie: przy `=== 'twitch' ? ... : 'youtube'` transmisja z Facebooka
        wracala z serwera jako YouTube i pierwszy zapis po odswiezeniu ja gubil. */
@@ -72,13 +85,17 @@ export function Stream({ t, apiKey, pl }: {
        Adres jest WYLICZANY z identyfikatora, więc nie obiecuje niczego ponad to, co naprawdę
        zapamiętaliśmy — a przy następnym zapisie wraca do Workera i rozbiera się z powrotem na
        ten sam identyfikator. Samo id nadal widać niżej, przy „Zapisany identyfikator". */
-    setUrl(watchUrl(next.provider, next.videoId));
+    /* Jedyne miejsce, w ktorym pole adresu jest nadpisywane z zewnatrz. */
+    if (fromUser || !touched.current) {
+      setUrl(watchUrl(next.provider, next.videoId));
+      touched.current = false;
+    }
   }, []);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      absorb(await fetchStreamAdmin(apiKey));
+      absorb(await fetchStreamAdmin(apiKey), true);
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : String(problem));
     }
@@ -92,7 +109,8 @@ export function Stream({ t, apiKey, pl }: {
     if (!state?.live) return;
     const timer = window.setInterval(() => {
       if (document.hidden) return;
-      fetchStreamAdmin(apiKey).then(absorb).catch(() => { /* zostaje jak było */ });
+      /* Bez `true`: to jest odczyt w tle, a nie prosba czlowieka o wartosc z serwera. */
+      fetchStreamAdmin(apiKey).then((next) => absorb(next)).catch(() => { /* zostaje jak było */ });
     }, 30_000);
     return () => window.clearInterval(timer);
   }, [apiKey, state?.live, absorb]);
@@ -102,7 +120,7 @@ export function Stream({ t, apiKey, pl }: {
     setError(null);
     setNote(null);
     try {
-      absorb(await action());
+      absorb(await action(), true);
       setNote(message);
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : String(problem));
@@ -178,7 +196,7 @@ export function Stream({ t, apiKey, pl }: {
 
         <input
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => { touched.current = true; setUrl(event.target.value); }}
           placeholder={provider === 'twitch' ? t('stream.placeholderTwitch') : t('stream.placeholderYouTube')}
           className="mt-3 w-full rounded-xl border border-border bg-background px-3.5 py-2.5 font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
         />
