@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "npm run build && wrangler dev -c worker/wrangler.toml",
     "preview:static": "npm run build && vite preview --port 4173",
-    "make": "node tools/build-make-blueprints.mjs && node tools/check-refs.mjs && node tools/check-minor-blueprint.mjs && node tools/check-voting.mjs && node tools/check-locale-detect.mjs && node tools/check-chat-intent.mjs && node tools/check-migrations.mjs && node tools/check-i18n.mjs && node tools/check-stream-links.mjs",
+    "make": "node tools/build-make-blueprints.mjs && node tools/check-refs.mjs && node tools/check-minor-blueprint.mjs && node tools/check-voting.mjs && node tools/check-locale-detect.mjs && node tools/check-chat-intent.mjs && node tools/check-migrations.mjs && node tools/check-i18n.mjs && node tools/check-stream-links.mjs && node tools/check-payload-fields.mjs",
     "emails": "node tools/preview-emails.mjs",
     "pdfs": "node tools/build-pdfs.mjs",
     "check": "tsc --noEmit && npm run make && npm run emails",

@@ -279,6 +279,39 @@ const FIELD_WHITELIST = {
      po cichu, `sponsor-approve` widzi puste `id` i odmawia tak, jakby panel przysłał
      śmieci — awaria wyglądająca jak działający przycisk, który zawsze mówi „nie". */
   'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit'],
+
+  /* TRANSMISJA. BRAK TEGO WPISU UNIERUCHOMIL CALA ZAKLADKE, MELDUJAC SUKCES.
+     =========================================================================
+     `sanitizePayload` przepisuje TYLKO pola wymienione tutaj i w `common`. Dla typu bez
+     wpisu zostaje samo `common` — czyli `type`, `event`, `locale` i kilka innych. Wszystko
+     inne wypada po cichu.
+
+     `stream-admin` nie mial tu wpisu. Czyli `payload.action` bylo ZAWSZE `undefined`,
+     a `streamAdmin` zaczyna od `String(payload.action || 'state')` — wiec KAZDE zadanie
+     bylo obslugiwane jako zwykly odczyt stanu. Odpowiedz: 200 i biezacy stan.
+
+     Skutek widziany przez czlowieka, dokladnie w tych slowach:
+       „wklejam link, klikam zapisz i sie nie zapisuje"  — zapis byl odczytem
+       „pokazuje ciagle ten sam identyfikator"           — oddawal to, co juz bylo
+       „klikam otworz transmisje i nic sie nie dzieje"   — otwarcie tez bylo odczytem
+       „pisze niby OK ale nic sie nie dzieje"            — bo naprawde bylo OK, tylko
+                                                            nie o to prosil
+     ZMIERZONE: w logach bazy przez pol godziny same GET-y na `stream_state`, ani jednego
+     PATCH-a, przy kilkunastu probach zapisu i kilku kliknieciach „otworz transmisje".
+
+     To jest DRUGI raz, gdy ten sam brak zatrzymal cala zakladke — pierwszy opisany jest
+     przy `OBJECT_FIELDS` w `sanitizePayload` (zapis ustawien). Dlatego razem z tym wpisem
+     powstal tools/check-payload-fields.mjs: sprawdza, ze kazda koncowka rozgalezajaca sie
+     po `action` ma to pole na swojej liscie. Sam wpis naprawia dzis, test pilnuje jutra.
+
+     `url`, `videoId`, `provider`, `title` — zapis zrodla. `email`, `name` — dopisywanie
+     i usuwanie adresu z listy powiadomienia o starcie. */
+  'stream-admin': ['action', 'url', 'videoId', 'provider', 'title', 'email', 'name'],
+
+  /* Serca od widzow. Bez tego wpisu `payload.count` bylo `undefined`, `Number.parseInt`
+     dawalo NaN i kazde serce przepadalo — licznik pod odtwarzaczem nie ruszal sie, cokolwiek
+     widzowie klikali. Ten sam brak co przy `stream-admin`, ta sama cicha porazka. */
+  'stream-heart': ['count'],
   /* Zgłoszenia sponsorów, oczami organizatora. Cztery pola i ani jednego więcej — to jest
      cała treść kontraktu tej końcówki:
        action  'list' | 'approve' | 'reject'
@@ -368,7 +401,11 @@ const FIELD_WHITELIST = {
     'email', 'code', 'action',
     // Which rider on this address, when there is more than one. See findEntry.
     'entryId',
-    'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes'
+    'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes',
+    /* `wantsPrint` wypadalo w sanitizacji, wiec zaznaczenie „chce wydruk" przy samodzielnej
+       edycji zgloszenia nie mialo ZADNEGO skutku — formularz meldowal zapis, kolumna zostawala
+       stara. Znalezione przez tools/check-payload-fields.mjs. */
+    'wantsPrint'
   ],
   voting: ['action', 'participantId', 'name', 'email', 'deviceId', 'score', 'editToken', 'edition', 'notifyResults'],
   'voting-admin': [
