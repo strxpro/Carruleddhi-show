@@ -1492,6 +1492,24 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   gap: 8px;
 }
 
+/* ODLICZANIE WYCHODZI Z PASKA, ZANIM ZACZNIE SIE TLOK.
+   ---------------------------------------------------------------------------
+   W pasku stoja obok siebie: znak firmowy z data, odliczanie, wybor jezyka, „bede tam"
+   i przycisk menu. Piec rzeczy. Powyzej ~560 px to sie miesci; ponizej zaczyna sie
+   przepychanie i to wlasnie wtedy „bede tam" wchodzi na flage i na przycisk menu.
+   Zgloszone ze zrzutem przy 424 px.
+
+   Wychodzi odliczanie, a nie przycisk, bo odliczanie jest w pasku POWTORZENIEM: ten sam
+   licznik stoi kilkaset pikseli nizej, w naglowku strony, w rozmiarze nie do przeoczenia.
+   „Bede tam" nie ma gdzie indziej swojego miejsca w zasiegu kciuka — usuniecie go z paska
+   kosztowaloby czynnosc, usuniecie licznika nie kosztuje nic.
+
+   `visibility` nie wystarczy, musi byc `display: none`: element ukryty przez visibility
+   nadal zajmuje swoja szerokosc w flexie, czyli tlok zostaje. */
+@media (max-width: 560px) {
+  .site-header .nav-current { display: none; }
+}
+
 @media (max-width: 430px) {
   .site-header .nav-attend { max-width: 38vw; padding-inline: 11px; font-size: 11px; letter-spacing: .06em; }
   .site-header .nav-actions { gap: 6px; }
