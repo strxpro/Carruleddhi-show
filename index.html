@@ -112,7 +112,30 @@
     <div class="nav-shell">
       <a class="brand" href="#hero" aria-label="Carruleddhi Show — home">
         <span class="brand__name">Carruleddhi</span>
-        <span class="brand__date" data-header-date>17 · 10 · 2026</span>
+        <!-- DATA, KTORA OBRACA SIE W ODLICZANIE.
+             ==================================================================
+             Na telefonie odliczanie stalo osobno na srodku paska i bylo piata rzecza
+             w rzedzie szerokosci 390 px. Tutaj nie zajmuje ani jednego piksela wiecej
+             niz data, ktora i tak tam byla: to sa dwie sciany tego samego szescianu.
+
+             Na poczatku widac date — bo dopoki ktos jest na gorze strony, ma pod nosem
+             wielki licznik w naglowku i drugi, maly, byloby powtorzeniem. Obrot nastepuje
+             dokladnie wtedy, gdy tamten zjezdza pod pasek, czyli w chwili, w ktorej liczba
+             znika z ekranu. Steruje tym `data-clock-docked` na naglowku — ten sam atrybut,
+             ktory od poczatku dokowal licznik w pasku. Zadnego nowego nasluchu przewijania.
+
+             `aria-hidden` na scianie z odliczaniem: te same cztery liczby maja juz opis
+             przy liczniku w hero i tykaja co sekunde. Czytnik ekranu dostalby ten sam
+             strumien zmian drugi raz. -->
+        <span class="brand__flip" data-brand-flip>
+          <span class="brand__face brand__date" data-header-date>17 · 10 · 2026</span>
+          <span class="brand__face brand__face--clock" aria-hidden="true">
+            <b data-days>00</b><i data-i18n="count.daysShort">g</i>
+            <b data-hours>00</b><i data-i18n="count.hoursShort">o</i>
+            <b data-minutes>00</b><i data-i18n="count.minutesShort">m</i>
+            <b data-seconds>00</b><i data-i18n="count.secondsShort">s</i>
+          </span>
+        </span>
       </a>
 
       <div class="nav-current" data-nav-current aria-live="polite">
@@ -2198,6 +2221,19 @@
         <h2 data-i18n="modal.successTitle">Fatto. Sei nella lista!</h2>
         <p class="modal__lead" data-i18n="modal.successBody">I tre promemoria arriveranno automaticamente a questo indirizzo.</p>
         <button class="btn btn--blue" type="button" data-close-reminder data-i18n="a11y.close">Chiudi</button>
+        <!-- WYJSCIE Z TEGO EKRANU — I DLACZEGO MUSI TU BYC.
+             To okno pokazywalo „jesteś na liście" wylacznie na podstawie znacznika
+             w przegladarce odwiedzajacego. Znacznik nie wie nic o tym, co dzieje sie
+             w bazie: po wyczyszczeniu listy w panelu organizatora zostawal i na zawsze
+             zaslanial formularz. Zglaszone przez organizatora na wlasnej stronie —
+             „pokazuje, ze jestem w bazie, a przeciez usunalem wszystko".
+
+             Serwera nie da sie o to zapytac bez zdradzania, czy dany adres jest zapisany —
+             a to informacja o czlowieku, ktorej nie wolno oddawac komukolwiek, kto zgadnie
+             adres. Wiec zamiast pytac, dajemy droge z powrotem: jedno klikniecie kasuje
+             znacznik i przywraca formularz. -->
+        <button class="modal__again" type="button" data-reminder-again
+                data-i18n="modal.againLink">Non sono io — iscrivimi di nuovo</button>
       </div>
     </div>
   </div>

@@ -3723,6 +3723,25 @@ import {
     return $$('body > *').filter((element) => element !== modal && element.tagName !== 'SCRIPT');
   }
 
+  /* Kasuje znacznik „ten czlowiek jest juz zapisany" i pokazuje formularz.
+
+     Znacznik jest wygoda, nie prawda: mowi tylko tyle, ze z TEJ przegladarki ktos kiedys
+     wyslal zapis. Nie wie, czy adres nadal jest na liscie — bo baze mozna wyczyscic
+     w panelu, a przegladarki nikt o tym nie zawiadomi. Dlatego znacznik nie moze byc
+     jedyna droga i musi byc z niego wyjscie. */
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-reminder-again]')) reminderAgain();
+  });
+
+  function reminderAgain() {
+    storage.remove('carruleddhi.reminder');
+    const modal = $('[data-reminder-modal]');
+    if (!modal) return;
+    $('[data-reminder-form-view]', modal)?.classList.remove('is-hidden');
+    $('[data-reminder-success]', modal)?.classList.remove('is-visible');
+    modalFocusable(modal)[0]?.focus({ preventScroll: true });
+  }
+
   function openReminder() {
     const modal = $('[data-reminder-modal]');
     if (!modal) return;
@@ -3735,6 +3754,7 @@ import {
       element.dataset.modalWasInert = String(element.inert);
       element.inert = true;
     });
+    $('[data-reminder-again]', modal)?.classList.toggle('is-hidden', !subscribed);
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-locked', 'is-modal-open');

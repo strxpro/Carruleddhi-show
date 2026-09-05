@@ -610,6 +610,67 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
 }
 .brand { flex: none; display: flex; flex-direction: column; text-decoration: none; }
 .brand__name { font-family: var(--font-display); font-size: 17px; line-height: 1; }
+/* SZESCIAN POD NAZWA — DWIE SCIANY, JEDNO MIEJSCE.
+   ---------------------------------------------------------------------------
+   `perspective` na obudowie, `preserve-3d` na obracanym pudelku, sciany ustawione
+   jedna nad druga w przestrzeni. Bez `perspective` obrot wyglada jak plaskie sciskanie
+   w pionie, a nie jak bryla — to jest ta jedna wlasciwosc, ktora robi tu cala robote.
+
+   Wysokosc wpisana na stalo (`--brand-face-h`), bo obie sciany sa pozycjonowane
+   bezwzglednie i pudelko nie ma z czego wziac wysokosci. Ta sama liczba dla obu scian,
+   inaczej obrot skakalby w pionie w polowie drogi.
+
+   Zegar na dole ma `translateY(100%) rotateX(-90deg)` — czyli lezy pod przednia sciana,
+   odchylony do tylu. Obrot calego pudelka o 90 stopni stawia go na wprost. */
+.brand__flip {
+  --brand-face-h: 13px;
+  position: relative;
+  display: block;
+  height: var(--brand-face-h);
+  margin-top: 4px;
+  perspective: 220px;
+}
+.brand__flip > * {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  backface-visibility: hidden;
+}
+/* Obracane jest PUDELKO, nie sciany z osobna: dwie niezalezne animacje rozjechalyby sie
+   przy przerwaniu w polowie, a tak jest jeden ruch i jeden czas trwania. */
+.brand__flip {
+  transform-style: preserve-3d;
+  transition: transform .62s cubic-bezier(.2, .8, .2, 1);
+  transform: rotateX(0deg);
+}
+.brand__face--clock {
+  gap: 1px;
+  color: var(--yellow);
+  font-family: var(--font-meta);
+  font-size: 10px;
+  letter-spacing: .04em;
+  transform: translateY(100%) rotateX(-90deg);
+  transform-origin: center top;
+}
+.brand__face--clock b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.brand__face--clock i { margin-right: 4px; font-style: normal; opacity: .65; }
+.brand__date { transform-origin: center bottom; }
+
+/* Obrot tylko na telefonie: na szerszych ekranach odliczanie stoi na srodku paska,
+   ma tam miejsce i nie ma powodu go stamtad zabierac. */
+@media (max-width: 760px) {
+  .site-header[data-clock-docked] .brand__flip { transform: rotateX(90deg); }
+  /* Licznik na srodku paska schodzi z telefonu calkiem — jego rola przejmuje sciana
+     pod nazwa. To jest to „usun go z paska na telefonie" ze zgloszenia. */
+  .site-header .nav-clock { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Bez obrotu, ale ZMIANA ZOSTAJE: kto wylaczyl ruch, ma nadal zobaczyc odliczanie,
+     tylko bez jazdy. Zerowy czas trwania zamiast zablokowanej sciany. */
+  .brand__flip { transition-duration: 0s; }
+}
+
 .brand__date { margin-top: 4px; color: var(--blue-200); font-family: var(--font-meta); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
 .site-nav { display: flex; flex: 1 1 auto; justify-content: center; gap: clamp(8px, 1.5vw, 24px); min-width: 0; }
 .site-nav a { position: relative; color: rgba(255,255,255,.75); font-family: var(--font-meta); font-size: clamp(12px, 1.1vw, 14px); font-weight: 600; letter-spacing: clamp(.04em, .06vw, .08em); text-decoration: none; text-transform: uppercase; white-space: nowrap; }
@@ -2733,3 +2794,23 @@ body { font-variation-settings: 'opsz' 16; }
      dokładnie tam, gdzie ekran jest najmniejszy. */
   .patron__logos { gap: 10px; }
 }
+
+/* Wyjscie z ekranu „jesteś na liście". Celowo skromne — to nie jest czynnosc, ktorej ktos
+   szuka na co dzien, ale musi byc widoczna dla tego jednego czlowieka, ktoremu znacznik
+   w przegladarce zaslonil formularz (patrz komentarz przy `data-reminder-again`). */
+.modal__again {
+  margin-top: 14px;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--blue-200);
+  font-family: var(--font-meta);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.modal__again:hover,
+.modal__again:focus-visible { color: var(--white); }
+.modal__again.is-hidden { display: none; }
