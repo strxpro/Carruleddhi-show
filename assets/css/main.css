@@ -628,7 +628,17 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   display: block;
   height: var(--brand-face-h);
   margin-top: 4px;
-  perspective: 220px;
+  /* BEZ PERSPEKTYWY — OBROT MA BYC PLASKI.
+     ---------------------------------------------------------------------------
+     Perspektywa dawala bryle, ale placi sie za nia znieksztalceniem: sciana, ktora po
+     obrocie stoi na wprost, lezy o wlasna wysokosc dalej od patrzacego, wiec przy
+     `perspective: 220px` wraca minimalnie mniejsza i z lekko zbieznymi krawedziami. Na
+     napisie wysokim na dwanascie pikseli widac to jako przekrzywienie cyfr. Zgloszone:
+     „tam gdzie jest licznik nadal jest pod perspektywa, powinno byc rowno plasko".
+
+     Bez perspektywy obrot jest rzutem prostokatnym: w ruchu nadal widac przewracanie sie
+     sciany, a w spoczynku napis stoi idealnie prosto, w tym samym stopniu pisma co data.
+     Ruch traci odrobine glebi i zyskuje to, o co chodzilo — czytelnosc liczb. */
 }
 .brand__flip > * {
   position: absolute;

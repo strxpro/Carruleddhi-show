@@ -1189,6 +1189,17 @@ html {
   padding: 0;
   border-radius: 50%;
   justify-content: center;
+  /* ODSTEP MUSI ZEJSC DO ZERA, INACZEJ IKONA NIE JEST NA SRODKU KOLKA.
+     ---------------------------------------------------------------------------
+     Przycisk jest flexem z dwojgiem dzieci: kolkiem z ikona i napisem. W stanie zwinietym
+     napis dostaje `width: 0`, ale NADAL JEST dzieckiem flexa — a `gap: 8px` z szerokiego
+     stanu liczy sie miedzy nim a ikona tak samo jak wczesniej. Zawartosc ma wiec szerokosc
+     24 + 8 + 0 = 32 px i to ONA jest srodkowana, nie sama ikona. Skutek: ikona siedzi
+     cztery piksele w lewo od srodka kolka. Zgloszone ze zrzutem: „te ikony w srodku w tym
+     kolku nie sa wysrodkowane".
+
+     Cztery piksele to duzo, gdy kolko ma 52 px i jest jedynym, co widac. */
+  gap: 0;
 }
 .quick-actions.is-mini .quick-action > span:not(.quick-action__icon) {
   width: 0;
