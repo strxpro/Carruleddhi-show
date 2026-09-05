@@ -3491,13 +3491,81 @@ import {
       burstConfetti(press, 34);
       registerAttendance(true);
     });
+    /* DYMEK PO POTWIERDZENIU — I DLACZEGO TYLKO WTEDY.
+       =======================================================================
+       Pokazuje sie po nacisnieciu „bede tam" w doku, czyli w chwili, w ktorej czlowiek
+       wlasnie powiedzial „bede". To jedyny moment, w ktorym pytanie o przypomnienie jest
+       na miejscu — zapytane wczesniej byloby zaczepka, zapytane pozniej nie mialoby zwiazku
+       z niczym.
+
+       NIE pokazuje sie, gdy:
+         - to jest ODCISNIECIE, nie nacisniecie (drugie dotkniecie cofa obecnosc),
+         - ktos juz zapisal sie na przypomnienia z tej przegladarki — wtedy dymek
+           proponowalby rzecz juz zalatwiona. */
     $$('[data-quick-attend]').forEach((button) => {
       button.addEventListener('click', () => {
+        const bylaObecnosc = state.attended;
         burstConfetti(button, 16);
         registerAttendance(false, button);
+        const juzZapisany = storage.get('carruleddhi.reminder') === '1';
+        if (!bylaObecnosc && state.attended && !juzZapisany) pokazDymekDoku();
       });
     });
   }
+
+  /* ==========================================================================
+     DYMEK NAD DOKIEM
+     ==========================================================================
+     Chowa sie na dotkniecie gdziekolwiek poza nim, na Escape i przy zmianie widoku.
+     Nasluchy sa zakladane RAZEM Z NIM i zdejmowane razem z jego zniknieciem — dymek stoi
+     na ekranie kilka sekund na cala wizyte, a nasluch na kazde dotkniecie dokumentu
+     wiszacy przez reszte tej wizyty jest kosztem bez pokrycia.
+
+     Chowanie jest opoznione o jedna klatke po pokazaniu: bez tego to samo dotkniecie,
+     ktore nacisnelo „bede tam", zamykaloby dymek w tej samej chwili, w ktorej sie pojawia. */
+  let dymekSprzataczka = null;
+
+  function schowajDymekDoku() {
+    const dymek = $('[data-dock-bubble]');
+    if (!dymek || dymek.hidden) return;
+    dymek.classList.remove('is-shown');
+    dymekSprzataczka?.();
+    dymekSprzataczka = null;
+    /* Chowany dopiero po wygasnieciu przejscia, zeby zniknal ruchem, a nie zniknieciem. */
+    window.setTimeout(() => {
+      if (!dymek.classList.contains('is-shown')) dymek.hidden = true;
+    }, 260);
+  }
+
+  function pokazDymekDoku() {
+    const dymek = $('[data-dock-bubble]');
+    if (!dymek) return;
+    dymek.hidden = false;
+    /* Klatka zwloki, zeby przegladarka zdazyla policzyc stan poczatkowy przejscia —
+       bez tego element pojawia sie od razu w stanie koncowym i nie ma czego animowac. */
+    requestAnimationFrame(() => dymek.classList.add('is-shown'));
+
+    const naDotkniecie = (event) => {
+      if (dymek.contains(event.target)) return;
+      schowajDymekDoku();
+    };
+    const naKlawisz = (event) => { if (event.key === 'Escape') schowajDymekDoku(); };
+    const zaloz = () => {
+      document.addEventListener('pointerdown', naDotkniecie, { passive: true });
+      document.addEventListener('keydown', naKlawisz);
+    };
+    dymekSprzataczka = () => {
+      document.removeEventListener('pointerdown', naDotkniecie);
+      document.removeEventListener('keydown', naKlawisz);
+    };
+    requestAnimationFrame(zaloz);
+  }
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('[data-dock-bubble-open]')) return;
+    schowajDymekDoku();
+    openReminder();
+  });
 
   function setupQuickActions() {
     const dock = $('[data-quick-actions]');

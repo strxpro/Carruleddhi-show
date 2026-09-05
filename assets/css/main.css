@@ -2930,3 +2930,64 @@ body { font-variation-settings: 'opsz' 16; }
 .modal__again:hover,
 .modal__again:focus-visible { color: var(--white); }
 .modal__again.is-hidden { display: none; }
+
+/* ============================================================
+   Dymek nad dokiem: „chcesz powiadomienie?"
+   ============================================================
+   Stoi POZA dokiem, bo dok ma `overflow: hidden` i przycialby wszystko, co wystaje ponad
+   jego ramkę. Własne `position: fixed` i własne liczenie odstępu od dołu — ten sam
+   `--dock-lift`, którym dok trzyma się dołu WIDOCZNEGO okna, a nie dołu okna układu.
+   Dzięki temu dymek jedzie razem z dokiem, gdy pasek adresu telefonu wjeżdża i zjeżdża,
+   zamiast zostawać w powietrzu.
+
+   Wysuwa się Z GÓRY DOKU, nie znikąd: `transform-origin` przy dolnej krawędzi i start ze
+   skali 0.9 z przesunięciem w dół. Ruch idzie stamtąd, gdzie stoi przycisk, więc czyta się
+   jako „to wyszło z tego guzika", a nie jako osobne okienko, które się doklejło. */
+.dock-bubble {
+  position: fixed;
+  z-index: 845;
+  right: 10px;
+  bottom: calc(84px + env(safe-area-inset-bottom) + var(--dock-lift, 0px));
+  left: 10px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px) scale(.92);
+  transform-origin: 50% 100%;
+  transition: opacity .2s ease, transform .34s cubic-bezier(.32, .72, 0, 1);
+}
+.dock-bubble.is-shown {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.dock-bubble__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  padding: 10px 16px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(7,26,61,.96);
+  box-shadow: 0 1px 2px rgba(7,26,61,.5), 0 14px 34px -12px rgba(7,26,61,.6);
+  color: var(--white);
+  font-family: var(--font-meta);
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  transition: transform .2s cubic-bezier(.32, .72, 0, 1), border-color .2s ease;
+}
+.dock-bubble__btn:hover,
+.dock-bubble__btn:focus-visible { border-color: var(--yellow); }
+.dock-bubble__btn:active { transform: scale(.96); }
+.dock-bubble__arrow { color: var(--yellow); font-weight: 800; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Dymek zostaje, znika sam wjazd: to jest propozycja czynności, a nie ozdoba,
+     więc ma się pokazać także temu, kto ruch wyłączył. */
+  .dock-bubble { transition-duration: .01s; transform: none; }
+  .dock-bubble.is-shown { transform: none; }
+}

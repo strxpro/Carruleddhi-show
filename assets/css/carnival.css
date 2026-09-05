@@ -1148,8 +1148,29 @@ html {
    sie spod krawedzi, bo obudowa przycina zawartosc. Jeden ruch, jeden srodek. */
 .quick-actions {
   overflow: hidden;
-  transition: width .34s var(--ease-out), padding .34s var(--ease-out),
+  /* GLADSZE MORFOWANIE.
+     ---------------------------------------------------------------------------
+     Dluzej i lagodniej niz wczesniej: 0,52 s zamiast 0,34 i krzywa z bardzo dlugim
+     dojsciem (`cubic-bezier(.22, 1, .36, 1)`). Przy krotkim czasie zmiana szerokosci
+     czytala sie jak przeskok miedzy dwoma stanami — oko widzialo poczatek i koniec, a nie
+     ruch miedzy nimi. Dopiero powyzej mniej wiecej pol sekundy ramka zaczyna sprawiac
+     wrazenie, ze SIE ROZCIAGA, a nie ze zostala podmieniona.
+
+     Ten sam czas dla szerokosci i odstepu wewnetrznego, bo to jeden ruch: rozne czasy daja
+     efekt gumy, w ktorym tresc goni ramke. */
+  transition: width .52s cubic-bezier(.22, 1, .36, 1), padding .52s cubic-bezier(.22, 1, .36, 1),
     transform .38s var(--ease-snap), box-shadow .3s ease;
+}
+
+/* Napisy wchodza z lekkim opoznieniem wzgledem ramki i lekkim przesunieciem — ramka rusza
+   pierwsza, tresc za nia. Bez tego napis pojawia sie na pelnej szerokosci, zanim ramka do
+   niej dojdzie, i przez chwile widac tekst wystajacy poza swoje pudelko. */
+.quick-action > span:not(.quick-action__icon) {
+  transition: opacity .3s ease .12s, transform .42s cubic-bezier(.22, 1, .36, 1) .08s;
+}
+.quick-actions.is-mini .quick-action > span:not(.quick-action__icon) {
+  transform: translateX(-6px);
+  transition-delay: 0s;
 }
 /* Bez `width` i `padding` na liscie przejsc: te dwie rzeczy animuje juz obudowa i to ona
    ma niesc caly ruch. Zostaje `transform` na dotkniecie, kolor i zaokraglenie, bo one

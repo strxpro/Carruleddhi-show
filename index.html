@@ -2049,6 +2049,28 @@
       </div>
     </section>
 
+    <!-- DYMEK NAD DOKIEM: „chcesz powiadomienie?"
+         =====================================================================
+         Wysuwa sie po nacisnieciu „bede tam" w doku i prowadzi do tego samego okna
+         przypomnienia, ktore otwiera duzy przycisk w sekcji obecnosci. Powod, dla ktorego
+         to jest dymek, a nie od razu okno: nacisniecie w doku ma byc jednym ruchem kciuka
+         i konczyc sie potwierdzeniem, a nie oknem na caly ekran, o ktore nikt nie prosil.
+         Kto chce wiecej, dotyka dymka; kto nie chce, dotyka gdziekolwiek indziej.
+
+         STOI POZA DOKIEM, NIE W NIM. Dok ma `overflow: hidden` (to na nim opiera sie
+         rozwijanie napisow spod krawedzi), wiec cokolwiek wystaje ponad jego ramke,
+         zostaloby przyciete. Dlatego dymek jest osobnym elementem `fixed` i sam liczy
+         sobie miejsce nad dokiem.
+
+         `hidden` na starcie i `role="status"`: czytnik ekranu ma o nim uslyszec, gdy
+         sie pojawi, a nie znalezc go w drzewie przed czasem. -->
+    <div class="dock-bubble" data-dock-bubble role="status" hidden>
+      <button class="dock-bubble__btn" type="button" data-dock-bubble-open>
+        <span data-i18n="quick.remindAsk">Vuoi un promemoria?</span>
+        <span class="dock-bubble__arrow" aria-hidden="true">→</span>
+      </button>
+    </div>
+
     <nav class="quick-actions" data-quick-actions aria-label="Azioni rapide" data-i18n-aria-label="quick.label" aria-expanded="true">
       <!-- DOK ZMIENIA SIE Z FAZA WYSCIGU, BO INACZEJ KŁAMIE.
            ===========================================================================
