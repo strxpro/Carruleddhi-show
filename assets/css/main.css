@@ -1222,8 +1222,35 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
    wchodzi wyściółka — skok wysokości bloku to więc 11 px na odsyłacz, nie 20. */
 @media (pointer: coarse) {
   .footer__links { gap: 2px; }
-  .footer__links a,
-  .footer__links button { display: flex; align-items: center; min-height: 44px; padding: 4px 0; }
+  /* PALEC POTRZEBUJE 44 px — ALE NIE ZA CENE ROZBICIA EFEKTU PRZEWIJANEGO NAPISU.
+     ---------------------------------------------------------------------------
+     Ta regula dawala odsylaczom w stopce `display: flex`, zeby wyrownac napis w polu
+     wysokim na 44 px. Problem w tym, ze odsylacze w stopce niosa efekt `.fx-roll`, ktory
+     stoi na `display: inline-grid`: miarka i stos dwoch kopii napisu leza W TEJ SAMEJ
+     komorce siatki, jedna nad druga, i widac tylko wierzchnia.
+
+     `.footer__links a` (0,1,1) bije `.fx-roll` (0,1,0), wiec na telefonie siatka znikala.
+     Miarka i stos przestawaly sie nakladac, a stos — wysoki na dwie linie — przestawal byc
+     przycinany. Skutek: KAZDA pozycja stopki wypisana dwa razy, jedna pod druga.
+     Zgloszone ze zrzutem: „informacje sie dubluja".
+
+     Rozdzielone: zwykle odsylacze dostaja flexa jak dotad, a te z efektem zachowuja swoja
+     siatke i dostaja te sama wysokosc przez `min-height` z wysrodkowaniem `align-content`,
+     ktore w siatce dziala tak samo jak `align-items` we flexie. Pole dotyku identyczne,
+     efekt caly. */
+  .footer__links a:not(.fx-roll),
+  .footer__links button:not(.fx-roll) { display: flex; align-items: center; min-height: 44px; padding: 4px 0; }
+  /* Odsylacz z efektem ma byc WYSOKI NA JEDNA LINIE — i to nie jest kwestia gustu.
+     Stos trzyma dwie kopie napisu jedna pod druga i jest przycinany ramka odsylacza; przy
+     ramce wyzszej niz jedna linia w szparze widac gorny skrawek drugiej kopii. Przy 44 px
+     i linii 25 px wystawalo dziewietnascie pikseli cudzego napisu.
+
+     Wygodne pole dotyku daje wtedy ODSTEP miedzy pozycjami, nie rozciaganie ramki: dwadziescia
+     pikseli przerwy plus wysokosc napisu to ta sama odlegloc dla palca miedzy srodkami
+     sasiednich pozycji, a stos zostaje przyciety dokladnie tam, gdzie ma. */
+  .footer__links { row-gap: 20px; }
+  .footer__links a.fx-roll,
+  .footer__links button.fx-roll { min-height: 0; padding: 0; }
 }
 .footer__links a, .footer__links button { width: fit-content; padding: 0; border: 0; background: transparent; color: var(--white); text-align: left; text-decoration: none; cursor: pointer; }
 .footer__links a:hover, .footer__links button:hover { color: var(--yellow); }
