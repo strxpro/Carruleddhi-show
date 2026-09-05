@@ -125,6 +125,71 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
 
   /* --------------------------------------------------------------------------- rysowanie */
 
+  /* ==========================================================================
+     DZWIEK
+     ==========================================================================
+     Obraz rusza wyciszony, bo inaczej nie ruszylby wcale: zadna przegladarka nie pozwoli
+     odtworzyc dzwieku, dopoki czlowiek czegos nie dotknie. To nie jest ustawienie do
+     zmiany — to warunek, ktory trzeba obejsc, a nie wylaczyc.
+
+     Obejscie jest jedno i uczciwe: widoczny przycisk. Dotkniecie go JEST tym gestem,
+     ktorego brakowalo, wiec od tej chwili dzwiek jest dozwolony.
+
+     Polecenie idzie przez `postMessage` do odtwarzacza YouTube, nie przez podmiane adresu
+     ramki — podmiana zaczelaby film od nowa, a przy transmisji na zywo oznaczaloby to
+     przeskok do biezacej chwili i sekunde czarnego ekranu. `unMute` i `setVolume` docieraja
+     do juz grajacego odtwarzacza i nic nie przerywaja.
+
+     `*` jako adres docelowy wiadomosci: ramka bywa na youtube.com albo youtube-nocookie.com
+     zaleznie od tego, co zwrocil Worker, a wiadomosc nie niesie niczego, czego nie moglby
+     zobaczyc ktokolwiek — to polecenie „odcisz", nie dane. */
+  let dzwiekWlaczony = false;
+
+  function slijDoOdtwarzacza(polecenie, argumenty = []) {
+    try {
+      frame?.contentWindow?.postMessage(JSON.stringify({
+        event: 'command', func: polecenie, args: argumenty
+      }), '*');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function odmalujDzwiek() {
+    const guzik = $('[data-stream-sound]', section);
+    if (!guzik) return;
+    guzik.setAttribute('aria-pressed', String(dzwiekWlaczony));
+    $('[data-sound-off]', guzik)?.toggleAttribute('hidden', dzwiekWlaczony);
+    $('[data-sound-on]', guzik)?.toggleAttribute('hidden', !dzwiekWlaczony);
+    const napis = $('[data-stream-sound-label]', guzik);
+    if (napis) {
+      const klucz = dzwiekWlaczony ? 'stream.soundOff' : 'stream.soundOn';
+      napis.setAttribute('data-i18n', klucz);
+      /* Napis przepisywany od razu, a nie dopiero przy nastepnej zmianie jezyka: to jest
+         odpowiedz na dotkniecie i ma byc widoczna w tej samej chwili. */
+      /* Slownik biezacego jezyka prosto z i18n.js. Jezyk czytany z `lang` na dokumencie —
+         to tam applyLanguage() go zapisuje, wiec jest jedno zrodlo prawdy i nie trzeba go
+         tu sledzic osobno. Gdy czegos brakuje, napis zostaje ten, ktory byl: `data-i18n`
+         wyzej i tak zostal juz przestawiony, wiec najblizsza zmiana jezyka to naprawi. */
+      const jezyk = document.documentElement.getAttribute('lang') || 'it';
+      const slownik = window.CARRULEDDHI_I18N?.[jezyk] || window.CARRULEDDHI_I18N?.it;
+      if (slownik && slownik[klucz]) napis.textContent = slownik[klucz];
+    }
+  }
+
+  function przelaczDzwiek() {
+    if (!live) return;
+    dzwiekWlaczony = !dzwiekWlaczony;
+    if (dzwiekWlaczony) {
+      slijDoOdtwarzacza('unMute');
+      slijDoOdtwarzacza('setVolume', [100]);
+    } else {
+      slijDoOdtwarzacza('mute');
+    }
+    odmalujDzwiek();
+  }
+
   function paintCount() {
     if (!countLabel) return;
     const label = String(hearts + pending + inFlight);
@@ -164,9 +229,17 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
   function wlaczObraz() {
     if (obrazPokazany || !live || !embed) return;
     obrazPokazany = true;
-    const zWyciszeniem = embed + (embed.includes('?') ? '&' : '?') + 'mute=1&playsinline=1';
+    /* `enablejsapi=1` jest tym, co pozwala pozniej WLACZYC DZWIEK bez przeladowania.
+       Bez tego parametru odtwarzacz nie sluchа polecen z naszej strony i jedyna droga do
+       dzwieku byloby podmienienie adresu ramki, czyli start filmu od nowa. */
+    const zWyciszeniem = embed + (embed.includes('?') ? '&' : '?')
+      + 'mute=1&playsinline=1&enablejsapi=1';
     frame.setAttribute('src', zWyciszeniem);
     stage?.classList.add('is-playing');
+    /* Nowy odtwarzacz zaczyna wyciszony, wiec stan przycisku wraca do „wlacz dzwiek".
+       Bez tego po zmianie zrodla przycisk twierdzilby, ze dzwiek jest, a go nie ma. */
+    dzwiekWlaczony = false;
+    odmalujDzwiek();
   }
 
   function pokazObraz() {
@@ -183,6 +256,8 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
     }, { rootMargin: '200px 0px' });
     obserwatorSceny.observe(stage || section);
   }
+
+  $('[data-stream-sound]', section)?.addEventListener('click', przelaczDzwiek);
 
   function paint(state) {
     /* BRAK ODPOWIEDZI TO NIE JEST „TRANSMISJA SIĘ SKOŃCZYŁA".

@@ -353,3 +353,44 @@ html:has(.live__stage.is-faux-full) .site-header { display: none; }
   .live .eyebrow::before { animation: none; }
   .live__bar { transition: none; }
 }
+
+/* --------------------------------------------------------------------------- liczby na obrazie */
+
+/* LICZBY WIDOCZNE BEZ DOTYKANIA CZEGOKOLWIEK.
+   ---------------------------------------------------------------------------
+   Stały wcześniej w pasku sterowania, a ten pokazuje się dopiero po stuknięciu w ekran
+   i gaśnie po chwili — czyli dwie liczby, po które ktoś sięga najczęściej („ilu nas jest",
+   „ile oklasków"), były schowane za gestem, o którym nikt nie wie.
+
+   Róg obrazu, nie pasek pod nim: liczba widzów należy do tego, co się dzieje na ekranie,
+   i tam jej się szuka. Tło półprzezroczyste z rozmyciem, bo pod spodem leci obraz i sam
+   kolor nie zapewni czytelności na jasnej klatce. */
+.live__stats {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+.live__stats .live__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid rgb(255 255 255 / .16);
+  border-radius: 999px;
+  background: rgb(7 26 61 / .62);
+  color: #fff;
+  font-family: var(--font-meta);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(10px);
+}
+.live__stats .live__count--hearts { color: #ffd7d8; }
+
+@media (max-width: 560px) {
+  .live__stats { top: 9px; left: 9px; gap: 5px; }
+  .live__stats .live__count { padding: 4px 8px; font-size: 11px; }
+}

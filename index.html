@@ -466,24 +466,35 @@
                domeny nie siega zadne zdarzenie i nie ma sposobu, zeby siegalo.
                `aria-hidden` i brak fokusu: to jest gest, nie przycisk. Ta sama czynnosc
                ma osiagalny przycisk w pasku nizej, i to on jest droga z klawiatury. -->
+          <!-- LICZBY WIDOCZNE BEZ DOTYKANIA CZEGOKOLWIEK.
+               Stały wcześniej w pasku sterowania, a ten pokazuje się dopiero po stuknięciu
+               w ekran i gaśnie po chwili — czyli liczby, po które ktoś sięga najczęściej,
+               były schowane za gestem. Teraz mają własne pole w rogu obrazu i stoją tam
+               przez cały czas trwania transmisji. -->
+          <div class="live__stats" data-stream-stats>
+            <span class="live__count" title="Ile osób ogląda teraz">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><path d="M12 12a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4Zm0 1.8c-3.4 0-7 1.7-7 3.9v2.5h14v-2.5c0-2.2-3.6-3.9-7-3.9Z" fill="currentColor"/></svg>
+              <strong data-stream-viewers>0</strong>
+            </span>
+            <span class="live__count live__count--hearts" title="Oklaski">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z" fill="currentColor"/></svg>
+              <strong data-stream-count>0</strong>
+            </span>
+          </div>
+
           <div class="live__tap" data-stream-tap aria-hidden="true"></div>
           <div class="live__hearts" data-stream-hearts aria-hidden="true"></div>
 
           <!-- Pasek sterowania. Pojawia sie po stuknieciu i gasnie po chwili — tak jak
                w kazdym odtwarzaczu, ktorego ci ludzie uzywaja na co dzien. -->
           <div class="live__bar" data-stream-bar>
-            <!-- DWIE LICZBY, BO TO SA DWIE ROZNE RZECZY.
-                 Ludzik z jedna liczba pokazywal OKLASKI. Zglaszane jako „jak to klikam,
-                 to sie polubia" — ikona obiecywala widzow, a liczba rosla od wlasnego
-                 stukania. Teraz ludzik liczy otwarte karty, a serce oklaski. -->
-            <span class="live__count" data-stream-viewers-wrap title="Ile osób ogląda teraz">
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 12a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4Zm0 1.8c-3.4 0-7 1.7-7 3.9v2.5h14v-2.5c0-2.2-3.6-3.9-7-3.9Z" fill="currentColor"/></svg>
-              <strong data-stream-viewers>0</strong>
-            </span>
-            <span class="live__count live__count--hearts" data-stream-count-wrap title="Oklaski">
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z" fill="currentColor"/></svg>
-              <strong data-stream-count>0</strong>
-            </span>
+            <!-- Liczby przeniesione do `.live__stats` nad odtwarzaczem — patrz nizej.
+                 Tu zostaja same czynnosci: oklask, udostepnienie, dzwiek, pelny ekran. -->
+            <button class="live__btn" type="button" data-stream-sound aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15" data-sound-off><path d="M4 9v6h4l5 4V5L8 9H4Zm12.5 3 2.8-2.8-1.1-1.1L15.4 11l-2.8-2.9-1.1 1.1L14.3 12l-2.8 2.8 1.1 1.1 2.8-2.8 2.8 2.8 1.1-1.1L16.5 12Z" fill="currentColor"/></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15" data-sound-on hidden><path d="M4 9v6h4l5 4V5L8 9H4Zm11.5-1.4a5 5 0 0 1 0 8.8v-1.8a3.3 3.3 0 0 0 0-5.2V7.6Zm0-3.4a8.4 8.4 0 0 1 0 15.6v-1.8a6.6 6.6 0 0 0 0-12V4.2Z" fill="currentColor"/></svg>
+              <span data-stream-sound-label data-i18n="stream.soundOn">Attiva l’audio</span>
+            </button>
             <button class="live__btn" type="button" data-stream-clap>
               <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 21s-7.6-4.7-9.6-9.1C.8 8.3 2.8 5 6.2 5c2 0 3.4 1.1 4.3 2.3l.7.9.7-.9C12.8 6.1 14.2 5 16.2 5c3.4 0 5.4 3.3 3.8 6.9C17.9 16.3 12 21 12 21Z" fill="currentColor"/></svg>
               <span data-i18n="stream.clap">Applaudi</span>
