@@ -10524,7 +10524,7 @@ import {
         input.style.height = `${lastInputHeight}px`;
       }
     }
-    input?.addEventListener('input', sizeInput);
+    /* Nasluch dopisany nizej, razem z przewijaniem — patrz `naPisaniu`. */
 
     /**
      * Rosnace pole zabiera miejsce dziennikowi — wiec dziennik ma zostac przy NAJNOWSZEJ
@@ -10538,11 +10538,58 @@ import {
      * Przewijamy TYLKO wtedy, gdy dziennik i tak byl na dole. Ktos, kto cofnal sie do
      * wczesniejszej wypowiedzi i zaczal pisac, ma zostac tam, gdzie czyta.
      */
-    input?.addEventListener('input', () => {
-      if (!log) return;
-      const naDole = log.scrollHeight - log.scrollTop - log.clientHeight < 48;
-      if (naDole) log.scrollTop = log.scrollHeight;
-    });
+    /* JEDEN NASLUCH, NIE DWA — I POMIAR PRZED ZMIANA WYSOKOSCI.
+       =========================================================================
+       To byly dwie osobne obslugi tego samego zdarzenia `input`: pierwsza (`sizeInput`)
+       powiekszala pole, druga sprawdzala, czy dziennik jest na dole, i dociagala go.
+       Obslugi biegna w kolejnosci dopisania, wiec druga mierzyla stan PO tym, jak pole
+       juz urroslo i dziennik juz sie skurczyl.
+
+       A skurczenie dziennika to dokladnie to, co psuje ten pomiar. `scrollTop` zostaje
+       ten sam, `clientHeight` maleje — wiec odleglosc od dolu ROSNIE o tyle, o ile urroslo
+       pole. Przy jednym dodatkowym wierszu (okolo 24 px) proba `< 48` jeszcze przechodzila
+       i wygladalo to na dzialajace. Przy wklejeniu dluzszego tekstu albo przy drugim
+       i trzecim wierszu naraz odleglosc przekraczala prog, warunek nie wchodzil i ostatnia
+       wiadomosc zostawala pod kadrem. Zglaszane jako „czat sie zweza i nie przenosi do
+       ostatniej wiadomosci" — i jedno bylo przyczyna drugiego, a nie dwoma usterkami.
+
+       Teraz jest jedna obsluga: pomiar, zmiana wysokosci, przywrocenie. Taka sama
+       kolejnosc, jaka ma juz `measureChatViewport` przy wysuwaniu klawiatury — tam bylo
+       zrobione dobrze od poczatku i to bylo wskazowka, jak to ma wygladac tutaj.
+
+       Przewijamy TYLKO wtedy, gdy dziennik i tak byl na dole. Kto cofnal sie do
+       wczesniejszej wypowiedzi i zaczal pisac, zostaje tam, gdzie czyta. */
+    function naPisaniu() {
+      const naDole = log ? log.scrollHeight - log.scrollTop - log.clientHeight < 48 : false;
+      sizeInput();
+      if (log && naDole) {
+        log.scrollTop = log.scrollHeight;
+        /* Druga proba klatke pozniej: nowa wysokosc pola jest wpisana, ale uklad bywa
+           przeliczony dopiero teraz, wiec `scrollHeight` sprzed chwili mogl byc stary. */
+        requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+      }
+    }
+    input?.addEventListener('input', naPisaniu);
+
+    /* Zapas na wszystko, co zmienia wysokosc kompozytora poza pisaniem: dolaczone zdjecie,
+       zmiana jezyka na dluzsza etykiete, podpowiedzi. Dziennik ma wtedy zostac przy
+       najnowszej wypowiedzi tak samo, jak przy pisaniu. */
+    const kompozytor = panel?.querySelector('[data-chat-form]');
+    if (log && kompozytor && 'ResizeObserver' in window) {
+      let wysokoscKompozytora = kompozytor.getBoundingClientRect().height;
+      new ResizeObserver(() => {
+        const teraz = kompozytor.getBoundingClientRect().height;
+        if (Math.abs(teraz - wysokoscKompozytora) < 1) return;
+        const urosl = teraz > wysokoscKompozytora;
+        wysokoscKompozytora = teraz;
+        /* Tylko gdy kompozytor URROSL: przy kurczeniu dziennik dostaje miejsce z powrotem
+           i sam zostaje tam, gdzie byl — dociaganie w dol wyrywaloby wtedy widok. */
+        if (!urosl) return;
+        if (log.scrollHeight - log.scrollTop - log.clientHeight < 120) {
+          requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+        }
+      }).observe(kompozytor);
+    }
 
     /* Skocz do najnowszej wiadomości przy wejściu w pole (pojawienie się klawiatury),
        zeby uniknąć pisania w ciemno i wymusić pokazanie najnowszej wiadomości. */

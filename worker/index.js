@@ -1251,7 +1251,90 @@ function setThreadMode(env, threadId, mode, extra = {}) {
  * looks like a hedge. Null means "a person should take this", which is the safe
  * direction to fail in when the subject is who may race and what they must wear.
  */
-function chatSystemPrompt(deck, locale = 'it') {
+/* ============================================================================
+   ZYWE FAKTY — to, czego nie da sie wpisac na stale.
+   ============================================================================
+   Reszta wiedzy czatu to zdania, ktore sa prawdziwe przez caly rok. Te zmieniaja sie
+   w ciagu dnia: czy glosowanie jest otwarte, czy transmisja trwa, ilu jest zapisanych,
+   czy sa juz wyniki. Bez nich czat na pytanie „czy mozna juz glosowac?" oddawal rozmowe
+   czlowiekowi — o drugiej w nocy, przy odpowiedzi widocznej na stronie.
+
+   PAMIEC PODRECZNA NA MINUTE
+     Czat potrafi dostac kilka wiadomosci pod rzad. Bez tego kazda z nich pytalaby baze
+     o cztery rzeczy naraz. Minuta jest krotsza niz jakakolwiek zmiana, ktora ma tu
+     znaczenie, a przy dziesieciu rozmowach naraz oszczedza kilkaset zapytan.
+
+   BLEDY PRZELYKANE
+     Nieudany odczyt oddaje puste fakty, nie wyjatek. Czat ma wtedy mniej wiedzy i odda
+     pytanie czlowiekowi — to wlasciwe zachowanie. Wywrocenie calej odpowiedzi dlatego, ze
+     nie udalo sie policzyc zapisanych, byloby duzo gorsze.
+   ========================================================================= */
+let liveFactsCache = { at: 0, facts: [] };
+
+async function liveFacts(env) {
+  if (Date.now() - liveFactsCache.at < 60000) return liveFactsCache.facts;
+  const facts = [];
+  const pobierz = async (sciezka) => {
+    try {
+      const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${sciezka}`, {
+        headers: supabaseHeaders(env), cache: 'no-store'
+      });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (_) {
+      return null;
+    }
+  };
+
+  try {
+    const [glosowanie, transmisja, zwyciezcy, licznik] = await Promise.all([
+      pobierz('voting_settings?select=status,voting_ends_at&limit=1'),
+      pobierz('stream_state?select=is_live&limit=1'),
+      pobierz('prize_winners?select=prize_key,winner_label&limit=20'),
+      pobierz('public_counts?select=*&limit=1')
+    ]);
+
+    const stanGlosowania = glosowanie?.[0]?.status;
+    if (stanGlosowania === 'open') {
+      facts.push('STAN NA TERAZ: głosowanie publiczności jest OTWARTE — podstrona głosowania'
+        + ' jest dostępna na stronie.');
+    } else if (stanGlosowania) {
+      facts.push('STAN NA TERAZ: głosowanie publiczności jest zamknięte.');
+    }
+
+    if (transmisja?.[0]?.is_live) {
+      facts.push('STAN NA TERAZ: transmisja na żywo TRWA — zakładka z odtwarzaczem jest na'
+        + ' stronie, przycisk „oglądaj na żywo” prowadzi prosto do niej.');
+    } else {
+      facts.push('STAN NA TERAZ: transmisja na żywo nie trwa.');
+    }
+
+    /* Zwyciezca liczy sie tylko wtedy, gdy ma NAZWE. Wiersze nagrod istnieja od poczatku,
+       puste — bez tego warunku czat oglaszalby zwyciezcow, ktorych nikt jeszcze nie wpisal. */
+    const ogloszeni = (Array.isArray(zwyciezcy) ? zwyciezcy : [])
+      .filter((w) => String(w.winner_label || '').trim());
+    if (ogloszeni.length) {
+      facts.push('STAN NA TERAZ: wyniki są już ogłoszone. Zwycięzcy: '
+        + ogloszeni.map((w) => String(w.winner_label).trim()).join(', ') + '.');
+    } else {
+      facts.push('STAN NA TERAZ: wyniki NIE są jeszcze ogłoszone. Na pytanie „kto wygrał”'
+        + ' odpowiedz, że wyników jeszcze nie ma i pojawią się na stronie po wyścigu —'
+        + ' to jest pełna odpowiedź, nie oddawaj tego pytania człowiekowi.');
+    }
+
+    const zapisani = Number(licznik?.[0]?.registrations ?? licznik?.[0]?.riders);
+    if (Number.isFinite(zapisani)) {
+      facts.push(`STAN NA TERAZ: zgłoszonych zawodników: ${zapisani}.`);
+    }
+  } catch (_) {
+    /* zostaje tyle faktow, ile zdazylo sie zebrac */
+  }
+
+  liveFactsCache = { at: Date.now(), facts };
+  return facts;
+}
+
+function chatSystemPrompt(deck, locale = 'it', zywe = []) {
   const ev = COPY_DECK._event || {};
   /* Język jako wartość, nie jako polecenie do domyślenia się.
      ---------------------------------------------------------------------------
@@ -1310,6 +1393,16 @@ function chatSystemPrompt(deck, locale = 'it') {
     'Formularz do podpisu jest po włosku — to jedyna wersja, którą organizator przyjmuje.'
       + ' Kto wybrał inny język, dostaje dodatkowo ten sam formularz w swoim języku.',
     'Przypomnienia: 7 dni, 1 dzień i 3 godziny przed startem, na życzenie.',
+    /* DOPISANE PO ZGLOSZENIU „czat nie wie nic o newsletterze, sponsorach ani zwyciezcach".
+       Sprawdzone przed dopisaniem: na te trzy pytania czat oddawal rozmowe czlowiekowi,
+       mimo ze odpowiedzi sa na stronie. To nie bylo poluzowanie reguly „nie zmyslaj" —
+       brakowalo faktow, a nie pozwolenia na zgadywanie. */
+    'Newsletter: zapis formularzem na stronie, w stopce. Wystarczy adres e-mail'
+      + ' i potwierdzenie zgody. Wypisać można się odsyłaczem w każdej wiadomości.',
+    'Sponsorzy i partnerzy: logotypy są na stronie głównej, w pasku „dzięki nim jest ta'
+      + ' impreza”. Kto chce zostać sponsorem, wysyła zgłoszenie formularzem kontaktowym'
+      + ' na stronie — warunki, kwoty i umowę ustala już organizator, nie czat.',
+    'Kontakt: formularz na stronie oraz adres info@carruleddhishow.com.',
     /* Sponsoring — jedyne wejście toru C do tego pliku, uzgodnione.
        Do tej pory sponsoring był w całości na liście tematów do ESCALATE niżej, więc
        pytanie „ile to kosztuje" czekało na człowieka. Na stronie stoi teraz zaproszenie
@@ -1350,6 +1443,10 @@ function chatSystemPrompt(deck, locale = 'it') {
     '',
     'CO WIESZ — to jest cała Twoja wiedza',
     facts,
+    /* Zywe fakty NA KONCU listy, nie na poczatku: gdy co do czegos jest i zdanie stale,
+       i odczyt z bazy, ma wygrac ten drugi. Modele czytajace dluga liste faktow trzymaja
+       sie mocniej tego, co przeczytaly ostatnie. */
+    ...(zywe.length ? ['', 'STAN NA TERAZ — to jest świeższe niż fakty wyżej', ...zywe] : []),
     '',
     'ZASADA NADRZĘDNA — NIGDY NIE ZMYŚLAJ',
     'Jeśli odpowiedzi nie ma na liście powyżej, nie wymyślaj jej. Nie szacuj, nie zakładaj,',
@@ -1516,7 +1613,7 @@ async function askModel(env, deck, history, question, imageUrl = '', locale = 'i
   }
   /* Język podany, nie zgadywany. `deck` niesie już teksty w tym języku, ale sam nie mówi
      modelowi, w czym pisać — instrukcja i fakty w niej są po polsku niezależnie od gościa. */
-  const system = chatSystemPrompt(deck, locale);
+  const system = chatSystemPrompt(deck, locale, await liveFacts(env));
   try {
     /* AI_API_URL is the name in START-TUTAJ.md and in make/PROMPT-PELNY.md, so it is the
        name that wins. AI_BASE_URL is still read because it is what the first version of
