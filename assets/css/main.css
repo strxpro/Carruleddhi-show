@@ -644,6 +644,16 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   transition: transform .62s cubic-bezier(.2, .8, .2, 1);
   transform: rotateX(0deg);
 }
+/* Na telefonie mniejszy, bo tam stoi obok znaku firmowego w pasku szerokosci 390 px —
+   a nie jest to liczba, ktora ktos czyta z drugiego konca pokoju. Zgloszone jako
+   „powinien byc troche mniejszy ten licznik na telefonie". */
+@media (max-width: 760px) {
+  .brand__flip { --brand-face-h: 12px; }
+  .brand__face--clock { font-size: 9px; letter-spacing: .02em; }
+  .brand__face--clock i { margin-right: 3px; }
+  .brand__date { font-size: 9px; letter-spacing: .14em; }
+}
+
 .brand__face--clock {
   gap: 1px;
   color: var(--yellow);
@@ -670,6 +680,13 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
      tylko bez jazdy. Zerowy czas trwania zamiast zablokowanej sciany. */
   .brand__flip { transition-duration: 0s; }
 }
+
+/* Sciany nie moga miec wlasnego marginesu: obie leza `inset: 0` w pudelku, ktore ma juz
+   swoj `margin-top`. Margines na scianie spychal napis o cztery piksele W DOL WEWNATRZ
+   jej wlasnego prostokata — data siedziala nizej niz zegar i przy obrocie widac bylo,
+   ze jedna sciana jest przesunieta wzgledem drugiej. Zgloszone jako „napisy sa troche
+   skoslawe". Wyrownanie w pionie robi juz `align-items: center` na scianach. */
+.brand__flip .brand__date { margin-top: 0; }
 
 .brand__date { margin-top: 4px; color: var(--blue-200); font-family: var(--font-meta); font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
 .site-nav { display: flex; flex: 1 1 auto; justify-content: center; gap: clamp(8px, 1.5vw, 24px); min-width: 0; }
@@ -2582,7 +2599,11 @@ body { font-variation-settings: 'opsz' 16; }
     position: fixed;
     z-index: 840;
     right: 10px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    /* `--dock-lift` wpisuje app.js z `visualViewport` — to jest roznica miedzy dolem okna
+       UKLADU a dolem tego, co naprawde widac. Na telefonie te dwie rzeczy rozjezdzaja sie
+       za kazdym razem, gdy pasek adresu wyjezdza albo chowa sie przy przewijaniu, i bez
+       tego skladnika dok albo wsuwa sie pod pasek, albo odskakuje od krawedzi. */
+    bottom: calc(10px + env(safe-area-inset-bottom) + var(--dock-lift, 0px));
     left: 10px;
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2661,11 +2682,69 @@ body { font-variation-settings: 'opsz' 16; }
   }
   .quick-action.is-complete { animation: quick-action-done .42s var(--ease-out); }
 
+  /* SPOKOJNIEJSZY RUCH I MNIEJ PRACY DLA PRZEGLADARKI.
+     -----------------------------------------------------------------------
+     Ruch idzie WYLACZNIE po `transform` i `opacity` — tych dwoch przegladarka nie liczy
+     na nowo dla calej strony, tylko oddaje karcie graficznej. Kazda animacja szerokosci,
+     wysokosci albo odstepu na elemencie, ktory lezy nad przewijana trescia, konczy sie
+     przycinaniem przy przewijaniu — a dok lezy nad trescia zawsze.
+
+     Krzywa `cubic-bezier(.32, .72, 0, 1)` zamiast domyslnej: szybki poczatek i dlugie,
+     miekkie dojscie, bez odbicia na koncu. Taki ruch czyta sie jak rzecz, ktora ma mase,
+     a nie jak przelaczony stan — o to chodzilo w prosbie o „apple motion".
+
+     `will-change` NIE jest tu ustawione na stale. Dok stoi na ekranie caly czas, a stale
+     `will-change: transform` trzyma dla niego osobna warstwe przez cala wizyte i na
+     slabszym telefonie zabiera pamiec potrzebna reszcie strony. Warstwa powstaje i tak
+     na czas animacji. */
+  .quick-actions {
+    transition:
+      opacity .34s cubic-bezier(.32, .72, 0, 1),
+      transform .46s cubic-bezier(.32, .72, 0, 1),
+      visibility .34s;
+  }
+
+  /* Cien w dwoch warstwach: waska i ciemna tuz pod krawedzia daje kontakt z tlem, szeroka
+     i rzadka daje uniesienie. Jeden cien musi wybrac miedzy jednym a drugim i zawsze
+     wyglada albo na naklejke, albo na plame. */
+  .quick-actions {
+    border-color: rgba(255,255,255,.16);
+    box-shadow:
+      0 1px 2px rgba(7,26,61,.5),
+      0 16px 40px -12px rgba(7,26,61,.55);
+  }
+
+  /* Przycisk odpowiada od razu i wraca miekko: 120 ms w dol, 420 ms z powrotem.
+     Rowny czas w obie strony daje wrazenie opoznienia, bo nacisniecie ma byc natychmiast,
+     a puszczenie moze sie rozlozyc. */
+  .quick-action {
+    transition: transform .42s cubic-bezier(.32, .72, 0, 1), background-color .25s ease;
+  }
+  .quick-action:active { transition-duration: .12s; }
+
   .quick-action--attend { background: var(--yellow); cursor: pointer; }
   .quick-action--attend.is-complete { background: var(--green); color: var(--white); }
   .quick-action--signup { background: var(--coral); color: var(--white); }
-  .quick-action__icon { display: grid; width: 25px; height: 25px; flex: none; place-items: center; border-radius: 50%; background: rgba(255,255,255,.28); }
-  .quick-action__icon svg { width: 16px; height: 16px; }
+  /* IKONA W KOLKU: MNIEJSZA I NAPRAWDE NA SRODKU.
+     -----------------------------------------------------------------------
+     Znak w srodku byl za duzy wzgledem kolka (16 z 25 px, czyli dwie trzecie srednicy) —
+     kolko przestawalo czytac sie jak kolko, a robilo jak kwadrat ze scietymi rogami.
+     Zgloszone jako „te ikony mniejsze zeby byly, wysrodkowane w tych kolkach".
+
+     `place-items: center` samo nie wystarcza: rysunki maja `stroke-linecap: round`,
+     wiec ich widoczna masa konczy sie polowa grubosci kreski przed krawedzia pola
+     roboczego. Stad `display: block` na samym rysunku i rowne pole — bez tego znak
+     siedzi optycznie odrobine wyzej, niz stoi geometrycznie. */
+  .quick-action__icon {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255,255,255,.26);
+  }
+  .quick-action__icon svg { display: block; width: 13px; height: 13px; }
   body.is-menu-open .quick-actions,
   body.is-modal-open .quick-actions,
   .quick-actions.is-over-form,

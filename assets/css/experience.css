@@ -894,6 +894,27 @@ body.is-language-transitioning .nav-current__copy {
     font-size: 8px;
     letter-spacing: .13em;
   }
+
+  /* DWIE SCIANY MUSZA MIEC TEN SAM ROZMIAR I ZERO WLASNEGO MARGINESU.
+     -------------------------------------------------------------------------
+     Data i odliczanie to dwie sciany jednego obracanego pudelka (patrz `.brand__flip`
+     w main.css). Obie leza `inset: 0`, wiec kazdy wlasny margines spycha napis W DOL
+     WEWNATRZ jego prostokata — a gdy tylko jedna sciana go ma, przy obrocie widac, ze
+     napisy siedza na roznych wysokosciach. Zglaszane jako „napisy sa troche skoslawe".
+
+     Regula musi stac TUTAJ, nie w main.css: `.site-header .brand__date` z tego arkusza ma
+     te sama specyficznosc co `.brand__flip .brand__date` i jest wczytywana pozniej, wiec
+     wygrywala kolejnoscia. Trzy klasy zamiast dwoch rozstrzygaja to bez `!important`.
+
+     Rowny rozmiar obu scian (9 px zamiast 8 i 10) z tego samego powodu: przy obrocie
+     zmienia sie sciana, nie stopien pisma. Rozne rozmiary czytaly sie jak skok. */
+  .site-header .brand__flip .brand__date {
+    margin-top: 0;
+    font-size: 9px;
+  }
+  .site-header .brand__flip .brand__face--clock {
+    font-size: 9px;
+  }
   /* Byla tu regula display none. Postep na telefonie jest potrzebny bardziej niz na
      pulpicie, bo strona ma 12 sekcji i bez niego nie wiadomo, ile jeszcze zostalo. */
   /* Na telefonie w pasku sa juz marka, flaga i menu — na nazwe sekcji nie ma miejsca

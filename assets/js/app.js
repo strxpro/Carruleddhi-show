@@ -3528,7 +3528,24 @@ import {
       ...$$('[data-open-reminder]'),
       ...$$('[data-vote-cta]'),
       ...$$('[data-race-podium], a[href="#podium"]')
-    ].filter(Boolean).filter((element) => !dock.contains(element));
+    ].filter(Boolean)
+      .filter((element) => !dock.contains(element))
+      /* PRZYPIETY PASEK NIE JEST RYWALEM — I TO ON UNIERUCHOMIL CALY DOK.
+         =====================================================================
+         W pasku stoi „bede tam" z tym samym `data-open-reminder`, co przycisk w sekcji
+         obecnosci. Pasek jest `position: fixed`, wiec przecina sie z widokiem ZAWSZE —
+         obserwator melduje rywala na kazdej wysokosci strony, `is-over-form` nie schodzi
+         nigdy i dok jest przezroczysty przez cala wizyte.
+
+         Zmierzone na 390 px, cztery wysokosci od gory do dolu strony: `opacity: 0`
+         i klasa `is-over-form` w kazdym punkcie. Zgloszone jako „brakuje mi tych dwoch
+         guzikow" — one byly na swoim miejscu, tylko niewidzialne.
+
+         Sens reguly dotyczy SEKCJI: dok ma nie powtarzac zaproszenia, ktore czlowiek ma
+         wlasnie przed oczami w tresci. Przycisk przypiety do krawedzi ekranu nie nalezy
+         do zadnej sekcji i jest widoczny zawsze — gdyby liczyl sie jako rywal, dok nie
+         mialby prawa pokazac sie nigdy, czyli nie mialby po co istniec. */
+      .filter((element) => !element.closest('.site-header'));
 
     /* Przyciski wymienione po cichu wyglądają na usterkę odświeżania. Gdy faza się zmienia —
        zamknięto głosowanie, otwarto je — skład doku jest inny niż sekundę wcześniej, więc
@@ -3555,19 +3572,85 @@ import {
     }
 
     const formControlSelector = 'input, textarea, select, [contenteditable="true"]';
+
+    /* KLAWIATURA TO NIE JEST TO SAMO CO ZNIKAJACY PASEK ADRESU.
+       =========================================================================
+       Dok chowal sie, gdy `visualViewport.height` spadl ponizej 72% `window.innerHeight`.
+       Na telefonie okno kurczy sie z DWOCH niezaleznych powodow i tylko jeden z nich jest
+       powodem do chowania czegokolwiek:
+
+         klawiatura      zabiera 35-50% wysokosci — dok ma zejsc, bo inaczej lezy na niej
+         pasek adresu    zabiera 8-12% przy przewijaniu w gore i w dol, kilkanascie razy
+                         na minute — dok ma ZOSTAC, bo nic go nie zaslania
+
+       Jeden prog dla obu przypadkow musi sie mylic w ktoras strone. Zmierzone: dok
+       przychodzil z klasa `is-keyboard-hidden` zalozona przy braku jakiejkolwiek
+       klawiatury i zostawal niewidzialny do konca wizyty. Zgloszone jako „brakuje mi tych
+       dwoch guzikow" — one tam byly, tylko przezroczyste.
+
+       Teraz decyduje FOKUS, nie sama wysokosc. Klawiatura na telefonie nie wychodzi bez
+       ustawienia sie w polu — wiec brak pola w fokusie znaczy brak klawiatury, niezaleznie
+       od tego, co akurat zrobil pasek adresu. Wysokosc jest sprawdzeniem dodatkowym, nie
+       jedynym: chroni przed polem, ktore ma fokus, ale klawiatura jest schowana (mysz na
+       tablecie, klawiatura sprzetowa).
+
+       ODNIESIENIE TO NAJWIEKSZA WIDZIANA WYSOKOSC, nie `window.innerHeight`. Ta druga sama
+       bywa juz pomniejszona o pasek adresu, wiec porownanie z nia mierzy roznice dwoch
+       rzeczy, ktore obie sie ruszaja. */
+    let najwyzszeOkno = window.visualViewport?.height || window.innerHeight || 0;
+    const polePodFokusem = () => Boolean(document.activeElement?.matches?.(formControlSelector));
+
+    function przeliczKlawiature() {
+      const teraz = window.visualViewport?.height || window.innerHeight || 0;
+      if (teraz > najwyzszeOkno) najwyzszeOkno = teraz;
+      const skurczone = najwyzszeOkno > 0 && teraz < najwyzszeOkno * 0.78;
+      dock.classList.toggle('is-keyboard-hidden', polePodFokusem() && skurczone);
+    }
+
     document.addEventListener('focusin', (event) => {
-      if (event.target.matches?.(formControlSelector)) dock.classList.add('is-keyboard-hidden');
+      if (event.target.matches?.(formControlSelector)) {
+        /* Klatke pozniej: w chwili fokusu klawiatury jeszcze nie ma i okno ma pelna
+           wysokosc. Bez opoznienia warunek wysokosci nigdy by nie wszedl. */
+        window.setTimeout(przeliczKlawiature, 260);
+      }
     });
     document.addEventListener('focusout', () => {
-      window.setTimeout(() => {
-        if (!document.activeElement?.matches?.(formControlSelector)) dock.classList.remove('is-keyboard-hidden');
-      }, 80);
+      window.setTimeout(przeliczKlawiature, 120);
     });
 
     const viewport = window.visualViewport;
-    viewport?.addEventListener('resize', () => {
-      dock.classList.toggle('is-keyboard-hidden', viewport.height < window.innerHeight * 0.72);
-    }, { passive: true });
+    viewport?.addEventListener('resize', przeliczKlawiature, { passive: true });
+
+    /* DOK TRZYMA SIE DOLU WIDOCZNEGO OKNA, NIE DOLU STRONY.
+       -------------------------------------------------------------------------
+       `position: fixed` z `bottom` liczy sie od dolu okna UKLADU, a to na telefonie nie
+       jest to samo, co dol tego, co widac: przy wysunietym pasku adresu dok wsuwa sie
+       pod niego albo odskakuje od krawedzi. `visualViewport` zna prawdziwa roznice, wiec
+       wpisujemy ja jako `--dock-lift`, a arkusz dodaje do odstepu od dolu.
+
+       Zapis tylko przy realnej zmianie i przez `requestAnimationFrame`: to jest zdarzenie,
+       ktore na telefonie leci dziesiatki razy w trakcie jednego przewiniecia, a kazdy zapis
+       zmiennej CSS to przeliczenie ukladu. Stad tez brak jakiejkolwiek animacji na tym
+       przesunieciu — dok ma stac nieruchomo wzgledem krawedzi ekranu, a nie doganiac ja
+       plynnie, bo to wyglada jak drganie. */
+    let ostatniPodnos = -1;
+    let zaplanowany = false;
+    function przeliczPodnos() {
+      if (zaplanowany) return;
+      zaplanowany = true;
+      requestAnimationFrame(() => {
+        zaplanowany = false;
+        const v = window.visualViewport;
+        if (!v) return;
+        const podnos = Math.max(0, Math.round(window.innerHeight - v.height - v.offsetTop));
+        if (podnos === ostatniPodnos) return;
+        ostatniPodnos = podnos;
+        document.documentElement.style.setProperty('--dock-lift', podnos + 'px');
+      });
+    }
+    przeliczPodnos();
+    viewport?.addEventListener('resize', przeliczPodnos, { passive: true });
+    viewport?.addEventListener('scroll', przeliczPodnos, { passive: true });
 
     /**
      * The dock shrinks to two icons while you are reading, and one tap brings the
