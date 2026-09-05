@@ -311,6 +311,11 @@ const FIELD_WHITELIST = {
   /* Serca od widzow. Bez tego wpisu `payload.count` bylo `undefined`, `Number.parseInt`
      dawalo NaN i kazde serce przepadalo — licznik pod odtwarzaczem nie ruszal sie, cokolwiek
      widzowie klikali. Ten sam brak co przy `stream-admin`, ta sama cicha porazka. */
+  /* Publiczny odczyt stanu transmisji niesie jeden identyfikator karty przegladarki —
+     losowy, tworzony po stronie strony, ginacy razem z karta. Sluzy wylacznie do policzenia,
+     ile kart jest teraz otwartych. Bez tego wpisu wypadlby w sanitizacji i licznik widzow
+     pokazywalby zero — czyli dokladnie ta sama cicha porazka, co przy `stream-admin`. */
+  stream: ['viewerId'],
   'stream-heart': ['count'],
   /* Zgłoszenia sponsorów, oczami organizatora. Cztery pola i ani jednego więcej — to jest
      cała treść kontraktu tej końcówki:
@@ -9267,13 +9272,65 @@ async function readStream(env) {
  * a proba zaosczedzenia jednego zapytania przez wyslanie go „na zapas" znaczylaby, ze
  * kazdy odwiedzajacy widzi adres jeszcze niepublicznej transmisji.
  */
-async function streamPublic(env, request, cors) {
+/**
+ * Odnotowuje jedna otwarta karte i oddaje, ile ich jest.
+ *
+ * OKNO 75 SEKUND, A ODPYTANIE CO 6
+ *   Z zapasem, bo miedzy odpytaniami wchodzi uspiona karta, chwilowo zerwana siec i
+ *   telefon, ktory wygasil ekran. Okno rowne odstepowi odpytan dawaloby licznik migajacy
+ *   w dol przy kazdym opoznieniu.
+ *
+ * SPRZATANIE PRZY OKAZJI, BEZ OSOBNEGO ZADANIA
+ *   Wiersze starsze niz kwadrans kasowane sa co jakis czas przy zwyklym odczycie —
+ *   losowo, zeby przy stu ogladajacych nie robilo tego stu naraz. Osobny cron byloby
+ *   trzeba pamietac, utrzymywac i tlumaczyc; tu wystarcza dwie linijki.
+ *
+ * Bledy przelykane: licznik widzow nie ma prawa wywrocic odpowiedzi, od ktorej zalezy
+ * to, czy ktokolwiek w ogole zobaczy odtwarzacz.
+ */
+async function notePresence(env, viewerId) {
+  const id = String(viewerId || '').slice(0, 64);
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(id)) return 0;
+  try {
+    await fetch(`${env.SUPABASE_URL}/rest/v1/stream_presence`, {
+      method: 'POST',
+      headers: supabaseHeaders(env, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([{ viewer_id: id, seen_at: new Date().toISOString() }])
+    });
+
+    if (Math.random() < 0.05) {
+      const stare = new URL(`${env.SUPABASE_URL}/rest/v1/stream_presence`);
+      stare.searchParams.set('seen_at', `lt.${new Date(Date.now() - 900000).toISOString()}`);
+      await fetch(stare, { method: 'DELETE', headers: supabaseHeaders(env, { Prefer: 'return=minimal' }) });
+    }
+
+    const licz = new URL(`${env.SUPABASE_URL}/rest/v1/stream_presence`);
+    licz.searchParams.set('select', 'viewer_id');
+    licz.searchParams.set('seen_at', `gte.${new Date(Date.now() - 75000).toISOString()}`);
+    const odpowiedz = await fetch(licz, {
+      headers: supabaseHeaders(env, { Prefer: 'count=exact' , Range: '0-0' }),
+      cache: 'no-store'
+    });
+    const zakres = odpowiedz.headers.get('content-range') || '';
+    const ile = Number.parseInt(zakres.split('/')[1] || '', 10);
+    return Number.isFinite(ile) ? ile : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+async function streamPublic(env, request, payload, cors) {
   const row = await readStream(env);
-  if (!row) return json({ ok: true, live: false, hearts: 0 }, 200, cors);
+  if (!row) return json({ ok: true, live: false, hearts: 0, viewers: 0 }, 200, cors);
   const live = Boolean(row.is_live) && Boolean(row.video_id);
+  /* Obecnosc odnotowywana przy okazji odpytania o stan, ktore strona i tak wysyla co
+     szesc sekund w trakcie transmisji — zadnego dodatkowego ruchu. Tylko gdy transmisja
+     trwa: poza nia nie ma czego liczyc, a tabela nie ma rosnac bez powodu. */
+  const viewers = live ? await notePresence(env, payload.viewerId) : 0;
   return json({
     ok: true,
     live,
+    viewers,
     hearts: Number(row.hearts) || 0,
     title: live ? String(row.title || '') : '',
     provider: live ? row.provider : '',
@@ -10012,7 +10069,7 @@ export default {
       if (type === 'entry-lookup') return entryLookup(env, payload, cors);
       if (type === 'entry-code') return entryCode(env, payload, cors);
       if (type === 'entry-manage') return entryManage(env, payload, cors);
-      if (type === 'stream') return streamPublic(env, request, cors);
+      if (type === 'stream') return streamPublic(env, request, payload, cors);
       if (type === 'stream-heart') return streamHeart(env, payload, cors);
       if (type === 'stream-admin') return streamAdmin(env, payload, cors);
       if (type === 'roster') return roster(env, payload, cors);

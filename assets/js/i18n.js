@@ -1325,6 +1325,10 @@
   const streamExtras = {
     it: {
       'stream.cta': 'Guarda la diretta',
+      /* Krotka odmiana WYLACZNIE do paska. Pelne zdanie („Ogladaj na zywo") nie miesci
+         sie w pasku na telefonie i wychodzi poza ekran — zmierzone na 390 px. W hero
+         i w menu zostaje pelna wersja, tam jest na nia miejsce. */
+      'stream.ctaShort': 'In diretta',
       'stream.badge': 'In diretta ora',
       'stream.title': 'La discesa, mentre succede.',
       'stream.lead': 'Il segnale arriva dal traguardo. Tocca lo schermo per applaudire.',
@@ -1336,6 +1340,10 @@
     },
     pl: {
       'stream.cta': 'Oglądaj na żywo',
+      /* Krotka odmiana WYLACZNIE do paska. Pelne zdanie („Ogladaj na zywo") nie miesci
+         sie w pasku na telefonie i wychodzi poza ekran — zmierzone na 390 px. W hero
+         i w menu zostaje pelna wersja, tam jest na nia miejsce. */
+      'stream.ctaShort': 'Na żywo',
       'stream.badge': 'Trwa transmisja',
       'stream.title': 'Zjazd, w chwili gdy się dzieje.',
       'stream.lead': 'Obraz leci spod mety. Stuknij w ekran, żeby bić brawo.',
@@ -1347,6 +1355,10 @@
     },
     en: {
       'stream.cta': 'Watch live',
+      /* Krotka odmiana WYLACZNIE do paska. Pelne zdanie („Ogladaj na zywo") nie miesci
+         sie w pasku na telefonie i wychodzi poza ekran — zmierzone na 390 px. W hero
+         i w menu zostaje pelna wersja, tam jest na nia miejsce. */
+      'stream.ctaShort': 'Live now',
       'stream.badge': 'Live right now',
       'stream.title': 'The descent, as it happens.',
       'stream.lead': 'The signal comes from the finish line. Tap the screen to applaud.',
@@ -1358,6 +1370,10 @@
     },
     de: {
       'stream.cta': 'Live ansehen',
+      /* Krotka odmiana WYLACZNIE do paska. Pelne zdanie („Ogladaj na zywo") nie miesci
+         sie w pasku na telefonie i wychodzi poza ekran — zmierzone na 390 px. W hero
+         i w menu zostaje pelna wersja, tam jest na nia miejsce. */
+      'stream.ctaShort': 'Live',
       'stream.badge': 'Jetzt live',
       'stream.title': 'Die Abfahrt, während sie passiert.',
       'stream.lead': 'Das Signal kommt vom Ziel. Tippe auf den Bildschirm, um zu applaudieren.',
@@ -1369,6 +1385,10 @@
     },
     es: {
       'stream.cta': 'Ver en directo',
+      /* Krotka odmiana WYLACZNIE do paska. Pelne zdanie („Ogladaj na zywo") nie miesci
+         sie w pasku na telefonie i wychodzi poza ekran — zmierzone na 390 px. W hero
+         i w menu zostaje pelna wersja, tam jest na nia miejsce. */
+      'stream.ctaShort': 'En directo',
       'stream.badge': 'En directo ahora',
       'stream.title': 'La bajada, mientras ocurre.',
       'stream.lead': 'La señal llega desde la meta. Toca la pantalla para aplaudir.',
@@ -1380,6 +1400,10 @@
     },
     fr: {
       'stream.cta': 'Voir en direct',
+      /* Krotka odmiana WYLACZNIE do paska. Pelne zdanie („Ogladaj na zywo") nie miesci
+         sie w pasku na telefonie i wychodzi poza ekran — zmierzone na 390 px. W hero
+         i w menu zostaje pelna wersja, tam jest na nia miejsce. */
+      'stream.ctaShort': 'En direct',
       'stream.badge': 'En direct maintenant',
       'stream.title': 'La descente, pendant qu’elle se passe.',
       'stream.lead': 'Le signal vient de l’arrivée. Touchez l’écran pour applaudir.',

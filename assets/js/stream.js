@@ -34,7 +34,10 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
      Zamknięta transmisja zmienia się raz na rok, otwarta — licznik serc rośnie co sekundę.
      Jedna wartość pośrodku byłaby albo marnowaniem zapytań przez jedenaście miesięcy, albo
      licznikiem, który zauważa cudze brawa dopiero po minucie. */
-  const POLL_CLOSED_MS = 60_000;
+  /* Dwadziescia sekund, nie minuta. Tyle najdluzej czeka ktos, kto ma strone otwarta,
+     zanim zobaczy, ze transmisja ruszyla. Minuta to bylo za dlugo — organizator wlacza
+     i patrzy na wlasna strone, na ktorej przez pol minuty nic sie nie dzieje. */
+  const POLL_CLOSED_MS = 20_000;
   const POLL_LIVE_MS = 6_000;
   /* Stuknięcia zbierają się w paczkę i lecą jednym zapytaniem. Człowiek stuka pięć razy w
      sekundę; pięć zapytań na sekundę razy stu oglądających to nie jest licznik, to atak na
@@ -48,6 +51,31 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
   const heartLayer = $('[data-stream-hearts]', section);
   const bar = $('[data-stream-bar]', section);
   const countLabel = $('[data-stream-count]', section);
+  const viewersLabel = $('[data-stream-viewers]', section);
+
+  /* IDENTYFIKATOR KARTY, NIE CZLOWIEKA.
+     ---------------------------------------------------------------------------
+     Losowy ciag na czas zycia karty. Idzie z kazdym odpytaniem o stan — tym samym,
+     ktore i tak leci co szesc sekund — i sluzy wylacznie do policzenia, ile kart jest
+     teraz otwartych. `sessionStorage`, a nie `localStorage`: ma zginac razem z karta,
+     bo liczymy obecnosc TERAZ, a nie „kiedys tu byl".
+
+     W trybie prywatnym `sessionStorage` potrafi rzucic wyjatkiem — wtedy identyfikator
+     zyje w zmiennej, czyli do pierwszego odswiezenia. Gorzej niz nic? Nie: licznik nadal
+     dziala, tylko odswiezenie strony liczy sie jako nowa karta. Wywrocony skrypt
+     transmisji bylby duzo gorszy. */
+  const viewerId = (() => {
+    const nowy = () => 'v' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
+    try {
+      const zapisany = sessionStorage.getItem('carruleddhi.viewer');
+      if (zapisany) return zapisany;
+      const swiezy = nowy();
+      sessionStorage.setItem('carruleddhi.viewer', swiezy);
+      return swiezy;
+    } catch (_) {
+      return nowy();
+    }
+  })();
   const nameLine = $('[data-stream-name]', section);
 
   let live = false;
@@ -77,7 +105,10 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
 
   /* ------------------------------------------------------------------ rozmowa z serwerem */
 
+  /* `viewerId` tylko przy odczycie stanu. Przy oklaskach nie ma po co — ten sam licznik
+     obecnosci odswieza sie sekunde pozniej zwyklym odpytaniem. */
   async function ask(type, body = {}) {
+    if (type === 'stream') body = { ...body, viewerId };
     const bridge = api();
     const endpoint = config()?.endpoints?.[type === 'stream-heart' ? 'streamHeart' : 'stream'];
     if (!bridge || !endpoint) return null;
@@ -100,6 +131,59 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
     if (countLabel.textContent !== label) countLabel.textContent = label;
   }
 
+  /* Liczba ogladajacych. Nigdy nie schodzi ponizej jednego, gdy transmisja trwa: sam
+     patrzacy na te liczbe jest juz jednym z nich, a „0 oglada" na wlasnym ekranie czyta
+     sie jak awaria licznika. */
+  function paintViewers(ile) {
+    if (!viewersLabel) return;
+    const label = String(Math.max(1, Number(ile) || 0));
+    if (viewersLabel.textContent !== label) viewersLabel.textContent = label;
+  }
+
+  /* OBRAZ RUSZA, GDY SEKCJA WCHODZI NA EKRAN — NIE WCZESNIEJ.
+     ---------------------------------------------------------------------------
+     Wczesniej `src` ramki byl ustawiany w chwili, gdy serwer powiedzial „transmisja trwa",
+     czyli czesto wtedy, gdy sekcja byla jeszcze kilka ekranow nizej. Odtwarzacz ciagnal
+     wtedy wideo do niewidocznego elementu — na danych komorkowych to jest realny koszt
+     dla kogos, kto do tej sekcji nigdy nie dojdzie.
+
+     Teraz ladowanie czeka na `IntersectionObserver`. Przy okazji jest to dokladnie to,
+     o co proszono: obraz zaczyna sie sam, gdy sie do niego przewinie.
+
+     `mute=1` NIE JEST WYBOREM STYLU. Zadna przegladarka nie pozwoli uruchomic dzwieku bez
+     gestu czlowieka — bez wyciszenia autostart po prostu NIE ZADZIALA i zostanie plansza
+     z trojkatem. Z wyciszeniem obraz rusza od razu, a dzwiek wlacza sie jednym
+     kliknieciem w odtwarzaczu.
+
+     `rootMargin` z zapasem 200 px: ladowanie zaczyna sie chwile PRZED wejsciem sekcji
+     w kadr, wiec do momentu, gdy czlowiek na nia patrzy, obraz zdazyl juz ruszyc. To jest
+     cala tajemnica „plynnosci" — nie krotsza animacja, tylko wczesniejszy start. */
+  let obrazPokazany = false;
+  let obserwatorSceny = null;
+
+  function wlaczObraz() {
+    if (obrazPokazany || !live || !embed) return;
+    obrazPokazany = true;
+    const zWyciszeniem = embed + (embed.includes('?') ? '&' : '?') + 'mute=1&playsinline=1';
+    frame.setAttribute('src', zWyciszeniem);
+    stage?.classList.add('is-playing');
+  }
+
+  function pokazObraz() {
+    obrazPokazany = false;
+    stage?.classList.remove('is-playing');
+    if (!('IntersectionObserver' in window)) { wlaczObraz(); return; }
+    obserwatorSceny?.disconnect();
+    obserwatorSceny = new IntersectionObserver((wpisy) => {
+      if (wpisy.some((w) => w.isIntersecting)) {
+        wlaczObraz();
+        obserwatorSceny?.disconnect();
+        obserwatorSceny = null;
+      }
+    }, { rootMargin: '200px 0px' });
+    obserwatorSceny.observe(stage || section);
+  }
+
   function paint(state) {
     /* BRAK ODPOWIEDZI TO NIE JEST „TRANSMISJA SIĘ SKOŃCZYŁA".
        ---------------------------------------------------------------------------
@@ -110,6 +194,7 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
     if (!state) return;
 
     const nowLive = Boolean(state.live && state.embed);
+    if (nowLive) paintViewers(state.viewers);
     hearts = Number(state.hearts) || 0;
     paintCount();
 
@@ -131,7 +216,7 @@ import { $, $$, api, config, demoMode, reducedMotion, text } from './voting-core
       /* Adres wpisywany przy włączeniu i zdejmowany przy wyłączeniu. `removeAttribute`, a nie
          `src = ''`: pusty łańcuch jest w części przeglądarek adresem samej strony i ramka
          wczytałaby stronę główną SAMA W SOBIE, rekurencyjnie. */
-      if (live) frame.setAttribute('src', embed);
+      if (live) pokazObraz();
       else frame.removeAttribute('src');
     }
 

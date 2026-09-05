@@ -89,6 +89,54 @@
 
 /* `position: relative` na scenie, bo wszystko poniżej — warstwa do stukania, serca i pasek —
    jest wobec niej pozycjonowane. Scena, a nie sama ramka, wchodzi też na pełny ekran. */
+/* POSWIATA POD ODTWARZACZEM.
+   ---------------------------------------------------------------------------
+   To jest ta „rozszerzona krawedz" znana z YouTube. Tam poswiata jest prawdziwa: gracz
+   probkuje klatki wideo i rozlewa ich kolory poza ramke. U nas obraz przychodzi z innej
+   domeny w elemencie `iframe` — przegladarka NIE POZWALA odczytac z niego ani jednego
+   piksela i zaden trik tego nie obchodzi. Prawdziwej poswiaty z obrazu nie da sie zrobic.
+
+   Wiec robimy to, co da sie zrobic uczciwie: wolno przesuwajaca sie plama w barwach
+   serwisu, rozmyta i pulsujaca pod ramka. Nie udaje odbicia obrazu — jest oprawa sceny.
+
+   `filter: blur` na osobnej warstwie pod spodem, nie cien na scenie: cien nie potrafi
+   miec kilku kolorow naraz ani sie ruszac. `pointer-events: none`, zeby nie zabierala
+   stuknięć warstwie oklaskow. `z-index: -1` trzyma ja pod ramka, a nie na niej. */
+.live__glow {
+  position: absolute;
+  z-index: -1;
+  inset: -8% -6%;
+  border-radius: 50%;
+  opacity: .0;
+  background:
+    radial-gradient(38% 46% at 22% 32%, rgba(246,73,79,.85), transparent 70%),
+    radial-gradient(34% 42% at 78% 28%, rgba(255,201,40,.75), transparent 70%),
+    radial-gradient(42% 48% at 62% 78%, rgba(63,130,247,.80), transparent 72%),
+    radial-gradient(36% 40% at 30% 76%, rgba(40,182,122,.65), transparent 70%);
+  filter: blur(46px) saturate(1.25);
+  transition: opacity .9s ease;
+  animation: live-glow-drift 17s ease-in-out infinite;
+}
+/* Zapala sie dopiero, gdy leci obraz — poswiata pod czarnym prostokatem wygladalaby jak
+   usterka, a nie jak oprawa. */
+.live__stage.is-playing .live__glow { opacity: .85; }
+@keyframes live-glow-drift {
+  0%   { transform: scale(1) rotate(0deg); }
+  33%  { transform: scale(1.09) rotate(4deg); }
+  66%  { transform: scale(1.04) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Poswiata zostaje, ruch znika: kolor jest oprawa, a ruch pod tekstem meczy.
+     Dlatego `animation: none`, a nie `display: none`. */
+  .live__glow { animation: none; }
+}
+
+/* `overflow: hidden` na scenie ucinaloby poswiate, bo ta lezy POZA jej krawedzia.
+   Zaokraglenie ramki bierze na siebie `.live__frame`, wiec nic sie nie rozjezdza. */
+.live__stage { overflow: visible; }
+.live__frame { overflow: hidden; border-radius: 22px; }
+
 .live__stage {
   position: relative;
   margin-top: 2.2rem;

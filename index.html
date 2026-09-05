@@ -179,8 +179,11 @@
         <!-- To samo zaproszenie w pasku, zeby bylo osiagalne z kazdego miejsca strony,
              a nie tylko z gory. Ten sam atrybut co w hero, wiec odslania je jedno
              przypisanie w stream.js — dwa miejsca do pomylenia byloby o jedno za duzo. -->
-        <a class="btn btn--small btn--live nav-live" href="#live" data-stream-cta hidden>
-          <span class="btn__live-dot" aria-hidden="true"></span><span data-i18n="stream.cta">Guarda la diretta</span>
+        <a class="btn btn--small btn--live nav-live" href="#live" data-stream-cta hidden aria-label="Oglądaj na żywo" data-i18n-aria-label="stream.cta">
+          <!-- `stream.ctaShort`, nie `stream.cta`: pelne zdanie nie miesci sie w pasku na
+               telefonie i wychodzi poza ekran. W hero i w menu ten sam przycisk nosi pelna
+               nazwe — tam jest na nia miejsce. -->
+          <span class="btn__live-dot" aria-hidden="true"></span><span data-i18n="stream.ctaShort">In diretta</span>
         </a>
         <a class="btn btn--small nav-vote" href="votazione.html" data-vote-cta hidden>
           <span data-i18n="voting.cta">Vota il partecipante</span>
@@ -430,6 +433,8 @@
              inaczej serca, licznik i pasek zostalyby POD odtwarzaczem i na pelnym ekranie
              zniknelyby razem z reszta strony. -->
         <div class="live__stage reveal" data-delay="1" data-stream-stage>
+          <!-- Poswiata. Pusty element, bo caly jej wyglad jest w CSS — patrz .live__glow. -->
+          <div class="live__glow" aria-hidden="true"></div>
           <div class="live__frame">
             <iframe class="live__video" data-stream-frame title="Carruleddhi Show" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
           </div>
@@ -444,8 +449,16 @@
           <!-- Pasek sterowania. Pojawia sie po stuknieciu i gasnie po chwili — tak jak
                w kazdym odtwarzaczu, ktorego ci ludzie uzywaja na co dzien. -->
           <div class="live__bar" data-stream-bar>
-            <span class="live__count" data-stream-count-wrap>
+            <!-- DWIE LICZBY, BO TO SA DWIE ROZNE RZECZY.
+                 Ludzik z jedna liczba pokazywal OKLASKI. Zglaszane jako „jak to klikam,
+                 to sie polubia" — ikona obiecywala widzow, a liczba rosla od wlasnego
+                 stukania. Teraz ludzik liczy otwarte karty, a serce oklaski. -->
+            <span class="live__count" data-stream-viewers-wrap title="Ile osób ogląda teraz">
               <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 12a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4Zm0 1.8c-3.4 0-7 1.7-7 3.9v2.5h14v-2.5c0-2.2-3.6-3.9-7-3.9Z" fill="currentColor"/></svg>
+              <strong data-stream-viewers>0</strong>
+            </span>
+            <span class="live__count live__count--hearts" data-stream-count-wrap title="Oklaski">
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z" fill="currentColor"/></svg>
               <strong data-stream-count>0</strong>
             </span>
             <button class="live__btn" type="button" data-stream-clap>

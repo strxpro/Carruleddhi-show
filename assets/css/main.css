@@ -1474,6 +1474,22 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* W TRAKCIE TRANSMISJI W PASKU STOI JEDEN PRZYCISK, NIE DWA.
+   ---------------------------------------------------------------------------
+   Gdy transmisja rusza, do paska wchodzi „ogladaj na zywo" — i przez chwile stoi tam
+   razem z „bede tam", flaga, odliczaniem i menu. Piec rzeczy w pasku szerokosci telefonu
+   konczy sie tak, jak na zrzucie: przyciski zlepione, flaga na krawedzi.
+
+   „Bede tam" ustepuje, bo w trakcie transmisji jest zdaniem o przyszlosci wypowiedzianym
+   w czasie, ktory wlasnie trwa — obietnica przyjscia na cos, co sie dzieje. „Ogladaj
+   teraz" jest jedyna sensowna czynnoscia w tej chwili. Zaproszenie wraca do paska samo,
+   gdy transmisja sie skonczy: to jest regula CSS, nie zapis stanu.
+
+   `:has()` zamiast klasy na pasku, bo o widocznosci „ogladaj" decyduje juz atrybut
+   `hidden` ustawiany przez stream.js — dokladanie do tego drugiego znacznika dawaloby
+   dwa zrodla prawdy i jedno z nich predzej czy pozniej by sie rozjechalo. */
+.site-header:has(.nav-live:not([hidden])) .nav-attend { display: none; }
+
 .site-header .nav-attend.is-complete {
   background: var(--green);
   color: var(--white);
@@ -1510,13 +1526,37 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   .site-header .nav-current { display: none; }
 }
 
+/* „Ogladaj na zywo" dostaje to samo traktowanie co „bede tam": nie lamie sie, nie rosnie
+   i nie wypycha przycisku menu poza ekran. Napis w pasku jest juz krotki (`stream.ctaShort`),
+   to sa ograniczenia na wypadek dluzszych tlumaczen. */
+.site-header .nav-live {
+  flex: none;
+  max-width: 46vw;
+  padding-inline: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 430px) {
-  .site-header .nav-attend { max-width: 38vw; padding-inline: 11px; font-size: 11px; letter-spacing: .06em; }
+  .site-header .nav-attend,
+  .site-header .nav-live { max-width: 38vw; padding-inline: 11px; font-size: 11px; letter-spacing: .06em; }
   .site-header .nav-actions { gap: 6px; }
 }
 @media (max-width: 360px) {
-  .site-header .nav-attend { max-width: 34vw; padding-inline: 9px; font-size: 10px; }
-  .site-header .nav-actions { gap: 5px; }
+  .site-header .nav-attend,
+  .site-header .nav-live { max-width: 34vw; padding-inline: 8px; font-size: 10px; letter-spacing: .04em; }
+  .site-header .nav-actions { gap: 4px; }
+}
+
+/* Najwezsze telefony, jakie jeszcze chodza (iPhone SE pierwszej generacji ma 320 px).
+   Napis w przycisku transmisji chowa sie calkiem — zostaje sama pulsujaca kropka, ktora
+   i tak niesie znaczenie „cos leci teraz", a przycisk menu przestaje wychodzic poza ekran.
+   Dostepnosc nie cierpi: `aria-label` na odsylaczu mowi, dokad prowadzi. */
+@media (max-width: 340px) {
+  .site-header .nav-live { max-width: none; padding-inline: 10px; }
+  .site-header .nav-live [data-i18n] { display: none; }
+  .site-header .nav-attend { max-width: 30vw; padding-inline: 7px; }
 }
 .menu-toggle {
   display: inline-flex !important;
