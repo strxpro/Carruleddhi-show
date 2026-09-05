@@ -3737,64 +3737,24 @@ import {
     }, { passive: true });
     onScroll();
 
-    /**
-     * Hold and it gives a little, release and it springs home.
-     *
-     * The movement is damped to a third of the finger's travel and capped, so it
-     * reads as elastic resistance rather than a draggable panel — it is not meant
-     * to be repositioned, just to feel alive under the thumb. A drag beyond 6 px
-     * cancels the click, otherwise nudging the dock would fire whichever button was
-     * underneath.
-     */
-    let hold = null;
-    let holdFrame = 0;
+    /* GESTU PRZECIAGANIA DOKU JUZ NIE MA — I TO JEST CELOWE USUNIECIE.
+       =========================================================================
+       Stalo tu „przytrzymaj, a ustapi; puszczaj, a wroci": dok szedl za palcem do
+       szesnastu pikseli i sprezynowal z powrotem. Miало to dawac wrazenie, ze rzecz zyje
+       pod kciukiem.
 
-    const paintHold = () => {
-      holdFrame = 0;
-      if (!hold) return;
-      const damp = 0.34;
-      const limit = 16;
-      const dx = clamp(hold.dx * damp, -limit, limit);
-      const dy = clamp(hold.dy * damp, -limit, limit);
-      dock.style.setProperty('--dock-nudge-x', `${dx.toFixed(1)}px`);
-      dock.style.setProperty('--dock-nudge-y', `${dy.toFixed(1)}px`);
-    };
+       W praktyce czytalo sie inaczej: dalo sie go pchnac palcem w dol, wiec wygladal na
+       cos, co da sie schowac — a nie dawalo sie, bo zawsze wracal. Kontrolka, ktora
+       reaguje na przeciagniecie i nic z tego nie wynika, obiecuje czynnosc, ktorej nie ma.
+       Zgloszone wprost: „mozna palcem schowac w dol, zeby nie bylo tego".
 
-    dock.addEventListener('pointerdown', (event) => {
-      if (event.pointerType === 'mouse' && event.button !== 0) return;
-      hold = { id: event.pointerId, x: event.clientX, y: event.clientY, dx: 0, dy: 0, moved: false };
-      dock.classList.add('is-held');
-      try { dock.setPointerCapture(event.pointerId); } catch (_) { /* unsupported pointer */ }
-    });
+       Razem z gestem odchodzi polykanie klikniecia po przeciagnieciu (bez przeciagania
+       nie ma czego polykac) oraz zmienne `--dock-nudge-x/y`, ktore go rysowaly. Dotkniecie
+       przycisku nadal odpowiada — skala na `:active`, patrz carnival.css.
 
-    dock.addEventListener('pointermove', (event) => {
-      if (!hold || event.pointerId !== hold.id) return;
-      hold.dx = event.clientX - hold.x;
-      hold.dy = event.clientY - hold.y;
-      if (Math.abs(hold.dx) > 6 || Math.abs(hold.dy) > 6) hold.moved = true;
-      if (!holdFrame) holdFrame = requestAnimationFrame(paintHold);
-    });
+       Reszta doku bez zmian: zwijanie do dwoch kolek przy czytaniu i rozwijanie
+       pierwszym dotknieciem dziala tak samo. */
 
-    const releaseHold = () => {
-      if (!hold) return;
-      const moved = hold.moved;
-      hold = null;
-      cancelAnimationFrame(holdFrame);
-      holdFrame = 0;
-      dock.classList.remove('is-held');
-      // Springs back through the CSS transition, which only applies without .is-held.
-      dock.style.setProperty('--dock-nudge-x', '0px');
-      dock.style.setProperty('--dock-nudge-y', '0px');
-      if (moved) {
-        // Swallow the click that would otherwise follow the drag.
-        const swallow = (event) => { event.preventDefault(); event.stopPropagation(); };
-        dock.addEventListener('click', swallow, { capture: true, once: true });
-        window.setTimeout(() => dock.removeEventListener('click', swallow, { capture: true }), 60);
-      }
-    };
-    dock.addEventListener('pointerup', releaseHold);
-    dock.addEventListener('pointercancel', releaseHold);
-    dock.addEventListener('lostpointercapture', releaseHold);
   }
 
   function modalFocusable(modal) {

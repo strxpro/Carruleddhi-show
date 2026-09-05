@@ -1137,17 +1137,28 @@ html {
 /* ============================================================
    18. Bottom dock: two icons while reading, full size on tap.
    ============================================================ */
+/* DOK ROSNIE JAKO JEDNA RZECZ, NIE JAKO DWA OSOBNE KAFLE.
+   ---------------------------------------------------------------------------
+   Zmienne `--dock-nudge-*` znikly razem z gestem przeciagania (patrz app.js).
+
+   Szerokosc animuje TYLKO obudowa. Wczesniej robil to takze kazdy przycisk osobno, wiec
+   przy rozwijaniu kazdy z nich pecznial od wlasnego srodka i widac bylo dwa niezalezne
+   ruchy zamiast jednego — zgloszone jako „kazdy ma swoj srodek i z tego sie powieksza".
+   Teraz rosnie ramka, a przyciski po prostu wypelniaja to, co dostana; napisy odslaniaja
+   sie spod krawedzi, bo obudowa przycina zawartosc. Jeden ruch, jeden srodek. */
 .quick-actions {
-  --dock-nudge-x: 0px;
-  --dock-nudge-y: 0px;
-  transition: width .32s var(--ease-out), padding .32s var(--ease-out),
+  overflow: hidden;
+  transition: width .34s var(--ease-out), padding .34s var(--ease-out),
     transform .38s var(--ease-snap), box-shadow .3s ease;
 }
+/* Bez `width` i `padding` na liscie przejsc: te dwie rzeczy animuje juz obudowa i to ona
+   ma niesc caly ruch. Zostaje `transform` na dotkniecie, kolor i zaokraglenie, bo one
+   nalezа do samego przycisku, nie do rozwijania doku. */
 .quick-action {
   position: relative;
   overflow: hidden;
-  transition: width .32s var(--ease-out), padding .3s var(--ease-out),
-    transform .22s var(--ease-snap), background .25s ease, border-radius .3s var(--ease-out);
+  transition: transform .22s var(--ease-snap), background .25s ease,
+    border-radius .3s var(--ease-out);
 }
 .quick-action::after {
   content: '';
@@ -1226,7 +1237,7 @@ html {
 .quick-actions.is-expanding .quick-action:not([hidden]) ~ .quick-action:not([hidden]) {
   animation-delay: .035s;
 }
-.quick-actions.is-held { transition-duration: 0s; }
+/* `.is-held` odeszla razem z gestem przeciagania — nic juz tej klasy nie zaklada. */
 @keyframes dock-open {
   0% { transform: scale(.78) translateY(7px); }
   58% { transform: scale(1.055) translateY(-3px); }
@@ -1244,7 +1255,7 @@ html {
     max-width: calc(100vw - 24px);
     grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-bottom: 0;
-    transform: translateX(calc(-50% + var(--dock-nudge-x))) translateY(var(--dock-nudge-y));
+    transform: translateX(-50%);
   }
   .quick-actions:not(.is-mini) .quick-action {
     width: 100%;
@@ -1258,7 +1269,7 @@ html {
   }
   .quick-actions.is-keyboard-hidden,
   .quick-actions.is-over-form {
-    transform: translateX(calc(-50% + var(--dock-nudge-x))) translateY(calc(100% + 34px));
+    transform: translateX(-50%) translateY(calc(100% + 34px));
   }
   .quick-action__icon { width: 28px; height: 28px; }
 }
@@ -1724,25 +1735,16 @@ html.no-js #gallery .gallery-cta[data-duplicate-cta] { display: flex; }
 }
 
 /* ============================================================
-   22. Dock: elastic under the thumb.
+   22. Dock: gdzie stoi i jak schodzi z drogi.
    ============================================================
-   The nudge is written by app.js as two custom properties and damped to a third of
-   the finger's travel, capped at 16 px. While held there is no transition, so it
-   tracks the thumb; on release the transition comes back and it springs home. The
-   translate has to be composed with the -50% that centres it, or letting go would
-   throw the dock to the left edge. */
-.quick-actions {
-  --dock-nudge-x: 0px;
-  --dock-nudge-y: 0px;
-}
-.quick-actions.is-held {
-  transition: none;
-  cursor: grabbing;
-}
+   Bylo tu „elastycznie pod kciukiem": dok szedl za palcem i sprezynowal z powrotem,
+   rysowany dwiema zmiennymi wpisywanymi z app.js. Gest zostal usuniety — dawal sie pchnac
+   w dol, wiec obiecywal chowanie, ktorego nie bylo (patrz komentarz w app.js). Razem
+   z nim odchodza obie zmienne; przesuniecia sa teraz stale i czytelne wprost. */
 @media (max-width: 760px) {
   .quick-actions {
-    transform: translateX(-50%) translate(var(--dock-nudge-x), var(--dock-nudge-y));
-    transition: width .32s var(--ease-out), padding .32s var(--ease-out),
+    transform: translateX(-50%);
+    transition: width .34s var(--ease-out), padding .34s var(--ease-out),
       transform .42s var(--ease-snap);
   }
   .quick-actions.is-keyboard-hidden {
@@ -1751,8 +1753,8 @@ html.no-js #gallery .gallery-cta[data-duplicate-cta] { display: flex; }
 }
 @media (min-width: 761px) {
   .quick-actions {
-    transform: translate(var(--dock-nudge-x), var(--dock-nudge-y));
-    transition: width .32s var(--ease-out), padding .32s var(--ease-out),
+    transform: none;
+    transition: width .34s var(--ease-out), padding .34s var(--ease-out),
       transform .42s var(--ease-snap);
   }
 }
@@ -3556,12 +3558,15 @@ body.is-modal-open .site-header { opacity: .55; pointer-events: none; }
   body.is-modal-open .quick-actions,
   .quick-actions.is-over-form,
   .quick-actions.is-keyboard-hidden {
-    transform: translateX(calc(-50% + var(--dock-nudge-x))) translateY(calc(100% + 34px)) scale(.97);
+    transform: translateX(-50%) translateY(calc(100% + 34px)) scale(.97);
   }
 
   /* Przyciski wchodzą po kolei, nie razem. Opóźnienie jest TYLKO w stanie widocznym —
      przy chowaniu obie znikają naraz, bo czekanie na wyjście jest wyłącznie irytujące. */
-  .quick-action { transition-property: width, padding, transform, background, border-radius, opacity, box-shadow; }
+  /* Bez `width` i `padding`: szerokosc animuje wylacznie obudowa doku. Gdy robil to takze
+     kazdy przycisk osobno, przy rozwijaniu kazdy pecznial od wlasnego srodka i widac bylo
+     dwa niezalezne ruchy zamiast jednego. Zostaje to, co nalezy do samego przycisku. */
+  .quick-action { transition-property: transform, background, border-radius, opacity, box-shadow; }
   .quick-action:nth-child(1) { transition-delay: .05s; }
   .quick-action:nth-child(2) { transition-delay: .11s; }
 
