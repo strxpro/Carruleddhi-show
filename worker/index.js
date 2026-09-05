@@ -1715,9 +1715,29 @@ async function askModel(env, deck, history, question, imageUrl = '', locale = 'i
     }
     // ESCALATE to nie awaria, tylko model robiacy dokladnie to, o co go poproszono.
     noteModelFailure('');
-    /* Porównanie dokładne, nie `includes`. Model, który w poprawnej odpowiedzi wspomniał to
-       słowo, tracił całą odpowiedź i wątek szedł do człowieka bez powodu. */
-    return answer.toUpperCase().replace(/[^A-Z]/g, '') === 'ESCALATE' ? null : answer;
+    /* SLOWO ESCALATE WYCIEKALO DO ROZMOWY.
+       -------------------------------------------------------------------------
+       Porownanie bylo dokladne: cala odpowiedz musiala skladac sie z tego jednego slowa.
+       Wtedy — i tylko wtedy — watek szedl do czlowieka. Powod byl dobry: `includes`
+       zabieralby poprawna odpowiedz, w ktorej model wspomnial to slowo mimochodem.
+
+       Ale model robi trzecia rzecz, ktorej nikt tu nie przewidzial: ODPOWIADA I DOPISUJE
+       ESCALATE NA KONCU. Zmierzone na produkcji, prawdziwe odpowiedzi:
+
+         „Glosowanie publicznosci jest juz zamkniete. ESCALATE"
+         „Wystarczy wpisac swoj adres e-mail w formularzu newslettera (...). ESCALATE"
+
+       Odwiedzajacy widzial wtedy w oknie czatu slowo ESCALATE. Zadne z dwoch zachowan nie
+       bylo tym, o co chodzi: odpowiedz JEST, wiec nie ma po co budzic czlowieka, ale slowa
+       nie wolno pokazac.
+
+       Teraz znacznik jest WYCINANY, a decyzja zapada po tym, co zostalo. Zostala tresc —
+       oddajemy tresc. Zostalo mniej niz kilka znakow — to bylo samo ESCALATE, czyli watek
+       idzie do czlowieka. `ESCALATE` nie wystepuje w zadnym jezyku tej strony jako zwykle
+       slowo, wiec wyciecie nie ma jak zepsuc prawdziwej odpowiedzi. */
+    const bezZnacznika = answer.replace(/ESCALATE[\s.:!—-]*/gi, '').trim();
+    if (bezZnacznika.length < 3) return null;
+    return bezZnacznika;
   } catch (error) {
     /* AbortSignal.timeout rzuca TimeoutError, reszta to zwykle DNS albo zerwane
        polaczenie — sama nazwa bledu wystarczy, zeby je rozroznic. */
