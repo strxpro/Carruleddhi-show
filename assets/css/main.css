@@ -1672,6 +1672,23 @@ html.has-custom-cursor:has(dialog[open]) .cursor-ring { opacity: 0 !important; }
   .site-header .nav-live { max-width: none; padding-inline: 10px; }
   .site-header .nav-live [data-i18n] { display: none; }
   .site-header .nav-attend { max-width: 30vw; padding-inline: 7px; }
+
+  /* PRZY 320 px BRAKUJE OKOLO DWUDZIESTU PIECIU PIKSELI I MUSZA SKADS PRZYJSC.
+     ---------------------------------------------------------------------------
+     Zmierzone na produkcji przy 320 px: zawartosc paska konczyla sie na 324, a sam pasek
+     na 310 — przycisk menu wychodzil poza obie te krawedzie. Skladniki: znak firmowy 112,
+     wybor jezyka 52, „bede tam" 62, menu 52, do tego cztery odstepy i wypelnienie.
+
+     Oddaje wybor jezyka: zostaje sama flaga, znikaja dwie litery kodu i strzalka. Flaga
+     niesie te sama informacje i jest tym, w co sie celuje palcem — kod „PL" obok niej
+     powtarza to samo slowami. Dwadziescia kilka pikseli wraca do paska i wszystko sie
+     miesci, bez ruszania przyciskow, ktore sa czynnosciami.
+
+     320 px to najwezszy telefon, jaki jeszcze chodzi (iPhone SE pierwszej generacji);
+     powyzej tej szerokosci kod jezyka zostaje na swoim miejscu. */
+  .site-header .language-picker__code,
+  .site-header .language-picker__trigger svg { display: none; }
+  .site-header .language-picker__trigger { padding-inline: 8px; }
 }
 .menu-toggle {
   display: inline-flex !important;
