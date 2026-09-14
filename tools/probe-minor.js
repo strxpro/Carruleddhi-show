@@ -59,7 +59,7 @@
   };
   fill('firstName', 'Marco');
   fill('lastName', 'Rossi');
-  fill('postalCode', '07028');
+  fill('town', 'Santa Teresa Gallura');
   fill('email', 'marco@example.com');
   fill('phone', '+39 320 000 0000');
   fill('address', 'Via Roma 1, Santa Teresa Gallura');
@@ -84,8 +84,8 @@
   await sleep(700);
   const adultSent = window.__sent;
   out.adultPayload = adultSent ? {
-    hasPostalCode: 'postalCode' in adultSent,
-    postalCode: adultSent.postalCode,
+    hasTown: 'town' in adultSent,
+    town: adultSent.town,
     hasTaxCode: 'taxCode' in adultSent,
     isMinor: adultSent.isMinor,
     riderAge: adultSent.riderAge,
@@ -99,7 +99,7 @@
 
   fill('firstName', 'Sara');
   fill('lastName', 'Rossi');
-  fill('postalCode', '07028');
+  fill('town', 'Santa Teresa Gallura');
   fill('email', 'sara@example.com');
   fill('phone', '+39 320 111 1111');
   fill('address', 'Via Roma 2, Santa Teresa Gallura');
@@ -140,7 +140,7 @@
     guardianEmail: minorSent.guardianEmail,
     guardianConsent: minorSent.guardianConsent,
     motherName: minorSent.motherName,
-    postalCode: minorSent.postalCode
+    town: minorSent.town
   } : 'NOT SENT';
 
   out.docWidth = document.documentElement.scrollWidth;

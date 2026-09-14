@@ -20,7 +20,7 @@ const roster = [
   {
     id: '11111111-1111-4111-8111-111111111111',
     createdAt: '2026-08-01T10:00:00Z', raceNumber: '041', firstName: 'Marco', lastName: 'Rossi',
-    birthDate: '1994-04-12', postalCode: '07028', email: 'marco@example.com', phone: '+39 333',
+    birthDate: '1994-04-12', town: 'Santa Teresa Gallura', email: 'marco@example.com', phone: '+39 333',
     address: 'Via Roma 4', cartName: 'Fulmine di Gallura', category: 'classic', teamName: '',
     cartNotes: '', locale: 'it', status: 'ok', emailStatus: 'sent', printedAt: null,
     selfUpdatedAt: null, emailGroupSize: 1, isMinor: false, riderAge: 32, guardian: null
@@ -28,7 +28,7 @@ const roster = [
   {
     id: '22222222-2222-4222-8222-222222222222',
     createdAt: '2026-08-02T10:00:00Z', raceNumber: '042', firstName: 'Sara', lastName: 'Bianchi',
-    birthDate: '2012-03-04', postalCode: '07028', email: 'sara@example.com', phone: '+39 334',
+    birthDate: '2012-03-04', town: 'Santa Teresa Gallura', email: 'sara@example.com', phone: '+39 334',
     address: 'Via Verdi 9', cartName: 'Stella', category: 'junior', teamName: '',
     cartNotes: '', locale: 'it', status: 'ok', emailStatus: 'sent', printedAt: null,
     selfUpdatedAt: null, emailGroupSize: 1, isMinor: true, riderAge: 14, guardian: null
@@ -37,7 +37,7 @@ const roster = [
     /* Zapisany BEZ numeru startowego — ma się pokazać z adnotacją, a nie zniknąć. */
     id: '33333333-3333-4333-8333-333333333333',
     createdAt: '2026-08-03T10:00:00Z', raceNumber: null, firstName: 'Luca', lastName: 'Verdi',
-    birthDate: '1990-01-01', postalCode: '07028', email: 'luca@example.com', phone: '+39 335',
+    birthDate: '1990-01-01', town: 'Santa Teresa Gallura', email: 'luca@example.com', phone: '+39 335',
     address: 'Via Dante 1', cartName: 'Tuono', category: 'classic', teamName: '',
     cartNotes: '', locale: 'it', status: 'ok', emailStatus: 'sent', printedAt: null,
     selfUpdatedAt: null, emailGroupSize: 1, isMinor: false, riderAge: 36, guardian: null

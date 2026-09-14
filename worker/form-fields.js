@@ -29,7 +29,7 @@ export const FORM_FIELDS = {
    "frameY": 704.6,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 661.72,
    "width": 252.28,
@@ -127,7 +127,7 @@ export const FORM_FIELDS = {
    "frameY": 709.55,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 685.38,
    "width": 413.78,
@@ -249,7 +249,7 @@ export const FORM_FIELDS = {
    "frameY": 664.05,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
@@ -347,7 +347,7 @@ export const FORM_FIELDS = {
    "frameY": 683.71,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 659.54,
    "width": 413.78,
@@ -469,7 +469,7 @@ export const FORM_FIELDS = {
    "frameY": 664.05,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
@@ -567,7 +567,7 @@ export const FORM_FIELDS = {
    "frameY": 683.71,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 659.54,
    "width": 413.78,
@@ -689,7 +689,7 @@ export const FORM_FIELDS = {
    "frameY": 651.99,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 609.11,
    "width": 252.28,
@@ -787,7 +787,7 @@ export const FORM_FIELDS = {
    "frameY": 673.51,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 649.35,
    "width": 413.78,
@@ -909,7 +909,7 @@ export const FORM_FIELDS = {
    "frameY": 664.05,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
@@ -1007,7 +1007,7 @@ export const FORM_FIELDS = {
    "frameY": 673.51,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 649.35,
    "width": 413.78,
@@ -1129,7 +1129,7 @@ export const FORM_FIELDS = {
    "frameY": 664.05,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 621.17,
    "width": 252.28,
@@ -1227,7 +1227,7 @@ export const FORM_FIELDS = {
    "frameY": 683.71,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 659.54,
    "width": 413.78,
@@ -1349,7 +1349,7 @@ export const FORM_FIELDS = {
    "frameY": 704.6,
    "frameH": 13.39
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 34.02,
    "y": 661.72,
    "width": 252.28,
@@ -1447,7 +1447,7 @@ export const FORM_FIELDS = {
    "frameY": 709.55,
    "frameH": 14.31
   },
-  "POSTAL_CODE": {
+  "TOWN": {
    "x": 153.07,
    "y": 685.38,
    "width": 413.78,

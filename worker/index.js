@@ -206,7 +206,7 @@ const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 const FIELD_WHITELIST = {
   common: ['type', 'event', 'eventDate', 'locale', 'source', 'submittedAt'],
   registration: [
-    'firstName', 'lastName', 'birthDate', 'postalCode', 'email', 'phone', 'address',
+    'firstName', 'lastName', 'birthDate', 'town', 'email', 'phone', 'address',
     'cartName', 'category', 'teamName', 'cartNotes', 'rulesConsent', 'privacyConsent', 'newsConsent',
     // Riders under 18 on the day of the event. `isMinor` and `riderAge` always
     // travel; the rest only when the rider is a minor. See validate().
@@ -231,7 +231,7 @@ const FIELD_WHITELIST = {
      entry plus a withdrawal rather than a silent swap. See ROSTER_EDITABLE. */
   roster: [
     'action', 'id', 'since', 'limit',
-    'firstName', 'lastName', 'birthDate', 'postalCode', 'phone', 'address',
+    'firstName', 'lastName', 'birthDate', 'town', 'phone', 'address',
     'cartName', 'teamName', 'cartNotes', 'category', 'raceNumber', 'status'
   ],
   // Reminders and the newsletter. `list` names which one and is checked against a fixed set.
@@ -406,7 +406,7 @@ const FIELD_WHITELIST = {
     'email', 'code', 'action',
     // Which rider on this address, when there is more than one. See findEntry.
     'entryId',
-    'phone', 'address', 'postalCode', 'cartName', 'category', 'teamName', 'cartNotes',
+    'phone', 'address', 'town', 'cartName', 'category', 'teamName', 'cartNotes',
     /* `wantsPrint` wypadalo w sanitizacji, wiec zaznaczenie „chce wydruk" przy samodzielnej
        edycji zgloszenia nie mialo ZADNEGO skutku — formularz meldowal zapis, kolumna zostawala
        stara. Znalezione przez tools/check-payload-fields.mjs. */
@@ -4922,7 +4922,7 @@ async function unsubConfirm(env, payload, cors) {
    ========================================================================== */
 
 const ROSTER_COLUMNS = [
-  'id', 'created_at', 'race_number', 'first_name', 'last_name', 'birth_date', 'postal_code',
+  'id', 'created_at', 'race_number', 'first_name', 'last_name', 'birth_date', 'town',
   'email', 'phone', 'address', 'cart_name', 'category', 'team_name', 'cart_notes', 'locale',
   'status', 'email_status', 'printed_at', 'self_updated_at',
   'is_minor', 'rider_age', 'child_kind', 'guardian_relation', 'guardian_name',
@@ -4939,7 +4939,7 @@ function rosterRow(row) {
     firstName: row.first_name,
     lastName: row.last_name,
     birthDate: row.birth_date || '',
-    postalCode: row.postal_code || '',
+    town: row.town || '',
     email: row.email,
     phone: row.phone || '',
     address: row.address || '',
@@ -4989,7 +4989,7 @@ const ROSTER_EDITABLE = {
   firstName: 'first_name',
   lastName: 'last_name',
   birthDate: 'birth_date',
-  postalCode: 'postal_code',
+  town: 'town',
   phone: 'phone',
   address: 'address',
   cartName: 'cart_name',
@@ -5270,7 +5270,7 @@ async function findEntries(env, email) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/registrations`);
   url.searchParams.set(
     'select',
-    'id,race_number,first_name,last_name,email,phone,address,postal_code,'
+    'id,race_number,first_name,last_name,email,phone,address,town,'
     + 'cart_name,category,team_name,cart_notes,locale,status,is_minor,created_at,self_updated_at,'
     + 'wants_print'
   );
@@ -5540,7 +5540,7 @@ async function entryManage(env, payload, cors) {
         email: maskEmail(row.email),
         phone: row.phone || '',
         address: row.address || '',
-        postalCode: row.postal_code || '',
+        town: row.town || '',
         cartName: row.cart_name || '',
         category: row.category || 'classic',
         teamName: row.team_name || '',
@@ -5649,7 +5649,7 @@ async function entryManage(env, payload, cors) {
   };
   setText('phone', 'phone', 40);
   setText('address', 'address', 300);
-  setText('postalCode', 'postal_code', 12);
+  setText('town', 'town', 80);
   setText('cartName', 'cart_name', 120);
   setText('teamName', 'team_name', 120);
   setText('cartNotes', 'cart_notes', 1000);
@@ -5706,7 +5706,7 @@ async function entryManage(env, payload, cors) {
     firstName: row.first_name,
     lastName: row.last_name,
     birthDate: row.birth_date || '',
-    postalCode: patchRow.postal_code ?? row.postal_code ?? '',
+    town: patchRow.town ?? row.town ?? '',
     email: row.email,
     phone: patchRow.phone ?? row.phone ?? '',
     address: patchRow.address ?? row.address ?? '',
@@ -6944,7 +6944,7 @@ async function storeIntake(env, request, type, payload) {
     first_name: trimmed(payload.firstName, ''),
     last_name: trimmed(payload.lastName, ''),
     birth_date: trimmed(payload.birthDate),
-    postal_code: trimmed(payload.postalCode),
+    town: trimmed(payload.town),
     email: String(payload.email || '').trim().toLowerCase(),
     phone: trimmed(payload.phone),
     address: trimmed(payload.address),
@@ -9889,7 +9889,7 @@ function ageOn(birthISO, onDate) {
 
 function validate(type, payload, env) {
   if (type === 'registration') {
-    const required = ['firstName', 'lastName', 'email', 'phone', 'address', 'cartName', 'birthDate', 'postalCode'];
+    const required = ['firstName', 'lastName', 'email', 'phone', 'address', 'cartName', 'birthDate', 'town'];
     const missing = required.filter((key) => !payload[key]);
     if (missing.length) return `Missing fields: ${missing.join(', ')}`;
     if (!EMAIL_PATTERN.test(payload.email)) return 'Invalid email';

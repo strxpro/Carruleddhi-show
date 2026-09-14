@@ -1261,3 +1261,16 @@ tłumaczenie kiedyś wydłużyło krok, treść nadal będzie osiągalna przewij
 **Na ekranach niższych niż ~840 px kroki 1 i 2 nadal wymagają przewinięcia.**
 Zmierzone przy 390×780: krok 1 kończy się na 805 px. Dalsze upychanie oznaczałoby
 pola tak ciasne, że trudno w nie trafić palcem, więc tego nie zrobiłem.
+
+## CAP zamieniony na miejscowość (14.09.2026)
+
+Pole „CAP" (kod pocztowy) zniknęło — formularz pyta teraz o **miejscowość**
+(`town`; it „Comune", pl „Miejscowość", en „Town / city", de „Wohnort",
+es „Localidad", fr „Localité"). Zmiana objęła formularz zapisu i samodzielną
+edycję zgłoszenia, walidator Workera, bazę (kolumna `town`, migracja
+`0046_registrations_town.sql`), mail potwierdzający, dwanaście PDF-ów, panel
+admina i wiadomość WhatsApp w Make (linia „📍 miejscowość", tylko gdy podana).
+
+Kolumna `postal_code` została w bazie jako archiwalna — nowe zgłoszenia jej nie
+wypełniają, stare zachowują swój kod. Uwaga do sekcji 19 wyżej: zapis
+o `postalCode` jest nieaktualny.

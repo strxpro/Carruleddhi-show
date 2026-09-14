@@ -53,7 +53,7 @@ export function formValues(row) {
     RACE_NUMBER: String(row.race_number ?? '').padStart(3, '0'),
     FULL_NAME: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
     BIRTH_DATE: formatDate(row.birth_date),
-    POSTAL_CODE: row.postal_code || '',
+    TOWN: row.town || '',
     PHONE: row.phone || '',
     EMAIL: row.email || '',
     ADDRESS: row.address || '',

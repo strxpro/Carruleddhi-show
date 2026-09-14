@@ -113,7 +113,7 @@ export interface RosterRow {
   firstName: string;
   lastName: string;
   birthDate: string;
-  postalCode: string;
+  town: string;
   email: string;
   phone: string;
   address: string;
@@ -141,7 +141,7 @@ export interface RosterEdit {
   firstName?: string;
   lastName?: string;
   birthDate?: string;
-  postalCode?: string;
+  town?: string;
   phone?: string;
   address?: string;
   cartName?: string;

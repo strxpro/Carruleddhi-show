@@ -76,7 +76,7 @@ const probe = `
     fill('firstName', 'Marco');
     fill('lastName', 'Rossi');
     fill('birthDate', '1990-05-05');
-    fill('postalCode', '07028');
+    fill('town', 'Santa Teresa Gallura');
     fill('email', 'ktos@example.com');
     fill('phone', '+39 333 111 222');
     fill('address', 'Via Verdi 1');

@@ -17,7 +17,7 @@ Jeden dokument, jeden zestaw placeholderów, dwie kopie na wyjściu:
 ## Placeholdery wartości (nie tłumaczą się)
 
 ```
-{{RACE_NUMBER}}   {{FULL_NAME}}    {{BIRTH_DATE}}   {{POSTAL_CODE}}
+{{RACE_NUMBER}}   {{FULL_NAME}}    {{BIRTH_DATE}}   {{TOWN}}
 {{ADDRESS}}       {{EMAIL}}        {{PHONE}}
 {{CART_NAME}}     {{CATEGORY}}     {{TEAM}}         {{CART_NOTES}}
 {{SUBMITTED_AT}}  {{GENERATED_AT}} {{LOCALE_UPPER}}
@@ -27,7 +27,7 @@ Jeden dokument, jeden zestaw placeholderów, dwie kopie na wyjściu:
 
 ```
 {{L_DOC_TITLE}}  {{L_SECTION_RIDER}}  {{L_SECTION_CART}}  {{L_SECTION_DECL}}
-{{L_FULL_NAME}}  {{L_BIRTH_DATE}}     {{L_POSTAL_CODE}}      {{L_ADDRESS}}
+{{L_FULL_NAME}}  {{L_BIRTH_DATE}}     {{L_F_TOWN}}      {{L_ADDRESS}}
 {{L_EMAIL}}      {{L_PHONE}}          {{L_CART_NAME}}     {{L_CATEGORY}}
 {{L_TEAM}}       {{L_NOTES}}          {{L_NUMBER}}        {{L_DECL_BODY}}
 {{L_SIGN_PLACE}} {{L_SIGN_DATE}}      {{L_SIGN_RIDER}}    {{L_SIGN_GUARDIAN}}
@@ -48,7 +48,7 @@ CARRULEDDHI SHOW 2026                        │  N. {{RACE_NUMBER}}  │
 ── {{L_SECTION_RIDER}} ─────────────────────────────────────────────
 {{L_FULL_NAME}}:   {{FULL_NAME}}
 {{L_BIRTH_DATE}}:  {{BIRTH_DATE}}
-{{L_POSTAL_CODE}}:    {{POSTAL_CODE}}
+{{L_F_TOWN}}:    {{TOWN}}
 {{L_ADDRESS}}:     {{ADDRESS}}
 {{L_EMAIL}}:       {{EMAIL}}
 {{L_PHONE}}:       {{PHONE}}
@@ -83,7 +83,7 @@ ______________________________            ______________________________
 | `L_SECTION_DECL` | DICHIARAZIONE E LIBERATORIA |
 | `L_FULL_NAME` | Nome e cognome |
 | `L_BIRTH_DATE` | Data di nascita |
-| `L_POSTAL_CODE` | CAP |
+| `L_F_TOWN` | Comune (miejscowość) |
 | `L_ADDRESS` | Indirizzo |
 | `L_EMAIL` | E-mail |
 | `L_PHONE` | Telefono |

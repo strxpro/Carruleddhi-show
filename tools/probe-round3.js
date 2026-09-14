@@ -78,11 +78,11 @@ async (doc, win) => {
   out.flip.quickLabel = (doc.querySelector('[data-attendance-quick-label]').textContent || '').trim();
   out.flip.signupLabel = (doc.querySelector('.quick-action--signup span[data-i18n]').textContent || '').trim();
 
-  /* --------------------------------------------------------------- postal code */
-  const postal = doc.querySelector('[name="postalCode"]');
+  /* ------------------------------------------------------------------- town */
+  const postal = doc.querySelector('[name="town"]');
   out.postal = postal ? {
     exists: true,
-    label: (doc.querySelector('label[for="postal-code"]').textContent || '').trim(),
+    label: (doc.querySelector('label[for="town"]').textContent || '').trim(),
     autocomplete: postal.getAttribute('autocomplete'),
     taxCodeGone: !doc.querySelector('[name="taxCode"]')
   } : { exists: false };

@@ -406,7 +406,7 @@ function EditDialog({
     firstName: row.firstName,
     lastName: row.lastName,
     birthDate: row.birthDate,
-    postalCode: row.postalCode,
+    town: row.town,
     phone: row.phone,
     address: row.address,
     cartName: row.cartName,
@@ -482,7 +482,7 @@ function EditDialog({
           {field(pl ? 'Imię' : 'Nome', 'firstName')}
           {field(pl ? 'Nazwisko' : 'Cognome', 'lastName')}
           {field(pl ? 'Data urodzenia' : 'Data di nascita', 'birthDate', 'date')}
-          {field(pl ? 'Kod pocztowy' : 'CAP', 'postalCode')}
+          {field(pl ? 'Miejscowość' : 'Comune', 'town')}
           {field(pl ? 'Telefon' : 'Telefono', 'phone')}
           {field(pl ? 'Numer startowy' : 'Numero di partenza', 'raceNumber')}
           {field(pl ? 'Adres' : 'Indirizzo', 'address')}

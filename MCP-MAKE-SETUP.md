@@ -3,7 +3,7 @@
 > ## ⚠️ TEN PLIK JEST NIEAKTUALNY. NIE IDŹ ZA NIM.
 >
 > Opisuje architekturę, której już nie ma: Cloudflare Workers (jest Vercel), Arkusze Google
-> (jest Supabase), Brevo (jest SMTP OVH), pole `taxCode` (jest `postalCode`), pięć endpointów
+> (jest Supabase), Brevo (jest SMTP OVH), pole `taxCode` (jest `town` — miejscowość; wcześniej `postalCode`), pięć endpointów
 > (jest kilkanaście), dwa scenariusze w Make (jest jeden).
 >
 > **Aktualne instrukcje:**

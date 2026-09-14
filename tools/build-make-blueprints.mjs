@@ -11,7 +11,7 @@
  *
  * Sheet layout assumed by both blueprints (same header row in every tab):
  *   A submittedAt  B locale   C raceNumber  D firstName  E lastName
- *   F birthDate    G postalCode  H email    I phone      J address
+ *   F birthDate    G town        H email    I phone      J address
  *   K cartName     L category M teamName    N cartNotes  O newsConsent
  *   P rulesConsent Q lastReminder
  */
@@ -653,7 +653,7 @@ function wrap(name, flow, instant) {
 const HEADERS = {
   Registrations: [
     'created_at', 'race_number', 'first_name', 'last_name', 'birth_date',
-    'postal_code', 'email', 'phone', 'address', 'cart_name', 'category',
+    'town', 'email', 'phone', 'address', 'cart_name', 'category',
     'team_name', 'cart_notes', 'locale', 'rules_consent', 'privacy_consent',
     'news_consent', 'status', 'pdf_it_url', 'pdf_translated_url', 'email_status',
     'printed_at',
@@ -702,7 +702,7 @@ const regRow = row('Registrations', {
   first_name: '{{1.firstName}}',
   last_name: '{{1.lastName}}',
   birth_date: '{{1.birthDate}}',
-  postal_code: '{{1.postalCode}}',
+  town: '{{1.town}}',
   email: '{{lower(1.email)}}',
   phone: '{{1.phone}}',
   address: '{{1.address}}',

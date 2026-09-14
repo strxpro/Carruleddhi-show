@@ -49,7 +49,7 @@ function payloadFor({ locale, isMinor }) {
     lastName: 'Rossi',
     fullName: `${first} Rossi`,
     birthDateLabel: isMinor ? '04.03.2012' : '12.04.1994',
-    postalCode: '07028',
+    town: 'Santa Teresa Gallura',
     email: 'marco.rossi@example.com',
     emailLower: 'marco.rossi@example.com',
     phone: '+39 333 111 2233',

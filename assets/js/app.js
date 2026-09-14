@@ -4223,10 +4223,10 @@ import {
       firstName: String(raw.firstName || '').trim(),
       lastName: String(raw.lastName || '').trim(),
       birthDate: String(raw.birthDate || ''),
-      // Was `taxCode` here long after the field became a postal code, so the
-      // payload carried an empty tax code and no postal code at all — and the
-      // Worker requires postalCode, which made every submit fail with 422.
-      postalCode: String(raw.postalCode || '').trim().toUpperCase(),
+      // Was `taxCode` (later `postalCode`) here long after the field changed, so the
+      // payload carried an empty value and no town at all — and the
+      // Worker requires town, which made every submit fail with 422.
+      town: String(raw.town || '').trim().replace(/\s+/g, ' '),
       email: String(raw.email || '').trim().toLowerCase(),
       phone: String(raw.phone || '').trim(),
       address: String(raw.address || '').trim(),
@@ -4966,7 +4966,7 @@ import {
             if (field) field.value = value || '';
           };
           put('#entry-phone', entry.phone);
-          put('#entry-postal', entry.postalCode);
+          put('#entry-town', entry.town);
           put('#entry-address', entry.address);
           put('#entry-cart', entry.cartName);
           put('#entry-team', entry.teamName);
@@ -5002,7 +5002,7 @@ import {
           action: 'update',
           entryId: selectedEntryId,
           phone: $('#entry-phone', panel)?.value || '',
-          postalCode: $('#entry-postal', panel)?.value || '',
+          town: $('#entry-town', panel)?.value || '',
           address: $('#entry-address', panel)?.value || '',
           cartName: $('#entry-cart', panel)?.value || '',
           teamName: $('#entry-team', panel)?.value || '',

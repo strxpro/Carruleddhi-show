@@ -47,7 +47,7 @@ w mailu.
 
 **Zgłoszenie — wpisane przez człowieka w formularzu** (24)
 
-`firstName` · `lastName` · `birthDate` · `postalCode` · `email` · `phone` · `address` ·
+`firstName` · `lastName` · `birthDate` · `town` · `email` · `phone` · `address` ·
 `cartName` · `category` · `teamName` · `cartNotes` · `rulesConsent` · `privacyConsent` ·
 `newsConsent` · `isMinor` · `riderAge` · `childKind` · `guardianRelation` · `guardianName` ·
 `guardianEmail` · `guardianPhone` · `motherName` · `fatherName` · `guardianConsent`

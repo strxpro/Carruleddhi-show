@@ -39,7 +39,7 @@ export const COPY_DECK = {
     "labels": {
       "fullName": "Nome e cognome",
       "birthDate": "Data di nascita",
-      "postalCode": "CAP",
+      "town": "Comune",
       "email": "E-mail",
       "phone": "Telefono",
       "address": "Indirizzo",
@@ -219,7 +219,7 @@ export const COPY_DECK = {
     "labels": {
       "fullName": "Imię i nazwisko",
       "birthDate": "Data urodzenia",
-      "postalCode": "CAP",
+      "town": "Miejscowość",
       "email": "E-mail",
       "phone": "Telefon",
       "address": "Adres",
@@ -399,7 +399,7 @@ export const COPY_DECK = {
     "labels": {
       "fullName": "Full name",
       "birthDate": "Date of birth",
-      "postalCode": "Postal code",
+      "town": "Town / city",
       "email": "Email",
       "phone": "Phone",
       "address": "Address",
@@ -579,7 +579,7 @@ export const COPY_DECK = {
     "labels": {
       "fullName": "Vor- und Nachname",
       "birthDate": "Geburtsdatum",
-      "postalCode": "Postleitzahl",
+      "town": "Wohnort",
       "email": "E-Mail",
       "phone": "Telefon",
       "address": "Adresse",
@@ -759,7 +759,7 @@ export const COPY_DECK = {
     "labels": {
       "fullName": "Nombre y apellidos",
       "birthDate": "Fecha de nacimiento",
-      "postalCode": "Código postal",
+      "town": "Localidad",
       "email": "Correo",
       "phone": "Teléfono",
       "address": "Dirección",
@@ -939,7 +939,7 @@ export const COPY_DECK = {
     "labels": {
       "fullName": "Nom et prénom",
       "birthDate": "Date de naissance",
-      "postalCode": "Code postal",
+      "town": "Localité",
       "email": "E-mail",
       "phone": "Téléphone",
       "address": "Adresse",
