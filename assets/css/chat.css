@@ -77,7 +77,7 @@
 }
 
 /* ------------------------------------------------------------------- shell */
-.chat { display: flex; flex-direction: column; gap: 12px; }
+.chat { display: flex; flex-direction: column; gap: 12px; overflow-anchor: none; }
 
 /* ============================================================================
    STAŁA WYSOKOŚĆ PANELU ROZMOWY — TO JEST NAPRAWA „DOTKNIĘCIE POLA PRZERZUCA
@@ -505,6 +505,8 @@
 }
 
 .chat-gate__form { display: grid; gap: 12px; }
+.chat-gate__form [hidden] { display: none; }
+.chat-gate__form .chat__system { grid-column: 1 / -1; }
 
 /* Adres, który już znamy: karta potwierdzenia zamiast dwóch pustych pól.
    ---------------------------------------------------------------------------
@@ -1024,6 +1026,29 @@
   font-weight: 700;
   overflow-wrap: anywhere;
 }
+
+.chat__summary dd:not(.chat__summary-shot) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.chat__summary-edit {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid rgb(7 26 61 / .25);
+  border-radius: 10px;
+  background: #fff;
+  color: #071a3d;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.chat__summary-edit:focus-visible { outline: 3px solid #ffc928; outline-offset: 2px; }
+.chat__summary-edit:disabled { opacity: .5; cursor: default; }
 
 /* Miniatura dołączonego zdjęcia. Wpuszczona przez całą szerokość siatki (`grid-column: 1 / -1`),
    bo obraz obok etykiety byłby wysoki na jeden wiersz tekstu i nie dałoby się na nim niczego

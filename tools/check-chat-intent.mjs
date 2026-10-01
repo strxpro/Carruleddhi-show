@@ -35,6 +35,7 @@ const between = (from, to) => {
 };
 
 const zrodlo = [
+  between('function normalizeIntent(value)', 'const HUMAN_SURE = ['),
   between('const DATA_INTENTS = [', 'const DATA_INTENT_PATTERNS'),
   between('const DATA_INTENT_PATTERNS', '/* Słowa, bez których'),
   between('const DATA_SELF_PATTERNS', '/* DRUGI SYGNAŁ TYLKO'),
@@ -70,6 +71,27 @@ const PROBKI = [
   // zmiana danych — wymaga wskazania siebie
   ['edit', 'chce zmienic numer telefonu w moim zgloszeniu'],
   ['edit', 'vorrei correggere i miei dati'],
+  ['edit', 'Remove my phone number'],
+  ['edit', 'Usuń mój numer telefonu'],
+  ['withdraw', 'USUŃ MOJE ZGŁOSZENIE'],
+  ['identity', 'Chcę zmienić nazwisko'],
+  ['identity', 'cambiare nome'],
+  ['identity', 'Change my email'],
+  ['edit', 'Change my cart name'],
+  ['edit', 'Change my team name'],
+  [null, 'Subscribe to the newsletter'],
+  [null, 'Jak zapisać się na newsletter?'],
+  [null, 'Do not cancel my registration'],
+  [null, 'Nie chcę wycofać się z wyścigu'],
+  [null, 'Do not unsubscribe me from notifications'],
+  ['notifications', 'Unsubscribe me from newsletter'],
+  [null, 'Please do not unsubscribe me from the newsletter.'],
+  [null, 'Non voglio cancellare la mia iscrizione'],
+  [null, 'Je ne veux pas annuler mon inscription'],
+  [null, 'Change my wheels before the race'],
+  ['edit', 'ÄNDERN meine Daten'],
+  ['edit', 'Chcę zmienić numer telefonu, nie nazwisko'],
+  ['withdraw', 'Chcę wycofać moje zgłoszenie, nie mogę przyjechać'],
   // powiadomienia — jednoznaczne same z siebie
   ['notifications', 'nie chce powiadomien'],
   ['notifications', 'non voglio piu le notifiche'],

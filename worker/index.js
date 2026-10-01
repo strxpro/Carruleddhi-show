@@ -15,6 +15,7 @@
  *   WALL_SALT          secret, optional — salt for the stored IP hash
  */
 import { COPY_DECK } from './copy-deck.js';
+import { broadcastPublic, broadcastAdmin, broadcastCommand, prepareBroadcastLogos, cleanBroadcastSponsor, broadcastSponsorBaseline, isMissingTimingColumn } from './broadcast.js';
 /* Przepisanie wiersza na pola formularza i token do niego — wspólne dla strony do druku
    (printableForm niżej) i dla wypełnionego PDF-a w załączniku (api/form-pdf.js). Dwie kopie
    tej reguły to pierwsze miejsce, w którym link i załącznik zaczęłyby mówić co innego. */
@@ -23,6 +24,7 @@ import { EMAIL_TEMPLATES } from './email-templates.js';
 import { PRINT_TEMPLATES, PRINT_WORDING, PRINT_DATA_KEYS } from './print-templates.js';
 
 const ALLOWED_TYPES = new Set([
+  'broadcast', 'broadcast-admin',
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
   /* Statystyki odwiedzin. `visit` to sonda ze strony — publiczna, bo wysyła ją przeglądarka
      zwiedzającego; `stats` to odczyt dla panelu, za tym samym hasłem co reszta panelu. */
@@ -134,6 +136,7 @@ const ALLOWED_TYPES = new Set([
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
 const SUPABASE_TYPES = new Set([
+  'broadcast', 'broadcast-admin',
   'visit', 'stats',
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
@@ -184,6 +187,7 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * admin.html as well before using this on a public hostname.
  */
 const PROTECTED_TYPES = new Set([
+  'broadcast-admin',
   'roster', 'subscribers',
   'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge',
   'voting-admin',
@@ -204,6 +208,8 @@ const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
 /** Only these keys are forwarded. Anything else is dropped, not rejected. */
 const FIELD_WHITELIST = {
+  broadcast: ['action'],
+  'broadcast-admin': ['action', 'id', 'mode', 'enabled', 'sponsor', 'ids', 'image', 'expectedSponsor'],
   common: ['type', 'event', 'eventDate', 'locale', 'source', 'submittedAt'],
   registration: [
     'firstName', 'lastName', 'birthDate', 'town', 'email', 'phone', 'address',
@@ -278,7 +284,7 @@ const FIELD_WHITELIST = {
      `sponsor-leads`, `sponsor-approve`, `sponsor-reject`). Bez nich sanitizacja wyrzuca je
      po cichu, `sponsor-approve` widzi puste `id` i odmawia tak, jakby panel przysłał
      śmieci — awaria wyglądająca jak działający przycisk, który zawsze mówi „nie". */
-  'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit'],
+  'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit', 'expectedSponsors'],
 
   /* TRANSMISJA. BRAK TEGO WPISU UNIERUCHOMIL CALA ZAKLADKE, MELDUJAC SUKCES.
      =========================================================================
@@ -415,7 +421,7 @@ const FIELD_WHITELIST = {
   voting: ['action', 'participantId', 'name', 'email', 'deviceId', 'score', 'editToken', 'edition', 'notifyResults'],
   'voting-admin': [
     'action', 'id', 'registrationId', 'category', 'startNumber', 'firstName', 'lastName',
-    'projectName', 'imagePath', 'active', 'raceStartsAt', 'durationMinutes', 'status', 'photo',
+    'projectName', 'imagePath', 'active', 'raceStartsAt', 'durationMinutes', 'status', 'photo', 'raceTimeMs',
     /* Werdykt jury: akcje `prizes` (odczyt) i `prize-set` (zapis jednej nagrody). Bez tych
        czterech pól sanitizePayload wyrzuca je po cichu, handler widzi puste napisy i odmawia
        tak, jakby organizator przysłał śmieci — a puste `participantId` razem z pustym
@@ -444,7 +450,7 @@ const MAX_PHOTO_BODY_BYTES = 1536 * 1024;
    „photo" nic by nie znaczyło — zgłoszenie sponsora nie ma zdjęcia, ma logo. Gdyby ten
    klucz tu nie stał, sanitizacja przycięłaby obrazek do 3000 znaków i `decodePhoto`
    odmówiłby formatu, którego nikt nie przysłał. */
-const LONG_FIELDS = new Set(['photo', 'logo']);
+const LONG_FIELDS = new Set(['photo', 'logo', 'image']);
 
 /**
  * Pola, w których nowa linia jest treścią, a nie śmieciem.
@@ -473,7 +479,7 @@ const MULTILINE_FIELDS = new Set(['text', 'message', 'cartNotes']);
  * porządnego sprawdzenia, znaczy wpuszczenie dowolnej struktury z internetu prosto
  * do handlera. `settings` jest tu dlatego, że `cleanSettings()` bada go pole po polu.
  */
-const OBJECT_FIELDS = new Set(['settings']);
+const OBJECT_FIELDS = new Set(['settings', 'sponsor']);
 const RATE_LIMIT_MAX = 6;
 const RATE_LIMIT_WINDOW_SECONDS = 600;
 
@@ -736,6 +742,16 @@ const FAQ_TOPICS = [
    `HUMAN_MAYBE` rzeczowniki wieloznaczne („człowiek", „persona", „person"). Wymagają
                  DRUGIEGO sygnału: słowa o rozmowie albo o kontakcie. Ten sam wzorzec dwóch
                  sygnałów co w `dataIntent` wyżej, gdzie „zmień" wymaga wskazania siebie. */
+function normalizeIntent(value) {
+  return String(value || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '')
+    .replace(/ł/g, 'l').replace(/ß/g, 'ss').replace(/[’‘`]/g, "'");
+}
+
+// Conservative on negated/ambiguous commands: never launch a destructive wizard from them.
+function negatedIntent(text) {
+  return /\b(?:not|never|don't|dont|do not|nie|non|no|nicht|kein|keine|ne|pas|n')\b/.test(text);
+}
+
 const HUMAN_SURE = [
   'człowiekiem', 'czlowiekiem', 'organizatorem', 'organizatorami', 'organizatorzy',
   'operatore', 'organizzatore', 'organizzatori',
@@ -756,17 +772,19 @@ const TALK_WORDS = [
   'hablar', 'contactar', 'llamar',
   'parler', 'contacter', 'appeler'
 ];
-const wordRe = (word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu');
+const wordRe = (word) => new RegExp(`(?<![\\p{L}\\p{N}])${normalizeIntent(word)}(?![\\p{L}\\p{N}])`, 'iu');
 const HUMAN_SURE_PATTERNS = HUMAN_SURE.map(wordRe);
 const HUMAN_MAYBE_PATTERNS = HUMAN_MAYBE.map(wordRe);
 const TALK_PATTERNS = TALK_WORDS.map(wordRe);
 
 function wantsHuman(question) {
-  const text = String(question || '');
+  const text = normalizeIntent(question);
   if (!text.trim()) return false;
-  if (HUMAN_SURE_PATTERNS.some((pattern) => pattern.test(text))) return true;
-  return HUMAN_MAYBE_PATTERNS.some((pattern) => pattern.test(text))
-    && TALK_PATTERNS.some((pattern) => pattern.test(text));
+  // Scope negation to the clause mentioning the person, not "I do not want a bot".
+  return text.split(/[,;.!?]|\b(?:but|ale|ma|pero|mais|aber)\b/).some((request) =>
+    !negatedIntent(request) && (HUMAN_SURE_PATTERNS.some((pattern) => pattern.test(request))
+      || (HUMAN_MAYBE_PATTERNS.some((pattern) => pattern.test(request))
+        && TALK_PATTERNS.some((pattern) => pattern.test(request)))));
 }
 
 /**
@@ -838,7 +856,7 @@ const DATA_INTENTS = [
 const DATA_INTENT_PATTERNS = DATA_INTENTS.map(([intent, words]) => [
   intent,
   words.map((word) => {
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = normalizeIntent(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu');
   })
 ]);
@@ -873,6 +891,7 @@ const DATA_SELF_PATTERNS = [
    innego. Przy ZMIANIE DANYCH nie wystarcza — „czy mogę zmienić koła przed wyścigiem?" jest
    pytaniem o regulamin i nie ma prawa otwierać weryfikacji adresu. */
 const DATA_RACE_PATTERNS = [
+  'zgloszenie', 'zgloszenia', 'zgloszeniu',
   'wyscig', 'wyścig', 'wyscigu', 'wyścigu', 'wyscigi', 'zjazd', 'zjazdu',
   'zawody', 'zawodow', 'zawodów', 'start', 'startu',
   'gara', 'gare', 'corsa', 'partenza', 'iscrizione',
@@ -901,23 +920,46 @@ const SPONSOR_PATTERNS = [
 ].map((word) => new RegExp(`(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`, 'iu'));
 
 function sponsorIntent(question) {
-  const text = String(question || '');
-  return SPONSOR_PATTERNS.some((pattern) => pattern.test(text));
+  const text = normalizeIntent(question);
+  return !negatedIntent(text) && SPONSOR_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function dataIntent(question) {
-  const text = String(question || '');
+  const text = normalizeIntent(question);
   if (!text.trim()) return null;
-  const mine = DATA_SELF_PATTERNS.some((pattern) => pattern.test(text));
+  const clauses = text.split(/[,;.!?]/).filter((part) => part.trim());
+  if (clauses.length > 1) {
+    const intents = [...new Set(clauses.map(dataIntent).filter(Boolean))];
+    return intents.length === 1 ? intents[0] : null;
+  }
+  const mine = DATA_SELF_PATTERNS.some((pattern) => pattern.test(text))
+    || /\b(?:chce|chcialbym|chcialabym|vorrei|i want|quiero|je veux|ich mochte)\b/.test(text);
   const race = DATA_RACE_PATTERNS.some((pattern) => pattern.test(text));
+  const matches = (intent) => DATA_INTENT_PATTERNS.find(([key]) => key === intent)[1]
+    .some((pattern) => pattern.test(text));
+  const change = /\b(?:zmien\w*|popraw\w*|edytuj|aktualizuj|modific\w*|cambi\w*|correg\w*|aggiorna\w*|change|edit|update|correct|andern|korrigieren|aktualisieren|actualizar|changer|corriger)\b/.test(text);
+  const field = /\b(?:telefon\w*|phone|telephone|telefono|address|adres\w*|indirizzo|town|city|miasto|miejscowosc|cart|wozk\w*|team|squadra|notes|notat\w*|dane|dati|data|details|daten|datos|donnees)\b/.test(text);
+  const identityText = text.replace(/\b(?:cart|team|project) name\b|\bnome (?:del|della) (?:carretto|squadra|progetto)\b/g, '');
+  const identity = /\b(?:imie|imienia|nazwisk\w*|name|surname|nome|cognome|nachname|nombre|apellido|nom|prenom|birth\w*|urodzen\w*|nascita|email|e-mail|consent\w*|zgod\w*)\b/.test(identityText);
+  if (matches('print')) return 'print'; // Both "print for me" and "do not print" edit a boolean.
+  const notifications = matches('notifications');
+  const stop = /\b(?:unsubscribe|stop|wypisz\w*|rezygn\w*|zrezygn\w*|usun\w*|remove|cancel|abmelden|abbestellen|disiscriv\w*|disdire|annull\w*|desuscribir\w*|desabonn\w*|arret\w*)\b/.test(text);
+  const refuseNotifications = /\b(?:nie chce|non voglio|no quiero|do not want|don't want|dont want|no more|nicht mehr|ne veux plus)\b/.test(text);
+  if (notifications && (stop || refuseNotifications)) {
+    if (negatedIntent(text) && !refuseNotifications) return null;
+    return 'notifications';
+  }
+  if (negatedIntent(text)) return null;
+  if (change && identity) return 'identity';
+  if (mine && field && (change || matches('withdraw'))) return 'edit';
   for (const [intent, patterns] of DATA_INTENT_PATTERNS) {
     if (!patterns.some((pattern) => pattern.test(text))) continue;
     /* Powiadomienia same z siebie są jednoznaczne: „nie chcę newslettera" nie jest pytaniem o
        regulamin. Wycofanie wymaga wskazania siebie ALBO wyścigu — patrz `DATA_RACE_PATTERNS`.
        Zmiana danych wymaga wskazania siebie i tylko siebie. */
-    if (intent === 'notifications') return intent;
-    if (intent === 'withdraw' && (mine || race)) return intent;
-    if (intent === 'edit' && mine) return intent;
+    if (intent === 'withdraw' && race && !field && !identity && !notifications) return intent;
+    if (intent === 'edit' && change && mine && !notifications
+      && /\b(?:registration|entry|iscrizione|anmeldung|inscripcion|inscription|zgloszeni\w*)\b/.test(text)) return intent;
     /* Wydruk jest jednoznaczny sam z siebie: slowo „drukarka" w rozmowie o zawodach nie
        znaczy nic innego, a zdania „nie mam drukarki" nikt nie pisze o cudzym zgloszeniu. */
     if (intent === 'print') return intent;
@@ -1186,18 +1228,58 @@ async function chatThread(env, request, payload, create = false) {
   const found = await fetch(url, { headers: supabaseHeaders(env) });
   if (!found.ok) return { error: 'CHAT_READ_FAILED', status: 502 };
   const rows = await found.json();
-  if (rows[0]) return { thread: rows[0] };
+  if (rows[0]) {
+    // The shipped gate opens a blank thread before its first send. Initialize only
+    // from explicit contact fields; never extract identity from message prose.
+    if (create && !rows[0].display_name && !rows[0].email && payload.name !== undefined) {
+      const profile = chatProfile(payload);
+      if (!profile) return { error: 'CHAT_BAD_PROFILE', status: 422 };
+      const saved = await fetch(`${env.SUPABASE_URL}/rest/v1/chat_threads?id=eq.${rows[0].id}&display_name=is.null&email=is.null`, {
+        method: 'PATCH', headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
+        body: JSON.stringify({ display_name: profile.name, email: profile.email })
+      });
+      const updated = saved.ok ? (await saved.json().catch(() => []))[0] : null;
+      if (!updated) return { error: 'CHAT_WRITE_FAILED', status: 502 };
+      return { thread: { ...rows[0], ...updated } };
+    }
+    return { thread: rows[0] };
+  }
   if (!create) return { error: 'CHAT_NO_THREAD', status: 404 };
+
+  const profile = payload.name === undefined && payload.email === undefined
+    ? { name: null, email: null } : chatProfile(payload);
+  if (!profile) return { error: 'CHAT_BAD_PROFILE', status: 422 };
 
   const made = await insertRow(env, 'chat_threads', {
     visitor_token: token,
     locale: localeOf(payload.locale),
-    display_name: trimmed(payload.name),
-    email: String(payload.email || '').trim().toLowerCase() || null,
+    display_name: profile.name,
+    email: profile.email,
     ip_hash: await hashIp(env, request)
   }, 'id,mode,locale,display_name,email,unread_for_admin,last_alert_at');
   if (!made.ok) return { error: 'CHAT_WRITE_FAILED', status: 502 };
   return { thread: made.row, fresh: true };
+}
+
+function chatProfile(payload) {
+  if (typeof payload.name !== 'string' || typeof payload.email !== 'string') return null;
+  const name = payload.name.trim();
+  const email = payload.email.trim().toLowerCase();
+  if (!name || name.length > 80 || /[\x00-\x1f\x7f]/.test(name)
+    || email.length > 254 || !EMAIL_PATTERN.test(email)) return null;
+  return { name, email };
+}
+
+async function chatModelHistory(env, threadId, messageId) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/chat_messages`);
+  url.searchParams.set('select', 'id,author,body,image_path');
+  url.searchParams.set('thread_id', `eq.${threadId}`);
+  url.searchParams.set('author', 'in.(visitor,ai,organiser)');
+  if (messageId) url.searchParams.set('id', `neq.${messageId}`);
+  url.searchParams.set('order', 'created_at.desc,id.desc');
+  url.searchParams.set('limit', '6');
+  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  return response.ok ? (await response.json()).reverse() : [];
 }
 
 async function chatMessages(env, threadId, since = '') {
@@ -1295,17 +1377,17 @@ async function liveFacts(env) {
     ]);
 
     const stanGlosowania = glosowanie?.[0]?.status;
-    if (stanGlosowania === 'open') {
+    if (stanGlosowania === 'voting') {
       facts.push('STAN NA TERAZ: głosowanie publiczności jest OTWARTE — podstrona głosowania'
         + ' jest dostępna na stronie.');
-    } else if (stanGlosowania) {
+    } else if (['scheduled', 'closed'].includes(stanGlosowania)) {
       facts.push('STAN NA TERAZ: głosowanie publiczności jest zamknięte.');
     }
 
     if (transmisja?.[0]?.is_live) {
       facts.push('STAN NA TERAZ: transmisja na żywo TRWA — zakładka z odtwarzaczem jest na'
         + ' stronie, przycisk „oglądaj na żywo” prowadzi prosto do niej.');
-    } else {
+    } else if (transmisja?.[0]?.is_live === false) {
       facts.push('STAN NA TERAZ: transmisja na żywo nie trwa.');
     }
 
@@ -1316,14 +1398,15 @@ async function liveFacts(env) {
     if (ogloszeni.length) {
       facts.push('STAN NA TERAZ: wyniki są już ogłoszone. Zwycięzcy: '
         + ogloszeni.map((w) => String(w.winner_label).trim()).join(', ') + '.');
-    } else {
+    } else if (Array.isArray(zwyciezcy)) {
       facts.push('STAN NA TERAZ: wyniki NIE są jeszcze ogłoszone. Na pytanie „kto wygrał”'
         + ' odpowiedz, że wyników jeszcze nie ma i pojawią się na stronie po wyścigu —'
         + ' to jest pełna odpowiedź, nie oddawaj tego pytania człowiekowi.');
     }
 
-    const zapisani = Number(licznik?.[0]?.registrations ?? licznik?.[0]?.riders);
-    if (Number.isFinite(zapisani)) {
+    const count = licznik?.[0]?.registrations ?? licznik?.[0]?.riders;
+    const zapisani = Number(count);
+    if (count !== null && count !== undefined && count !== '' && Number.isFinite(zapisani)) {
       facts.push(`STAN NA TERAZ: zgłoszonych zawodników: ${zapisani}.`);
     }
   } catch (_) {
@@ -1488,6 +1571,12 @@ function chatSystemPrompt(deck, locale = 'it', zywe = []) {
     'w tej rozmowie coś już oddałeś człowiekowi. Jedno oddane pytanie nie kończy rozmowy.',
     '',
     'CZEGO NIE ROBISZ',
+    'Nie masz narzędzi do zmiany danych ani wysyłania wiadomości. Nigdy nie twierdź, że',
+    'zmieniłeś profil, zgłoszenie, powiadomienia lub decyzję o wydruku albo wysłałeś e-mail.',
+    'Profil czatu zmienia się w formularzu profilu; to nie zmienia tożsamości ani adresu',
+    'zgłoszenia lub weryfikacji kodem. Korekty tożsamości zgłoszenia przekazuj organizatorom.',
+    'Brak bieżącego faktu oznacza brak wiedzy, nie zamknięte głosowanie, brak transmisji',
+    'lub nieogłoszone wyniki. Nie zgaduj stanu na żywo.',
     'Nie udzielasz porad prawnych ani medycznych. Pytanie, czy dziecko może startować z',
     'jakimś schorzeniem — ESCALATE. Nie obiecujesz niczego, czego nie ma na liście. Nie',
     'mówisz o liczbie uczestników. Nie prosisz o dane osobowe;',
@@ -2375,12 +2464,28 @@ async function notifyChatTelegram(env, request, ctx, thread, payload, message) {
 async function chatVisitor(env, request, payload, cors, ctx) {
   const action = String(payload.action || 'open');
 
+  if (action === 'profile') {
+    const profile = chatProfile(payload);
+    if (!profile) return json({ ok: false, code: 'CHAT_BAD_PROFILE' }, 422, cors);
+    const { thread, error, status } = await chatThread(env, request, payload, false);
+    if (error) return json({ ok: false, code: error }, status, cors);
+    // The bearer token selects the thread; never accept an arbitrary thread ID or touch registrations.
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/chat_threads?id=eq.${thread.id}&visitor_token=eq.${encodeURIComponent(payload.token)}&select=display_name,email`, {
+      method: 'PATCH', headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
+      body: JSON.stringify({ display_name: profile.name, email: profile.email })
+    });
+    const saved = response.ok ? (await response.json().catch(() => []))[0] : null;
+    if (!saved) return json({ ok: false, code: 'CHAT_WRITE_FAILED' }, 502, cors);
+    return json({ ok: true, profile: { name: saved.display_name, email: saved.email } }, 200, cors);
+  }
+
   if (action === 'open') {
     const { thread, error, status } = await chatThread(env, request, payload, true);
     if (error) return json({ ok: false, code: error }, status, cors);
     const messages = await chatMessages(env, thread.id) || [];
     // `chatOpen` lets the page label the green dot honestly instead of pulsing at 03:00.
-    return json({ ok: true, mode: thread.mode, messages, chatOpen: chatOpenNow() }, 200, cors);
+    return json({ ok: true, mode: thread.mode, messages, chatOpen: chatOpenNow(),
+      profile: { name: thread.display_name || '', email: thread.email || '' } }, 200, cors);
   }
 
   if (action === 'poll') {
@@ -2542,11 +2647,8 @@ async function chatVisitor(env, request, payload, cors, ctx) {
     : { locale: fallbackLocale, sure: false };
   const locale = detected.locale;
 
-  // A name or an address given mid-conversation is worth keeping, so the organiser
-  // knows who they are talking to without asking twice.
+  // Existing contact details change only through the explicit, validated profile action.
   const details = {};
-  if (payload.name && !thread.display_name) details.display_name = trimmed(payload.name);
-  if (payload.email && !thread.email) details.email = String(payload.email).trim().toLowerCase();
   /* Zapis języka TYLKO przy pewnym rozpoznaniu. Zapisany fallback byłby w bazie
      nieodróżnialny od rozpoznania, a „ok" w niemieckim wątku przestawiłoby wątek na język
      z przełącznika strony — czyli na cudzy. Przy niepewnym rozpoznaniu wątek zostaje przy
@@ -2620,12 +2722,13 @@ async function chatVisitor(env, request, payload, cors, ctx) {
   /* Sponsoring pierwszy, przed sprawami danych i przed słownikiem. „Chcę reklamę na wózku"
      zawiera słowo „chcę", ale nie jest prośbą o zmianę własnych danych — a odpowiedź regułką o
      wpisowym byłaby najdroższą pomyłką, jaką ten czat może zrobić. */
-  if (!hasPhoto && sponsorIntent(body)) {
+  const askedForHuman = wantsHuman(body);
+  if (!hasPhoto && !askedForHuman && sponsorIntent(body)) {
     return json({ ok: true, mode: thread.mode === 'human' ? 'human' : 'ai', reply: null, selfService: 'sponsor', ...echo }, 200, cors);
   }
 
   const intent = dataIntent(body);
-  if (!hasPhoto && intent) {
+  if (!hasPhoto && !askedForHuman && intent && intent !== 'identity') {
     return json({ ok: true, mode: thread.mode === 'human' ? 'human' : 'ai', reply: null, selfService: intent, ...echo }, 200, cors);
   }
 
@@ -2644,15 +2747,13 @@ async function chatVisitor(env, request, payload, cors, ctx) {
    * rozjechać — i czwartym wywołaniem `alertOrganisers`, które pilnuje checker
    * `tools/check-minor-blueprint.mjs`.
    */
-  const askedForHuman = !hasPhoto && wantsHuman(body);
-
-  let reply = (hasPhoto || askedForHuman) ? null : faqAnswer(deck, body);
-  if (!reply && !askedForHuman) {
+  const identityHelp = intent === 'identity';
+  let reply = (hasPhoto || askedForHuman || identityHelp) ? null : faqAnswer(deck, body);
+  if (!reply && !askedForHuman && !identityHelp) {
     /* Historia czytana JUŻ PO zapisie tej wiadomości, więc bieżące pytanie stoi w niej jako
        ostatni wiersz — a niżej jedzie drugi raz jako `question`. Ten sam tekst dwa razy pod
        rząd to dla modelu sygnał, że gość się powtarza. Odsiewany po identyfikatorze. */
-    const history = (await chatMessages(env, thread.id) || [])
-      .filter((row) => row.id !== stored.row?.id);
+    const history = await chatModelHistory(env, thread.id, stored.row?.id);
     reply = await askModel(env, deck, history, body, imageUrl, locale);
   }
 
@@ -2709,7 +2810,16 @@ async function chatVisitor(env, request, payload, cors, ctx) {
        Godziny zostają przy zdaniu: „ktoś to przeczyta" bez „kiedy" czyta się o 23:00 tak samo
        jak o 11:00, a o 23:00 jest zdaniem, po którym czat wygląda na porzucony. */
     const hours = open ? deck.chatHoursNow : deck.chatHoursLater;
+    const identityGuidance = {
+      it: 'Il nome e l\u2019email del profilo chat si cambiano dal profilo, non scrivendo un messaggio. Per correggere i dati anagrafici o l\u2019email dell\u2019iscrizione serve l\u2019organizzatore.',
+      pl: 'Nazw\u0119 i e-mail profilu czatu zmienisz w profilu, nie wiadomo\u015bci\u0105. Dane osobowe lub e-mail zg\u0142oszenia mo\u017ce poprawi\u0107 organizator.',
+      en: 'Edit your chat name and email in the chat profile, not by message. Registration identity or email corrections require an organiser.',
+      de: 'Chatname und E-Mail lassen sich im Chatprofil bearbeiten, nicht per Nachricht. Korrekturen der Anmeldedaten muss der Veranstalter vornehmen.',
+      es: 'Edita el nombre y correo del chat en el perfil, no por mensaje. Los datos de identidad o correo de la inscripci\u00f3n los corrige la organizaci\u00f3n.',
+      fr: 'Modifiez le nom et l\u2019e-mail du chat dans le profil, pas par message. Les corrections d\u2019identit\u00e9 ou d\u2019e-mail de l\u2019inscription passent par l\u2019organisation.'
+    };
     const handover = [
+      identityHelp ? identityGuidance[locale] : '',
       deck.chatHandover || 'Przekazuję to organizatorom — odpiszą tutaj.',
       hours
     ].filter(Boolean).join(' ');
@@ -5405,19 +5515,20 @@ async function entryCode(env, payload, cors) {
 }
 
 /**
- * Checks a six-digit code against the newest unspent row for (email, purpose, entry).
+ * Checks a six-digit code against the newest row for (email, purpose, entry).
  *
  * Lifted out of unsubConfirm rather than copied: attempts, expiry and single use are the
  * three things that make a six-digit code worth anything, and two copies of that is one
  * copy that will eventually be missing one of them.
  *
  * `options.consume` says what the caller intends to do with a valid code, not what this
- * function writes — nothing here ever stamps `consumed_at`, that is `spendCode`. What the flag
+ * function writes. Entry mutations check/spend inside the 0049 transaction; legacy sponsor
+ * callers still use `spendCode`. What the flag
  * changes is whether the row id comes back:
  *
  * - `consume: true` (the default, today's behaviour) returns `id`, so the caller can spend the
- *   row once the action it authorises has actually landed. Rows already carrying `consumed_at`
- *   are filtered out, so a spent code never checks out twice.
+ *   row once the action it authorises has actually landed. A consumed newest row is rejected;
+ *   it never makes an older code valid again.
  * - `consume: false` returns no `id`, so a mere check has nothing to spend the row with. This is
  *   the path `verify-code` uses: it confirms the address inside the conversation and leaves the
  *   code alive for the request that does the work and carries (email, code) again.
@@ -5432,41 +5543,25 @@ async function entryCode(env, payload, cors) {
  * @returns {{ok: true, id?: string}|{ok: false, code: string, status: number, left?: number}}
  */
 async function checkCode(env, email, purpose, code, entryId, options = {}) {
-  const consume = options.consume !== false;
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/verification_codes`);
-  url.searchParams.set('select', 'id,code_hash,expires_at,attempts');
-  url.searchParams.set('email', `eq.${email}`);
-  url.searchParams.set('purpose', `eq.${purpose}`);
-  url.searchParams.set('entry_id', entryId ? `eq.${entryId}` : 'is.null');
-  url.searchParams.set('consumed_at', 'is.null');
-  url.searchParams.set('order', 'created_at.desc');
-  url.searchParams.set('limit', '1');
-  const response = await fetch(url, { headers: supabaseHeaders(env) });
-  const row = response.ok ? (await response.json().catch(() => []))?.[0] : null;
-  if (!row) return { ok: false, code: 'ENTRY_NO_CODE', status: 410 };
+  const result = await entryCodeRpc(env, 'verification_code_check', {
+    p_email: email, p_purpose: purpose, p_code_hash: await hashCode(env, email, code),
+    p_entry_id: entryId || null
+  });
+  return result.ok && options.consume === false ? { ok: true } : result;
+}
 
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    return { ok: false, code: 'ENTRY_CODE_EXPIRED', status: 410 };
-  }
-  if (row.attempts >= CODE_ATTEMPT_LIMIT) {
-    return { ok: false, code: 'ENTRY_TOO_MANY_TRIES', status: 429 };
-  }
-
-  if (row.code_hash !== (await hashCode(env, email, code))) {
-    await fetch(`${env.SUPABASE_URL}/rest/v1/verification_codes?id=eq.${row.id}`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ attempts: row.attempts + 1 })
-    }).catch(() => {});
-    return {
-      ok: false,
-      code: 'ENTRY_CODE_WRONG',
-      status: 422,
-      left: Math.max(CODE_ATTEMPT_LIMIT - row.attempts - 1, 0)
-    };
-  }
-
-  return consume ? { ok: true, id: row.id } : { ok: true };
+async function entryCodeRpc(env, name, body) {
+  try {
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      method: 'POST', headers: supabaseHeaders(env), body: JSON.stringify(body)
+    });
+    const result = await response.json().catch(() => null);
+    if (response.ok && typeof result?.ok === 'boolean') return result;
+    if (result?.code === 'PGRST202' || result?.code === '42883') {
+      return { ok: false, code: 'ENTRY_MIGRATION_REQUIRED', status: 503 };
+    }
+  } catch (_) { /* No REST fallback: it would reintroduce the check/spend race. */ }
+  return { ok: false, code: 'ENTRY_WRITE_FAILED', status: 502 };
 }
 
 /**
@@ -5492,8 +5587,12 @@ async function entryManage(env, payload, cors) {
   const action = String(payload.action || 'view');
   if (!EMAIL_PATTERN.test(email)) return json({ ok: false, code: 'ENTRY_BAD_EMAIL' }, 422, cors);
   if (code.length !== 6) return json({ ok: false, code: 'ENTRY_BAD_CODE' }, 422, cors);
-  if (!['view', 'update', 'withdraw'].includes(action)) {
+  if (!['view', 'update', 'withdraw', 'print'].includes(action)) {
     return json({ ok: false, code: 'ENTRY_UNKNOWN_ACTION' }, 400, cors);
+  }
+  if ((action === 'print' || Object.hasOwn(payload, 'wantsPrint'))
+    && typeof payload.wantsPrint !== 'boolean') {
+    return json({ ok: false, code: 'ENTRY_BAD_PRINT' }, 422, cors);
   }
 
   const entryId = String(payload.entryId || '');
@@ -5512,7 +5611,7 @@ async function entryManage(env, payload, cors) {
      Zmiana decyzji o wydruku idzie pod `edit-entry`: to zmiana wlasnego zgloszenia, tylko
      w innym polu, i nie ma powodu prosic o osobny list. */
   const purpose = action === 'withdraw' ? 'cancel-entry' : 'edit-entry';
-  let checked = await consumeCode(env, email, purpose, code, row.id);
+  let checked = action === 'view' ? await consumeCode(env, email, purpose, code, row.id) : { ok: true };
   if (!checked.ok && action === 'view') {
     checked = await consumeCode(env, email, 'cancel-entry', code, row.id);
   }
@@ -5523,6 +5622,15 @@ async function entryManage(env, payload, cors) {
       cors
     );
   }
+
+  if (action !== 'view' && (row.is_minor || row.status === 'withdrawn')) {
+    return json({ ok: false, code: row.is_minor ? 'ENTRY_MINOR_ORGANISER' : 'ENTRY_WITHDRAWN' }, 409, cors);
+  }
+  // Hash once; the RPC checks and spends under the same transaction as the write.
+  const codeHash = action === 'view' ? null : await hashCode(env, email, code);
+  const writeEntry = (patch = {}) => entryCodeRpc(env, 'entry_manage_with_code', {
+    p_email: email, p_code_hash: codeHash, p_entry_id: row.id, p_action: action, p_patch: patch
+  });
 
   /* `view` deliberately does not spend the code.
      Somebody types six digits, sees their entry, changes the phone number and presses save —
@@ -5563,18 +5671,14 @@ async function entryManage(env, payload, cors) {
    * czlowiek zmienia ja z innego powodu — kupil drukarke albo wlasnie odkryl, ze jej nie ma.
    * Osobna czynnosc znaczy tez, ze da sie ja wykonac bez otwierania calego kreatora edycji.
    *
-   * Kod NIE jest tu wydawany: bramka stoi wyzej, wspolnie z reszta spraw wlasnego zgloszenia
-   * (patrz `checked`). Bez niej ktokolwiek, kto zna adres, moglby zamowic wydruk na cudze
+    * Kod NIE jest tu wydawany: sprawdza go atomowa funkcja writeEntry razem z zapisem.
+    * Bez niej ktokolwiek, kto zna adres, moglby zamowic wydruk na cudze
    * nazwisko — drobiazg, ale drobiazg robiony cudzymi rekami i cudzym papierem.
    */
   if (action === 'print') {
-    const wants = Boolean(payload.wantsPrint);
-    const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${row.id}`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ wants_print: wants })
-    });
-    if (!patch.ok) return json({ ok: false, code: 'ENTRY_WRITE_FAILED' }, 502, cors);
+    const wants = payload.wantsPrint;
+    const patch = await writeEntry({ wants_print: wants });
+    if (!patch.ok) return json(patch, patch.status || 502, cors);
     /* Kod NIE jest zuzywany, w odroznieniu od wycofania. Zmiana zdania o wydruku jest
        odwracalna jednym naciśnięciem i ktos, kto pomylil przycisk, ma go nacisnac jeszcze
        raz — a nie zaczynac od nowa od listu z kodem. */
@@ -5582,28 +5686,16 @@ async function entryManage(env, payload, cors) {
   }
 
   if (action === 'withdraw') {
-    await spendCode(env, checked.id);
     /* `status` and nothing else. The trigger from migration 0011 clears the race number when
        this lands, which puts it back in the pool for the next person — and it does that in
        the database rather than here, so it also happens when the organiser changes the status
        from the panel or by hand. */
-    const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${row.id}`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ status: 'withdrawn' })
-    });
-    if (!patch.ok) return json({ ok: false, code: 'ENTRY_WRITE_FAILED' }, 502, cors);
+    const patch = await writeEntry();
+    if (!patch.ok) return json(patch, patch.status || 502, cors);
 
     /* Off the reminder list as well. Three letters counting down to a race somebody has
        just left is the clearest possible way to look like nobody is reading anything. */
-    await fetch(
-      `${env.SUPABASE_URL}/rest/v1/reminder_subscribers?email=eq.${encodeURIComponent(email)}`,
-      {
-        method: 'PATCH',
-        headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-        body: JSON.stringify({ status: 'unsubscribed' })
-      }
-    ).catch(() => {});
+    // Reminder opt-out is part of the same database transaction.
 
     /* A letter confirming it happened.
        Not a formality. Withdrawing is the one action here that cannot be undone from the
@@ -5641,10 +5733,15 @@ async function entryManage(env, payload, cors) {
   }
 
   // update
+  for (const key of ENTRY_NULLABLE_FIELDS) {
+    if (Object.hasOwn(payload, key) && payload[key] !== null && typeof payload[key] !== 'string') {
+      return json({ ok: false, code: 'ENTRY_BAD_FIELD' }, 422, cors);
+    }
+  }
   const patchRow = {};
   const setText = (key, column, max = 200) => {
     if (payload[key] === undefined) return;
-    const value = String(payload[key]).trim().slice(0, max);
+    const value = payload[key] === null ? '' : sanitizeScalar(payload[key], MULTILINE_FIELDS.has(key)).trim().slice(0, max);
     patchRow[column] = value || null;
   };
   setText('phone', 'phone', 40);
@@ -5654,23 +5751,21 @@ async function entryManage(env, payload, cors) {
   setText('teamName', 'team_name', 120);
   setText('cartNotes', 'cart_notes', 1000);
   if (payload.category !== undefined) {
-    patchRow.category = payload.category === 'art' ? 'art' : 'classic';
+    if (!['art', 'classic'].includes(payload.category)) return json({ ok: false, code: 'ENTRY_BAD_CATEGORY' }, 422, cors);
+    patchRow.category = payload.category;
   }
+  if (Object.hasOwn(payload, 'wantsPrint')) patchRow.wants_print = payload.wantsPrint;
 
   if (Object.keys(patchRow).length === 0) {
     return json({ ok: false, code: 'ENTRY_NOTHING_TO_DO' }, 422, cors);
   }
 
-  await spendCode(env, checked.id);
   // Stamped so the organiser can tell "the rider corrected this" from "somebody mistyped it".
   patchRow.self_updated_at = new Date().toISOString();
 
-  const patch = await fetch(`${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${row.id}`, {
-    method: 'PATCH',
-    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-    body: JSON.stringify(patchRow)
-  });
-  if (!patch.ok) return json({ ok: false, code: 'ENTRY_WRITE_FAILED' }, 502, cors);
+  const patch = await writeEntry(patchRow);
+  if (!patch.ok) return json(patch, patch.status || 502, cors);
+  const merged = { ...row, ...patchRow };
 
   /* A fresh confirmation, with the forms attached again.
      ---------------------------------------------------------------------------
@@ -5706,14 +5801,15 @@ async function entryManage(env, payload, cors) {
     firstName: row.first_name,
     lastName: row.last_name,
     birthDate: row.birth_date || '',
-    town: patchRow.town ?? row.town ?? '',
+    town: merged.town ?? '',
     email: row.email,
-    phone: patchRow.phone ?? row.phone ?? '',
-    address: patchRow.address ?? row.address ?? '',
-    cartName: patchRow.cart_name ?? row.cart_name ?? '',
-    category: patchRow.category ?? row.category ?? 'classic',
-    teamName: patchRow.team_name ?? row.team_name ?? '',
-    cartNotes: patchRow.cart_notes ?? row.cart_notes ?? '',
+    phone: merged.phone ?? '',
+    address: merged.address ?? '',
+    cartName: merged.cart_name ?? '',
+    category: merged.category ?? 'classic',
+    teamName: merged.team_name ?? '',
+    cartNotes: merged.cart_notes ?? '',
+    wantsPrint: merged.wants_print,
     raceNumber: row.race_number ? String(row.race_number).padStart(3, '0') : '',
     isMinor: Boolean(row.is_minor),
     riderAge: row.rider_age ? String(row.rider_age) : '',
@@ -5730,13 +5826,15 @@ async function entryManage(env, payload, cors) {
   /* Marked in the subject, because two identical confirmations in one inbox is the situation
      where somebody prints the wrong one. */
   fresh.subject = `${deckFor(locale).editedPrefix} ${fresh.subject}`;
-  await sendToMake(env, fresh).catch(() => {});
+  const mailed = await sendToMake(env, fresh).catch(() => false);
+  if (!mailed) noteMailFailure('entry-edit: confirmation enqueue failed');
 
   return json({
     ok: true,
     updated: Object.keys(patchRow).filter((key) => key !== 'self_updated_at'),
-    // The page says "we have sent the confirmation again" only when it actually went.
-    mailed: true
+    // Acknowledged by Make, not evidence of delivery to the recipient.
+    mailed,
+    mailStatus: mailed ? 'queued' : 'failed'
   }, 200, cors);
 }
 
@@ -6015,7 +6113,13 @@ function cleanSettings(input) {
         || /^\/assets\/[A-Za-z0-9._/-]+$/.test(logo);
       if (!logoOk || logo.includes('..')) return { error: 'SETTINGS_SPONSOR_LOGO' };
 
-      sponsors.push({ name, url, logo });
+      try {
+        const sponsor = cleanBroadcastSponsor({ ...entry, name, url, logo });
+        // Older settings clients omit metadata. The SQL normalizer retains it.
+        for (const key of ['id', 'active', 'tier']) if (entry[key] === undefined) delete sponsor[key];
+        sponsor.order = sponsors.length;
+        sponsors.push(sponsor);
+      } catch (_) { return { error: 'SETTINGS_SPONSOR_SHAPE' }; }
     }
     out.sponsors = sponsors;
   }
@@ -6191,7 +6295,7 @@ async function settingsShape(env, settings) {
        odpowiedź jest jedna dla wszystkich i nie wie, kto ją czyta. Rok od języka nie zależy,
        więc jego miejsce jest tutaj. */
     eventYear: eventYearLabel(settings.eventDate),
-    sponsors: await withSignedLogos(env, settings.sponsors),
+    sponsors: await withSignedLogos(env, settings.sponsors.filter((sponsor) => sponsor.active !== false)),
     galleryImages: await withSignedGallery(env, settings.galleryImages)
   };
 }
@@ -6199,7 +6303,9 @@ async function settingsShape(env, settings) {
 async function adminSettingsShape(env, settings) {
   return {
     ...settings,
-    sponsors: await withSignedLogos(env, settings.sponsors),
+    sponsors: await Promise.all(settings.sponsors.map(async (sponsor) => ({ ...sponsor,
+      logoUrl: !sponsor.logo || sponsor.logo.startsWith('/') ? sponsor.logo : await signPhoto(env, sponsor.logo)
+    }))),
     galleryPreviewUrls: await withSignedGallery(env, settings.galleryImages)
   };
 }
@@ -6410,13 +6516,12 @@ async function sponsorLeadApprove(env, payload, cors) {
        pokazać — i lepiej, żeby wyszła teraz niż na stronie głównej. */
     const cleaned = cleanSettings({ sponsors: [...sponsors, entry] });
     if (cleaned.error) return json({ ok: false, code: cleaned.error }, 422, cors);
-    const merged = alignGalleryCaptions({ ...current, ...cleaned.value });
-    const saved = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ data: merged })
-    }).catch(() => null);
-    if (!saved?.ok) return json({ ok: false, code: 'SETTINGS_WRITE_FAILED' }, 502, cors);
+    try {
+      await prepareBroadcastLogos(env, [entry]);
+      await broadcastCommand(env, 'sponsor-append', { sponsor: cleaned.value.sponsors.at(-1) });
+    } catch (error) {
+      return json({ ok: false, code: error.message || 'SETTINGS_WRITE_FAILED' }, error.status || 502, cors);
+    }
   }
 
   const marked = await markSponsorLead(env, row.id, 'approved');
@@ -6535,13 +6640,11 @@ async function settingsAdmin(env, payload, cors) {
         edition: rollover.result
       }, 200, cors);
     }
-    const merged = { ...current, announcementEventDate: current.eventDate };
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ data: merged })
-    });
-    if (!response.ok) return json({ ok: false, code: 'SETTINGS_WRITE_FAILED' }, 502, cors);
+    try {
+      await broadcastCommand(env, 'settings-patch', { patch: { announcementEventDate: current.eventDate } });
+    } catch (error) {
+      return json({ ok: false, code: error.message || 'SETTINGS_WRITE_FAILED' }, error.status || 502, cors);
+    }
     return json({
       ok: true, queued: true, eventDate: current.eventDate,
       edition: rollover.result
@@ -6558,25 +6661,23 @@ async function settingsAdmin(env, payload, cors) {
   const cleaned = cleanSettings(payload.settings);
   if (cleaned.error) return json({ ok: false, code: cleaned.error }, 422, cors);
 
-  /* Read, merge, write. Not `jsonb_merge` in a single statement, because two organisers
-     saving different switches within a second of each other is not a scenario worth
-     designing for here, and a read-modify-write is the shape the panel already sends. */
-  const current = await readSettings(env);
-  /* Wyrównanie podpisów do zdjęć robione TU, na scalonym obiekcie, a nie w `cleanSettings` —
-     pełne uzasadnienie nad `alignGalleryCaptions`. Krótko: łatka zna tylko jedną z dwóch
-     tablic, więc tylko tutaj jest z czym równać. */
-  const merged = alignGalleryCaptions({ ...current, ...cleaned.value });
-
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
-    method: 'PATCH',
-    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-    body: JSON.stringify({ data: merged })
-  });
-  if (!response.ok) {
-    return json({ ok: false, code: 'SETTINGS_WRITE_FAILED', detail: await response.text() }, 502, cors);
+  // Merge the actual patch under the same SQL lock used by broadcast controls.
+  // Never replay stale sponsor data when saving an unrelated settings flag.
+  try {
+    let expectedSponsors;
+    if (cleaned.value.sponsors) {
+      if (!Array.isArray(payload.expectedSponsors) || payload.expectedSponsors.length > MAX_SPONSORS) {
+        throw Object.assign(new Error('BROADCAST_SETTINGS_CONFLICT'), { status: 409 });
+      }
+      expectedSponsors = payload.expectedSponsors.map((sponsor) => broadcastSponsorBaseline(sponsor, 'BROADCAST_SETTINGS_CONFLICT'));
+    }
+    if (cleaned.value.sponsors) await prepareBroadcastLogos(env, cleaned.value.sponsors);
+    await broadcastCommand(env, 'settings-patch', { patch: cleaned.value,
+      ...(cleaned.value.sponsors ? { expectedSponsors } : {}) });
+  } catch (error) {
+    return json({ ok: false, code: error.message || 'SETTINGS_WRITE_FAILED' }, error.status || 502, cors);
   }
-
-  return json({ ok: true, settings: await adminSettingsShape(env, merged) }, 200, cors);
+  return json({ ok: true, settings: await adminSettingsShape(env, await readSettings(env)) }, 200, cors);
 }
 
 /* ============================================================================
@@ -7802,6 +7903,18 @@ async function readPrizeWinners(env, editionId) {
 const PARTICIPANT_COLUMNS =
   'id,registration_id,category,start_number,first_name,last_name,project_name,image_path,active';
 
+async function readParticipantResponse(env, url) {
+  url.searchParams.set('select', `${PARTICIPANT_COLUMNS},race_time_ms`);
+  let response = await fetch(url, { headers: supabaseHeaders(env) });
+  let timingReady = true;
+  if (!response.ok && isMissingTimingColumn(await response.clone().json().catch(() => null))) {
+    timingReady = false;
+    url.searchParams.set('select', PARTICIPANT_COLUMNS);
+    response = await fetch(url, { headers: supabaseHeaders(env) });
+  }
+  return { response, timingReady };
+}
+
 /** Ustawienia to jeden wiersz. `id is.true` — tak samo jak site_settings. */
 async function readVotingSettings(env) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/voting_settings`);
@@ -7895,14 +8008,13 @@ async function signPhotos(env, paths, bucket = 'participant-photos') {
 
 async function readParticipants(env, { activeOnly = true } = {}) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/participants`);
-  url.searchParams.set('select', PARTICIPANT_COLUMNS);
   if (activeOnly) url.searchParams.set('active', 'is.true');
   url.searchParams.set('order', 'category.asc,start_number.asc');
   url.searchParams.set('limit', '400');
-  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  const { response, timingReady } = await readParticipantResponse(env, url);
   if (!response.ok) return null;
   const rows = await response.json().catch(() => []);
-  return Array.isArray(rows) ? rows : [];
+  return { rows: Array.isArray(rows) ? rows : [], timingReady };
 }
 
 /**
@@ -7968,6 +8080,7 @@ function participantShape(row, signed, tally) {
     firstName: row.first_name,
     lastName: row.last_name,
     projectName: row.project_name || '',
+    raceTimeMs: row.race_time_ms ?? null,
     photo: signed.get(row.image_path) || '',
     voteCount: stats ? Number(stats.vote_count) || 0 : 0,
     averageScore: stats ? Number(stats.average_score) || 0 : 0,
@@ -8029,6 +8142,7 @@ async function readVotingArchive(env, editionKey) {
     firstName: String(entry.firstName || ''),
     lastName: String(entry.lastName || ''),
     projectName: String(entry.projectName || ''),
+    raceTimeMs: entry.raceTimeMs ?? null,
     photo: signed.get(entry.imagePath) || '',
     voteCount: Number(entry.voteCount) || 0,
     averageScore: Number(entry.averageScore) || 0,
@@ -8088,11 +8202,12 @@ async function votingState(env, payload, cors) {
     }
   }
 
-  const [settings, participants] = await Promise.all([
+  const [settings, participantData] = await Promise.all([
     readVotingSettings(env),
     readParticipants(env)
   ]);
-  if (participants === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  if (participantData === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  const participants = participantData.rows;
 
   const phase = votingPhase(settings);
   const closed = phase === 'closed';
@@ -8162,10 +8277,9 @@ async function votingState(env, payload, cors) {
 async function findParticipant(env, id) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/participants`);
-  url.searchParams.set('select', PARTICIPANT_COLUMNS);
   url.searchParams.set('id', `eq.${id}`);
   url.searchParams.set('limit', '1');
-  const response = await fetch(url, { headers: supabaseHeaders(env) });
+  const { response } = await readParticipantResponse(env, url);
   if (!response.ok) return null;
   const rows = await response.json().catch(() => []);
   return (Array.isArray(rows) ? rows[0] : null) || null;
@@ -8510,12 +8624,13 @@ async function patchVotingSettings(env, patch) {
  * przychodzą, w chwili, w której jeszcze da się z tym cokolwiek zrobić.
  */
 async function votingAdminState(env, cors) {
-  const [settings, participants, ranking] = await Promise.all([
+  const [settings, participantData, ranking] = await Promise.all([
     readVotingSettings(env),
     readParticipants(env, { activeOnly: false }),
     readRanking(env)
   ]);
-  if (participants === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  if (participantData === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  const participants = participantData.rows;
 
   const tally = new Map(ranking.map((row) => [row.participant_id, row]));
   const signed = await signPhotos(env, participants.map((row) => row.image_path));
@@ -8540,6 +8655,7 @@ async function votingAdminState(env, cors) {
     scoreMin: VOTE_MIN,
     scoreMax: VOTE_MAX,
     participants: rows,
+    timingReady: participantData.timingReady,
     totalVotes: ranking.reduce((sum, row) => sum + (Number(row.vote_count) || 0), 0)
   }, 200, cors);
 }
@@ -8556,6 +8672,13 @@ async function votingAdminSave(env, payload, cors) {
   const editing = /^[0-9a-f-]{36}$/i.test(id);
 
   const row = {};
+  if (Object.hasOwn(payload, 'raceTimeMs')) {
+    const time = payload.raceTimeMs;
+    if (time !== null && (!Number.isInteger(time) || time < 0 || time > 2147483647)) {
+      return json({ ok: false, code: 'VOTING_BAD_RACE_TIME' }, 422, cors);
+    }
+    row.race_time_ms = time;
+  }
   const registrationId = String(payload.registrationId || '').trim();
   if (/^[0-9a-f-]{36}$/i.test(registrationId)) row.registration_id = registrationId;
 
@@ -8604,18 +8727,30 @@ async function votingAdminSave(env, payload, cors) {
     ]) {
       if (!row[field]) return json({ ok: false, code }, 422, cors);
     }
-    const stored = await insertRow(env, 'participants', row, PARTICIPANT_COLUMNS);
+  }
+  if (!Object.keys(row).length) return json({ ok: false, code: 'VOTING_NOTHING_TO_SAVE' }, 422, cors);
+
+  // Probe before any write: 0047-only deployments must keep ordinary edits working,
+  // but may not acknowledge a timing save that the database cannot persist.
+  const probeUrl = new URL(`${env.SUPABASE_URL}/rest/v1/participants`);
+  probeUrl.searchParams.set('limit', '0');
+  const { response: probe, timingReady } = await readParticipantResponse(env, probeUrl);
+  if (!probe.ok) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  if (!timingReady && Object.hasOwn(row, 'race_time_ms')) {
+    return json({ ok: false, code: 'VOTING_TIMING_MIGRATION_REQUIRED' }, 503, cors);
+  }
+  const columns = PARTICIPANT_COLUMNS + (timingReady ? ',race_time_ms' : '');
+  if (!editing) {
+    const stored = await insertRow(env, 'participants', row, columns);
     if (!stored.ok) {
       if (stored.duplicate) return json({ ok: false, code: 'VOTING_START_NUMBER_TAKEN' }, 409, cors);
       return json({ ok: false, code: 'VOTING_STORE_FAILED', detail: stored.detail || null }, 502, cors);
     }
-    return json({ ok: true, participant: stored.row }, 200, cors);
+    return json({ ok: true, participant: { ...stored.row, raceTimeMs: stored.row?.race_time_ms ?? null } }, 200, cors);
   }
 
-  if (!Object.keys(row).length) return json({ ok: false, code: 'VOTING_NOTHING_TO_SAVE' }, 422, cors);
-
   const response = await fetch(
-    `${env.SUPABASE_URL}/rest/v1/participants?id=eq.${id}&select=${PARTICIPANT_COLUMNS}`,
+    `${env.SUPABASE_URL}/rest/v1/participants?id=eq.${id}&select=${columns}`,
     {
       method: 'PATCH',
       headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
@@ -8629,7 +8764,7 @@ async function votingAdminSave(env, payload, cors) {
   }
   const saved = (await response.json().catch(() => []))?.[0];
   if (!saved) return json({ ok: false, code: 'VOTING_NO_PARTICIPANT' }, 404, cors);
-  return json({ ok: true, participant: saved }, 200, cors);
+  return json({ ok: true, participant: { ...saved, raceTimeMs: saved.race_time_ms ?? null } }, 200, cors);
 }
 
 /**
@@ -8953,11 +9088,12 @@ async function votingAdminWinners(env, cors) {
     return json({ ok: false, code: 'VOTING_STILL_OPEN' }, 409, cors);
   }
 
-  const [participants, ranking] = await Promise.all([
+  const [participantData, ranking] = await Promise.all([
     readParticipants(env, { activeOnly: true }),
     readRanking(env)
   ]);
-  if (participants === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  if (participantData === null) return json({ ok: false, code: 'VOTING_READ_FAILED' }, 502, cors);
+  const participants = participantData.rows;
 
   const tally = new Map(ranking.map((row) => [row.participant_id, row]));
   /* Ta sama kolejność co w stanie strony: suma punktów, liczba głosów, średnia. Rozjazd tutaj
@@ -9812,11 +9948,31 @@ async function recordAttendance(env, request, payload, cors) {
   return readCounts(env, cors);
 }
 
+const ENTRY_NULLABLE_FIELDS = new Set(['phone', 'address', 'town', 'cartName', 'teamName', 'cartNotes']);
+
 function sanitizePayload(type, input) {
   const allowed = [...FIELD_WHITELIST.common, ...(FIELD_WHITELIST[type] || [])];
   const output = {};
   for (const key of allowed) {
     const value = input[key];
+    if ((type === 'entry-manage' && (ENTRY_NULLABLE_FIELDS.has(key) || key === 'wantsPrint' || key === 'category'))
+      || (type === 'chat' && ['name', 'email'].includes(key))) {
+      // Preserve explicit clears and invalid types for the endpoint's narrow validator.
+      if (Object.hasOwn(input, key)) output[key] = value;
+      continue;
+    }
+    if ((type === 'voting-admin' && key === 'raceTimeMs')
+      || (type === 'broadcast-admin' && key === 'mode')) {
+      // Preserve explicit null and invalid types for the strict endpoint validator.
+      if (Object.hasOwn(input, key)) output[key] = value;
+      continue;
+    }
+    if ((type === 'settings-admin' && key === 'expectedSponsors')
+      || (type === 'broadcast-admin' && key === 'expectedSponsor')) {
+      // Baselines must survive intact, including invalid shapes for rejection.
+      if (value !== undefined) output[key] = value;
+      continue;
+    }
     if (value === undefined || value === null) continue;
     // A data URL is hundreds of kilobytes, so the 3000 character cap would quietly
     // truncate it into a corrupt image. It is passed through untouched here and
@@ -9848,6 +10004,10 @@ function sanitizePayload(type, input) {
        dodatkowej ochrony. */
     if (OBJECT_FIELDS.has(key)) {
       if (typeof value === 'object' && !Array.isArray(value)) output[key] = value;
+      continue;
+    }
+    if (type === 'broadcast-admin' && key === 'ids') {
+      if (Array.isArray(value)) output[key] = value;
       continue;
     }
     if (Array.isArray(value)) {
@@ -9956,9 +10116,9 @@ function clientIp(request) {
  * wyjątkiem, czyli KAŻDE zgłoszenie kończy się pustym 500. Pytanie o funkcję zamyka tę pułapkę.
  */
 async function overRateLimit(env, request, type) {
-  if (typeof env.RATE_LIMIT?.get !== 'function' || type === 'counts') return false;
+  if (typeof env.RATE_LIMIT?.get !== 'function' || type === 'counts' || type === 'broadcast-admin') return false;
   const key = `rl:${type}:${clientIp(request)}`;
-  const ceiling = type === 'roster' ? 12 : RATE_LIMIT_MAX;
+  const ceiling = type === 'broadcast' ? 120 : type === 'roster' ? 12 : RATE_LIMIT_MAX;
   const current = Number.parseInt((await env.RATE_LIMIT.get(key)) || '0', 10) || 0;
   if (current >= ceiling) return true;
   await env.RATE_LIMIT.put(key, String(current + 1), { expirationTtl: RATE_LIMIT_WINDOW_SECONDS });
@@ -10099,6 +10259,7 @@ export default {
     const carriesImage = WALL_FAMILY.has(pathType)
       || pathType === 'settings-admin'
       || pathType === 'voting-admin'
+      || pathType === 'broadcast-admin'
       /* Zgłoszenie sponsora niesie logo jako data URL (opcjonalne). Bez tego wpisu żądanie
          z logo dostaje 413 przed handlerem, a komunikat mówi o za dużym żądaniu, nie o za
          dużym obrazku — czyli o czymś, czego zgłaszający nie ma jak naprawić. */
@@ -10144,7 +10305,7 @@ export default {
       if (!secretsMatch(request.headers.get(ROSTER_HEADER), env.ROSTER_KEY)) {
         return json({ ok: false, code: 'ROSTER_UNAUTHORISED' }, 401, cors);
       }
-    } else if (!(await turnstileOk(env, request, input.turnstileToken))) {
+    } else if (type !== 'broadcast' && !(await turnstileOk(env, request, input.turnstileToken))) {
       return json({ ok: false, code: 'CAPTCHA_FAILED' }, 403, cors);
     }
     if (await overRateLimit(env, request, type)) {
@@ -10161,6 +10322,8 @@ export default {
     // after the shared rate limit and captcha checks above have already run.
     if (SUPABASE_TYPES.has(type)) {
       if (!wallReady(env)) return json({ ok: false, code: 'WALL_DISABLED' }, 503, cors);
+      if (type === 'broadcast') return broadcastPublic(env, payload, cors);
+      if (type === 'broadcast-admin') return broadcastAdmin(env, payload, cors);
       if (type === 'wall') return wallList(env, payload, cors);
       if (type === 'wall-post') return wallPost(env, request, payload, cors);
       if (type === 'wall-translate') return wallTranslate(env, payload, cors);

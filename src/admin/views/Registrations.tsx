@@ -12,6 +12,7 @@ import {
   type RosterRow
 } from '../api';
 import { StartCards } from './StartCards';
+import { RosterLiveActions, RosterLiveSummary, useRosterLive } from './RosterLive';
 
 /* The `pick()` helper and the snake_case fallbacks that used to be at the top of this file
    are gone. They existed because nothing on the server answered `roster` — the request went
@@ -39,6 +40,7 @@ export function Registrations({
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<RosterRow | null>(null);
+  const live = useRosterLive(apiKey);
 
   const load = useCallback(() => {
     setError('');
@@ -83,6 +85,7 @@ export function Registrations({
       await deleteRegistration(apiKey, row.id);
       setRows((current) => (current ? current.filter((one) => one.id !== row.id) : current));
       onChanged();
+      live.refresh();
     } catch {
       setError('write');
     }
@@ -160,6 +163,8 @@ export function Registrations({
           </button>
         </div>
       </div>
+
+      <RosterLiveSummary live={live} t={t} rows={rows} />
 
       {bundleError ? (
         <p className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-2.5 text-xs text-destructive">
@@ -241,6 +246,7 @@ export function Registrations({
                     <div className="font-semibold text-foreground">
                       <Highlighter text={`${row.firstName} ${row.lastName}`.trim() || '—'} query={highlightQuery || query} />
                     </div>
+                    <RosterLiveActions live={live} row={row} t={t} />
                     {row.isMinor ? (
                       <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-destructive/20 px-2 py-0.5 text-[11px] font-bold text-destructive">
                         <ShieldAlert className="size-3" />
@@ -372,6 +378,7 @@ export function Registrations({
             if (result.row) applyRow(result.row);
             else load();
             onChanged();
+            live.refresh();
             setEditing(null);
           }}
         />

@@ -1,3 +1,4 @@
+import { formatRaceTime, raceTimeLabel } from './race-time.js';
 /**
  * Podstrona głosowania: Nagroda publiczności.
  * ===========================================================================
@@ -56,6 +57,16 @@ import {
 
 (function () {
   'use strict';
+
+  function appendRaceTime(parent, row) {
+    const formatted = formatRaceTime(row.raceTimeMs);
+    if (!formatted) return;
+    const time = document.createElement('span');
+    time.className = 'race-time';
+    time.dataset.raceTime = '';
+    time.textContent = `${raceTimeLabel()}: ${formatted}`;
+    parent.append(time);
+  }
 
   /** Ile kafelków wchodzi w jednej porcji. */
   const BATCH = 12;
@@ -726,6 +737,7 @@ import {
         : text('voting.noVotes');
       score.append(points, scoreLabel);
       copy.append(title, rider, score);
+      appendRaceTime(copy, row);
 
       const tie = ties.get(row.id);
       if (tie) {
@@ -779,6 +791,7 @@ import {
       const rider = document.createElement('small');
       rider.textContent = `${riderName(row)} · ${row.category} · ${startBadge(row)}`;
       identity.append(cart, rider);
+      appendRaceTime(identity, row);
       who.append(image, identity);
 
       const points = document.createElement('td');
@@ -891,7 +904,7 @@ import {
       const rank = closed ? index + 1 : 0;
       const mine = state.myVote;
       const key = [
-        row.photo, row.voteCount, row.totalScore, row.averageScore,
+        row.photo, row.voteCount, row.totalScore, row.averageScore, row.raceTimeMs,
         rank, badgeByParticipant.get(row.id) || '',
         /* CAŁY mój głos, nie tylko „czy to mój kafelek".
            ---------------------------------------------------------------------------
@@ -1070,6 +1083,7 @@ import {
     rider.className = 'vote-card__rider';
     rider.textContent = `${riderName(row)} · ${row.category}`;
     caption.append(rider);
+    appendRaceTime(caption, row);
     figure.append(caption);
 
     if (rank) {

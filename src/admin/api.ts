@@ -10,6 +10,8 @@
  * Supabase — the function holds the service key and the browser never sees it.
  */
 
+import type { BroadcastState, Participant, Sponsor as BroadcastSponsor } from '../obs/types';
+
 const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
 export class ApiError extends Error {
@@ -39,6 +41,18 @@ async function call<T>(path: string, key: string, body: Record<string, unknown>)
       response.status,
       code
     );
+  }
+  if (path === 'voting-admin' || path === 'voting') {
+    const validTime = (row: unknown) => !!row && typeof row === 'object'
+      && (!Object.hasOwn(row, 'raceTimeMs') || (row as { raceTimeMs: unknown }).raceTimeMs === null
+        || (typeof (row as { raceTimeMs: unknown }).raceTimeMs === 'number'
+          && Number.isInteger((row as { raceTimeMs: number }).raceTimeMs)
+          && (row as { raceTimeMs: number }).raceTimeMs >= 0
+          && (row as { raceTimeMs: number }).raceTimeMs <= 2147483647));
+    if ((Object.hasOwn(payload, 'timingReady') && typeof payload.timingReady !== 'boolean')
+      || ['participants', 'podium'].some((field) => Array.isArray(payload[field]) && !payload[field].every(validTime))) {
+      throw new ApiError('VOTING_INVALID_RESPONSE', 502, 'VOTING_INVALID_RESPONSE');
+    }
   }
   return payload as T;
 }
@@ -379,8 +393,13 @@ export const setThreadMode = (key: string, threadId: string, mode: ChatThread['m
 export interface Sponsor {
   name: string;
   url: string;
-  /** A path in the bucket when saving, a signed URL when reading. See the function. */
+  /** Stable path for saving; logoUrl is only a preview. */
   logo: string;
+  logoUrl?: string;
+  id?: string;
+  active?: boolean;
+  order?: number;
+  tier?: string;
 }
 
 export interface SiteSettings {
@@ -411,12 +430,79 @@ export const fetchSettings = (key: string) =>
  * sends one switch. Sending the whole object back would mean every save rewrites values
  * the panel may have read minutes ago.
  */
-export const saveSettings = (key: string, settings: Partial<SiteSettings>) =>
-  call<{ ok: true; settings: SiteSettings }>('settings-admin', key, { settings });
+export const saveSettings = (key: string, settings: Partial<SiteSettings>, expectedSponsors?: Sponsor[]) =>
+  call<{ ok: true; settings: SiteSettings }>('settings-admin', key, {
+    settings,
+    ...(settings.sponsors !== undefined && expectedSponsors !== undefined
+      ? { expectedSponsors: expectedSponsors.map(({ logoUrl: _preview, ...sponsor }) => sponsor) }
+      : {}),
+  });
 
 /** Uploads a logo and returns its bucket path plus a signed URL to preview it with. */
 export const uploadSponsorLogo = (key: string, photo: string) =>
   call<{ ok: true; logo: string; url: string }>('settings-admin', key, { action: 'logo', photo });
+
+export interface BroadcastSponsorEdit extends BroadcastSponsor {
+  /** Stable canonical settings path, never the public broadcast URL. */
+  logo: string;
+  logoUrl: string;
+}
+
+/** Protected response only; public Participant and realtime snapshots contain no roster identity. */
+export interface BroadcastAdminParticipant extends Participant {
+  registrationId?: string | null;
+}
+
+export interface BroadcastAdminResponse {
+  timingReady?: boolean;
+  ok: true;
+  state: BroadcastState;
+  participants: BroadcastAdminParticipant[];
+  sponsors: BroadcastSponsorEdit[];
+  assetWarnings?: { id: string; code: string }[];
+  realtime: { url: string; anonKey: string | null; ready: boolean; code?: string };
+}
+
+export type BroadcastAction =
+  | { action: 'state' | 'hide' | 'clear' }
+  | { action: 'sponsor-delete'; id: string }
+  | { action: 'on-air'; id: string; mode?: 'live' | 'replay' }
+  | { action: 'sponsors-toggle'; enabled: boolean }
+  | { action: 'sponsor-save'; sponsor: Omit<BroadcastSponsorEdit, 'id' | 'logoUrl'> & { id?: string }; expectedSponsor?: Omit<BroadcastSponsorEdit, 'logoUrl'> }
+  | { action: 'sponsor-order'; ids: string[] }
+  | { action: 'participant-photo'; id: string; image: string };
+
+export async function broadcastAdmin(key: string, action: BroadcastAction): Promise<BroadcastAdminResponse> {
+  const response = await call<BroadcastAdminResponse>('broadcast-admin', key, action);
+  const participantValid = (value: Participant | null) => value !== null && typeof value === 'object'
+    && ['id', 'firstName', 'lastName', 'city', 'projectName', 'category', 'photo']
+      .every((field) => typeof value[field as keyof Participant] === 'string')
+    && ['number', 'string'].includes(typeof value.startNumber)
+    && (!Object.hasOwn(value, 'raceTimeMs') || value.raceTimeMs === null
+      || (typeof value.raceTimeMs === 'number' && Number.isInteger(value.raceTimeMs) && value.raceTimeMs >= 0 && value.raceTimeMs <= 2147483647));
+  const sponsorValid = (value: BroadcastSponsor) => value !== null && typeof value === 'object'
+    && ['id', 'name', 'logo', 'url', 'tier'].every((field) => typeof value[field as keyof BroadcastSponsor] === 'string')
+    && typeof value.active === 'boolean' && Number.isFinite(value.order);
+  // A partial/old deployment must not look like an empty, successfully saved broadcast.
+  if (response.ok !== true || response.state?.id !== 'main'
+    || (Object.hasOwn(response, 'timingReady') && typeof response.timingReady !== 'boolean')
+    || (Object.hasOwn(response.state, 'participant_mode') && !['live', 'replay'].includes(response.state.participant_mode as string))
+    || !Number.isSafeInteger(response.state.revision)
+    || typeof response.state.participant_visible !== 'boolean'
+    || typeof response.state.sponsors_enabled !== 'boolean'
+    || (response.state.participant !== null && !participantValid(response.state.participant))
+    || !Number.isFinite(Date.parse(response.state.updated_at))
+    || !Array.isArray(response.state.sponsors)
+    || !response.state.sponsors.every(sponsorValid)
+    || !Array.isArray(response.participants) || !Array.isArray(response.sponsors)
+    || !response.participants.every(participantValid)
+    || !response.participants.every((one) => one.registrationId == null || typeof one.registrationId === 'string')
+    || !response.sponsors.every((one) => sponsorValid(one) && typeof one.logoUrl === 'string')
+    || typeof response.realtime?.ready !== 'boolean') {
+    throw new ApiError('BROADCAST_INVALID_RESPONSE', 502, 'BROADCAST_INVALID_RESPONSE');
+  }
+  return response;
+}
 
 export const uploadGalleryImage = (key: string, photo: string) =>
   call<{ ok: true; imagePath: string; url: string }>('settings-admin', key, { action: 'gallery', photo });
@@ -519,6 +605,7 @@ export const announceEdition = (key: string) =>
 export type VotingPhase = 'scheduled' | 'voting' | 'closed';
 
 export interface VotingParticipant {
+  raceTimeMs?: number | null;
   id: string;
   category: string;
   startNumber: number;
@@ -539,6 +626,7 @@ export interface VotingParticipant {
 }
 
 export interface VotingState {
+  timingReady?: boolean;
   ok: true;
   phase: VotingPhase;
   status: VotingPhase;
@@ -553,6 +641,7 @@ export interface VotingState {
 
 /** What may be sent for one participant. Every field optional: an edit sends what changed. */
 export interface ParticipantEdit {
+  raceTimeMs?: number | null;
   registrationId?: string;
   category?: string;
   startNumber?: string;
@@ -751,6 +840,7 @@ export interface VotingEdition {
  * kazałby je tu dorabiać z powietrza.
  */
 export interface EditionResultRow {
+  raceTimeMs?: number | null;
   id: string;
   category: string;
   startNumber: number;
