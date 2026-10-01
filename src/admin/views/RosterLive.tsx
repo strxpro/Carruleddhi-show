@@ -127,6 +127,7 @@ export function RosterLiveSummary({ live, t, rows }: { live: Live; t: Translate;
       </span>
     </div>
     <p className="mt-2 text-xs text-muted-foreground">{t('live.current')}</p>
+    {live.connection.code === 'REALTIME_NOT_CONFIGURED' && <p role="alert" className="mt-3 rounded-xl border border-yellow/30 bg-yellow/10 p-3 text-xs leading-relaxed">{t('live.realtimeMissing')} {t('live.realtimeSetup')}</p>}
     <p className="mt-1 font-semibold" data-roster-current>{current ? `#${current.startNumber} ${current.firstName} ${current.lastName}` : t('live.noSelection')}</p>
     {current && <p className="mt-1 text-xs font-bold">{t(live.state?.participant_visible ? 'reg.liveOnAir' : 'live.hidden')}</p>}
     {current && <p className="mt-1 text-xs" data-roster-mode>{t(live.state?.participant_mode === 'replay' ? 'live.replay' : 'live.modeLive')}{formatRaceTime(current.raceTimeMs) && ` / ${t('vote.raceTime')}: ${formatRaceTime(current.raceTimeMs)}`}</p>}
@@ -161,11 +162,12 @@ export function RosterLiveSummary({ live, t, rows }: { live: Live; t: Translate;
   </section>;
 }
 
-export function RosterLiveActions({ live, row, t }: { live: Live; row: RosterRow; t: Translate }) {
+export function RosterLiveActions({ live, row, t, onConfirm, confirming = false }: { live: Live; row: RosterRow; t: Translate; onConfirm?: () => void; confirming?: boolean }) {
   const participant = live.participantFor(row);
   const selected = participant && live.state?.participant?.id === participant.id;
   const onAir = selected && live.state?.participant_visible && live.state?.participant_mode !== 'replay';
   return <div className="mt-2 min-w-[190px] max-w-[240px]" data-roster-registration={row.id}>
+    {row.status === 'new' && onConfirm && <button type="button" data-roster-confirm className={`${button} mb-2 border-primary/40 bg-primary/15 text-primary`} disabled={confirming || live.pending} onClick={onConfirm}>{t(confirming ? 'set.saving' : 'reg.confirmEntry')}</button>}
     <div className="flex flex-wrap gap-1.5">
       <button type="button" data-roster-activate className={`${button} bg-primary text-primary-foreground`} disabled={live.disabled || !participant || onAir}
         onClick={() => participant && void live.run({ action: 'on-air', id: participant.id, mode: 'live' })}>{t(onAir ? 'reg.liveOnAir' : 'live.onAir')}</button>

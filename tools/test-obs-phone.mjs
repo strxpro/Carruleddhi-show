@@ -41,7 +41,7 @@ try {
   });
   await page.goto(`${process.env.OBS_TEST_ORIGIN || 'http://127.0.0.1:5199'}/admin.html`, { waitUntil: 'networkidle0' });
   const links = await page.$$eval('.admin-live input[readonly]', inputs => inputs.map(input => new URL(input.value).pathname));
-  assert.deepEqual(links, ['/obs/participant', '/obs/sponsors'], 'admin provides two independent source links');
+  assert.deepEqual(links, ['/obs/participant', '/obs/replay', '/obs/sponsors'], 'admin provides live, replay and sponsor source links');
   for (const [index, participant] of participants.entries()) {
     await page.click(`button[aria-label="Zdjęcie zawodnika: ${participant.firstName} Rossi"]`);
     await page.waitForSelector('.live-portrait');
@@ -72,7 +72,7 @@ try {
     await page.click(`button[aria-label="Zjeżdża / ON AIR: #${participant.startNumber} ${participant.firstName} Rossi"]`);
     await page.waitForFunction(name => document.querySelector('.live-current .live-rider-details strong')?.textContent === name, {}, `${participant.firstName} Rossi`);
     assert.equal(state.participant.photo, participant.photo);
-    assert.deepEqual(actions.at(-1), { action: 'on-air', id: participant.id });
+    assert.deepEqual(actions.at(-1), { action: 'on-air', id: participant.id, mode: 'live' });
   }
   assert.deepEqual(errors, []);
   console.log('PASS: mobile camera input, gallery fallback, shared mask, two saved photos, save without activation, one-click rider switch, no mobile overflow. Camera hardware is not exercised.');

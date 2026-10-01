@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Loader2, Pencil, Printer, Search, ShieldAlert, Trash2, X } from 'lucide-react';
 import { Highlighter } from './Highlighter';
 import { cn, formatMoment } from '@/lib/utils';
@@ -41,6 +41,8 @@ export function Registrations({
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<RosterRow | null>(null);
   const live = useRosterLive(apiKey);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const confirmLock = useRef(false);
 
   const load = useCallback(() => {
     setError('');
@@ -75,6 +77,21 @@ export function Registrations({
   /** Replaces one row with what the server says it now holds. */
   const applyRow = (row: RosterRow) =>
     setRows((current) => (current ? current.map((one) => (one.id === row.id ? row : one)) : current));
+
+  const confirmEntry = async (row: RosterRow) => {
+    if (confirmLock.current || row.status !== 'new') return;
+    if (!window.confirm(`${t('reg.confirmPrompt')}\n#${row.raceNumber} ${row.firstName} ${row.lastName}`)) return;
+    confirmLock.current = true;
+    setConfirming(row.id);
+    setError('');
+    try {
+      const result = await updateRegistration(apiKey, row.id, { status: 'confirmed' });
+      if (result.row) applyRow(result.row); else load();
+      live.refresh();
+      onChanged();
+    } catch { setError('write'); }
+    finally { confirmLock.current = false; setConfirming(null); }
+  };
 
   const remove = async (row: RosterRow) => {
     const question = pl
@@ -246,7 +263,7 @@ export function Registrations({
                     <div className="font-semibold text-foreground">
                       <Highlighter text={`${row.firstName} ${row.lastName}`.trim() || '—'} query={highlightQuery || query} />
                     </div>
-                    <RosterLiveActions live={live} row={row} t={t} />
+                    <RosterLiveActions live={live} row={row} t={t} confirming={confirming !== null} onConfirm={() => void confirmEntry(row)} />
                     {row.isMinor ? (
                       <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-destructive/20 px-2 py-0.5 text-[11px] font-bold text-destructive">
                         <ShieldAlert className="size-3" />
@@ -287,7 +304,7 @@ export function Registrations({
                     >
                       {row.category || '—'}
                     </span>
-                    <div className="mt-1 text-[11px] uppercase text-muted-foreground">{row.status}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{t(row.status === 'new' ? 'reg.statusNew' : row.status === 'confirmed' ? 'reg.statusConfirmed' : 'reg.statusWithdrawn')}</div>
                   </td>
                   <td className="px-4 py-3 text-[12px] text-muted-foreground">
                     <div className="break-all"><Highlighter text={row.email || '—'} query={highlightQuery || query} /></div>

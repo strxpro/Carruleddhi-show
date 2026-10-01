@@ -117,7 +117,7 @@ try {
 
   await page.click(activate('r-new'));
   await waitRevision(2);
-  assert.deepEqual(actions.at(-1), { action: 'on-air', id: 'p-new' });
+  assert.deepEqual(actions.at(-1), { action: 'on-air', id: 'p-new', mode: 'live' });
   assert.match(await page.$eval('[data-roster-current]', el => el.textContent), /#7 New Rossi/);
   await waitEnabled('[data-roster-hide]');
   await page.click('[data-roster-hide]');
@@ -127,7 +127,7 @@ try {
   await waitEnabled('[data-roster-show]');
   await page.click('[data-roster-show]');
   await waitRevision(4);
-  assert.deepEqual(actions.at(-1), { action: 'on-air', id: 'p-new' });
+  assert.deepEqual(actions.at(-1), { action: 'on-air', id: 'p-new', mode: 'live' });
   await waitEnabled(activate('r-next'));
   await page.click(activate('r-next'));
   await waitRevision(5);

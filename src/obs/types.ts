@@ -34,4 +34,5 @@ export interface BroadcastState {
 export interface BroadcastConnection {
   status: 'connecting' | 'live' | 'reconnecting' | 'error';
   message?: string;
+  code?: string;
 }

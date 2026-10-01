@@ -6,19 +6,19 @@
   "rewrites": [
     {
       "source": "/obs/replay",
-      "destination": "/obs-replay.html"
+      "destination": "/obs-replay"
     },
     {
       "source": "/obs/overlay",
-      "destination": "/obs-overlay.html"
+      "destination": "/obs-overlay"
     },
     {
       "source": "/obs/participant",
-      "destination": "/obs-participant.html"
+      "destination": "/obs-participant"
     },
     {
       "source": "/obs/sponsors",
-      "destination": "/obs-sponsors.html"
+      "destination": "/obs-sponsors"
     },
     {
       "source": "/api/carruleddhi/:type",

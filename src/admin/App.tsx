@@ -435,6 +435,14 @@ export default function App() {
             <RefreshCw className="size-4" strokeWidth={1.5} />
           </button>
 
+          <div className="flex shrink-0 rounded-lg border border-border p-0.5" role="group" aria-label="Lingua / Język">
+            {(['it', 'pl'] as const).map((language) => <button key={language} type="button" aria-pressed={locale === language}
+              title={language === 'it' ? 'Italiano' : 'Polski'} onClick={() => setLocale(language)}
+              className={`rounded-md px-2 py-1.5 text-xs font-bold ${locale === language ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}>
+              {language.toUpperCase()}
+            </button>)}
+          </div>
+
           {/* The bell, and what is behind it.
               It used to mark everything read and open the dashboard — so "what is new" was
               answered with six totals and no way to see what any of them referred to. Now it

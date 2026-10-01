@@ -162,7 +162,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
       </span>
       {state && <span>{t('live.revision')}: {state.revision} / {new Date(state.updated_at).toLocaleString(t('locale.intl'))}</span>}
     </div>
-    {realtimeMissing && <p className="live-warning" role="alert">{t('live.realtimeMissing')} <code>{admin.realtime.code}</code></p>}
+    {realtimeMissing && <p className="live-warning" role="alert">{t('live.realtimeMissing')} {t('live.realtimeSetup')}</p>}
     {admin && admin.timingReady !== true && <p className="live-warning">{t('vote.timingUnavailable')}</p>}
     {!!admin?.assetWarnings?.length && <div className="live-warning" role="alert">
       <p>{t('live.assetWarning')}</p>

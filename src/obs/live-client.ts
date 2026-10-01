@@ -4,7 +4,7 @@ import type { BroadcastConnection, BroadcastState } from './types';
 interface SnapshotResponse {
   ok: boolean;
   state?: BroadcastState;
-  realtime?: { url: string; anonKey: string };
+  realtime?: { url: string; anonKey: string | null; code?: string };
   error?: string;
   code?: string;
 }
@@ -51,7 +51,7 @@ export function subscribeBroadcast(
         if (disposed) return;
         accept(data.state);
         if (!client) {
-          if (!data.realtime?.url || !data.realtime.anonKey) throw new Error('Supabase Realtime is not configured. Set the public anon/publishable key on the server.');
+          if (!data.realtime?.url || !data.realtime.anonKey) throw Object.assign(new Error('Supabase Realtime is not configured. Set the public anon/publishable key on the server.'), { code: 'REALTIME_NOT_CONFIGURED' });
           client = createClient(data.realtime.url, data.realtime.anonKey, {
             auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
           });
@@ -78,7 +78,7 @@ export function subscribeBroadcast(
         if (connected) status({ status: 'live' });
       } catch (error) {
         if (disposed) return;
-        status({ status: revision < 0 ? 'error' : 'reconnecting', message: error instanceof Error ? error.message : 'Broadcast connection failed' });
+        status({ status: revision < 0 ? 'error' : 'reconnecting', message: error instanceof Error ? error.message : 'Broadcast connection failed', code: error instanceof Error && 'code' in error ? String(error.code) : undefined });
         scheduleRetry();
       }
     })().finally(() => {

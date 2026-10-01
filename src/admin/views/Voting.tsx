@@ -1105,7 +1105,7 @@ function ParticipantRow({
            przewijaniem bez końca. */
         'grid gap-3 rounded-2xl border p-3',
         'grid-cols-[96px_minmax(0,1fr)] items-start',
-        'sm:grid-cols-[72px_minmax(0,1fr)_auto] sm:items-center',
+        'sm:grid-cols-[72px_minmax(0,1fr)] sm:items-center',
         row.active ? 'border-white/10 bg-white/5' : 'border-white/10 bg-transparent opacity-60',
         fresh && 'border-yellow/70 bg-yellow/10 ring-2 ring-yellow/20'
       )}
@@ -1155,7 +1155,7 @@ function ParticipantRow({
         }}
       />
 
-      <div className="grid gap-2 sm:grid-cols-[86px_minmax(0,1fr)_auto] sm:items-center">
+      <div className="min-w-0 grid gap-2 sm:grid-cols-[86px_minmax(0,1fr)_auto] sm:items-center">
         <input
           inputMode="numeric"
           value={startNumber}
@@ -1190,13 +1190,13 @@ function ParticipantRow({
         </p>
       </div>
 
-      <div className="col-span-full text-white">
+      <div className="col-span-full min-w-0 rounded-xl border border-white/10 bg-black/10 px-3 py-2 text-white sm:col-start-2 sm:col-end-3">
         <RaceTimeEditor value={row.raceTimeMs} timingReady={timingReady} disabled={busy} t={t}
           onSave={(raceTimeMs) => onSave({ raceTimeMs })} />
       </div>
       {/* Przyciski pod spodem na całą szerokość telefonu: obok danych mieściły się tylko
           ściśnięte w dwóch rzędach, a to są trzy różne czynności, z których jedna usuwa. */}
-      <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:justify-end">
+      <div className="col-span-full flex flex-wrap items-center justify-end gap-2 border-t border-white/10 pt-3">
         {dirty ? (
           <button
             type="button"
@@ -1213,7 +1213,8 @@ function ParticipantRow({
           onClick={() => onSave({ active: !row.active })}
           className={cn(
             chip,
-            row.active ? 'bg-white/10 text-white/50 hover:bg-white/20 shadow-inner ring-1 ring-inset ring-black/40' : 'bg-blue-600 text-white hover:bg-blue-500'
+             'whitespace-nowrap',
+             row.active ? 'bg-white/10 text-white/80 hover:bg-white/20 shadow-inner ring-1 ring-inset ring-black/40' : 'bg-blue-600 text-white hover:bg-blue-500'
           )}
         >
           {row.active ? t('vote.active') : t('vote.inactive')}
