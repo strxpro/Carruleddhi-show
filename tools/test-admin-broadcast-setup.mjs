@@ -32,9 +32,9 @@ try {
     const respond = (data, status = 200) => request.respond({ status, contentType: 'application/json', body: JSON.stringify(data) });
     if (path.endsWith('/inbox')) return respond({ ok: true, total: 0, counts: {} });
     if (path.endsWith('/roster')) {
-      if (body.action === 'update') {
+      if (body.action === 'confirm') {
         writes.push(body);
-        assert.deepEqual(body, { action: 'update', id: row.id, status: 'confirmed' });
+        assert.deepEqual(body, { action: 'confirm', id: row.id });
         if (failConfirm) return respond({ ok: false, code: 'ROSTER_WRITE_FAILED' }, 502);
         row.status = 'confirmed'; state.revision++;
         return respond({ ok: true, row });

@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import puppeteer from 'puppeteer';
+
+const browser = await puppeteer.launch({ headless: true });
+try {
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewport({ width: 1920, height: 1080 });
+  let state = { id: 'main', revision: 1, participant: null, participant_visible: false, participant_mode: 'live', sponsors_enabled: false, sponsors: [], updated_at: new Date().toISOString() };
+  await page.setRequestInterception(true);
+  page.on('request', request => {
+    if (new URL(request.url()).pathname !== '/api/carruleddhi/broadcast') return request.continue();
+    return request.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, state, realtime: { url: '', anonKey: null, ready: false } }) });
+  });
+  const origin = process.env.OBS_TEST_ORIGIN || 'http://127.0.0.1:5199';
+  const open = async path => { state.revision++; await page.goto(`${origin}${path}`, { waitUntil: 'networkidle0' }); };
+  await open('/obs/sponsors');
+  assert.equal(await page.$('.obs-preview-panel'), null, 'clean OBS source never displays instructions');
+  assert.equal(await page.$('.obs-sponsor-slot'), null, 'no fake sponsors are invented');
+  assert.equal(await page.$eval('body', node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  await open('/obs/sponsors?preview=1&lang=pl');
+  assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /Nie dodano jeszcze sponsorów/);
+  assert.ok(await page.$('a[href="/admin?tab=live"]'));
+  assert.ok(await page.$('a[href="/obs/sponsors"]'));
+  await page.screenshot({ path: 'shots/obs-sponsors-empty-guide.png' });
+  state.sponsors = [{ id: 'a', name: 'Sponsor testowy', logo: '', url: '', active: true, order: 0, tier: 'partner' }];
+  await open('/obs/sponsors?preview=1&lang=pl');
+  assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /jest wyłączona/);
+  state.sponsors_enabled = true;
+  await open('/obs/sponsors?preview=1&lang=pl');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.obs-sponsors')).opacity === '1');
+  assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /Karuzela włączona/);
+  state.sponsors[0].active = false;
+  await open('/obs/sponsors?preview=1&lang=it');
+  assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /Tutti gli sponsor sono inattivi/);
+  state.participant = { id: 'p-one', firstName: 'Anna', lastName: 'Rossi', startNumber: 8, category: 'classic', city: 'Gallura', projectName: 'Cart', photo: '', raceTimeMs: 83456 };
+  state.participant_visible = true;
+  await open('/obs/replay');
+  await page.waitForSelector('.obs-race-time');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.obs-participant')).clipPath === 'inset(0px 0% 0px 0px)' || getComputedStyle(document.querySelector('.obs-participant')).opacity === '1');
+  assert.match(await page.$eval('.obs-race-time', node => node.textContent), /01:23.456/);
+  const fits = await page.$eval('.obs-race-time', badge => {
+    const b = badge.getBoundingClientRect(), card = badge.closest('.obs-participant').getBoundingClientRect();
+    return b.left >= card.left && b.right <= card.right && b.top >= card.top && b.bottom <= card.bottom;
+  });
+  assert.ok(fits, 'replay time must remain inside the animated clipping mask');
+  await page.screenshot({ path: 'shots/obs-replay-time-visible.png', omitBackground: true });
+  await open('/obs/participant');
+  await page.waitForSelector('.obs-participant');
+  assert.equal(await page.$('.obs-race-time'), null, 'normal source remains distinct from replay');
+  await page.setViewport({ width: 390, height: 844 });
+  await open('/obs/sponsors?preview=1&lang=it');
+  assert.ok(await page.$eval('.obs-preview-panel', panel => { const r = panel.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }));
+  assert.deepEqual(errors, []);
+  console.log('PASS: transparent clean sources, empty/off/inactive/ready sponsor guides PL/IT, no invented sponsors, replay time inside mask, mobile preview.');
+} finally { await browser.close(); }

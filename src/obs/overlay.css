@@ -50,4 +50,16 @@ body{font-family:ObsBaloo,sans-serif;color:var(--obs-cream);-webkit-font-smoothi
 .obs-diagnostics p{margin:6px 0 0}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}}
 
-.obs-race-time{position:absolute;left:0;right:0;bottom:-68px;height:58px;border-radius:14px;background:var(--obs-navy);border:2px solid var(--obs-yellow);color:var(--obs-yellow);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:12px;font-variant-numeric:tabular-nums}.obs-race-time span{font-size:14px;font-weight:800}.obs-race-time strong{font-size:30px}
+.obs-race-time{position:absolute;left:20px;right:150px;top:318px;height:60px;z-index:3;border-radius:14px;background:var(--obs-navy);border:2px solid var(--obs-yellow);color:var(--obs-yellow);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 8px;font-variant-numeric:tabular-nums}.obs-race-time span{font-size:11px;font-weight:800;line-height:1}.obs-race-time strong{font-size:30px;line-height:1.2}
+.obs-preview-backdrop{position:fixed;inset:0;background:repeating-conic-gradient(#232a36 0 25%,#1b212c 0 50%) 0 / 40px 40px}
+.obs-preview-panel{position:fixed;left:24px;top:24px;width:min(460px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow:auto;z-index:10;padding:22px;border-radius:20px;background:var(--obs-navy);border:1px solid #526077;color:var(--obs-cream);font-size:16px;line-height:1.4;box-shadow:0 12px 36px #0005}
+.obs-preview-panel header{display:flex;gap:12px;justify-content:space-between;align-items:center;font-size:14px}
+.obs-preview-panel header strong{font-size:20px}
+.obs-preview-panel [data-preview-connection="live"]{color:var(--obs-yellow)}
+.obs-preview-panel section{border-top:1px solid #ffffff24;margin-top:16px;padding-top:16px}
+.obs-preview-panel h2{font-size:22px;line-height:1.15;margin:0 0 8px;color:var(--obs-yellow)}
+.obs-preview-panel p{margin:0}
+.obs-preview-panel nav{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+.obs-preview-panel a{display:inline-block;border:1px solid #ffffff40;border-radius:999px;padding:9px 14px;text-decoration:none;font-weight:800;color:var(--obs-cream)}
+.obs-preview-panel a:first-child{background:var(--obs-yellow);border-color:var(--obs-yellow);color:var(--obs-navy)}
+.obs-preview-panel .obs-preview-note{font-size:13px;color:#bcd6ff}

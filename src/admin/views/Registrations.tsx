@@ -4,6 +4,7 @@ import { Highlighter } from './Highlighter';
 import { cn, formatMoment } from '@/lib/utils';
 import type { PanelLocale, TranslateKey } from '../i18n';
 import {
+  confirmRegistration,
   deleteRegistration,
   fetchFormsBundle,
   fetchRoster,
@@ -43,6 +44,10 @@ export function Registrations({
   const live = useRosterLive(apiKey);
   const [confirming, setConfirming] = useState<string | null>(null);
   const confirmLock = useRef(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [batchResult, setBatchResult] = useState<{ succeeded: number; failed: number; skipped: number; snapshotFailed?: boolean } | null>(null);
 
   const load = useCallback(() => {
     setError('');
@@ -74,18 +79,80 @@ export function Registrations({
     return [...found].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [rows, query]);
 
+  const eligible = visible.filter((row) => row.status === 'new');
+  const selectedRows = eligible.filter((row) => selected.has(row.id));
+  const selectionDisabled = batchBusy || confirming !== null || writeBusy || editing !== null;
+  const allSelected = eligible.length > 0 && selectedRows.length === eligible.length;
+
+  const confirmSelected = async () => {
+    if (confirmLock.current || selectionDisabled || selectedRows.length === 0) return;
+    const ids = selectedRows.map((row) => row.id);
+    const prompt = pl
+      ? `Potwierdzić wybrane nowe zgłoszenia (${ids.length})? Pozostałe zgłoszenia nie zostaną zmienione. Aktualny status zostanie sprawdzony przed zapisem.`
+      : `Confermare le nuove iscrizioni selezionate (${ids.length})? Le altre iscrizioni non saranno modificate. Lo stato attuale sarà verificato prima del salvataggio.`;
+    if (!window.confirm(prompt)) return;
+    confirmLock.current = true;
+    setBatchBusy(true);
+    setBatchResult(null);
+    setError('');
+    const result = { succeeded: 0, failed: 0, skipped: 0, snapshotFailed: false };
+    const failed = new Set<string>();
+    let statusChanged = false;
+    try {
+      // A fresh UUID snapshot excludes withdrawn, confirmed and missing entries; never match numbers or email.
+      const snapshot = await fetchRoster(apiKey);
+      if (!Array.isArray(snapshot.rows)) throw new Error('Invalid roster snapshot');
+      setRows(snapshot.rows);
+      const current = new Map(snapshot.rows.map((row) => [row.id, row]));
+      for (const id of ids) {
+        if (current.get(id)?.status !== 'new') { result.skipped++; continue; }
+        try {
+          const response = await confirmRegistration(apiKey, id);
+          if (!response.row || response.row.id !== id || response.row.status !== 'confirmed') throw new Error('Confirmation not acknowledged');
+          applyRow(response.row);
+          result.succeeded++;
+        } catch (problem) {
+          if ((problem as { code?: string }).code === 'ROSTER_STATUS_CONFLICT') {
+            result.skipped++;
+            statusChanged = true;
+          } else {
+            result.failed++;
+            failed.add(id);
+          }
+        }
+      }
+    } catch {
+      result.failed = ids.length;
+      result.snapshotFailed = true;
+      ids.forEach((id) => failed.add(id));
+    } finally {
+      setSelected(failed);
+      setBatchResult(result);
+      confirmLock.current = false;
+      setBatchBusy(false);
+      if (statusChanged) load();
+      if (result.succeeded > 0) { live.refresh(); onChanged(); }
+    }
+  };
+
   /** Replaces one row with what the server says it now holds. */
-  const applyRow = (row: RosterRow) =>
+  const applyRow = (row: RosterRow) => {
     setRows((current) => (current ? current.map((one) => (one.id === row.id ? row : one)) : current));
+    if (row.status !== 'new') setSelected((current) => {
+      const next = new Set(current);
+      next.delete(row.id);
+      return next;
+    });
+  };
 
   const confirmEntry = async (row: RosterRow) => {
-    if (confirmLock.current || row.status !== 'new') return;
+    if (confirmLock.current || editing || row.status !== 'new') return;
     if (!window.confirm(`${t('reg.confirmPrompt')}\n#${row.raceNumber} ${row.firstName} ${row.lastName}`)) return;
     confirmLock.current = true;
     setConfirming(row.id);
     setError('');
     try {
-      const result = await updateRegistration(apiKey, row.id, { status: 'confirmed' });
+      const result = await confirmRegistration(apiKey, row.id);
       if (result.row) applyRow(result.row); else load();
       live.refresh();
       onChanged();
@@ -94,10 +161,13 @@ export function Registrations({
   };
 
   const remove = async (row: RosterRow) => {
+    if (confirmLock.current || editing) return;
     const question = pl
       ? `Usunąć zgłoszenie ${row.firstName} ${row.lastName} na zawsze? Do rezygnacji użyj statusu „withdrawn" — wtedy numer wraca do puli, a wiersz zostaje.`
       : `Eliminare per sempre l’iscrizione di ${row.firstName} ${row.lastName}? Per un ritiro usa lo stato «withdrawn»: il numero torna disponibile e la riga resta.`;
     if (!window.confirm(question)) return;
+    confirmLock.current = true;
+    setWriteBusy(true);
     try {
       await deleteRegistration(apiKey, row.id);
       setRows((current) => (current ? current.filter((one) => one.id !== row.id) : current));
@@ -105,6 +175,9 @@ export function Registrations({
       live.refresh();
     } catch {
       setError('write');
+    } finally {
+      confirmLock.current = false;
+      setWriteBusy(false);
     }
   };
 
@@ -194,7 +267,8 @@ export function Registrations({
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            disabled={batchBusy}
+            onChange={(event) => { setQuery(event.target.value); setSelected(new Set()); }}
             placeholder={t('reg.search')}
             className="w-full rounded-xl border border-border bg-card py-2.5 pl-10 pr-3.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary"
           />
@@ -204,10 +278,43 @@ export function Registrations({
         </span>
       </div>
 
+      <section className="mt-4 rounded-xl border border-border bg-card p-3" aria-label={pl ? 'Potwierdzanie wybranych zgłoszeń' : 'Conferma iscrizioni selezionate'} data-roster-bulk>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" data-roster-select-all checked={allSelected}
+              ref={(input) => { if (input) input.indeterminate = selectedRows.length > 0 && !allSelected; }}
+              disabled={selectionDisabled || eligible.length === 0}
+              onChange={(event) => setSelected(event.target.checked ? new Set(eligible.map((row) => row.id)) : new Set())}
+              className="size-5 accent-primary" />
+            {pl ? 'Zaznacz nowe w wynikach' : 'Seleziona nuove nei risultati'} ({eligible.length})
+          </label>
+          <span className="text-sm font-semibold" data-roster-selected-count>{pl ? 'Wybrane' : 'Selezionate'}: {selectedRows.length}</span>
+          <button type="button" data-roster-clear-selection disabled={selectionDisabled || selectedRows.length === 0}
+            onClick={() => setSelected(new Set())} className="min-h-11 rounded-full border border-border px-4 py-2 text-xs font-semibold disabled:opacity-40">
+            {pl ? 'Wyczyść wybór' : 'Deseleziona'}
+          </button>
+          <button type="button" data-roster-bulk-confirm disabled={selectionDisabled || selectedRows.length === 0}
+            onClick={() => void confirmSelected()} className="flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-40">
+            {batchBusy && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+            {batchBusy ? (pl ? 'Potwierdzanie...' : 'Conferma in corso...') : (pl ? 'Potwierdź wybrane' : 'Conferma selezionate')}
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{pl
+          ? 'Tylko nowe zgłoszenia w bieżących wynikach. Zmiana wyszukiwania czyści wybór.'
+          : 'Solo nuove iscrizioni nei risultati attuali. Cambiare la ricerca cancella la selezione.'}</p>
+        {batchBusy && <p role="status" className="mt-2 text-sm">{pl ? 'Sprawdzanie statusów i zapisywanie wybranych zgłoszeń...' : 'Verifica degli stati e salvataggio delle iscrizioni selezionate...'}</p>}
+        {batchResult && <div role="status" className="mt-2 text-sm" data-roster-bulk-result>
+          <p>{pl ? 'Potwierdzone' : 'Confermate'}: {batchResult.succeeded}. {pl ? 'Nieudane' : 'Non riuscite'}: {batchResult.failed}. {pl ? 'Pominięte' : 'Ignorate'}: {batchResult.skipped}.</p>
+          {batchResult.snapshotFailed && <p>{pl ? 'Nie udało się sprawdzić aktualnych statusów. Nie wysłano żadnych zmian.' : 'Impossibile verificare gli stati attuali. Nessuna modifica inviata.'}</p>}
+          {batchResult.failed > 0 && <p>{pl ? 'Nieudane pozostały zaznaczone. Spróbuj ponownie.' : 'Le iscrizioni non riuscite restano selezionate. Riprova.'}</p>}
+          {batchResult.skipped > 0 && <p>{pl ? 'Pominięto zgłoszenia, które nie są już nowe lub nie istnieją.' : 'Ignorate le iscrizioni non più nuove o non più presenti.'}</p>}
+        </div>}
+      </section>
+
       {error ? (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground">
           {t('common.error')}
-          <button type="button" onClick={load} className="ml-auto underline">
+          <button type="button" onClick={load} disabled={batchBusy} className="ml-auto underline">
             {t('common.retry')}
           </button>
         </div>
@@ -258,12 +365,21 @@ export function Registrations({
                 >
                   <td className="px-4 py-3 font-mono text-base font-bold text-primary">
                     {row.raceNumber || '—'}
+                    {row.status === 'new' && <label className="mt-1 flex min-h-11 min-w-11 cursor-pointer items-center">
+                      <input type="checkbox" data-roster-select={row.id} checked={selected.has(row.id)} disabled={selectionDisabled}
+                        aria-label={`${pl ? 'Wybierz' : 'Seleziona'} #${row.raceNumber} ${row.firstName} ${row.lastName}`}
+                        onChange={(event) => setSelected((current) => {
+                          const next = new Set(current);
+                          if (event.target.checked) next.add(row.id); else next.delete(row.id);
+                          return next;
+                        })} className="size-5 accent-primary" />
+                    </label>}
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-foreground">
                       <Highlighter text={`${row.firstName} ${row.lastName}`.trim() || '—'} query={highlightQuery || query} />
                     </div>
-                    <RosterLiveActions live={live} row={row} t={t} confirming={confirming !== null} onConfirm={() => void confirmEntry(row)} />
+                    <RosterLiveActions live={live} row={row} t={t} confirming={confirming !== null || batchBusy || writeBusy || editing !== null} onConfirm={() => void confirmEntry(row)} />
                     {row.isMinor ? (
                       <div className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-destructive/20 px-2 py-0.5 text-[11px] font-bold text-destructive">
                         <ShieldAlert className="size-3" />
@@ -350,6 +466,7 @@ export function Registrations({
                       </button>
                       <button
                         type="button"
+                        disabled={batchBusy || confirming !== null || writeBusy}
                         onClick={() => setEditing(row)}
                         title={pl ? 'Edytuj' : 'Modifica'}
                         className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -358,6 +475,7 @@ export function Registrations({
                       </button>
                       <button
                         type="button"
+                        disabled={batchBusy || confirming !== null || writeBusy}
                         onClick={() => remove(row)}
                         title={pl ? 'Usuń na zawsze' : 'Elimina per sempre'}
                         className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive"
@@ -391,12 +509,20 @@ export function Registrations({
           pl={pl}
           onClose={() => setEditing(null)}
           onSave={async (changes) => {
-            const result = await updateRegistration(apiKey, editing.id, changes);
-            if (result.row) applyRow(result.row);
-            else load();
-            onChanged();
-            live.refresh();
-            setEditing(null);
+            if (confirmLock.current) return;
+            confirmLock.current = true;
+            setWriteBusy(true);
+            try {
+              const result = await updateRegistration(apiKey, editing.id, changes);
+              if (result.row) applyRow(result.row);
+              else load();
+              onChanged();
+              live.refresh();
+              setEditing(null);
+            } finally {
+              confirmLock.current = false;
+              setWriteBusy(false);
+            }
           }}
         />
       ) : null}

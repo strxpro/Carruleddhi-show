@@ -112,7 +112,7 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   assert.ok(await page.$('a[href="/obs/participant"]'));
   assert.ok(await page.$('a[href="/obs/sponsors"]'));
-  assert.ok(await page.$('a[href="/obs/overlay"]'));
+  assert.ok(await page.$('a[href^="/obs/overlay?preview=1"]'));
   const sponsors = structuredClone(state.sponsors);
 
   await page.click(activate('r-new'));

@@ -5140,9 +5140,9 @@ async function roster(env, payload, cors) {
   const id = String(payload.id || '');
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ ok: false, code: 'ROSTER_BAD_ID' }, 422, cors);
 
-  if (action === 'update') {
-    const patch = {};
-    for (const [key, column] of Object.entries(ROSTER_EDITABLE)) {
+  if (action === 'update' || action === 'confirm') {
+    const patch = action === 'confirm' ? { status: 'confirmed' } : {};
+    for (const [key, column] of action === 'confirm' ? [] : Object.entries(ROSTER_EDITABLE)) {
       if (payload[key] === undefined) continue;
 
       if (key === 'category') {
@@ -5190,7 +5190,7 @@ async function roster(env, payload, cors) {
     }
 
     const response = await fetch(
-      `${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${id}&select=${ROSTER_COLUMNS}`,
+      `${env.SUPABASE_URL}/rest/v1/registrations?id=eq.${id}${action === 'confirm' ? '&status=eq.new' : ''}&select=${ROSTER_COLUMNS}`,
       {
         method: 'PATCH',
         headers: supabaseHeaders(env, { Prefer: 'return=representation' }),
@@ -5208,6 +5208,9 @@ async function roster(env, payload, cors) {
       );
     }
     const rows = await response.json().catch(() => []);
+    if (action === 'confirm' && (!Array.isArray(rows) || !rows[0])) {
+      return json({ ok: false, code: 'ROSTER_STATUS_CONFLICT' }, 409, cors);
+    }
     // The updated row goes back so the panel shows what the database actually holds rather
     // than what it hoped it wrote — the race-number trigger can change it on a withdrawal.
     return json({ ok: true, row: Array.isArray(rows) && rows[0] ? rosterRow(rows[0]) : null }, 200, cors);

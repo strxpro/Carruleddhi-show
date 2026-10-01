@@ -345,6 +345,9 @@ export const fetchRoster = (key: string, limit = 500) =>
 export const updateRegistration = (key: string, id: string, changes: RosterEdit) =>
   call<{ ok: true; row: RosterRow | null }>('roster', key, { action: 'update', id, ...changes });
 
+export const confirmRegistration = (key: string, id: string) =>
+  call<{ ok: true; row: RosterRow }>('roster', key, { action: 'confirm', id });
+
 export const deleteRegistration = (key: string, id: string) =>
   call<{ ok: true; deleted: true }>('roster', key, { action: 'delete', id });
 

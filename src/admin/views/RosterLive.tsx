@@ -138,7 +138,7 @@ export function RosterLiveSummary({ live, t, rows }: { live: Live; t: Translate;
       <button type="button" className={button} data-roster-replay-current disabled={live.disabled || !currentRow || !live.timingReady} onClick={() => current && void live.run({ action: 'on-air', id: current.id, mode: 'replay' })}>{t('live.replay')}</button>
       <button type="button" className={button} data-roster-clear disabled={live.disabled || !current} onClick={() => void live.run({ action: 'clear' })}>{t('live.clear')}</button>
       <button type="button" className={button} disabled={live.pending} onClick={live.refresh}>{t('live.refresh')}</button>
-      <a className={button} href="/obs/overlay" target="_blank" rel="noreferrer">{t('live.preview')}</a>
+      <a className={button} href={`/obs/overlay?preview=1&lang=${t('locale.intl').startsWith('pl') ? 'pl' : 'it'}`} target="_blank" rel="noreferrer">{t('live.preview')}</a>
     </div>
     {live.pending && <p role="status" className="mt-2 text-xs">{t('common.loading')}</p>}
     {live.error && <p role="alert" className="mt-2 text-sm text-destructive">{t('live.failed')} <button type="button" className="underline" disabled={live.pending} onClick={live.refresh}>{t('common.retry')}</button></p>}

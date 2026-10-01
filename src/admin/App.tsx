@@ -90,7 +90,11 @@ export default function App() {
   const dict = dictionaries[locale];
   const t = useCallback((key: TranslateKey) => dict[key], [dict]);
 
-  const [tab, setTab] = useState<TabId>(() => (sessionStorage.getItem(TAB_KEY) as TabId) || 'dashboard');
+  const [tab, setTab] = useState<TabId>(() => {
+    const linked = new URLSearchParams(location.search).get('tab');
+    if (linked === 'live') return 'live';
+    return (sessionStorage.getItem(TAB_KEY) as TabId) || 'dashboard';
+  });
   useEffect(() => {
     sessionStorage.setItem(TAB_KEY, tab);
   }, [tab]);

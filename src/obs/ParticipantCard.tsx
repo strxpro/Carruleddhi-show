@@ -45,9 +45,9 @@ export function ParticipantCard({ participant, visible, mode = 'live' }: { parti
             {ready.projectName && <span className="obs-project">{ready.projectName}</span>}
           </div>
         </motion.div>
+        {mode === 'replay' && formatRaceTime(ready.raceTimeMs) && <div className="obs-race-time"><span>TEMPO</span><strong>{formatRaceTime(ready.raceTimeMs)}</strong></div>}
       </motion.article>}
     </AnimatePresence>
-    {ready && visible && mode === 'replay' && formatRaceTime(ready.raceTimeMs) && <div className="obs-race-time"><span>TEMPO</span><strong>{formatRaceTime(ready.raceTimeMs)}</strong></div>}
   </div>;
 }
 

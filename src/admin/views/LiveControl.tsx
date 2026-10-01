@@ -240,6 +240,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
           </button>
         </div>
         <p className="live-help">{t('live.sponsorsToggleHint')}</p><p className="live-help">{t('live.sponsorsHint')}</p>
+        {(!sponsors.some(s => s.active) || !state.sponsors_enabled) && <p className="live-warning" role="status" data-sponsor-empty-guide>{t(!sponsors.length ? 'live.sponsorSetupEmpty' : !sponsors.some(s => s.active) ? 'live.sponsorSetupInactive' : 'live.sponsorSetupOff')}</p>}
         <ul className="live-list">
           {sponsors.map((one, index) => <li key={one.id} className="live-list-row">
             <div className="live-sponsor-identity">
@@ -303,7 +304,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
             try { await navigator.clipboard.writeText(`${window.location.origin}${source.path}`); setCopyNote('live.copied'); }
             catch { setCopyNote('live.copyFailed'); }
           }}><Copy size={16} aria-hidden="true" />{t('live.copy')}</button>
-          <a className="live-button" href={source.path} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden="true" />{t('stream.openLink')}</a>
+          <a className="live-button" href={`${source.path}?preview=1&lang=${t('locale.intl').startsWith('pl') ? 'pl' : 'it'}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden="true" />{t('live.preview')}</a>
         </div>
       </div>)}
       <p className="live-help">{t('live.obsVisibilityHint')}</p>
@@ -312,7 +313,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
       </div>
       {copyNote && <p className="live-help" role="status">{t(copyNote)}</p>}
       <p className="live-help">{t('live.previewHint')}</p>
-      {preview && <div id="live-overlay-preview" className="live-preview"><iframe src="/obs/overlay" title={t('live.preview')} tabIndex={-1} /></div>}
+      {preview && <div id="live-overlay-preview" className="live-preview"><iframe src={`/obs/overlay?preview=1&lang=${t('locale.intl').startsWith('pl') ? 'pl' : 'it'}`} title={t('live.preview')} /></div>}
     </section>
   </div>;
 }
