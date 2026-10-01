@@ -4,6 +4,7 @@ import {
   Award,
   BarChart3,
   Radio,
+  MonitorPlay,
   // `Bell` is still here as the sidebar icon for the reminders tab. The bell in the header
   // and its `BellRing` variant moved into NotificationBell together with the dropdown.
   Bell,
@@ -40,6 +41,7 @@ import { Voting } from './views/Voting';
 import { Prizes } from './views/Prizes';
 import { Stats } from './views/Stats';
 import { Stream } from './views/Stream';
+import { LiveControl } from './views/LiveControl';
 import { Season } from './views/Season';
 import { Chat } from './views/Chat';
 import { Wall } from './views/Wall';
@@ -58,6 +60,7 @@ type TabId =
   | 'dashboard'
   | 'stats'
   | 'stream'
+  | 'live'
   | 'season'
   | 'registrations'
   | 'voting'
@@ -171,6 +174,7 @@ export default function App() {
              ktory wlacza i wylacza zakladke WSZYSTKIM odwiedzajacym naraz, wiec ma stac
              tam, gdzie sie na niego patrzy przed startem, a nie miedzy listami. */
           { id: 'stream', title: t('nav.stream'), icon: Radio },
+          { id: 'live', title: t('nav.live'), icon: MonitorPlay },
           /* Podsumowanie sezonu — obok statystyk, z tego samego powodu i z tą samą zasadą.
              To jest ODCZYT o wydarzeniu, a nie prowadzenie wydarzenia: wchodzi się tu po
              zawodach albo rok później, żeby przeczytać rocznik. Świadomie NIE w „Głosowaniu",
@@ -456,6 +460,7 @@ export default function App() {
           ) : null}
           {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
           {tab === 'stream' ? <Stream t={t} apiKey={key} pl={locale === 'pl'} /> : null}
+          {tab === 'live' ? <LiveControl t={t} apiKey={key} /> : null}
           {tab === 'season' ? <Season t={t} apiKey={key} /> : null}
           {tab === 'voting' ? <Voting t={t} apiKey={key} /> : null}
           {tab === 'awards' ? <Prizes t={t} apiKey={key} /> : null}

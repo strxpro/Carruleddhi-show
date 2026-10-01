@@ -135,7 +135,7 @@ function alignCaptions(images: string[], captions: string[]): string[] {
  * the browser already has the pixels and the alternative is pushing four megabytes
  * through a serverless function to throw most of it away.
  */
-function downscale(file: File): Promise<string> {
+export function downscaleSponsorLogo(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('read'));
@@ -372,6 +372,18 @@ export function SettingsView({
   /* The saved list, kept beside the edited one so the "unsaved changes" note is a fact
      rather than a flag somebody has to remember to set. */
   const [savedSponsors, setSavedSponsors] = useState<Sponsor[]>([]);
+  const sponsorsTouched = useRef(false);
+  const [sponsorError, setSponsorError] = useState('');
+  const [sponsorSaving, setSponsorSaving] = useState(false);
+  // Unrelated saves/refreshes may contain newer sponsors, but cannot rebase a dirty editor.
+  const receiveSettings = useCallback((next: SiteSettings, replaceSponsors = false) => {
+    const preserveSponsors = sponsorsTouched.current && !replaceSponsors;
+    setSettings((current) => ({ ...next, sponsors: preserveSponsors ? current.sponsors : next.sponsors }));
+    if (!preserveSponsors) {
+      sponsorsTouched.current = false;
+      setSavedSponsors(next.sponsors);
+    }
+  }, []);
   const fileInput = useRef<HTMLInputElement>(null);
   const galleryInput = useRef<HTMLInputElement>(null);
   const pendingLogoFor = useRef<number | null>(null);
@@ -391,8 +403,7 @@ export function SettingsView({
       .then((response) => {
         if (!alive) return;
         const captions = alignCaptions(response.settings.galleryImages, response.settings.galleryCaptions);
-        setSettings({ ...response.settings, galleryCaptions: captions });
-        setSavedSponsors(response.settings.sponsors);
+        receiveSettings({ ...response.settings, galleryCaptions: captions });
         galleryImagesRef.current = response.settings.galleryImages;
         galleryCaptionsRef.current = captions;
         setSavedGallery({ images: response.settings.galleryImages, captions });
@@ -419,7 +430,7 @@ export function SettingsView({
     return () => {
       alive = false;
     };
-  }, [apiKey]);
+  }, [apiKey, receiveSettings]);
 
   /**
    * Przyjmuje świeże ustawienia z serwera i przepisuje nimi WSZYSTKIE kopie na tym ekranie.
@@ -431,8 +442,7 @@ export function SettingsView({
    * właśnie ustawił.
    */
   const absorbSettings = useCallback((next: SiteSettings) => {
-    setSettings(next);
-    setSavedSponsors(next.sponsors);
+    receiveSettings(next);
     galleryImagesRef.current = next.galleryImages;
     setEventDraft({
       eventName: next.eventName,
@@ -440,35 +450,42 @@ export function SettingsView({
       eventLocation: next.eventLocation
     });
     setLoadFailed(false);
-  }, []);
+  }, [receiveSettings]);
 
   const push = useCallback(
     async (patch: Partial<SiteSettings>) => {
       setStatus('saving');
+      if (patch.sponsors !== undefined) setSponsorSaving(true);
       try {
-        const response = await saveSettings(apiKey, patch);
-        setSettings(response.settings);
-        setSavedSponsors(response.settings.sponsors);
+        const response = await saveSettings(apiKey, patch, patch.sponsors !== undefined ? savedSponsors : undefined);
+        receiveSettings(response.settings, patch.sponsors !== undefined);
+        if (patch.sponsors !== undefined) setSponsorError('');
         setStatus('saved');
         window.setTimeout(() => setStatus('idle'), 2200);
         return true;
-      } catch (_) {
+      } catch (problem) {
+        if (patch.sponsors !== undefined) setSponsorError(problem instanceof Error ? problem.message : String(problem));
         setStatus('failed');
         return false;
+      } finally {
+        if (patch.sponsors !== undefined) setSponsorSaving(false);
       }
     },
-    [apiKey]
+    [apiKey, savedSponsors, receiveSettings]
   );
 
   const sponsorsDirty = JSON.stringify(settings.sponsors) !== JSON.stringify(savedSponsors);
 
-  const editSponsor = (index: number, patch: Partial<Sponsor>) =>
+  const editSponsor = (index: number, patch: Partial<Sponsor>) => {
+    sponsorsTouched.current = true;
     setSettings((current) => ({
       ...current,
       sponsors: current.sponsors.map((sponsor, i) => (i === index ? { ...sponsor, ...patch } : sponsor))
     }));
+  };
 
-  const move = (index: number, by: number) =>
+  const move = (index: number, by: number) => {
+    sponsorsTouched.current = true;
     setSettings((current) => {
       const next = [...current.sponsors];
       const target = index + by;
@@ -482,8 +499,10 @@ export function SettingsView({
       next[target] = moving;
       return { ...current, sponsors: next };
     });
+  };
 
   const pickLogo = (index: number) => {
+    sponsorsTouched.current = true;
     pendingLogoFor.current = index;
     setUploadError(false);
     fileInput.current?.click();
@@ -499,11 +518,11 @@ export function SettingsView({
     setUploading(true);
     setUploadError(false);
     try {
-      const response = await uploadSponsorLogo(apiKey, await downscale(file));
+      const response = await uploadSponsorLogo(apiKey, await downscaleSponsorLogo(file));
       /* Two values from one upload: the bucket path, which is what gets saved, and a
          signed URL, which is what can be shown. Storing the signed URL would save a
          link that stops working in an hour. */
-      editSponsor(index, { logo: response.logo });
+      editSponsor(index, { logo: response.logo, logoUrl: response.url });
       setPreview((current) => ({ ...current, [response.logo]: response.url }));
     } catch (_) {
       setUploadError(true);
@@ -549,16 +568,14 @@ export function SettingsView({
   const absorbApproved = useCallback(
     (next: SiteSettings | undefined) => {
       if (next) {
-        setSettings(next);
-        setSavedSponsors(next.sponsors);
+        receiveSettings(next);
         galleryImagesRef.current = next.galleryImages;
         setLoadFailed(false);
         return;
       }
       void fetchSettings(apiKey)
         .then((response) => {
-          setSettings(response.settings);
-          setSavedSponsors(response.settings.sponsors);
+          receiveSettings(response.settings);
           galleryImagesRef.current = response.settings.galleryImages;
           setPreview((current) => ({ ...current, ...galleryPreviewMap(response.settings) }));
           setLoadFailed(false);
@@ -570,7 +587,7 @@ export function SettingsView({
           setLoadFailed(true);
         });
     },
-    [apiKey]
+    [apiKey, receiveSettings]
   );
 
   const pickGallery = (index: number) => {
@@ -667,8 +684,7 @@ export function SettingsView({
         eventDate: draftIso,
         eventLocation: eventDraft.eventLocation.trim()
       });
-      setSettings(response.settings);
-      setSavedSponsors(response.settings.sponsors);
+      receiveSettings(response.settings);
       /* Wersja robocza przepisana z odpowiedzi, a nie zostawiona taka, jaka była. Worker
          przycina i normalizuje nazwę oraz miejsce, więc bez tego pole pokazywałoby tekst
          z podwójną spacją, którego w bazie nie ma — i karta zostałaby „brudna" na zawsze,
@@ -693,7 +709,8 @@ export function SettingsView({
     eventReady,
     eventSignature,
     eventYearSane,
-    loadFailed
+    loadFailed,
+    receiveSettings
   ]);
 
   /**
@@ -1096,6 +1113,7 @@ export function SettingsView({
 
       {/* ---------------------------------------------------------- sponsors */}
       <section className="mt-4 rounded-2xl border border-white/10 bg-white/4 p-5">
+        <fieldset disabled={sponsorSaving || uploading || loadFailed}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <h3 className="text-sm font-bold text-white">{t('set.sponsors')}</h3>
@@ -1124,9 +1142,9 @@ export function SettingsView({
                 title={t('set.sponsorLogo')}
                 className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-dashed border-white/20 bg-white/5 text-white/40 hover:border-yellow hover:text-yellow"
               >
-                {logoSrc(sponsor.logo) ? (
+                {sponsor.logoUrl || logoSrc(sponsor.logo) ? (
                   <img
-                    src={logoSrc(sponsor.logo)}
+                    src={sponsor.logoUrl || logoSrc(sponsor.logo)}
                     alt={sponsor.name || t('set.sponsorLogo')}
                     className="size-full object-contain"
                   />
@@ -1189,12 +1207,13 @@ export function SettingsView({
                   <ArrowDown className="size-4" />
                 </button>
                 <ArmedDeleteButton
-                  onConfirm={() =>
+                  onConfirm={() => {
+                    sponsorsTouched.current = true;
                     setSettings((current) => ({
                       ...current,
                       sponsors: current.sponsors.filter((_, i) => i !== index)
-                    }))
-                  }
+                    }));
+                  }}
                   title={t('set.sponsorRemove')}
                 />
               </div>
@@ -1221,12 +1240,13 @@ export function SettingsView({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              sponsorsTouched.current = true;
               setSettings((current) => ({
                 ...current,
                 sponsors: [...current.sponsors, { name: '', url: '', logo: '' }]
-              }))
-            }
+              }));
+            }}
             className="flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2 text-xs font-semibold text-white/80 hover:border-white/60 hover:text-white"
           >
             <Plus className="size-3.5" />
@@ -1235,12 +1255,13 @@ export function SettingsView({
 
           <button
             type="button"
-            disabled={!sponsorsDirty || status === 'saving'}
+            disabled={!sponsorsDirty || status === 'saving' || uploading || loadFailed}
             onClick={() =>
               push({
                 // A row with no name is a row somebody started and abandoned; it would
                 // render as an empty tile on the public page.
                 sponsors: settings.sponsors.filter((sponsor) => sponsor.name.trim())
+                  .map(({ logoUrl: _preview, ...sponsor }, order) => ({ ...sponsor, order }))
               })
             }
             className="rounded-full bg-yellow px-4 py-2 text-xs font-bold text-navy-950 disabled:opacity-40"
@@ -1256,10 +1277,15 @@ export function SettingsView({
           {status === 'saved' ? (
             <span className="text-[12px] text-emerald-300">{t('set.saved')}</span>
           ) : null}
-          {status === 'failed' ? (
+          {status === 'failed' && !sponsorError ? (
             <span className="text-[12px] text-coral">{t('set.saveFailed')}</span>
           ) : null}
         </div>
+        </fieldset>
+        {sponsorError && <p role="alert" className="mt-3 text-xs leading-relaxed text-coral">
+          {t(sponsorError.includes('CONFLICT') ? 'set.sponsorsConflict' : 'set.saveFailed')}
+          <code className="mt-1 block">{sponsorError}</code>
+        </p>}
       </section>
 
       {/* ---------------------------------------------------------- language */}

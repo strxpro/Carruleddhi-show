@@ -1,0 +1,6 @@
+/* One reusable photo opening, shared by the phone crop preview and the OBS template. */
+.broadcast-photo-mask {
+  border-radius: 24% 7% 24% 7%;
+  overflow: hidden;
+  clip-path: inset(0 round 24% 7% 24% 7%);
+}

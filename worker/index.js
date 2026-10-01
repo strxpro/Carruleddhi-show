@@ -15,6 +15,7 @@
  *   WALL_SALT          secret, optional — salt for the stored IP hash
  */
 import { COPY_DECK } from './copy-deck.js';
+import { broadcastPublic, broadcastAdmin, broadcastCommand, prepareBroadcastLogos, cleanBroadcastSponsor, broadcastSponsorBaseline } from './broadcast.js';
 /* Przepisanie wiersza na pola formularza i token do niego — wspólne dla strony do druku
    (printableForm niżej) i dla wypełnionego PDF-a w załączniku (api/form-pdf.js). Dwie kopie
    tej reguły to pierwsze miejsce, w którym link i załącznik zaczęłyby mówić co innego. */
@@ -23,6 +24,7 @@ import { EMAIL_TEMPLATES } from './email-templates.js';
 import { PRINT_TEMPLATES, PRINT_WORDING, PRINT_DATA_KEYS } from './print-templates.js';
 
 const ALLOWED_TYPES = new Set([
+  'broadcast', 'broadcast-admin',
   'registration', 'reminder', 'attendance', 'contact', 'counts', 'roster',
   /* Statystyki odwiedzin. `visit` to sonda ze strony — publiczna, bo wysyła ją przeglądarka
      zwiedzającego; `stats` to odczyt dla panelu, za tym samym hasłem co reszta panelu. */
@@ -134,6 +136,7 @@ const ALLOWED_TYPES = new Set([
 
 /** These never reach Make; they are served from Supabase by the Worker itself. */
 const SUPABASE_TYPES = new Set([
+  'broadcast', 'broadcast-admin',
   'visit', 'stats',
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
@@ -184,6 +187,7 @@ const SUPABASE_FIRST = new Set(['counts', 'attendance']);
  * admin.html as well before using this on a public hostname.
  */
 const PROTECTED_TYPES = new Set([
+  'broadcast-admin',
   'roster', 'subscribers',
   'wall-admin', 'chat-admin', 'chat-inbound', 'inbox', 'settings-admin', 'reminders-due', 'purge',
   'voting-admin',
@@ -204,6 +208,8 @@ const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 
 /** Only these keys are forwarded. Anything else is dropped, not rejected. */
 const FIELD_WHITELIST = {
+  broadcast: ['action'],
+  'broadcast-admin': ['action', 'id', 'enabled', 'sponsor', 'ids', 'image', 'expectedSponsor'],
   common: ['type', 'event', 'eventDate', 'locale', 'source', 'submittedAt'],
   registration: [
     'firstName', 'lastName', 'birthDate', 'town', 'email', 'phone', 'address',
@@ -278,7 +284,7 @@ const FIELD_WHITELIST = {
      `sponsor-leads`, `sponsor-approve`, `sponsor-reject`). Bez nich sanitizacja wyrzuca je
      po cichu, `sponsor-approve` widzi puste `id` i odmawia tak, jakby panel przysłał
      śmieci — awaria wyglądająca jak działający przycisk, który zawsze mówi „nie". */
-  'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit'],
+  'settings-admin': ['settings', 'action', 'photo', 'id', 'status', 'limit', 'expectedSponsors'],
 
   /* TRANSMISJA. BRAK TEGO WPISU UNIERUCHOMIL CALA ZAKLADKE, MELDUJAC SUKCES.
      =========================================================================
@@ -444,7 +450,7 @@ const MAX_PHOTO_BODY_BYTES = 1536 * 1024;
    „photo" nic by nie znaczyło — zgłoszenie sponsora nie ma zdjęcia, ma logo. Gdyby ten
    klucz tu nie stał, sanitizacja przycięłaby obrazek do 3000 znaków i `decodePhoto`
    odmówiłby formatu, którego nikt nie przysłał. */
-const LONG_FIELDS = new Set(['photo', 'logo']);
+const LONG_FIELDS = new Set(['photo', 'logo', 'image']);
 
 /**
  * Pola, w których nowa linia jest treścią, a nie śmieciem.
@@ -473,7 +479,7 @@ const MULTILINE_FIELDS = new Set(['text', 'message', 'cartNotes']);
  * porządnego sprawdzenia, znaczy wpuszczenie dowolnej struktury z internetu prosto
  * do handlera. `settings` jest tu dlatego, że `cleanSettings()` bada go pole po polu.
  */
-const OBJECT_FIELDS = new Set(['settings']);
+const OBJECT_FIELDS = new Set(['settings', 'sponsor']);
 const RATE_LIMIT_MAX = 6;
 const RATE_LIMIT_WINDOW_SECONDS = 600;
 
@@ -6015,7 +6021,13 @@ function cleanSettings(input) {
         || /^\/assets\/[A-Za-z0-9._/-]+$/.test(logo);
       if (!logoOk || logo.includes('..')) return { error: 'SETTINGS_SPONSOR_LOGO' };
 
-      sponsors.push({ name, url, logo });
+      try {
+        const sponsor = cleanBroadcastSponsor({ ...entry, name, url, logo });
+        // Older settings clients omit metadata. The SQL normalizer retains it.
+        for (const key of ['id', 'active', 'tier']) if (entry[key] === undefined) delete sponsor[key];
+        sponsor.order = sponsors.length;
+        sponsors.push(sponsor);
+      } catch (_) { return { error: 'SETTINGS_SPONSOR_SHAPE' }; }
     }
     out.sponsors = sponsors;
   }
@@ -6191,7 +6203,7 @@ async function settingsShape(env, settings) {
        odpowiedź jest jedna dla wszystkich i nie wie, kto ją czyta. Rok od języka nie zależy,
        więc jego miejsce jest tutaj. */
     eventYear: eventYearLabel(settings.eventDate),
-    sponsors: await withSignedLogos(env, settings.sponsors),
+    sponsors: await withSignedLogos(env, settings.sponsors.filter((sponsor) => sponsor.active !== false)),
     galleryImages: await withSignedGallery(env, settings.galleryImages)
   };
 }
@@ -6199,7 +6211,9 @@ async function settingsShape(env, settings) {
 async function adminSettingsShape(env, settings) {
   return {
     ...settings,
-    sponsors: await withSignedLogos(env, settings.sponsors),
+    sponsors: await Promise.all(settings.sponsors.map(async (sponsor) => ({ ...sponsor,
+      logoUrl: !sponsor.logo || sponsor.logo.startsWith('/') ? sponsor.logo : await signPhoto(env, sponsor.logo)
+    }))),
     galleryPreviewUrls: await withSignedGallery(env, settings.galleryImages)
   };
 }
@@ -6410,13 +6424,12 @@ async function sponsorLeadApprove(env, payload, cors) {
        pokazać — i lepiej, żeby wyszła teraz niż na stronie głównej. */
     const cleaned = cleanSettings({ sponsors: [...sponsors, entry] });
     if (cleaned.error) return json({ ok: false, code: cleaned.error }, 422, cors);
-    const merged = alignGalleryCaptions({ ...current, ...cleaned.value });
-    const saved = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ data: merged })
-    }).catch(() => null);
-    if (!saved?.ok) return json({ ok: false, code: 'SETTINGS_WRITE_FAILED' }, 502, cors);
+    try {
+      await prepareBroadcastLogos(env, [entry]);
+      await broadcastCommand(env, 'sponsor-append', { sponsor: cleaned.value.sponsors.at(-1) });
+    } catch (error) {
+      return json({ ok: false, code: error.message || 'SETTINGS_WRITE_FAILED' }, error.status || 502, cors);
+    }
   }
 
   const marked = await markSponsorLead(env, row.id, 'approved');
@@ -6535,13 +6548,11 @@ async function settingsAdmin(env, payload, cors) {
         edition: rollover.result
       }, 200, cors);
     }
-    const merged = { ...current, announcementEventDate: current.eventDate };
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
-      method: 'PATCH',
-      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ data: merged })
-    });
-    if (!response.ok) return json({ ok: false, code: 'SETTINGS_WRITE_FAILED' }, 502, cors);
+    try {
+      await broadcastCommand(env, 'settings-patch', { patch: { announcementEventDate: current.eventDate } });
+    } catch (error) {
+      return json({ ok: false, code: error.message || 'SETTINGS_WRITE_FAILED' }, error.status || 502, cors);
+    }
     return json({
       ok: true, queued: true, eventDate: current.eventDate,
       edition: rollover.result
@@ -6558,25 +6569,23 @@ async function settingsAdmin(env, payload, cors) {
   const cleaned = cleanSettings(payload.settings);
   if (cleaned.error) return json({ ok: false, code: cleaned.error }, 422, cors);
 
-  /* Read, merge, write. Not `jsonb_merge` in a single statement, because two organisers
-     saving different switches within a second of each other is not a scenario worth
-     designing for here, and a read-modify-write is the shape the panel already sends. */
-  const current = await readSettings(env);
-  /* Wyrównanie podpisów do zdjęć robione TU, na scalonym obiekcie, a nie w `cleanSettings` —
-     pełne uzasadnienie nad `alignGalleryCaptions`. Krótko: łatka zna tylko jedną z dwóch
-     tablic, więc tylko tutaj jest z czym równać. */
-  const merged = alignGalleryCaptions({ ...current, ...cleaned.value });
-
-  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/site_settings?id=is.true`, {
-    method: 'PATCH',
-    headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
-    body: JSON.stringify({ data: merged })
-  });
-  if (!response.ok) {
-    return json({ ok: false, code: 'SETTINGS_WRITE_FAILED', detail: await response.text() }, 502, cors);
+  // Merge the actual patch under the same SQL lock used by broadcast controls.
+  // Never replay stale sponsor data when saving an unrelated settings flag.
+  try {
+    let expectedSponsors;
+    if (cleaned.value.sponsors) {
+      if (!Array.isArray(payload.expectedSponsors) || payload.expectedSponsors.length > MAX_SPONSORS) {
+        throw Object.assign(new Error('BROADCAST_SETTINGS_CONFLICT'), { status: 409 });
+      }
+      expectedSponsors = payload.expectedSponsors.map((sponsor) => broadcastSponsorBaseline(sponsor, 'BROADCAST_SETTINGS_CONFLICT'));
+    }
+    if (cleaned.value.sponsors) await prepareBroadcastLogos(env, cleaned.value.sponsors);
+    await broadcastCommand(env, 'settings-patch', { patch: cleaned.value,
+      ...(cleaned.value.sponsors ? { expectedSponsors } : {}) });
+  } catch (error) {
+    return json({ ok: false, code: error.message || 'SETTINGS_WRITE_FAILED' }, error.status || 502, cors);
   }
-
-  return json({ ok: true, settings: await adminSettingsShape(env, merged) }, 200, cors);
+  return json({ ok: true, settings: await adminSettingsShape(env, await readSettings(env)) }, 200, cors);
 }
 
 /* ============================================================================
@@ -9817,6 +9826,12 @@ function sanitizePayload(type, input) {
   const output = {};
   for (const key of allowed) {
     const value = input[key];
+    if ((type === 'settings-admin' && key === 'expectedSponsors')
+      || (type === 'broadcast-admin' && key === 'expectedSponsor')) {
+      // Baselines must survive intact, including invalid shapes for rejection.
+      if (value !== undefined) output[key] = value;
+      continue;
+    }
     if (value === undefined || value === null) continue;
     // A data URL is hundreds of kilobytes, so the 3000 character cap would quietly
     // truncate it into a corrupt image. It is passed through untouched here and
@@ -9848,6 +9863,10 @@ function sanitizePayload(type, input) {
        dodatkowej ochrony. */
     if (OBJECT_FIELDS.has(key)) {
       if (typeof value === 'object' && !Array.isArray(value)) output[key] = value;
+      continue;
+    }
+    if (type === 'broadcast-admin' && key === 'ids') {
+      if (Array.isArray(value)) output[key] = value;
       continue;
     }
     if (Array.isArray(value)) {
@@ -9956,9 +9975,9 @@ function clientIp(request) {
  * wyjątkiem, czyli KAŻDE zgłoszenie kończy się pustym 500. Pytanie o funkcję zamyka tę pułapkę.
  */
 async function overRateLimit(env, request, type) {
-  if (typeof env.RATE_LIMIT?.get !== 'function' || type === 'counts') return false;
+  if (typeof env.RATE_LIMIT?.get !== 'function' || type === 'counts' || type === 'broadcast-admin') return false;
   const key = `rl:${type}:${clientIp(request)}`;
-  const ceiling = type === 'roster' ? 12 : RATE_LIMIT_MAX;
+  const ceiling = type === 'broadcast' ? 120 : type === 'roster' ? 12 : RATE_LIMIT_MAX;
   const current = Number.parseInt((await env.RATE_LIMIT.get(key)) || '0', 10) || 0;
   if (current >= ceiling) return true;
   await env.RATE_LIMIT.put(key, String(current + 1), { expirationTtl: RATE_LIMIT_WINDOW_SECONDS });
@@ -10099,6 +10118,7 @@ export default {
     const carriesImage = WALL_FAMILY.has(pathType)
       || pathType === 'settings-admin'
       || pathType === 'voting-admin'
+      || pathType === 'broadcast-admin'
       /* Zgłoszenie sponsora niesie logo jako data URL (opcjonalne). Bez tego wpisu żądanie
          z logo dostaje 413 przed handlerem, a komunikat mówi o za dużym żądaniu, nie o za
          dużym obrazku — czyli o czymś, czego zgłaszający nie ma jak naprawić. */
@@ -10144,7 +10164,7 @@ export default {
       if (!secretsMatch(request.headers.get(ROSTER_HEADER), env.ROSTER_KEY)) {
         return json({ ok: false, code: 'ROSTER_UNAUTHORISED' }, 401, cors);
       }
-    } else if (!(await turnstileOk(env, request, input.turnstileToken))) {
+    } else if (type !== 'broadcast' && !(await turnstileOk(env, request, input.turnstileToken))) {
       return json({ ok: false, code: 'CAPTCHA_FAILED' }, 403, cors);
     }
     if (await overRateLimit(env, request, type)) {
@@ -10161,6 +10181,8 @@ export default {
     // after the shared rate limit and captcha checks above have already run.
     if (SUPABASE_TYPES.has(type)) {
       if (!wallReady(env)) return json({ ok: false, code: 'WALL_DISABLED' }, 503, cors);
+      if (type === 'broadcast') return broadcastPublic(env, payload, cors);
+      if (type === 'broadcast-admin') return broadcastAdmin(env, payload, cors);
       if (type === 'wall') return wallList(env, payload, cors);
       if (type === 'wall-post') return wallPost(env, request, payload, cors);
       if (type === 'wall-translate') return wallTranslate(env, payload, cors);

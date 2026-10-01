@@ -187,6 +187,71 @@ body {
    ========================================================================== */
 .start-cards { display: none; }
 
+/* LIVE controls stay within the admin palette; the iframe alone carries event graphics. */
+.admin-live { max-width: 1180px; margin: 0 auto; padding-bottom: 2rem; }
+.admin-live h2 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.03em; }
+.admin-live h3, .admin-live h4 { font-weight: 700; }
+.live-heading, .live-list-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.live-panel { margin-top: 1rem; padding: 1.25rem; border: 1px solid var(--color-border); border-radius: 1rem; background: var(--color-card); min-width: 0; }
+.live-current { border-top: 3px solid var(--color-primary); }
+.live-help { margin-top: .4rem; font-size: .8rem; line-height: 1.6; color: var(--color-muted-foreground); }
+.live-connection { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: 1rem; color: var(--color-muted-foreground); font-size: .75rem; }
+.live-connected { color: #70dda0; }
+.live-warning, .live-error, .live-success { margin-top: 1rem; padding: .8rem 1rem; border-radius: .65rem; font-size: .8rem; line-height: 1.6; overflow-wrap: anywhere; }
+.live-warning { border: 1px solid #ffc92866; background: #ffc9280d; color: #ffe28c; }
+.live-error { border: 1px solid #f6494f66; background: #f6494f0d; color: #ffadb0; }
+.live-success { border: 1px solid #2fbf7166; background: #2fbf710d; color: #9be7bc; }
+.admin-live code { display: block; font-size: .7rem; }
+.live-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem; margin-top: .75rem; }
+.admin-live .live-actions button { min-height: 44px; }
+.live-list-row > .live-actions { margin-top: 0; }
+.live-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 42px; padding: .6rem .9rem; border: 1px solid var(--color-border); border-radius: 999px; font-size: .75rem; font-weight: 700; cursor: pointer; color: var(--color-foreground); background: var(--color-secondary); text-decoration: none; }
+.live-button:hover:not(:disabled) { border-color: var(--color-primary); }
+.live-button-primary { background: var(--color-primary); color: var(--color-primary-foreground); border-color: var(--color-primary); }
+.live-icon-button { min-width: 42px; padding: .6rem; }
+.admin-live button:disabled, .admin-live fieldset:disabled { cursor: not-allowed; opacity: .55; }
+.admin-live :is(button, a, input):focus-visible { outline: 2px solid var(--color-ring); outline-offset: 3px; }
+.live-badge { padding: .4rem .7rem; border-radius: 999px; background: var(--color-muted); color: var(--color-muted-foreground); font-size: .7rem; font-weight: 800; }
+.live-on-air { background: #f6494f; color: white; }
+.live-rider { display: flex; align-items: center; gap: 1rem; margin: 1.25rem 0; min-width: 0; }
+.live-rider-small { margin: 0; flex: 1; }
+.live-rider-photo { flex-shrink: 0; width: 76px; height: 76px; border-radius: .75rem; object-fit: cover; background: var(--color-muted); }
+.live-number { font-size: 1.7rem; font-weight: 800; color: var(--color-primary); font-variant-numeric: tabular-nums; }
+.live-rider-small .live-number { font-size: 1.1rem; }
+.live-rider-details { display: grid; gap: .1rem; min-width: 0; overflow-wrap: anywhere; }
+.live-rider-details strong { font-size: 1.1rem; }
+.live-rider-details > span { font-size: .8rem; }
+.live-rider-details .live-help { margin-top: 0; }
+.live-list { margin: 1rem 0; padding: 0; list-style: none; }
+.live-list-row { padding: .85rem 0; border-bottom: 1px solid var(--color-border); }
+.live-field { display: grid; gap: .4rem; margin-top: .8rem; min-width: 0; font-size: .75rem; color: var(--color-muted-foreground); }
+.live-field input:not([type="range"]) { width: 100%; min-width: 0; padding: .7rem .8rem; border: 1px solid var(--color-input); border-radius: .6rem; background: var(--color-background); color: var(--color-foreground); font-size: .85rem; }
+.live-field input[type="file"] { font-size: .75rem; }
+.live-field input[type="range"] { width: 100%; min-height: 36px; accent-color: var(--color-primary); }
+.live-fields { display: grid; align-content: start; gap: .5rem; }
+.live-form-grid, .live-crop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.live-crop-grid { margin-top: 1rem; }
+.live-crop { width: 100%; max-width: 320px; height: auto; aspect-ratio: 1; background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 0 / 20px 20px; }
+.live-mask-preview { min-width: 0; }
+.live-portrait { scroll-margin-top: 80px; }
+.live-checkbox { display: flex; align-items: center; gap: .75rem; font-size: .85rem; }
+.live-checkbox input { width: 20px; height: 20px; accent-color: var(--color-primary); }
+.live-editor { margin-top: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: .75rem; }
+.live-sponsor-identity { display: flex; align-items: center; gap: .75rem; min-width: 0; overflow-wrap: anywhere; }
+.live-logo { width: 76px; height: 60px; padding: .4rem; object-fit: contain; border-radius: .5rem; background: #eee; flex-shrink: 0; }
+.live-placeholder { display: flex; align-items: center; justify-content: center; font-size: .65rem; text-align: center; color: var(--color-muted-foreground); background: var(--color-muted); }
+.live-preview { width: 100%; aspect-ratio: 16 / 9; overflow: hidden; margin-top: 1rem; background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 0 / 24px 24px; border: 1px solid var(--color-border); border-radius: .5rem; }
+.live-preview iframe { width: 100%; height: 100%; border: 0; }
+@media (max-width: 640px) {
+  .live-panel { padding: 1rem; }
+  .live-form-grid, .live-crop-grid { grid-template-columns: 1fr; }
+  .live-list-row { align-items: flex-start; flex-direction: column; }
+  .live-rider { gap: .6rem; }
+  .live-rider-photo { width: 54px; height: 54px; }
+  .live-number { font-size: 1.15rem; }
+  .live-rider-details strong { font-size: .95rem; }
+}
+
 @media print {
   /* Everything except the cards goes.
      One selector, and it only works because StartCards renders through a portal into <body> —
