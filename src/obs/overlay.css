@@ -49,3 +49,5 @@ body{font-family:ObsBaloo,sans-serif;color:var(--obs-cream);-webkit-font-smoothi
 .obs-diagnostics strong{color:var(--obs-yellow);margin-right:24px}
 .obs-diagnostics p{margin:6px 0 0}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:0s!important;transition-duration:0s!important}}
+
+.obs-race-time{position:absolute;left:0;right:0;bottom:-68px;height:58px;border-radius:14px;background:var(--obs-navy);border:2px solid var(--obs-yellow);color:var(--obs-yellow);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:12px;font-variant-numeric:tabular-nums}.obs-race-time span{font-size:14px;font-weight:800}.obs-race-time strong{font-size:30px}

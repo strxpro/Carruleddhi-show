@@ -45,9 +45,34 @@ async function db(env, path, body) {
     const known = String(data?.message || '').match(/\bBROADCAST_[A-Z_]+\b/)?.[0];
     const missing = ['PGRST202', 'PGRST205', '42P01', '42883'].includes(data?.code);
     throw Object.assign(new Error(known || (missing ? 'BROADCAST_MIGRATION_REQUIRED' : 'BROADCAST_UNAVAILABLE')),
-      { status: known ? (known.includes('CONFLICT') ? 409 : 422) : missing ? 503 : 502 });
+      { status: known ? (known.includes('CONFLICT') ? 409 : 422) : missing ? 503 : 502,
+        missingTimingMode: isMissingTimingColumn(data, 'participant_mode') });
   }
   return data;
+}
+
+// Only the new column's schema/cache error permits the staged-rollout fallback.
+export function isMissingTimingColumn(error, column = 'race_time_ms') {
+  return ['42703', 'PGRST204'].includes(error?.code)
+    && new RegExp(`\\b${column}\\b`).test(String(error?.message || ''));
+}
+
+function timingState(state) {
+  return { ...state, participant_mode: state.participant_mode ?? 'live',
+    participant: state.participant ? { ...state.participant, raceTimeMs: state.participant.raceTimeMs ?? null } : null };
+}
+
+async function readBroadcastState(env) {
+  const columns = 'id,revision,participant,participant_visible,sponsors_enabled,sponsors,updated_at';
+  let rows;
+  try {
+    rows = await db(env, `broadcast_state?id=eq.main&select=${columns},participant_mode&limit=1`);
+  } catch (error) {
+    if (!error.missingTimingMode) throw error;
+    rows = await db(env, `broadcast_state?id=eq.main&select=${columns}&limit=1`);
+  }
+  if (!rows?.[0]) throw Object.assign(new Error('BROADCAST_MIGRATION_REQUIRED'), { status: 503 });
+  return { state: timingState(rows[0]), timingReady: Object.hasOwn(rows[0], 'participant_mode') };
 }
 
 export function broadcastCommand(env, action, payload = {}) {
@@ -158,9 +183,7 @@ export function broadcastSponsorBaseline(input, code = 'BROADCAST_SPONSOR_CONFLI
 export async function broadcastPublic(env, payload, cors) {
   if ((payload.action || 'state') !== 'state') return response({ ok: false, code: 'BROADCAST_UNKNOWN_ACTION' }, 400, cors);
   try {
-    const rows = await db(env, 'broadcast_state?id=eq.main&select=id,revision,participant,participant_visible,sponsors_enabled,sponsors,updated_at&limit=1');
-    if (!rows?.[0]) return response({ ok: false, code: 'BROADCAST_MIGRATION_REQUIRED' }, 503, cors);
-    return response({ ok: true, state: rows[0], realtime: realtimeConfig(env) }, 200, cors);
+    return response({ ok: true, ...await readBroadcastState(env), realtime: realtimeConfig(env) }, 200, cors);
   } catch (error) { return fail(error, cors); }
 }
 
@@ -174,11 +197,16 @@ export async function broadcastAdmin(env, payload, cors) {
   try {
     if (['on-air','participant-photo'].includes(action) && !UUID.test(payload.id || '')) throw new Error('BROADCAST_BAD_ID');
     if (action === 'on-air') {
+      if (Object.hasOwn(payload, 'mode') && !['live','replay'].includes(payload.mode)) throw new Error('BROADCAST_BAD_MODE');
+      // 0047 ignores unknown RPC payload keys. Never let a replay request go live.
+      if (payload.mode === 'replay' && !(await readBroadcastState(env)).timingReady) {
+        throw Object.assign(new Error('BROADCAST_TIMING_MIGRATION_REQUIRED'), { status: 503 });
+      }
       // Explicit ON AIR intent authorizes publishing this existing voting photo.
       // Only the selected eligible row is inspected, never the entire roster.
       const source = await db(env, 'rpc/broadcast_photo_source', { p_id: payload.id });
       if (!source || source.id !== payload.id) throw new Error('BROADCAST_PARTICIPANT_INELIGIBLE');
-      const command = { id: payload.id };
+      const command = { id: payload.id, ...(payload.mode !== undefined ? { mode: payload.mode } : {}) };
       if (!source.photo && source.imagePath) {
         const path = source.imagePath;
         if (typeof path !== 'string' || path.length > 240 || !PARTICIPANT_PATH.test(path) || path.includes('..')) {
@@ -251,8 +279,9 @@ export async function broadcastAdmin(env, payload, cors) {
         if (UUID.test(link.id) && UUID.test(link.registration_id)) registrations.set(link.id, link.registration_id);
       }
     }
-    return response({ ok: true, ...data,
-      participants: data.participants.map((p) => ({ ...p, registrationId: registrations.get(p.id) || null })),
+    return response({ ok: true, ...data, state: timingState(data.state),
+      timingReady: Object.hasOwn(data.state, 'participant_mode'),
+      participants: data.participants.map((p) => ({ ...p, raceTimeMs: p.raceTimeMs ?? null, registrationId: registrations.get(p.id) || null })),
       sponsors: data.sponsors.map((s) => ({ ...s,
       logoUrl: data.state.sponsors.find((v) => v.id === s.id)?.logo || '' })),
       assetWarnings, realtime: realtimeConfig(env) }, 200, cors);

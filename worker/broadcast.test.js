@@ -6,7 +6,7 @@ import { realtimeConfig, cleanBroadcastSponsor, decodeBroadcastImage, broadcastP
 const env = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_KEY: 'private-service-key', ROSTER_KEY: 'admin-password' };
 const id = '11111111-1111-4111-8111-111111111111';
 const state = { id: 'main', revision: 3, participant: null, participant_visible: false,
-  sponsors_enabled: false, sponsors: [], updated_at: '2026-10-01T00:00:00Z' };
+  participant_mode: 'live', sponsors_enabled: false, sponsors: [], updated_at: '2026-10-01T00:00:00Z' };
 const data = { state, participants: [], sponsors: [] };
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const jwt = (role) => `header.${btoa(JSON.stringify({ role }))}.signature`;

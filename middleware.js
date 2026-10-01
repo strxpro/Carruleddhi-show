@@ -136,7 +136,7 @@ export default async function middleware(request) {
   const url = new URL(request.url);
   if (OPEN_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return;
   // OBS has a separate cookie jar. Only this public, sanitized graphics page bypasses the gate.
-  if (/^\/(?:obs\/(?:overlay|participant|sponsors)|obs-(?:overlay|participant|sponsors)(?:\.html)?)\/?$/.test(url.pathname)) return;
+  if (/^\/(?:obs\/(?:overlay|participant|sponsors|replay)|obs-(?:overlay|participant|sponsors|replay)(?:\.html)?)\/?$/.test(url.pathname)) return;
 
   // The switch in the admin panel. Checked after the path exclusions so opening the
   // site costs one query per isolate per half-minute and not one per asset.

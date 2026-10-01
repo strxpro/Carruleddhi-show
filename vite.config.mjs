@@ -19,13 +19,13 @@ export default defineConfig({
     name: 'obs-overlay-route',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
-        if (req.url) req.url = req.url.replace(/^\/obs\/(overlay|participant|sponsors)(?=\?|$)/, '/obs-$1.html');
+        if (req.url) req.url = req.url.replace(/^\/obs\/(overlay|participant|sponsors|replay)(?=\?|$)/, '/obs-$1.html');
         next();
       });
     },
     configurePreviewServer(server) {
       server.middlewares.use((req, _res, next) => {
-        if (req.url) req.url = req.url.replace(/^\/obs\/(overlay|participant|sponsors)(?=\?|$)/, '/obs-$1.html');
+        if (req.url) req.url = req.url.replace(/^\/obs\/(overlay|participant|sponsors|replay)(?=\?|$)/, '/obs-$1.html');
         next();
       });
     }
@@ -69,6 +69,7 @@ export default defineConfig({
         admin: resolve(import.meta.dirname, 'admin.html'),
         obs: resolve(import.meta.dirname, 'obs-overlay.html'),
         obsParticipant: resolve(import.meta.dirname, 'obs-participant.html'),
+        obsReplay: resolve(import.meta.dirname, 'obs-replay.html'),
         obsSponsors: resolve(import.meta.dirname, 'obs-sponsors.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
         cookies: resolve(import.meta.dirname, 'cookies.html'),

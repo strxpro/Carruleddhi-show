@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Participant } from './types';
 import './portrait-mask.css';
+import { formatRaceTime } from '../../assets/js/race-time.js';
 
-export function ParticipantCard({ participant, visible }: { participant: Participant | null; visible: boolean }) {
+export function ParticipantCard({ participant, visible, mode = 'live' }: { participant: Participant | null; visible: boolean; mode?: 'live' | 'replay' }) {
   const [ready, setReady] = useState<Participant | null>(null);
   const reduced = useReducedMotion();
   useEffect(() => {
@@ -36,7 +37,7 @@ export function ParticipantCard({ participant, visible }: { participant: Partici
         </motion.div>
         <motion.div className="obs-participant-copy" initial={{ opacity: 0, y: reduced ? 0 : 10 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduced ? 0 : .32, delay: reduced ? 0 : .15 }}>
-          <div className="obs-eyebrow"><span className="obs-on-track"><i />IN PISTA</span>{ready.category && <span>{ready.category}</span>}</div>
+          <div className="obs-eyebrow"><span className="obs-on-track"><i />{mode === 'replay' ? 'REPLAY' : 'IN PISTA'}</span>{ready.category && <span>{ready.category}</span>}</div>
           <div className="obs-first-name">{ready.lastName ? ready.firstName : ''}</div>
           <ParticipantName name={ready.lastName || ready.firstName} />
           <div className="obs-participant-meta">
@@ -46,6 +47,7 @@ export function ParticipantCard({ participant, visible }: { participant: Partici
         </motion.div>
       </motion.article>}
     </AnimatePresence>
+    {ready && visible && mode === 'replay' && formatRaceTime(ready.raceTimeMs) && <div className="obs-race-time"><span>TEMPO</span><strong>{formatRaceTime(ready.raceTimeMs)}</strong></div>}
   </div>;
 }
 

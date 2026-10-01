@@ -3431,3 +3431,13 @@ html.is-demo .vote-main { padding-top: clamp(126px, calc(var(--screen-h, 100svh)
 @media (prefers-reduced-motion: reduce) {
   .archive__stage .podium-confetti { display: none; }
 }
+/* Timing is separate from the audience score and never implies a ranking. */
+.race-time {
+  display: block;
+  margin-top: .3rem;
+  font-size: .8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}

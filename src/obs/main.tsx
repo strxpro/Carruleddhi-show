@@ -21,8 +21,8 @@ function Overlay() {
 
   return <main className="obs-stage" style={{ transform: `translate(-50%,-50%) scale(${scale})` }} data-connection={connection.status} data-revision={state?.revision ?? -1}>
     {state && <>
-      {module !== 'sponsors' && <ParticipantCard participant={state.participant} visible={state.participant_visible} />}
-      {module !== 'participant' && <SponsorStream sponsors={state.sponsors} enabled={state.sponsors_enabled} />}
+      {module !== 'sponsors' && <ParticipantCard participant={state.participant} visible={state.participant_visible} mode={module === 'replay' ? 'replay' : module === 'participant' ? 'live' : state.participant_mode} />}
+      {module !== 'participant' && module !== 'replay' && <SponsorStream sponsors={state.sponsors} enabled={state.sponsors_enabled} />}
     </>}
     {diagnostics && <aside className="obs-diagnostics"><strong>{connection.status.toUpperCase()}</strong><span>1920 × 1080 · revision {state?.revision ?? '—'}</span><p>{connection.message || 'Safe area: 96px / 54px. No top logo; transparent camera area.'}</p></aside>}
   </main>;

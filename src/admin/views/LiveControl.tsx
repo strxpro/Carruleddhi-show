@@ -7,6 +7,7 @@ import type { BroadcastConnection, BroadcastState, Participant } from '../../obs
 import { ActionButton } from './ActionButton';
 import { BroadcastPortrait } from './BroadcastPortrait';
 import { downscaleSponsorLogo } from './SettingsView';
+import { formatRaceTime } from '../../lib/race-time';
 
 const tone = 'bg-primary text-primary-foreground hover:bg-primary/90';
 const quietTone = 'bg-muted text-foreground hover:bg-accent';
@@ -34,6 +35,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
   const alive = useRef(true);
   const overlaySources = [
     { path: '/obs/participant', label: t('live.participantSource') },
+    { path: '/obs/replay', label: t('live.replay') },
     { path: '/obs/sponsors', label: t('live.sponsorsSource') },
   ];
 
@@ -82,7 +84,8 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
   }, [state?.revision, admin?.state.revision, apiKey, absorb, pending, loading]);
 
   async function run(action: BroadcastAction, message: TranslateKey = 'live.saved'): Promise<boolean> {
-    if (locked.current || loading || !admin || uncertain) return false;
+    if (locked.current || loading || !admin || uncertain
+      || (action.action === 'on-air' && action.mode === 'replay' && admin.timingReady !== true)) return false;
     locked.current = true;
     setPending(true); setError(''); setNote(null);
     try {
@@ -160,6 +163,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
       {state && <span>{t('live.revision')}: {state.revision} / {new Date(state.updated_at).toLocaleString(t('locale.intl'))}</span>}
     </div>
     {realtimeMissing && <p className="live-warning" role="alert">{t('live.realtimeMissing')} <code>{admin.realtime.code}</code></p>}
+    {admin && admin.timingReady !== true && <p className="live-warning">{t('vote.timingUnavailable')}</p>}
     {!!admin?.assetWarnings?.length && <div className="live-warning" role="alert">
       <p>{t('live.assetWarning')}</p>
       <ul>{admin.assetWarnings.map((warning) => <li key={warning.id}>{sponsors.find((one) => one.id === warning.id)?.name || warning.id} <code>{warning.code}</code></li>)}</ul>
@@ -182,12 +186,16 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
           <span className="live-number">#{current.startNumber}</span>
           <div className="live-rider-details"><strong>{current.firstName} {current.lastName}</strong>
             <span>{current.projectName}</span><span className="live-help">{[current.city, current.category].filter(Boolean).join(' / ')}</span>
+            <span data-live-mode>{t(state.participant_mode === 'replay' ? 'live.replay' : 'live.modeLive')}</span>
+            {formatRaceTime(current.raceTimeMs) && <span>{t('vote.raceTime')}: {formatRaceTime(current.raceTimeMs)}</span>}
           </div>
         </div>}
         <p className="live-help">{t('live.controlsHint')}</p>
         <div className="live-actions">
-          <ActionButton label={t('live.onAir')} tone={tone} reason={reason || (!current ? t('live.noSelection') : state.participant_visible ? t('live.onAir') : '')}
-            onPress={() => { if (current) void run({ action: 'on-air', id: current.id }); }} />
+          <ActionButton label={t('reg.liveShow')} tone={tone} reason={reason || (!current ? t('live.noSelection') : state.participant_visible ? t('live.onAir') : state.participant_mode === 'replay' && admin.timingReady !== true ? t('vote.timingUnavailable') : '')}
+            onPress={() => { if (current) void run({ action: 'on-air', id: current.id, mode: state.participant_mode ?? 'live' }); }} />
+          <ActionButton label={t('live.replay')} tone={quietTone} reason={reason || (admin.timingReady !== true ? t('vote.timingUnavailable') : !current ? t('live.noSelection') : '')}
+            onPress={() => { if (current) void run({ action: 'on-air', id: current.id, mode: 'replay' }); }} />
           <ActionButton label={t('live.hide')} tone={quietTone} reason={reason || (!current ? t('live.noSelection') : !state.participant_visible ? t('live.hidden') : '')}
             onPress={() => void run({ action: 'hide' })} />
           <ActionButton label={t('live.clear')} tone="bg-destructive/15 text-destructive hover:bg-destructive/25" reason={reason || (!current ? t('live.noSelection') : '')}
@@ -204,13 +212,17 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
             <div className="live-rider live-rider-small">
               {one.photo && <img src={one.photo} className="live-rider-photo" alt="" loading="lazy" />}
               <span className="live-number">#{one.startNumber}</span>
-              <div className="live-rider-details"><strong>{one.firstName} {one.lastName}</strong><span>{one.projectName}</span><span className="live-help">{[one.city, one.category].filter(Boolean).join(' / ')}</span></div>
+              <div className="live-rider-details"><strong>{one.firstName} {one.lastName}</strong><span>{one.projectName}</span><span className="live-help">{[one.city, one.category].filter(Boolean).join(' / ')}</span>
+                {formatRaceTime(one.raceTimeMs) && <span>{t('vote.raceTime')}: {formatRaceTime(one.raceTimeMs)}</span>}
+              </div>
             </div>
             <div className="live-actions">
+              <button type="button" className="live-button" disabled={busy || admin.timingReady !== true}
+                onClick={() => void run({ action: 'on-air', id: one.id, mode: 'replay' })}>{t('live.replay')}</button>
               <button type="button" className="live-button" disabled={busy} aria-label={`${t('live.photo')}: ${one.firstName} ${one.lastName}`} onClick={() => setPortrait(one)}>{t('live.photo')}</button>
-              <button type="button" className="live-button live-button-primary" disabled={busy || (current?.id === one.id && state.participant_visible)}
-                aria-label={`${t('live.onAir')}: #${one.startNumber} ${one.firstName} ${one.lastName}`} aria-pressed={current?.id === one.id && state.participant_visible}
-                onClick={() => void run({ action: 'on-air', id: one.id })}>{t('live.onAir')}</button>
+              <button type="button" className="live-button live-button-primary" disabled={busy || (current?.id === one.id && state.participant_visible && state.participant_mode !== 'replay')}
+                aria-label={`${t('live.onAir')}: #${one.startNumber} ${one.firstName} ${one.lastName}`} aria-pressed={current?.id === one.id && state.participant_visible && state.participant_mode !== 'replay'}
+                onClick={() => void run({ action: 'on-air', id: one.id, mode: 'live' })}>{t('live.onAir')}</button>
             </div>
           </li>)}
         </ul>

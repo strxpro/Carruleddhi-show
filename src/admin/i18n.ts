@@ -14,6 +14,14 @@
  */
 
 export const pl = {
+  'vote.raceTime': 'Czas przejazdu',
+  'vote.raceTimeSaveFailed': 'Nie zapisano czasu. Wpisana wartość pozostała w polu. Odśwież stan i spróbuj ponownie.',
+  'live.modeLive': 'Na żywo',
+  'vote.raceTimeHint': 'Wpisz np. 1:23.456. Puste pole usuwa czas.',
+  'vote.raceTimeInvalid': 'Nieprawidłowy czas. Użyj formatu 1:23.456.',
+  'vote.timingUnavailable': 'Czas i powtórka wymagają migracji bazy 0048. Pozostałe funkcje działają.',
+  'live.replay': 'Powtórka',
+
   'locale.intl': 'pl-PL',
   'locale.rel': 'pl',
 
@@ -758,6 +766,14 @@ export const pl = {
 export type Dict = { [K in keyof typeof pl]: string };
 
 export const it: Dict = {
+  'vote.raceTime': 'Tempo di discesa',
+  'vote.raceTimeSaveFailed': 'Tempo non salvato. Il valore resta nel campo. Aggiorna lo stato e riprova.',
+  'live.modeLive': 'In diretta',
+  'vote.raceTimeHint': 'Inserisci es. 1:23.456. Il campo vuoto rimuove il tempo.',
+  'vote.raceTimeInvalid': 'Tempo non valido. Usa il formato 1:23.456.',
+  'vote.timingUnavailable': 'Tempo e replay richiedono la migrazione 0048. Le altre funzioni restano disponibili.',
+  'live.replay': 'Replay',
+
   'locale.intl': 'it-IT',
   'locale.rel': 'it',
 

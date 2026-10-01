@@ -1,3 +1,5 @@
+import { formatRaceTime } from '../../lib/race-time';
+import { RaceTimeEditor } from './RaceTimeEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Eraser, Hourglass, ImagePlus, ListPlus, Play, RefreshCw, RotateCcw, Square, Trash2, Trophy
@@ -756,6 +758,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
                       <span className="block truncate text-[11px] uppercase tracking-wider text-white/45">
                         {String(row.startNumber).padStart(3, '0')} · {row.firstName} {row.lastName} · {row.category}
                       </span>
+                      {formatRaceTime(row.raceTimeMs) && <span className="block text-xs tabular-nums text-white/70">{t('vote.raceTime')}: {formatRaceTime(row.raceTimeMs)}</span>}
                     </span>
                     {/* Na żółto wynik, po którym stoi to miejsce — suma punktów. Średnia obok,
                         drobnym drukiem: jest ciekawa, ale nie ona rozstrzyga, a postawiona na
@@ -1025,12 +1028,13 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
               key={row.id}
               t={t}
               row={row}
+              timingReady={state?.timingReady === true}
               fresh={freshIds.includes(row.id)}
               busy={busy}
               photoBusy={photoBusy === row.id}
               field={field}
               chip={chip}
-              onSave={(changes) => void run(() => saveParticipant(apiKey, row.id, changes), t('vote.saved'))}
+              onSave={(changes) => run(() => saveParticipant(apiKey, row.id, changes), t('vote.saved'))}
               onPhoto={(file) => void pickPhoto(file, row.id)}
               onRemove={() => {
                 if (window.confirm(t('vote.removeConfirm'))) void run(() => removeParticipant(apiKey, row.id));
@@ -1054,6 +1058,7 @@ export function Voting({ t, apiKey }: { t: (key: TranslateKey) => string; apiKey
 function ParticipantRow({
   t,
   row,
+  timingReady,
   fresh,
   busy,
   photoBusy,
@@ -1065,13 +1070,14 @@ function ParticipantRow({
 }: {
   t: (key: TranslateKey) => string;
   row: VotingParticipant;
+  timingReady: boolean;
   fresh: boolean;
   busy: boolean;
   /** Wgrywanie zdjęcia DLA TEGO wiersza — szkielet stoi wtedy na jego kafelku. */
   photoBusy: boolean;
   field: string;
   chip: string;
-  onSave: (changes: ParticipantEdit) => void;
+  onSave: (changes: ParticipantEdit) => Promise<boolean>;
   onPhoto: (file: File) => void;
   onRemove: () => void;
 }) {
@@ -1184,6 +1190,10 @@ function ParticipantRow({
         </p>
       </div>
 
+      <div className="col-span-full text-white">
+        <RaceTimeEditor value={row.raceTimeMs} timingReady={timingReady} disabled={busy} t={t}
+          onSave={(raceTimeMs) => onSave({ raceTimeMs })} />
+      </div>
       {/* Przyciski pod spodem na całą szerokość telefonu: obok danych mieściły się tylko
           ściśnięte w dwóch rzędach, a to są trzy różne czynności, z których jedna usuwa. */}
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:justify-end">
@@ -1191,7 +1201,7 @@ function ParticipantRow({
           <button
             type="button"
             disabled={busy}
-            onClick={() => onSave({ startNumber, projectName })}
+            onClick={() => void onSave({ startNumber, projectName })}
             className={cn(chip, 'bg-yellow text-navy-950 hover:bg-white')}
           >
             {t('vote.save')}

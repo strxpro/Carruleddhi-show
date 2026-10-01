@@ -1,3 +1,14 @@
+import { formatRaceTime, raceTimeLabel } from './race-time.js';
+
+function appendRaceTime(parent, row) {
+  const formatted = formatRaceTime(row.raceTimeMs);
+  if (!formatted) return;
+  const time = document.createElement('span');
+  time.className = 'race-time';
+  time.dataset.raceTime = '';
+  time.textContent = `${raceTimeLabel()}: ${formatted}`;
+  parent.append(time);
+}
 /**
  * Głosowanie — część na stronie głównej.
  * ===========================================================================
@@ -70,6 +81,7 @@ import {
   let demoDriven = false;
   /** Ustawiane po pierwszym narysowaniu cokołu — kolejny odczyt stanu nie przebudowuje listy. */
   let podiumPainted = false;
+  let podiumTimeKey = '';
   /** Ustawiane, gdy licznik dobiegł zera i wysłano po nowy stan — żeby nie wysłać dziesięć razy. */
   let awaitingPhase = false;
 
@@ -226,6 +238,7 @@ import {
       const rider = document.createElement('small');
       rider.textContent = `${row.firstName} ${row.lastName}`.trim();
       identity.append(project, rider);
+      appendRaceTime(identity, row);
       if (ties.get(row.id)) {
         const tie = document.createElement('em');
         tie.className = 'podium__table-tie';
@@ -326,6 +339,7 @@ import {
       meta.textContent = `${String(row.startNumber).padStart(3, '0')} · `
         + `${`${row.firstName} ${row.lastName}`.trim()} · ${row.category}`;
       who.append(name, meta);
+      appendRaceTime(who, row);
 
       const score = document.createElement('span');
       score.className = 'standings__score';
@@ -621,7 +635,8 @@ import {
     /* Gdy cokoł został już zbudowany, nie przebudowujemy go przy każdym odczycie fazy.
        pull() co 30 s wywoływa paint() → paintPodium() i bez tej flagi replaceChildren()
        rozbierałby i składał DOM, resetując animację wznoszenia bloków. */
-    if (podiumPainted && state.phase === 'closed') {
+    const timeKey = JSON.stringify([document.documentElement.lang, state.podium.map(row => [row.id, row.raceTimeMs ?? null])]);
+    if (podiumPainted && state.phase === 'closed' && podiumTimeKey === timeKey) {
       setupScratch();
       return;
     }
@@ -701,6 +716,7 @@ import {
         : text('voting.noVotes');
       stats.append(points, count);
       body.append(project, rider, stats);
+      appendRaceTime(body, row);
 
       /* Remis dostaje własną linijkę pod statystykami, nie plakietkę w rogu: to jest zdanie
          do przeczytania, a nie etykieta do rozpoznania. Stoi tylko na kafelkach, które
@@ -743,6 +759,7 @@ import {
        lądowanie kart są animacjami potomków tej scenki. */
     if (!reducedMotion) $('[data-podium-stage]')?.classList.add('is-drawn');
     podiumPainted = true;
+    podiumTimeKey = timeKey;
     setupScratch();
   }
 
@@ -1053,6 +1070,7 @@ import {
         rider.textContent = `${String(row.startNumber).padStart(3, '0')} · `
           + `${`${row.firstName} ${row.lastName}`.trim()}`;
         identity.append(project, rider);
+        appendRaceTime(identity, row);
 
         const score = document.createElement('span');
         score.className = 'archive-row__score';

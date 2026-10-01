@@ -7,6 +7,7 @@ export interface Participant {
   projectName: string;
   category: string;
   photo: string;
+  raceTimeMs?: number | null;
 }
 
 export interface Sponsor {
@@ -24,6 +25,7 @@ export interface BroadcastState {
   revision: number;
   participant: Participant | null;
   participant_visible: boolean;
+  participant_mode?: 'live' | 'replay';
   sponsors_enabled: boolean;
   sponsors: Sponsor[];
   updated_at: string;

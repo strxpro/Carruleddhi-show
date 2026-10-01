@@ -7836,6 +7836,9 @@ import {
     let mode = 'ai';
     /** Rozmowa zakończona przez gościa. Trzeci stan panelu, obok bramy i rozmowy. */
     let ended = false;
+    let editingProfile = false;
+    let savingProfile = false;
+    let profileScroll = 0;
     /**
      * ROZMOWA PRZEKAZANA CZŁOWIEKOWI — STAN WĄTKU, NIE STAN TEJ KARTY.
      * ---------------------------------------------------------------------------
@@ -7861,6 +7864,15 @@ import {
       email: storage.get('carruleddhi.chat.email', '') || ''
     };
     const identified = () => Boolean(visitor.name && visitor.email);
+    const editLabel = () => ({ it: 'Modifica', pl: 'Edytuj', en: 'Edit', de: 'Bearbeiten', es: 'Editar', fr: 'Modifier' }[state.lang] || 'Modifica');
+    const profileCopy = () => ({
+      it: ['Modifica contatto chat', 'Nome e indirizzo per questa chat. Non modifica i dati di iscrizione alla gara.'],
+      pl: ['Edytuj dane czatu', 'Imię i adres do kontaktu w tym czacie. Nie zmienia danych zgłoszenia na wyścig.'],
+      en: ['Edit chat contact', 'Name and reply address for this chat. This does not change race registration details.'],
+      de: ['Chat-Kontakt bearbeiten', 'Name und Antwortadresse für diesen Chat. Die Rennanmeldung bleibt unverändert.'],
+      es: ['Editar contacto del chat', 'Nombre y dirección de respuesta para este chat. No cambia la inscripción en la carrera.'],
+      fr: ['Modifier le contact du chat', 'Nom et adresse de réponse pour ce chat. Ne modifie pas les données d’inscription à la course.']
+    }[state.lang] || ['Edit chat contact', 'This does not change race registration details.']);
 
     /* ---------------------------------------------------------------- tabs */
     const selectTab = (name) => {
@@ -7938,7 +7950,45 @@ import {
     botButton.dataset.chatToBot = '';
     botButton.hidden = true;
 
-    tools.append(botButton, endButton);
+    const profileButton = document.createElement('button');
+    profileButton.type = 'button';
+    profileButton.className = 'chat__chip';
+    profileButton.dataset.chatProfile = '';
+    const profileCancel = document.createElement('button');
+    profileCancel.type = 'button';
+    profileCancel.className = 'chat__chip';
+    profileCancel.dataset.chatProfileCancel = '';
+    profileCancel.hidden = true;
+    const profileError = document.createElement('p');
+    profileError.className = 'chat__system';
+    profileError.dataset.chatProfileError = '';
+    profileError.setAttribute('role', 'status');
+    profileError.hidden = true;
+    gateForm?.append(profileCancel, profileError);
+    tools.append(profileButton, botButton, endButton);
+
+    profileButton.addEventListener('click', () => {
+      if (flow || sending || ended) return;
+      editingProfile = true;
+      profileScroll = log?.scrollTop || 0;
+      const nameField = $('#chat-gate-name', panel);
+      const emailField = $('#chat-gate-email', panel);
+      if (nameField) nameField.value = visitor.name;
+      if (emailField) emailField.value = visitor.email;
+      if (gateForm) gateForm.hidden = false;
+      profileError.hidden = true;
+      applyGate();
+      paintChatChrome();
+      nameField?.focus({ preventScroll: true });
+    });
+    profileCancel.addEventListener('click', () => {
+      if (savingProfile) return;
+      editingProfile = false;
+      applyGate();
+      paintChatChrome();
+      if (log) log.scrollTop = profileScroll;
+      profileButton.focus({ preventScroll: true });
+    });
 
     const endedCard = document.createElement('div');
     endedCard.className = 'chat-ended';
@@ -7962,6 +8012,17 @@ import {
       endedTitle.textContent = text('chat.endedTitle');
       endedLead.textContent = text('chat.endedLead');
       restartButton.textContent = text('chat.restart');
+      profileButton.textContent = profileCopy()[0];
+      profileButton.title = `${visitor.name} (${visitor.email})`;
+      profileCancel.textContent = text('entry.back');
+      profileCancel.hidden = !editingProfile;
+      const lead = $('.chat-gate__lead', gate);
+      if (lead) lead.textContent = editingProfile ? profileCopy()[1] : text('chat.gateLead');
+      const submit = $('button[type="submit"]', gateForm);
+      if (submit) {
+        submit.dataset.i18n = editingProfile ? 'entry.save' : 'chat.gateStart';
+        submit.textContent = text(submit.dataset.i18n);
+      }
     }
     paintChatChrome();
     window.addEventListener('carruleddhi:language', paintChatChrome);
@@ -7978,9 +8039,9 @@ import {
     /** Shows the two fields, the conversation, or the closing card — never two at once. */
     function applyGate() {
       const done = identified();
-      const live = done && !ended;
-      if (gate) gate.hidden = done || ended;
-      if (log) log.hidden = !done;
+      const live = done && !ended && !editingProfile;
+      if (gate) gate.hidden = (done && !editingProfile) || ended;
+      if (log) log.hidden = !done || editingProfile;
       if (form) form.hidden = !live;
       if (chips) chips.hidden = !live;
       tools.hidden = !live;
@@ -8037,6 +8098,10 @@ import {
       visitor.name = '';
       visitor.email = '';
       ended = false;
+      editingProfile = false;
+      profileError.hidden = true;
+      if (gateForm) gateForm.hidden = false;
+      $('[data-chat-gate-known]', gate)?.remove();
       opened = false;
       lastAt = '';
       seen.clear();
@@ -8147,8 +8212,9 @@ import {
       }
     });
 
-    gateForm?.addEventListener('submit', (event) => {
+    gateForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (savingProfile) return;
       const nameField = $('#chat-gate-name', panel);
       const emailField = $('#chat-gate-email', panel);
       const name = String(nameField?.value || '').trim();
@@ -8174,6 +8240,43 @@ import {
       // The same pattern the registration form uses, and for the same reason: an address that
       // cannot receive a reply makes the whole conversation pointless.
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { showError(emailField, 'chat.gateBadEmail'); return; }
+
+      if (editingProfile) {
+        savingProfile = true;
+        profileError.hidden = true;
+        const controls = $$('input, button', gateForm);
+        nameField?.focus({ preventScroll: true });
+        controls.forEach(control => {
+          if (control.tagName === 'INPUT') control.readOnly = true;
+          else control.disabled = true;
+        });
+        const thread = token;
+        try {
+          const result = await postJSON(endpoint, eventPayload('chat', { action: 'profile', token, name, email }));
+          if (!result?.ok || typeof result.profile?.name !== 'string' || typeof result.profile?.email !== 'string') throw new Error('profile');
+          if (thread !== token || ended) return;
+          visitor.name = result.profile.name;
+          visitor.email = result.profile.email;
+          storage.set('carruleddhi.chat.name', visitor.name);
+          storage.set('carruleddhi.chat.email', visitor.email);
+          rememberPerson(visitor.name, visitor.email);
+          editingProfile = false;
+          applyGate();
+          paintChatChrome();
+          if (log) log.scrollTop = profileScroll;
+          profileButton.focus({ preventScroll: true });
+        } catch (_) {
+          profileError.textContent = text('chat.dataFailed');
+          profileError.hidden = false;
+        } finally {
+          savingProfile = false;
+          controls.forEach(control => {
+            if (control.tagName === 'INPUT') control.readOnly = false;
+            else control.disabled = false;
+          });
+        }
+        return;
+      }
 
       visitor.name = name;
       visitor.email = email;
@@ -8288,13 +8391,6 @@ import {
     const toBottom = () => {
       if (!log) return;
       log.scrollTop = log.scrollHeight;
-      /* Druga próba w następnej klatce, bo wysokość wiersza nie zawsze jest już znana.
-         Bąbelek ze zdjęciem rośnie, gdy obrazek się zdekoduje, a `<dl>` podsumowania
-         dostaje ostateczną wysokość po przeliczeniu układu. Bez tej drugiej próby
-         najwyższe wiersze czatu — te ze zdjęciem — kończyły o kilkadziesiąt pikseli
-         poniżej widocznego dołu. Klatka później, więc nikt nie zdąży w tym czasie
-         przewinąć dziennika ręcznie. */
-      requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
     };
 
     /**
@@ -8357,8 +8453,10 @@ import {
     async function openThread() {
       if (opened) return;
       opened = true;
+      const thread = token;
       try {
         const result = await postJSON(endpoint, eventPayload('chat', { action: 'open', token }));
+        if (thread !== token || ended) return;
         if (!result || result.ok === false) throw new Error(result?.code || 'chat');
         (result.messages || []).forEach((message) => append(message, false));
         // A thread with no history opens with a greeting rather than a blank box: an empty
@@ -8376,6 +8474,7 @@ import {
         setMode(result.mode || 'ai');
         toBottom();
       } catch (_) {
+        if (thread !== token || ended) return;
         opened = false;
         note('chat.offline');
       }
@@ -8632,11 +8731,12 @@ import {
     logoField.addEventListener('change', async () => {
       const file = logoField.files?.[0];
       if (!file) return;
+      const owner = flow;
       try {
         const dataUrl = await shrinkPhoto(file);
         /* Kreator mógł się w tym czasie skończyć — wybór pliku trwa tyle, ile trwa grzebanie
            w galerii telefonu, a „rezygnuję" jest naciskane także wtedy. */
-        if (!flow || flow.intent !== 'sponsor') return;
+        if (flow !== owner || flow?.intent !== 'sponsor' || flow.step !== 'logo') return;
         flow.logo = dataUrl;
         /* Bąbelek gościa z samym obrazem, bez podpisu: to jest jego odpowiedź na pytanie
            o zdjęcie i ma po niej zostać ślad w rozmowie — a „dołączone" powiedziane słowem
@@ -8646,7 +8746,7 @@ import {
         sponsorNext(sponsorAskLink);
       } catch (error) {
         console.warn('Chat sponsor logo could not be prepared:', error);
-        if (flow?.intent === 'sponsor') flowSay('chat.sponsorLogoFailed');
+        if (flow === owner && flow?.intent === 'sponsor') flowSay('chat.sponsorLogoFailed');
       } finally {
         /* Wyczyszczone, żeby wybranie TEGO SAMEGO pliku drugi raz znowu wywołało `change`.
            Bez tego druga próba po nieudanym zmniejszaniu nie robi nic i wygląda na zawieszenie. */
@@ -8727,6 +8827,7 @@ import {
        który przy każdym kroku żąda pary (adres, kod). Zgubiony albo podrobiony stan po stronie
        strony nie daje ani jednej czynności więcej. */
     let flow = null;
+    let activeSummary = null;
 
     /**
      * Kształt kreatora w jednym miejscu.
@@ -8770,6 +8871,8 @@ import {
     const endFlow = () => {
       gateForget();
       flow = null;
+      profileButton.disabled = false;
+      activeSummary?.querySelectorAll('button').forEach(button => { button.disabled = true; });
       /* Ostrzeżenie o cyfrze w imieniu należy do kroku, nie do panelu. Bez tego „rezygnuję"
          naciśnięte przy ostrzeżeniu na ekranie zostawiałoby nad kompozytorem zdanie o polu,
          o które już nikt nie pyta. */
@@ -8786,12 +8889,21 @@ import {
      */
     const flowChoices = (options, variant = '') => {
       if (!chipsList) return;
+      activeSummary?.querySelectorAll('button').forEach(button => {
+        button.disabled = !flow || !['summary', 'fix'].includes(flow.step);
+      });
+      const owner = flow;
+      const step = flow?.step;
+      let busy = false;
       chipsList.replaceChildren(...options.map(([label, run, quiet]) => {
         const chip = document.createElement('button');
         chip.type = 'button';
         chip.className = variant ? `chat__chip ${variant}` : 'chat__chip';
         chip.textContent = text(label) || label;
-        chip.addEventListener('click', () => {
+        chip.dataset.i18n = label;
+        chip.addEventListener('click', async () => {
+          if (busy || flow !== owner || flow?.step !== step) return;
+          busy = true;
           /* NACIŚNIĘTA PASTYLKA ZOSTAWIA ŚLAD — BĄBELEK GOŚCIA, TAK JAK PISANIE
              ---------------------------------------------------------------------------
              Pastylki działały, ale w zapisie rozmowy nie zostawało po nich nic: gość widział
@@ -8824,7 +8936,11 @@ import {
           if (!quiet) append({ author: 'visitor', body: chip.textContent || '', at: '' }, false);
           // Fokus przekładany PRZED podmianą rzędu: patrz `keepFocus`.
           keepFocus();
-          void run();
+          try {
+            await run();
+          } finally {
+            busy = false;
+          }
         });
         return chip;
       }));
@@ -9208,6 +9324,8 @@ import {
       flow.confirmed = false;
       flow.code = '';
       flow.step = 'gate';
+      const owner = flow;
+      const attempt = gateState;
 
       try {
         const result = await gatePost('verify-start', {
@@ -9218,7 +9336,7 @@ import {
         if (!result?.ok) throw Object.assign(new Error('verify-start'), { payload: result });
         /* Kreator mógł się w tym czasie skończyć — „rezygnuję" jest naciskane także w trakcie
            żądania. Wtedy nie ma czego rysować i nie ma gdzie tego wpisać. */
-        if (!gateState || !flow) return;
+        if (gateState !== attempt || flow !== owner) return;
         /* „Kod poszedł" mówione niezależnie od tego, czy adres jest gdziekolwiek znany: Worker
            odpowiada tak samo w obu przypadkach (O6). Inaczej rozmowa odpowiadałaby na pytanie
            „czy ten człowiek jest u Was zapisany". */
@@ -9226,11 +9344,11 @@ import {
            stanęłoby nad komunikatem, który o nim mówi, i palec trafiałby w nie, zanim gość
            przeczyta, na jaki adres poszedł kod. */
         await gateSystem('chat.gateCodeSent', { '%EMAIL%': result.email || gateMask(address) });
-        if (!gateState || !flow) return;
+        if (gateState !== attempt || flow !== owner) return;
         gateState.field = codeField((code) => gateCheck(code));
         gateChoices();
       } catch (problem) {
-        gateRefused(problem);
+        if (gateState === attempt && flow === owner) gateRefused(problem);
       }
     }
 
@@ -9245,9 +9363,12 @@ import {
      * @returns {Promise<boolean>} czy adres został potwierdzony
      */
     async function gateCheck(code) {
-      if (!gateState || !flow) return false;
+      if (!gateState || !flow || gateState.checking) return false;
       const digits = String(code || '').replace(/\D/g, '');
       if (digits.length !== 6) return false;
+      const owner = flow;
+      const attempt = gateState;
+      attempt.checking = true;
 
       try {
         const result = await gatePost('verify-code', {
@@ -9257,7 +9378,7 @@ import {
           ...(gateState.entryId ? { entryId: gateState.entryId } : {})
         });
         if (!result?.ok) throw Object.assign(new Error('verify-code'), { payload: result });
-        if (!gateState || !flow) return false;
+        if (gateState !== attempt || flow !== owner) return false;
 
         flow.confirmed = true;
         flow.code = digits;
@@ -9272,8 +9393,10 @@ import {
         if (after) await after(digits);
         return true;
       } catch (problem) {
-        gateRefused(problem);
+        if (gateState === attempt && flow === owner) gateRefused(problem);
         return false;
+      } finally {
+        attempt.checking = false;
       }
     }
 
@@ -9349,8 +9472,10 @@ import {
      * wypisanie zamieniało się w wiadomość w wątku i nikogo nie wypisywało.
      */
     async function notifyOff(code) {
+      const owner = flow;
       const result = await gatePost('notify-off', { email: flow.email, code });
       if (!result?.ok) throw Object.assign(new Error('notify-off'), { payload: result });
+      if (flow !== owner) return;
       flowSay('chat.dataNotifyOff');
       endFlow();
     }
@@ -9408,15 +9533,20 @@ import {
      * od listu z kodem.
      */
     async function printDecide(email, entryId, code) {
-      const seen = await gatePost('entry-manage', { action: 'view', email, code, id: entryId });
+      const owner = flow;
+      const seen = await gatePost('entry-manage', { action: 'view', email, code, entryId });
+      if (!seen?.ok || !seen.entry) throw Object.assign(new Error('view'), { payload: seen });
+      if (flow !== owner) return;
+      flow.step = 'print';
       const wants = Boolean(seen?.entry?.wantsPrint);
       flowSay(wants ? 'chat.printNowYes' : 'chat.printNowNo');
 
       const set = async (value) => {
         const saved = await gatePost('entry-manage', {
-          action: 'print', email, code, id: entryId, wantsPrint: value
+          action: 'print', email, code, entryId, wantsPrint: value
         });
         if (!saved?.ok) throw Object.assign(new Error('print'), { payload: saved });
+        if (flow !== owner) return;
         flowSay(value ? 'chat.printSetYes' : 'chat.printSetNo');
         endFlow();
       };
@@ -9437,6 +9567,7 @@ import {
 
     async function entryHandover(email) {
       if (!flow) return;
+      const owner = flow;
       const intent = flow.intent;
       const purpose = intent === 'withdraw' ? 'cancel-entry' : 'edit-entry';
       flow.step = 'lookup';
@@ -9447,6 +9578,8 @@ import {
          otwiera — służy do policzenia zgłoszeń, tak samo jak w formularzu, do którego ten
          adres wpisuje każdy, kto go zna. */
       const found = await gatePost('entry-lookup', { email });
+      if (!found?.ok) throw Object.assign(new Error('entry-lookup'), { payload: found });
+      if (flow !== owner) return;
       const entries = Array.isArray(found?.entries) ? found.entries : [];
 
       /* `only.id` w warunku, nie tylko liczba: bez identyfikatora nie ma czym wiązać kodu,
@@ -9564,9 +9697,11 @@ import {
      * nieudany zapis w bazie to rzeczy, na które gość nie ma w rozmowie żadnego ruchu.
      */
     async function flowGuard(step) {
+      const owner = flow;
       try {
         await step();
       } catch (problem) {
+        if (flow !== owner) return;
         const payload = problem?.payload || null;
         const said = payload?.code || problem?.message || '';
         /* `reason` przed `code`, bo jest dokładniejszy tam, gdzie występuje: `SPONSOR_BAD_CODE`
@@ -9682,6 +9817,7 @@ import {
      */
     function sponsorConsent() {
       if (!flow) return;
+      const owner = flow;
       flow.step = 'consent';
       flow.consent = false;
       /* Pytanie i oba odsyłacze w JEDNYM zadaniu kolejki: zgoda bez dokumentów pod ręką nie
@@ -9720,7 +9856,7 @@ import {
          odsyłacze pod pytaniem nadal prowadzą do obu dokumentów, a zgoda pada z pastylki, jak
          wcześniej. Lepiej zgoda słabsza niż kreator, którego nie da się dokończyć. */
       const consentGiven = () => {
-        if (!flow) return;
+        if (flow !== owner || flow?.step !== 'consent') return;
         append({ author: 'visitor', body: text('chat.sponsorConsentDone'), at: '' }, false);
         flow.consent = true;
         sponsorAskPerson();
@@ -9965,23 +10101,38 @@ import {
      */
     function sponsorSummaryBlock() {
       if (!log || !flow) return null;
+      activeSummary?.querySelectorAll('button').forEach(button => { button.disabled = true; });
       const none = text('chat.sponsorSummaryNone');
       const rows = [
-        ['chat.sponsorSummaryName', flow.cartName],
-        ['chat.sponsorSummaryPerson', `${flow.firstName} ${flow.lastName}`.trim()],
-        ['chat.sponsorSummaryPhone', flow.phone || none],
-        ['chat.sponsorSummaryEmail', flow.email],
-        ['chat.sponsorSummaryLogo', flow.logo ? text('chat.sponsorSummaryLogoSet') : none],
-        ['chat.sponsorSummaryLink', flow.siteUrl || none]
+        ['chat.sponsorSummaryName', flow.cartName, 'name'],
+        ['chat.sponsorSummaryPerson', `${flow.firstName} ${flow.lastName}`.trim(), 'person'],
+        ['chat.sponsorSummaryPhone', flow.phone || none, 'phone'],
+        ['chat.sponsorSummaryEmail', flow.email, 'email'],
+        ['chat.sponsorSummaryLogo', flow.logo ? text('chat.sponsorSummaryLogoSet') : none, 'logo'],
+        ['chat.sponsorSummaryLink', flow.siteUrl || none, 'link']
       ];
       const list = document.createElement('dl');
       list.className = 'chat__summary';
       list.dataset.chatSummary = '';
-      rows.forEach(([key, value]) => {
+      rows.forEach(([key, value, field]) => {
         const label = document.createElement('dt');
         label.textContent = text(key) || key;
+        label.dataset.i18n = key;
         const said = document.createElement('dd');
-        said.textContent = value || none;
+        const content = document.createElement('span');
+        content.textContent = value || none;
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'chat__summary-edit';
+        edit.dataset.chatEdit = field;
+        edit.dataset.chatEditLabel = key;
+        edit.textContent = editLabel();
+        edit.setAttribute('aria-label', `${editLabel()}: ${text(key)}`);
+        edit.addEventListener('click', () => {
+          if (list !== activeSummary || !flow || !['summary', 'fix'].includes(flow.step)) return;
+          sponsorEdit(field);
+        });
+        said.append(content, edit);
         list.append(label, said);
       });
       if (flow.logo) {
@@ -9994,6 +10145,7 @@ import {
         list.append(shot);
       }
       addRow(list);
+      activeSummary = list;
       return list;
     }
 
@@ -10018,15 +10170,18 @@ import {
       flow.step = 'summary';
       flow.after = '';
       setWarn('');
+      const owner = flow;
       /* Zdanie i tabelka w JEDNYM zadaniu kolejki: podsumowanie bez danych pod nim to zdanie
          „sprawdź, czy się zgadza" o niczym. Ta sama decyzja, co przy zgodzie i jej dokumentach. */
       sayLater(() => {
+        if (flow !== owner || flow.step !== 'summary') return;
         sayNow('chat.sponsorSummaryLead');
         sponsorSummaryBlock();
       });
       flowChoices([
         ['chat.sponsorSummaryYes', async () => {
           if (!flow) return;
+          activeSummary?.querySelectorAll('button').forEach(button => { button.disabled = true; });
           /* Dopiero tutaj cokolwiek wychodzi na zewnątrz: bramka wysyła kod na podany adres,
              a `sponsorSubmit` jedzie po poprawnym kodzie. `flowGuard` wokół wysyłki, bo błąd
              rzucony z zaczepu wpadłby w obsługę odmów bramki. */
@@ -10061,20 +10216,38 @@ import {
       if (!flow) return;
       flow.step = 'fix';
       flowSay('chat.sponsorFixWhich');
-      const fix = (ask) => async () => {
-        if (!flow) return;
-        flow.after = 'summary';
-        ask();
-      };
       flowChoices([
-        ['chat.sponsorSummaryName', fix(sponsorAskName)],
-        ['chat.sponsorSummaryPerson', fix(sponsorAskPerson)],
-        ['chat.sponsorSummaryPhone', fix(sponsorAskPhone)],
-        ['chat.sponsorSummaryEmail', fix(sponsorAskEmail)],
-        ['chat.sponsorSummaryLogo', fix(sponsorAskLogo)],
-        ['chat.sponsorSummaryLink', fix(sponsorAskLink)],
+        ['chat.sponsorSummaryName', () => sponsorEdit('name')],
+        ['chat.sponsorSummaryPerson', () => sponsorEdit('person')],
+        ['chat.sponsorSummaryPhone', () => sponsorEdit('phone')],
+        ['chat.sponsorSummaryEmail', () => sponsorEdit('email')],
+        ['chat.sponsorSummaryLogo', () => sponsorEdit('logo')],
+        ['chat.sponsorSummaryLink', () => sponsorEdit('link')],
         ['chat.sponsorSummaryBack', async () => sponsorSummary()]
       ]);
+    }
+
+    function sponsorEdit(field) {
+      if (!flow || flow.intent !== 'sponsor') return;
+      const fields = {
+        name: [sponsorAskName, flow.cartName],
+        person: [sponsorAskPerson, `${flow.firstName} ${flow.lastName}`.trim()],
+        phone: [sponsorAskPhone, flow.phone],
+        email: [sponsorAskEmail, flow.email],
+        logo: [sponsorAskLogo, ''],
+        link: [sponsorAskLink, flow.siteUrl]
+      };
+      const entry = fields[field];
+      if (!entry) return;
+      flow.after = 'summary';
+      entry[0]();
+      if (input) {
+        input.value = entry[1] || '';
+        sizeInput();
+        input.focus({ preventScroll: true });
+        input.select();
+      }
+      watchPersonDigits();
     }
 
     /**
@@ -10091,6 +10264,7 @@ import {
      * ją po swojej stronie.
      */
     async function sponsorSubmit(code) {
+      const owner = flow;
       const result = await gatePost('sponsor-lead', {
         cartName: flow.cartName,
         firstName: flow.firstName,
@@ -10116,6 +10290,7 @@ import {
         consent: flow.consent === true
       });
       if (!result?.ok) throw Object.assign(new Error('sponsor'), { payload: result });
+      if (flow !== owner) return;
       flowSay('chat.sponsorThanks');
       endFlow();
     }
@@ -10245,6 +10420,11 @@ import {
     }
 
     async function startFlow(intent) {
+      if (!['sponsor', 'edit', 'withdraw', 'print', 'notifications'].includes(intent)) {
+        note('chat.dataFailed');
+        return;
+      }
+      profileButton.disabled = true;
       if (intent === 'sponsor') {
         sponsorOffer();
         return;
@@ -10317,7 +10497,7 @@ import {
         /* Zmiana danych i wycofanie zaczynają od listy zgłoszeń na tym adresie, bo od niej
            zależy, czy bramka ma co wiązać — patrz `entryHandover`. Wchodzi się tu po „zmień
            adres" w bramce, więc adres jest nowy i lista też jest nowa. */
-        if (flow.intent === 'edit' || flow.intent === 'withdraw') {
+        if (flow.intent === 'edit' || flow.intent === 'withdraw' || flow.intent === 'print') {
           await flowGuard(() => entryHandover(email));
           return true;
         }
@@ -10364,7 +10544,17 @@ import {
          „prawie natychmiast" i „natychmiast" różnią się tym, że pierwsze zależy od kolejki
          zadań, a wystarczy, że coś ją zapcha — i kropki pojawiają się po bąbelku, a nie
          razem z nim. Bez kreatora nie ma tu teraz żadnego oddania sterowania. */
-      if (!attached && flow && await flowHandled(message)) return;
+      if (sending || ended || editingProfile || !identified()) return;
+      if (flow) {
+        sending = true;
+        keepFocus();
+        try {
+          await flowHandled(message);
+        } finally {
+          sending = false;
+        }
+        return;
+      }
       /* One in flight at a time.
          The submit handler and the Enter handler both call this, and a fast double press —
          or a click on the button while Enter is still being processed — used to start two
@@ -10379,6 +10569,7 @@ import {
          inaczej drugie naciśnięcie Enter dołączyłoby je po raz drugi, a to samo zdjęcie
          wysłane dwa razy to dwa pliki w buckecie i dwa bąbelki. */
       const photo = attached;
+      const thread = token;
       attached = null;
       fileField.value = '';
       paintAttach();
@@ -10409,6 +10600,7 @@ import {
           name: visitor.name,
           email: visitor.email
         }));
+        if (thread !== token || ended) return;
         pending?.classList.remove('is-pending');
         if (!result || result.ok === false) throw new Error(result?.code || 'chat');
 
@@ -10449,6 +10641,7 @@ import {
         // of offering the same six openers for ever.
         paintChips();
       } catch (_) {
+        if (thread !== token || ended) return;
         pending?.classList.add('is-failed');
         note('chat.sendFailed');
         /* Zdjęcie wraca do podglądu, gdy wysyłka padła. Zniknięcie razem z nieudaną wiadomością
@@ -10501,7 +10694,7 @@ import {
     // Enter sends, Shift+Enter makes a new line. The other way round is how people end up
     // sending half a sentence.
     input?.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
         event.preventDefault();
         send(input.value);
       }
@@ -10610,11 +10803,8 @@ import {
          `sizeInput` trzymałby pole na starej, wyższej liczbie do następnej zmiany okna. */
       measureInputCap();
 
-      if (log && wasAtBottom) {
-        requestAnimationFrame(() => {
-          log.scrollTop = log.scrollHeight;
-        });
-      }
+      sizeInput();
+      if (wasAtBottom) toBottom();
     }
     measureChatViewport();
     window.visualViewport?.addEventListener('resize', measureChatViewport, { passive: true });
@@ -10691,45 +10881,14 @@ import {
        Przewijamy TYLKO wtedy, gdy dziennik i tak byl na dole. Kto cofnal sie do
        wczesniejszej wypowiedzi i zaczal pisac, zostaje tam, gdzie czyta. */
     function naPisaniu() {
-      const naDole = log ? log.scrollHeight - log.scrollTop - log.clientHeight < 48 : false;
+      const naDole = atBottom();
+      const height = log?.clientHeight;
       sizeInput();
-      if (log && naDole) {
-        log.scrollTop = log.scrollHeight;
-        /* Druga proba klatke pozniej: nowa wysokosc pola jest wpisana, ale uklad bywa
-           przeliczony dopiero teraz, wiec `scrollHeight` sprzed chwili mogl byc stary. */
-        requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
-      }
+      if (naDole && log?.clientHeight !== height) toBottom();
     }
     input?.addEventListener('input', naPisaniu);
 
-    /* Zapas na wszystko, co zmienia wysokosc kompozytora poza pisaniem: dolaczone zdjecie,
-       zmiana jezyka na dluzsza etykiete, podpowiedzi. Dziennik ma wtedy zostac przy
-       najnowszej wypowiedzi tak samo, jak przy pisaniu. */
-    const kompozytor = panel?.querySelector('[data-chat-form]');
-    if (log && kompozytor && 'ResizeObserver' in window) {
-      let wysokoscKompozytora = kompozytor.getBoundingClientRect().height;
-      new ResizeObserver(() => {
-        const teraz = kompozytor.getBoundingClientRect().height;
-        if (Math.abs(teraz - wysokoscKompozytora) < 1) return;
-        const urosl = teraz > wysokoscKompozytora;
-        wysokoscKompozytora = teraz;
-        /* Tylko gdy kompozytor URROSL: przy kurczeniu dziennik dostaje miejsce z powrotem
-           i sam zostaje tam, gdzie byl — dociaganie w dol wyrywaloby wtedy widok. */
-        if (!urosl) return;
-        if (log.scrollHeight - log.scrollTop - log.clientHeight < 120) {
-          requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
-        }
-      }).observe(kompozytor);
-    }
-
-    /* Skocz do najnowszej wiadomości przy wejściu w pole (pojawienie się klawiatury),
-       zeby uniknąć pisania w ciemno i wymusić pokazanie najnowszej wiadomości. */
-    input?.addEventListener('focus', () => {
-      if (!log) return;
-      requestAnimationFrame(() => {
-        log.scrollTop = log.scrollHeight;
-      });
-    });
+    // Focus alone never changes the reader's position in the conversation.
 
     /* --------------------------------------------------------------- chips */
     /* Every question the chips can offer, as i18n keys. The first six are the ones the FAQ
@@ -10803,13 +10962,18 @@ import {
     });
     // Repainted on a language change, because the labels are the questions themselves.
     window.addEventListener('carruleddhi:language', () => {
-      paintChips();
+      if (!flow) paintChips();
+      $$('[data-chat-edit]', panel).forEach(button => {
+        button.textContent = editLabel();
+        button.setAttribute('aria-label', `${editLabel()}: ${text(button.dataset.chatEditLabel)}`);
+      });
       setChipsOpen(chips?.classList.contains('is-open') || false);
     });
 
     /* --------------------------------------------------------------- poll */
     function startPolling() {
       if (polling) return;
+      let reading = false;
       polling = window.setInterval(async () => {
         // Nothing to poll for behind a hidden tab or a closed panel.
         if (document.hidden || panel.hidden) return;
@@ -10819,14 +10983,16 @@ import {
            wywołanie modelu trwa kilka sekund. Odczyt wchodzący w tym okienku pobierał oba
            wiersze, nie znał jeszcze ich identyfikatorów — bo `send()` dostaje je dopiero na
            końcu — i dorysowywał drugą kopię. Odczyt czeka więc na zakończenie wysyłki. */
-        if (sending) return;
+        if (sending || reading || ended || editingProfile) return;
+        reading = true;
+        const thread = token;
         try {
           const result = await postJSON(endpoint, eventPayload('chat', {
             action: 'poll',
             token,
             since: lastAt
           }));
-          if (!result || result.ok === false) return;
+          if (!result || result.ok === false || thread !== token || ended || sending) return;
           (result.messages || []).forEach((message) => append(message, false));
           /* Tryb po wiadomościach: przekazanie rozmowy widać dopiero pod tym, co organizator
              właśnie napisał, a nie nad tym. */
@@ -10843,6 +11009,8 @@ import {
           else hideTyping();
         } catch (_) {
           /* A dropped poll is not worth telling anybody about; the next one retries. */
+        } finally {
+          reading = false;
         }
       }, CHAT_POLL_MS);
     }

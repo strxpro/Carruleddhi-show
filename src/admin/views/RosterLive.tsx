@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { broadcastAdmin, type BroadcastAdminParticipant, type RosterRow } from '../api';
+import { broadcastAdmin, saveParticipant, type BroadcastAdminParticipant, type RosterRow } from '../api';
+import { formatRaceTime } from '../../lib/race-time';
+import { RaceTimeEditor } from './RaceTimeEditor';
 import type { TranslateKey } from '../i18n';
 import { subscribeBroadcast } from '../../obs/live-client';
 import type { BroadcastConnection, BroadcastState } from '../../obs/types';
 import { BroadcastPortrait } from './BroadcastPortrait';
 
 type Translate = (key: TranslateKey) => string;
-type RosterAction = { action: 'on-air'; id: string } | { action: 'hide' | 'clear' } | { action: 'participant-photo'; id: string; image: string };
+type RosterAction = { action: 'on-air'; id: string; mode?: 'live' | 'replay' } | { action: 'hide' | 'clear' } | { action: 'participant-photo'; id: string; image: string };
 
 export function useRosterLive(apiKey: string) {
   const [state, setState] = useState<BroadcastState | null>(null);
   const [participants, setParticipants] = useState<BroadcastAdminParticipant[]>([]);
+  const [timingReady, setTimingReady] = useState(false);
   const [connection, setConnection] = useState<BroadcastConnection>({ status: 'connecting' });
   const [pending, setPending] = useState(true);
   const [error, setError] = useState(false);
@@ -34,6 +37,7 @@ export function useRosterLive(apiKey: string) {
       if (data.state.revision >= metadataRevision.current) {
         metadataRevision.current = data.state.revision;
         setParticipants(data.participants);
+        setTimingReady(data.timingReady === true);
       }
     }).catch(() => { if (epoch.current === request) setError(true); }).finally(() => {
       if (epoch.current === request) { locked.current = false; setPending(false); }
@@ -41,8 +45,21 @@ export function useRosterLive(apiKey: string) {
     return () => { ++epoch.current; unsubscribe(); };
   }, [apiKey, attempt]);
 
+  useEffect(() => {
+    if (!state || state.revision <= metadataRevision.current || pending) return;
+    let cancelled = false;
+    void broadcastAdmin(apiKey, { action: 'state' }).then((data) => {
+      if (cancelled || data.state.revision < metadataRevision.current) return;
+      metadataRevision.current = data.state.revision;
+      setParticipants(data.participants);
+      setTimingReady(data.timingReady === true);
+      accept(data.state);
+    }).catch(() => { if (!cancelled) setError(true); });
+    return () => { cancelled = true; };
+  }, [apiKey, state?.revision, pending]);
+
   async function run(action: RosterAction): Promise<boolean> {
-    if (locked.current || error) return false;
+    if (locked.current || error || (action.action === 'on-air' && action.mode === 'replay' && !timingReady)) return false;
     locked.current = true;
     setPending(true);
     const request = epoch.current;
@@ -53,6 +70,7 @@ export function useRosterLive(apiKey: string) {
       if (data.state.revision >= metadataRevision.current) {
         metadataRevision.current = data.state.revision;
         setParticipants(data.participants);
+        setTimingReady(data.timingReady === true);
       }
       return true;
     } catch {
@@ -69,7 +87,27 @@ export function useRosterLive(apiKey: string) {
     return matches.length === 1 ? matches[0] : undefined;
   }
 
-  return { state, connection, pending, error, portrait, setPortrait, run, participantFor,
+  async function saveTime(id: string, raceTimeMs: number | null) {
+    if (locked.current || error || !timingReady) return false;
+    locked.current = true; setPending(true);
+    const request = epoch.current;
+    try {
+      await saveParticipant(apiKey, id, { raceTimeMs });
+      const data = await broadcastAdmin(apiKey, { action: 'state' });
+      if (epoch.current !== request) return false;
+      if (data.state.revision >= metadataRevision.current) {
+        metadataRevision.current = data.state.revision;
+        setParticipants(data.participants);
+        setTimingReady(data.timingReady === true);
+      }
+      accept(data.state);
+      return true;
+    } finally {
+      if (epoch.current === request) { locked.current = false; setPending(false); }
+    }
+  }
+
+  return { state, connection, pending, error, portrait, setPortrait, run, participantFor, timingReady, saveTime,
     disabled: pending || error || !state,
     refresh: () => { locked.current = true; setPending(true); setAttempt((value) => value + 1); } };
 }
@@ -91,9 +129,12 @@ export function RosterLiveSummary({ live, t, rows }: { live: Live; t: Translate;
     <p className="mt-2 text-xs text-muted-foreground">{t('live.current')}</p>
     <p className="mt-1 font-semibold" data-roster-current>{current ? `#${current.startNumber} ${current.firstName} ${current.lastName}` : t('live.noSelection')}</p>
     {current && <p className="mt-1 text-xs font-bold">{t(live.state?.participant_visible ? 'reg.liveOnAir' : 'live.hidden')}</p>}
+    {current && <p className="mt-1 text-xs" data-roster-mode>{t(live.state?.participant_mode === 'replay' ? 'live.replay' : 'live.modeLive')}{formatRaceTime(current.raceTimeMs) && ` / ${t('vote.raceTime')}: ${formatRaceTime(current.raceTimeMs)}`}</p>}
+    {!live.pending && !live.timingReady && <p className="mt-2 text-xs">{t('vote.timingUnavailable')}</p>}
     <div className="mt-3 flex flex-wrap gap-2">
       <button type="button" className={button} data-roster-hide disabled={live.disabled || !current || !live.state?.participant_visible} onClick={() => void live.run({ action: 'hide' })}>{t('live.hide')}</button>
-      <button type="button" className={button} data-roster-show disabled={live.disabled || !currentRow || live.state?.participant_visible} onClick={() => current && void live.run({ action: 'on-air', id: current.id })}>{t('reg.liveShow')}</button>
+      <button type="button" className={button} data-roster-show disabled={live.disabled || !currentRow || live.state?.participant_visible || (live.state?.participant_mode === 'replay' && !live.timingReady)} onClick={() => current && void live.run({ action: 'on-air', id: current.id, mode: live.state?.participant_mode ?? 'live' })}>{t('reg.liveShow')}</button>
+      <button type="button" className={button} data-roster-replay-current disabled={live.disabled || !currentRow || !live.timingReady} onClick={() => current && void live.run({ action: 'on-air', id: current.id, mode: 'replay' })}>{t('live.replay')}</button>
       <button type="button" className={button} data-roster-clear disabled={live.disabled || !current} onClick={() => void live.run({ action: 'clear' })}>{t('live.clear')}</button>
       <button type="button" className={button} disabled={live.pending} onClick={live.refresh}>{t('live.refresh')}</button>
       <a className={button} href="/obs/overlay" target="_blank" rel="noreferrer">{t('live.preview')}</a>
@@ -123,14 +164,18 @@ export function RosterLiveSummary({ live, t, rows }: { live: Live; t: Translate;
 export function RosterLiveActions({ live, row, t }: { live: Live; row: RosterRow; t: Translate }) {
   const participant = live.participantFor(row);
   const selected = participant && live.state?.participant?.id === participant.id;
-  const onAir = selected && live.state?.participant_visible;
+  const onAir = selected && live.state?.participant_visible && live.state?.participant_mode !== 'replay';
   return <div className="mt-2 min-w-[190px] max-w-[240px]" data-roster-registration={row.id}>
     <div className="flex flex-wrap gap-1.5">
       <button type="button" data-roster-activate className={`${button} bg-primary text-primary-foreground`} disabled={live.disabled || !participant || onAir}
-        onClick={() => participant && void live.run({ action: 'on-air', id: participant.id })}>{t(onAir ? 'reg.liveOnAir' : 'live.onAir')}</button>
-      {selected && <button type="button" className={button} disabled={live.disabled || !onAir} onClick={() => void live.run({ action: 'hide' })}>{t('live.hide')}</button>}
+        onClick={() => participant && void live.run({ action: 'on-air', id: participant.id, mode: 'live' })}>{t(onAir ? 'reg.liveOnAir' : 'live.onAir')}</button>
+      <button type="button" data-roster-replay className={button} disabled={live.disabled || !participant || !live.timingReady}
+        onClick={() => participant && void live.run({ action: 'on-air', id: participant.id, mode: 'replay' })}>{t('live.replay')}</button>
+      {selected && <button type="button" className={button} disabled={live.disabled || !live.state?.participant_visible} onClick={() => void live.run({ action: 'hide' })}>{t('live.hide')}</button>}
       <button type="button" className={button} disabled={live.disabled || !participant} onClick={() => participant && live.setPortrait(participant)}>{t('live.photo')}</button>
     </div>
+    {participant && <RaceTimeEditor key={participant.id} value={participant.raceTimeMs} timingReady={live.timingReady} disabled={live.disabled} t={t}
+      onSave={(raceTimeMs) => live.saveTime(participant.id, raceTimeMs)} />}
     {!participant && !live.pending && <p className="mt-1 text-[11px] text-muted-foreground">{t(row.status !== 'confirmed' ? 'reg.liveUnconfirmed' : 'reg.liveUnmapped')}</p>}
   </div>;
 }

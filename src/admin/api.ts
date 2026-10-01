@@ -42,6 +42,18 @@ async function call<T>(path: string, key: string, body: Record<string, unknown>)
       code
     );
   }
+  if (path === 'voting-admin' || path === 'voting') {
+    const validTime = (row: unknown) => !!row && typeof row === 'object'
+      && (!Object.hasOwn(row, 'raceTimeMs') || (row as { raceTimeMs: unknown }).raceTimeMs === null
+        || (typeof (row as { raceTimeMs: unknown }).raceTimeMs === 'number'
+          && Number.isInteger((row as { raceTimeMs: number }).raceTimeMs)
+          && (row as { raceTimeMs: number }).raceTimeMs >= 0
+          && (row as { raceTimeMs: number }).raceTimeMs <= 2147483647));
+    if ((Object.hasOwn(payload, 'timingReady') && typeof payload.timingReady !== 'boolean')
+      || ['participants', 'podium'].some((field) => Array.isArray(payload[field]) && !payload[field].every(validTime))) {
+      throw new ApiError('VOTING_INVALID_RESPONSE', 502, 'VOTING_INVALID_RESPONSE');
+    }
+  }
   return payload as T;
 }
 
@@ -442,6 +454,7 @@ export interface BroadcastAdminParticipant extends Participant {
 }
 
 export interface BroadcastAdminResponse {
+  timingReady?: boolean;
   ok: true;
   state: BroadcastState;
   participants: BroadcastAdminParticipant[];
@@ -452,7 +465,8 @@ export interface BroadcastAdminResponse {
 
 export type BroadcastAction =
   | { action: 'state' | 'hide' | 'clear' }
-  | { action: 'on-air' | 'sponsor-delete'; id: string }
+  | { action: 'sponsor-delete'; id: string }
+  | { action: 'on-air'; id: string; mode?: 'live' | 'replay' }
   | { action: 'sponsors-toggle'; enabled: boolean }
   | { action: 'sponsor-save'; sponsor: Omit<BroadcastSponsorEdit, 'id' | 'logoUrl'> & { id?: string }; expectedSponsor?: Omit<BroadcastSponsorEdit, 'logoUrl'> }
   | { action: 'sponsor-order'; ids: string[] }
@@ -463,12 +477,16 @@ export async function broadcastAdmin(key: string, action: BroadcastAction): Prom
   const participantValid = (value: Participant | null) => value !== null && typeof value === 'object'
     && ['id', 'firstName', 'lastName', 'city', 'projectName', 'category', 'photo']
       .every((field) => typeof value[field as keyof Participant] === 'string')
-    && ['number', 'string'].includes(typeof value.startNumber);
+    && ['number', 'string'].includes(typeof value.startNumber)
+    && (!Object.hasOwn(value, 'raceTimeMs') || value.raceTimeMs === null
+      || (typeof value.raceTimeMs === 'number' && Number.isInteger(value.raceTimeMs) && value.raceTimeMs >= 0 && value.raceTimeMs <= 2147483647));
   const sponsorValid = (value: BroadcastSponsor) => value !== null && typeof value === 'object'
     && ['id', 'name', 'logo', 'url', 'tier'].every((field) => typeof value[field as keyof BroadcastSponsor] === 'string')
     && typeof value.active === 'boolean' && Number.isFinite(value.order);
   // A partial/old deployment must not look like an empty, successfully saved broadcast.
   if (response.ok !== true || response.state?.id !== 'main'
+    || (Object.hasOwn(response, 'timingReady') && typeof response.timingReady !== 'boolean')
+    || (Object.hasOwn(response.state, 'participant_mode') && !['live', 'replay'].includes(response.state.participant_mode as string))
     || !Number.isSafeInteger(response.state.revision)
     || typeof response.state.participant_visible !== 'boolean'
     || typeof response.state.sponsors_enabled !== 'boolean'
@@ -587,6 +605,7 @@ export const announceEdition = (key: string) =>
 export type VotingPhase = 'scheduled' | 'voting' | 'closed';
 
 export interface VotingParticipant {
+  raceTimeMs?: number | null;
   id: string;
   category: string;
   startNumber: number;
@@ -607,6 +626,7 @@ export interface VotingParticipant {
 }
 
 export interface VotingState {
+  timingReady?: boolean;
   ok: true;
   phase: VotingPhase;
   status: VotingPhase;
@@ -621,6 +641,7 @@ export interface VotingState {
 
 /** What may be sent for one participant. Every field optional: an edit sends what changed. */
 export interface ParticipantEdit {
+  raceTimeMs?: number | null;
   registrationId?: string;
   category?: string;
   startNumber?: string;
@@ -819,6 +840,7 @@ export interface VotingEdition {
  * kazałby je tu dorabiać z powietrza.
  */
 export interface EditionResultRow {
+  raceTimeMs?: number | null;
   id: string;
   category: string;
   startNumber: number;

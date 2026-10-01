@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 
 // Embedded PostgreSQL only: no production DB, credentials or old migrations.
-test('Broadcast migration executes twice and enforces SQL behavior and privileges', async () => {
+for (const timing of [false, true]) test(`Broadcast migration ${timing ? '0048' : '0047'} executes twice and enforces SQL behavior and privileges`, async () => {
   const db = new PGlite();
   try {
     await db.exec(`
@@ -17,10 +17,17 @@ test('Broadcast migration executes twice and enforces SQL behavior and privilege
       create table public.participants(id uuid primary key,registration_id uuid references public.registrations(id) on delete set null,
         first_name text,last_name text,project_name text,category text,start_number integer,active boolean,image_path text);
       create function public.bump_stream_hearts(integer) returns integer language sql security definer as 'select $1';
+      create table public.voting_editions(id uuid primary key);
+      create table public.voting_settings(id boolean primary key);
     `);
     const sql = await readFile(new URL('../supabase/migrations/0047_broadcast_state.sql', import.meta.url), 'utf8');
     await db.exec(sql);
     await db.exec(sql);
+    if (timing) {
+      const migration = await readFile(new URL('../supabase/migrations/0048_participant_race_time.sql', import.meta.url), 'utf8');
+      await db.exec(migration);
+      await db.exec(migration);
+    }
     const command = async (action, payload = {}) => (await db.query(
       'select to_jsonb(public.broadcast_command($1,$2::jsonb)) as state', [action, JSON.stringify(payload)])).rows[0].state;
     const snapshot = async () => (await db.query("select * from public.broadcast_state where id='main'")).rows[0];
@@ -31,7 +38,7 @@ test('Broadcast migration executes twice and enforces SQL behavior and privilege
     const live = await command('on-air', { id });
     assert.equal(live.participant.city, 'Town');
     assert.equal(live.participant_visible, true);
-    assert.deepEqual(Object.keys(live.participant).sort(), ['id','firstName','lastName','city','startNumber','category','projectName','photo'].sort());
+    assert.deepEqual(Object.keys(live.participant).sort(), ['id','firstName','lastName','city','startNumber','category','projectName','photo', ...(timing ? ['raceTimeMs'] : [])].sort());
     const switched = await command('sponsors-toggle', { enabled: true });
     assert.equal(switched.participant.id, id);
     assert.ok(switched.revision > live.revision);
