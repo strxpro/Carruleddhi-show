@@ -19,13 +19,17 @@ export default defineConfig({
     name: 'obs-overlay-route',
     configureServer(server) {
       server.middlewares.use((req, _res, next) => {
-        if (req.url) req.url = req.url.replace(/^\/obs\/(overlay|participant|sponsors|replay)(?=\?|$)/, '/obs-$1.html');
+        if (req.url) req.url = req.url
+          .replace(/^\/obs\/effects\/(confetti|ribbons|sparkles)(?=\?|$)/, '/obs-effect-$1.html')
+          .replace(/^\/obs\/(overlay|participant|sponsors|replay|starting|intro|break|voting|results|standby|ending)(?=\?|$)/, '/obs-$1.html');
         next();
       });
     },
     configurePreviewServer(server) {
       server.middlewares.use((req, _res, next) => {
-        if (req.url) req.url = req.url.replace(/^\/obs\/(overlay|participant|sponsors|replay)(?=\?|$)/, '/obs-$1.html');
+        if (req.url) req.url = req.url
+          .replace(/^\/obs\/effects\/(confetti|ribbons|sparkles)(?=\?|$)/, '/obs-effect-$1.html')
+          .replace(/^\/obs\/(overlay|participant|sponsors|replay|starting|intro|break|voting|results|standby|ending)(?=\?|$)/, '/obs-$1.html');
         next();
       });
     }
@@ -71,6 +75,8 @@ export default defineConfig({
         obsParticipant: resolve(import.meta.dirname, 'obs-participant.html'),
         obsReplay: resolve(import.meta.dirname, 'obs-replay.html'),
         obsSponsors: resolve(import.meta.dirname, 'obs-sponsors.html'),
+        ...Object.fromEntries(['starting', 'intro', 'break', 'voting', 'results', 'standby', 'ending'].map(name => [`obsScene${name}`, resolve(import.meta.dirname, `obs-${name}.html`)])),
+        ...Object.fromEntries(['confetti', 'ribbons', 'sparkles'].map(name => [`obsEffect${name}`, resolve(import.meta.dirname, `obs-effect-${name}.html`)])),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
         cookies: resolve(import.meta.dirname, 'cookies.html'),
         regolamento: resolve(import.meta.dirname, 'regolamento.html'),

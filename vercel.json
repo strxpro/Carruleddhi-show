@@ -4,6 +4,8 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
+    { "source": "/obs/:scene(starting|intro|break|voting|results|standby|ending)", "destination": "/obs-:scene" },
+    { "source": "/obs/effects/:effect(confetti|ribbons|sparkles)", "destination": "/obs-effect-:effect" },
     {
       "source": "/api/broadcast/:action",
       "destination": "/api/intake?broadcastAction=:action"
@@ -31,7 +33,7 @@
   ],
   "headers": [
     {
-      "source": "/obs/:module(overlay|participant|sponsors|replay)",
+      "source": "/obs/:path*",
       "headers": [
         {
           "key": "X-Robots-Tag",

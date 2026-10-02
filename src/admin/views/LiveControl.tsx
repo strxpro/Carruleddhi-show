@@ -9,6 +9,7 @@ import { BroadcastPortrait } from './BroadcastPortrait';
 import { downscaleSponsorLogo } from './SettingsView';
 import { formatRaceTime } from '../../lib/race-time';
 import { RunControl } from './RunControl';
+import { BroadcastScenesLinks } from './BroadcastScenesLinks';
 
 type SponsorDraft = Omit<BroadcastSponsorEdit, 'id'> & {
   id?: string;
@@ -267,7 +268,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
       </section>
     </>}
 
-    <section className="live-panel" aria-labelledby="live-overlay-title">
+    <section className="live-panel" aria-labelledby="live-overlay-title" data-obs-primary-links>
       <h3 id="live-overlay-title">{t('live.overlay')}</h3><p className="live-help">{t('live.overlayHint')}</p>
       {overlaySources.map((source) => <div key={source.path}>
         <label className="live-field"><span>{source.label} / 1920 x 1080</span><input readOnly value={`${window.location.origin}${source.path}`} onFocus={(e) => e.target.select()} /></label>
@@ -287,5 +288,6 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
       <p className="live-help">{t('live.previewHint')}</p>
       {preview && <div id="live-overlay-preview" className="live-preview"><iframe src={`/obs/overlay?preview=1&lang=${t('locale.intl').startsWith('pl') ? 'pl' : 'it'}`} title={t('live.preview')} /></div>}
     </section>
+    <BroadcastScenesLinks t={t} />
   </div>;
 }

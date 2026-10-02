@@ -351,3 +351,15 @@ body {
 
   .start-cards__empty { font-size: 10pt; }
 }
+
+.scene-catalog summary { min-height: 44px; padding: .65rem 0; font-weight: 700; cursor: pointer; }
+.scene-catalog :is(summary, select):focus-visible { outline: 2px solid var(--color-ring); outline-offset: 3px; }
+.scene-catalog .live-help { overflow-wrap: anywhere; }
+.scene-catalog .live-help a { text-decoration: underline; }
+.scene-catalog-options { min-width: 0; margin-top: 1.25rem; }
+.scene-catalog-options legend { margin-bottom: .5rem; font-weight: 700; }
+.scene-catalog .live-field select { width: 100%; min-width: 0; min-height: 44px; padding: .7rem .8rem; border: 1px solid var(--color-input); border-radius: .6rem; background: var(--color-background); color: var(--color-foreground); font-size: .85rem; }
+.scene-catalog .live-checkbox { min-height: 44px; }
+.scene-catalog .live-checkbox input { flex-shrink: 0; }
+.scene-catalog-source { min-width: 0; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+.scene-catalog .live-button { min-height: 44px; }

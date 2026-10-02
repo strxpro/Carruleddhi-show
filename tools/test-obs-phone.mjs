@@ -56,7 +56,7 @@ try {
     return respond({ ok: false });
   });
   await page.goto(`${process.env.OBS_TEST_ORIGIN || 'http://127.0.0.1:5199'}/admin.html`, { waitUntil: 'networkidle0' });
-  const links = await page.$$eval('.admin-live input[readonly]', inputs => inputs.map(input => new URL(input.value).pathname));
+  const links = await page.$$eval('[data-obs-primary-links] input[readonly]', inputs => inputs.map(input => new URL(input.value).pathname));
   assert.deepEqual(links, ['/obs/participant', '/obs/replay', '/obs/sponsors'], 'admin provides live, replay and sponsor source links');
   for (const [index, participant] of participants.entries()) {
     await page.click(`button[aria-label="Zdjęcie zawodnika: ${participant.firstName} Rossi"]`);
