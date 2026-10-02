@@ -96,6 +96,13 @@ function readBody(req, limit = 1536 * 1024) {
  */
 function normalise(rawUrl, origin) {
   const url = new URL(rawUrl, origin);
+  // Vercel may preserve the original path while appending the rewrite's query.
+  // Strip only the single matching routing marker, never arbitrary user queries.
+  const broadcastPath = /^\/api\/broadcast\/([a-z-]{1,24})\/?$/.exec(url.pathname);
+  if (broadcastPath && url.searchParams.getAll('broadcastAction').length === 1
+      && url.searchParams.get('broadcastAction') === broadcastPath[1]) {
+    url.searchParams.delete('broadcastAction');
+  }
   if (url.pathname === '/api/intake' || url.pathname === '/api/intake/') {
     const broadcastAction = url.searchParams.get('broadcastAction');
     if (broadcastAction !== null) {

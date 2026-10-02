@@ -165,6 +165,23 @@ test('Vercel Edge and Node adapters restore scoped routes and enforce the small 
     const edge = await intake(new Request('https://example.test/api/intake?broadcastAction=state'));
     assert.equal(edge.status, 200);
     assert.equal((await edge.json()).serverNow, snapshot.serverNow);
+    const preserved = await intake(new Request('https://example.test/api/broadcast/state?broadcastAction=state'));
+    assert.equal(preserved.status, 200);
+    assert.equal((await preserved.json()).serverNow, snapshot.serverNow);
+    for (const query of ['broadcastAction=stop', 'broadcastAction=state&broadcastAction=state', 'broadcastAction=state&token=bad']) {
+      const rejected = await intake(new Request(`https://example.test/api/broadcast/state?${query}`));
+      assert.equal(rejected.status, 400);
+      assert.equal((await rejected.json()).code, 'BROADCAST_QUERY_NOT_ALLOWED');
+    }
+    const unauthorized = await intake(new Request('https://example.test/api/broadcast/stop?broadcastAction=stop', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }));
+    assert.equal(unauthorized.status, 401);
+    let nodeOutput;
+    const nodeResponse = { setHeader() {}, end(value) { nodeOutput = value; } };
+    await intake({ url: '/api/broadcast/state?broadcastAction=state', method: 'GET', headers: { host: 'example.test' } }, nodeResponse);
+    assert.equal(nodeResponse.statusCode, 200);
+    assert.equal(JSON.parse(nodeOutput).serverNow, snapshot.serverNow);
     const req = new EventEmitter();
     Object.assign(req, { url: '/api/intake?broadcastAction=stop', method: 'POST',
       headers: { host: 'example.test', 'content-type': 'application/json', authorization: `Bearer ${env.BROADCAST_CONTROL_TOKEN}` }, body: ' '.repeat(2049) });
