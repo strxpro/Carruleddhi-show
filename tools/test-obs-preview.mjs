@@ -17,14 +17,17 @@ try {
   const open = async path => { state.revision++; await page.goto(`${origin}${path}`, { waitUntil: 'networkidle0' }); };
   await open('/obs/sponsors');
   assert.equal(await page.$('.obs-preview-panel'), null, 'clean OBS source never displays instructions');
-  assert.equal(await page.$('.obs-sponsor-slot'), null, 'no fake sponsors are invented');
+  assert.equal(await page.$eval('.obs-sponsors', node => node.getAttribute('aria-hidden')), 'true', 'explicit OFF hides even house cards');
   assert.equal(await page.$eval('body', node => getComputedStyle(node).backgroundColor), 'rgba(0, 0, 0, 0)');
+  state.sponsors_enabled = true;
   await open('/obs/sponsors?preview=1&lang=pl');
-  assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /Nie dodano jeszcze sponsorów/);
+  assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /Karty Carruleddhi Show/);
+  assert.ok(await page.$('.obs-house'));
   assert.ok(await page.$('a[href="/admin?tab=live"]'));
   assert.ok(await page.$('a[href="/obs/sponsors"]'));
   await page.screenshot({ path: 'shots/obs-sponsors-empty-guide.png' });
   state.sponsors = [{ id: 'a', name: 'Sponsor testowy', logo: '', url: '', active: true, order: 0, tier: 'partner' }];
+  state.sponsors_enabled = false;
   await open('/obs/sponsors?preview=1&lang=pl');
   assert.match(await page.$eval('[data-preview-sponsors]', node => node.textContent), /jest wyłączona/);
   state.sponsors_enabled = true;
@@ -37,9 +40,16 @@ try {
   state.participant = { id: 'p-one', firstName: 'Anna', lastName: 'Rossi', startNumber: 8, category: 'classic', city: 'Gallura', projectName: 'Cart', photo: '', raceTimeMs: 83456 };
   state.participant_visible = true;
   await open('/obs/replay');
+  assert.equal(await page.$('.obs-participant'), null, 'current participant alone must never appear in replay');
+  state.last_finished_participant_id = 'p-finished';
+  state.last_finished_participant = { ...state.participant, id: 'p-finished' };
+  state.last_finished_elapsed_ms = 83456;
+  state.participant = { ...state.participant, firstName: 'Beata' };
+  await open('/obs/replay');
   await page.waitForSelector('.obs-race-time');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.obs-participant')).clipPath === 'inset(0px 0% 0px 0px)' || getComputedStyle(document.querySelector('.obs-participant')).opacity === '1');
   assert.match(await page.$eval('.obs-race-time', node => node.textContent), /01:23.456/);
+  assert.equal(await page.$eval('.obs-first-name', node => node.textContent), 'Anna');
   const fits = await page.$eval('.obs-race-time', badge => {
     const b = badge.getBoundingClientRect(), card = badge.closest('.obs-participant').getBoundingClientRect();
     return b.left >= card.left && b.right <= card.right && b.top >= card.top && b.bottom <= card.bottom;
@@ -53,5 +63,5 @@ try {
   await open('/obs/sponsors?preview=1&lang=it');
   assert.ok(await page.$eval('.obs-preview-panel', panel => { const r = panel.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }));
   assert.deepEqual(errors, []);
-  console.log('PASS: transparent clean sources, empty/off/inactive/ready sponsor guides PL/IT, no invented sponsors, replay time inside mask, mobile preview.');
+  console.log('PASS: transparent clean sources, OFF respected, branded empty belt, guides PL/IT, frozen replay distinct from current participant, time inside mask, mobile preview.');
 } finally { await browser.close(); }

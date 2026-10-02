@@ -23,11 +23,11 @@ export function ParticipantCard({ participant, visible, mode = 'live' }: { parti
 
   return <div className="obs-participant-anchor">
     <AnimatePresence mode="wait">
-      {ready && <motion.article key={ready.id} className="obs-participant" aria-label={`${ready.startNumber}. ${ready.firstName} ${ready.lastName}`}
+      {ready && <motion.article key={ready.id} className={`obs-participant${mode === 'replay' ? ' obs-participant-replay' : ''}`} aria-label={`${ready.startNumber}. ${ready.firstName} ${ready.lastName}`}
         initial={{ opacity: 0, x: reduced ? 0 : 38, clipPath: reduced ? 'inset(0 0 0 0)' : 'inset(0 0 0 100%)' }}
         animate={{ opacity: 1, x: 0, clipPath: 'inset(0 0% 0 0)' }}
         exit={{ opacity: 0, x: reduced ? 0 : 24, clipPath: reduced ? 'inset(0 0 0 0)' : 'inset(0 100% 0 0)' }}
-        transition={{ duration: reduced ? 0 : .42, ease: [.22, 1, .36, 1] }}>
+        transition={{ duration: reduced ? 0 : mode === 'replay' ? .48 : .42, ease: [.22, 1, .36, 1] }}>
         <div className="obs-card-back"><WheelDetail /><div className="obs-card-seam" /></div>
         <div className="obs-photo-frame"><Portrait participant={ready} /></div>
         <motion.div className="obs-race-number" initial={{ y: reduced ? 0 : 18, rotate: reduced ? 0 : -5 }}

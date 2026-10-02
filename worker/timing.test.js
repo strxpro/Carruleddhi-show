@@ -178,11 +178,12 @@ test('Unrelated participant failures are not retried as missing timing schema', 
   }
 });
 
-test('0047 broadcast reads default live/null, rejects replay, and preserves base on-air/settings actions', async (t) => {
+test('0047 broadcast base reads and sponsors work; START/STOP require0050 and replay is read-only', async (t) => {
   const commands = [];
   const reads = [];
   t.mock.method(globalThis, 'fetch', async (input, options = {}) => {
     const url = new URL(input); reads.push(url.pathname);
+    if (url.pathname.endsWith('/broadcast_snapshot')) return reply({ code: 'PGRST202', message: 'missing function' }, 404);
     if (url.pathname.endsWith('/broadcast_state')) {
       if (url.searchParams.get('select').includes('participant_mode')) return reply(missing('participant_mode'), 400);
       return reply([{ ...state, participant: { id } }]);
@@ -199,13 +200,18 @@ test('0047 broadcast reads default live/null, rejects replay, and preserves base
   assert.equal(publicBody.timingReady, false);
   assert.equal(publicBody.state.participant_mode, 'live');
   assert.equal(publicBody.state.participant.raceTimeMs, null);
-  const before = reads.length;
   const replay = await call('broadcast-admin', { action: 'on-air', id, mode: 'replay' });
-  assert.equal(replay.status, 503);
-  assert.equal((await replay.json()).code, 'BROADCAST_TIMING_MIGRATION_REQUIRED');
+  assert.equal(replay.status, 200);
   assert.equal(commands.length, 0);
-  assert.ok(reads.slice(before).every(path => path.endsWith('/broadcast_state')));
-  for (const body of [{ action: 'on-air', id }, { action: 'on-air', id, mode: 'live' }, { action: 'hide' },
+  for (const body of [{ action: 'on-air', id }, { action: 'start', id }, { action: 'stop' }]) {
+    const response = await call('broadcast-admin', body);
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'RUN_MIGRATION_REQUIRED');
+  }
+  assert.equal(commands.length, 0);
+  assert.equal(publicBody.runReady, false);
+  assert.equal(publicBody.serverNow, null);
+  for (const body of [{ action: 'hide' },
     { action: 'clear' }, { action: 'sponsors-toggle', enabled: false }]) {
     const response = await call('broadcast-admin', body);
     assert.equal(response.status, 200);
@@ -218,11 +224,12 @@ test('0047 broadcast reads default live/null, rejects replay, and preserves base
   assert.equal(commands.at(-1).p_action, 'settings-patch');
 });
 
-test('0048 replay forwards mode only with the selected id and includes timing in broadcast DTOs', async (t) => {
+test('0050 legacy live starts same authority; legacy replay never switches current participant', async (t) => {
   const commands = [];
-  const current = { ...state, participant_mode: 'replay', participant: { id, raceTimeMs: 12345 } };
+  const current = { ...state, run_status: 'IDLE', participant_mode: 'live', participant: { id, raceTimeMs: 12345 } };
   t.mock.method(globalThis, 'fetch', async (input, options = {}) => {
     const url = new URL(input);
+    if (url.pathname.endsWith('/broadcast_snapshot')) return reply({ state: current, serverNow: '2026-10-01T00:00:01Z' });
     if (url.pathname.endsWith('/broadcast_state')) return reply([current]);
     if (url.pathname.endsWith('/broadcast_command')) { commands.push(JSON.parse(options.body)); return reply(current); }
     if (url.pathname.endsWith('/broadcast_photo_source')) return reply({ id, photo: '', imagePath: '' });
@@ -236,10 +243,11 @@ test('0048 replay forwards mode only with the selected id and includes timing in
     assert.equal(body.timingReady, true);
     assert.equal(body.participants[0].raceTimeMs, 12345);
     assert.equal(body.state.participant.raceTimeMs, 12345);
-    assert.deepEqual(commands.at(-1).p_payload, { id, mode });
+    if (mode === 'replay') assert.equal(commands.length, 0);
+    else assert.deepEqual(commands.at(-1), { p_action: 'start', p_payload: { id } });
   }
   const body = await (await call('broadcast', { action: 'state' })).json();
-  assert.equal(body.state.participant_mode, 'replay');
+  assert.equal(body.state.participant_mode, 'live');
   assert.equal(body.timingReady, true);
 });
 

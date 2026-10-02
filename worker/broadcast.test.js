@@ -6,8 +6,8 @@ import { realtimeConfig, cleanBroadcastSponsor, decodeBroadcastImage, broadcastP
 const env = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_KEY: 'private-service-key', ROSTER_KEY: 'admin-password' };
 const id = '11111111-1111-4111-8111-111111111111';
 const state = { id: 'main', revision: 3, participant: null, participant_visible: false,
-  participant_mode: 'live', sponsors_enabled: false, sponsors: [], updated_at: '2026-10-01T00:00:00Z' };
-const data = { state, participants: [], sponsors: [] };
+  participant_mode: 'live', sponsors_enabled: false, sponsors: [], updated_at: '2026-10-01T00:00:00Z', run_status: 'IDLE' };
+const data = { state, participants: [], sponsors: [], serverNow: '2026-10-01T00:00:01Z' };
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const jwt = (role) => `header.${btoa(JSON.stringify({ role }))}.signature`;
 const request = (route, body, authenticated = false) => new Request(`https://example.test/api/carruleddhi/${route}`, {
@@ -54,19 +54,21 @@ test('Prepared image requires supported MIME, size and matching magic bytes', ()
 
 test('Public state reads only the sanitized singleton and reports realtime readiness', async (t) => {
   const calls = [];
-  t.mock.method(globalThis, 'fetch', async (url, options) => { calls.push({ url, options }); return reply([state]); });
+  t.mock.method(globalThis, 'fetch', async (url, options) => { calls.push({ url, options }); return reply(data); });
   const result = await (await broadcastPublic(env, { action: 'state' }, {})).json();
   assert.deepEqual(result.state, state);
   assert.equal(result.realtime.ready, false);
   assert.equal(result.realtime.anonKey, null);
   assert.equal(calls.length, 1);
-  assert.match(calls[0].url, /\/broadcast_state\?/);
+  assert.match(calls[0].url, /\/rpc\/broadcast_snapshot$/);
+  assert.equal(result.serverNow, data.serverNow);
+  assert.equal(result.runReady, true);
   assert.doesNotMatch(JSON.stringify(result), /private-service-key|registration|birth|email/);
 });
 
 test('Public route cannot be promoted to admin by body action or type and needs no CAPTCHA', async (t) => {
   let calls = 0;
-  t.mock.method(globalThis, 'fetch', async () => { calls++; return reply([state]); });
+  t.mock.method(globalThis, 'fetch', async () => { calls++; return reply(data); });
   const read = await worker.fetch(request('broadcast', { action: 'state' }), { ...env, TURNSTILE_SECRET: 'enabled' }, {});
   assert.equal(read.status, 200);
   const bad = await worker.fetch(request('broadcast', { action: 'on-air', type: 'broadcast-admin', id }), env, {});
@@ -119,18 +121,18 @@ test('Hide and show retain the selected participant and never send sponsor chang
     if (url.endsWith('broadcast_photo_source')) return reply({ id, photo: '', imagePath: '' });
     if (url.endsWith('broadcast_command')) {
       const command = JSON.parse(options.body); commands.push(command);
-      current = { ...current, revision: current.revision + 1, participant_visible: command.p_action === 'on-air' };
+      current = { ...current, revision: current.revision + 1, participant_visible: command.p_action === 'show' };
       return reply(current);
     }
     return reply({ ...data, state: current });
   });
-  for (const action of [{ action: 'hide' }, { action: 'on-air', id }]) {
+  for (const action of [{ action: 'hide' }, { action: 'show' }]) {
     const result = await (await broadcastAdmin(env, action, {})).json();
     assert.equal(result.state.participant.id, id);
-    assert.equal(result.state.participant_visible, action.action === 'on-air');
+    assert.equal(result.state.participant_visible, action.action === 'show');
     assert.equal(result.state.sponsors_enabled, true);
   }
-  assert.deepEqual(commands, [{ p_action: 'hide', p_payload: {} }, { p_action: 'on-air', p_payload: { id } }]);
+  assert.deepEqual(commands, [{ p_action: 'hide', p_payload: {} }, { p_action: 'show', p_payload: {} }]);
 });
 
 test('Admin route requires the roster password before any database access', async (t) => {
@@ -150,9 +152,11 @@ test('Admin on-air sends only the participant id to the atomic RPC, never a clie
   const result = await worker.fetch(request('broadcast-admin', { action: 'on-air', id,
     participant: { email: 'no@example.org' }, sponsors_enabled: true }, true), env, {});
   assert.equal(result.status, 200);
-  assert.deepEqual(calls[0].body, { p_id: id });
-  assert.deepEqual(calls[1].body, { p_action: 'on-air', p_payload: { id } });
-  assert.equal(calls.length, 3);
+  assert.deepEqual(calls[0].body, {});
+  assert.match(calls[0].url, /broadcast_snapshot$/);
+  assert.deepEqual(calls[1].body, { p_id: id });
+  assert.deepEqual(calls[2].body, { p_action: 'start', p_payload: { id } });
+  assert.equal(calls.length, 4);
   assert.deepEqual((await result.json()).participants, []);
 });
 
@@ -290,12 +294,13 @@ test('ON AIR preserves an uploaded crop without reading or copying the original 
     return reply(url.endsWith('broadcast_command') ? state : data);
   });
   assert.equal((await broadcastAdmin(env, { action:'on-air', id }, {})).status, 200);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
 });
 
 test('ON AIR rejects invalid stored paths without SSRF, upload, or state mutation', async (t) => {
   let path=''; let calls=0;
   t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.endsWith('broadcast_snapshot')) return reply(data);
     calls++;
     assert.match(url, /broadcast_photo_source$/);
     return reply({ id, photo:'', imagePath:path });
@@ -312,7 +317,10 @@ test('ON AIR rejects invalid stored paths without SSRF, upload, or state mutatio
 
 test('ON AIR does not copy or activate an ineligible participant', async (t) => {
   let calls=0;
-  t.mock.method(globalThis, 'fetch', async (url) => { calls++; assert.match(url,/broadcast_photo_source$/); return reply(null); });
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url.endsWith('broadcast_snapshot')) return reply(data);
+    calls++; assert.match(url,/broadcast_photo_source$/); return reply(null);
+  });
   const result=await broadcastAdmin(env, { action:'on-air', id }, {});
   assert.equal(result.status,422);
   assert.equal((await result.json()).code,'BROADCAST_PARTICIPANT_INELIGIBLE');
@@ -324,6 +332,7 @@ test('ON AIR preparation failures never send the activation command', async (t) 
     t.mock.restoreAll();
     const png=Buffer.alloc(64); png.set([137,80,78,71,13,10,26,10]);
     t.mock.method(globalThis,'fetch',async (url,options) => {
+      if (url.endsWith('broadcast_snapshot')) return reply(data);
       if (url.endsWith('broadcast_photo_source')) return reply({id,photo:'',imagePath:'participants/original.png'});
       assert.match(url,/\/storage\//);
       if (failure==='read' || options.method==='POST') return reply({},502);

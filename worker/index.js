@@ -16,6 +16,7 @@
  */
 import { COPY_DECK } from './copy-deck.js';
 import { broadcastPublic, broadcastAdmin, broadcastCommand, prepareBroadcastLogos, cleanBroadcastSponsor, broadcastSponsorBaseline, isMissingTimingColumn } from './broadcast.js';
+import { broadcastControl } from './broadcast-control.js';
 /* Przepisanie wiersza na pola formularza i token do niego — wspólne dla strony do druku
    (printableForm niżej) i dla wypełnionego PDF-a w załączniku (api/form-pdf.js). Dwie kopie
    tej reguły to pierwsze miejsce, w którym link i załącznik zaczęłyby mówić co innego. */
@@ -209,7 +210,7 @@ const ROSTER_HEADER = 'X-Carruleddhi-Roster-Key';
 /** Only these keys are forwarded. Anything else is dropped, not rejected. */
 const FIELD_WHITELIST = {
   broadcast: ['action'],
-  'broadcast-admin': ['action', 'id', 'mode', 'enabled', 'sponsor', 'ids', 'image', 'expectedSponsor'],
+  'broadcast-admin': ['action', 'id', 'participantId', 'runId', 'mode', 'enabled', 'sponsor', 'ids', 'image', 'expectedSponsor'],
   common: ['type', 'event', 'eventDate', 'locale', 'source', 'submittedAt'],
   registration: [
     'firstName', 'lastName', 'birthDate', 'town', 'email', 'phone', 'address',
@@ -8762,6 +8763,7 @@ async function votingAdminSave(env, payload, cors) {
   );
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
+    if (/\bRUN_ALREADY_RUNNING\b/.test(detail)) return json({ ok: false, code: 'RUN_ALREADY_RUNNING' }, 409, cors);
     if (detail.includes('23505')) return json({ ok: false, code: 'VOTING_START_NUMBER_TAKEN' }, 409, cors);
     return json({ ok: false, code: 'VOTING_STORE_FAILED', detail: detail.slice(0, 400) }, 502, cors);
   }
@@ -8790,7 +8792,11 @@ async function votingAdminRemove(env, payload, cors) {
     method: 'DELETE',
     headers: supabaseHeaders(env, { Prefer: 'return=minimal' })
   });
-  if (!response.ok) return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    if (/\bRUN_ALREADY_RUNNING\b/.test(detail)) return json({ ok: false, code: 'RUN_ALREADY_RUNNING' }, 409, cors);
+    return json({ ok: false, code: 'VOTING_STORE_FAILED' }, 502, cors);
+  }
 
   if (participant.image_path) await removePhoto(env, participant.image_path, 'participant-photos');
   return json({ ok: true, removed: id }, 200, cors);
@@ -9965,7 +9971,7 @@ function sanitizePayload(type, input) {
       continue;
     }
     if ((type === 'voting-admin' && key === 'raceTimeMs')
-      || (type === 'broadcast-admin' && key === 'mode')) {
+      || (type === 'broadcast-admin' && ['mode','runId','participantId'].includes(key))) {
       // Preserve explicit null and invalid types for the strict endpoint validator.
       if (Object.hasOwn(input, key)) output[key] = value;
       continue;
@@ -10230,6 +10236,7 @@ export default {
     const cors = corsHeaders(request, env);
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith('/api/broadcast/')) return broadcastControl(request, env, cors);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (!url.pathname.startsWith('/api/carruleddhi')) return new Response('Not found', { status: 404, headers: cors });
 

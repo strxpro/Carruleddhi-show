@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 
-test('0048 duration, replay, archive/prizes, privacy and repeat-safe migration', async () => {
+for (const central of [false, true]) test(`${central ? '0050' : '0048'} duration archive/prizes, privacy and repeat-safe migration`, async () => {
   const db = new PGlite();
   const id = '11111111-1111-4111-8111-111111111111';
   const registrationId = '22222222-2222-4222-8222-222222222222';
@@ -92,6 +92,8 @@ test('0048 duration, replay, archive/prizes, privacy and repeat-safe migration',
     await assert.rejects(db.query("select rollover_voting_edition('No','2027-08-01','Town')"), /permission denied/);
     await assert.rejects(db.query('select broadcast_participant($1)', [id]), /permission denied/);
     await db.exec('reset role');
+    const centralMigration = central ? await readFile(new URL('../supabase/migrations/0050_broadcast_run_control.sql', import.meta.url), 'utf8') : null;
+    if (central) await db.exec(centralMigration);
     await db.query(`insert into votes(participant_id,category,score,notify_results,voter_name,voter_email,voter_locale)
       values($1,'public-choice',8,true,'Private','voter@example.org','it'),($1,'public-choice',10,false,null,null,null)`, [id]);
     await db.query(`insert into prize_winners select id,$1,'prize-2',null,'Jury note' from voting_editions where edition_key='2026'`, [id]);
@@ -108,11 +110,21 @@ test('0048 duration, replay, archive/prizes, privacy and repeat-safe migration',
     assert.equal(same.rolledOver, false);
     assert.equal((await db.query('select race_time_ms from participants')).rows[0].race_time_ms, 98765);
     await db.exec("update voting_settings set status='closed'");
+    let expectedTime = 98765;
+    let frozen;
+    if (central) {
+      await command('start', { id });
+      await assert.rejects(rollover('2027'), /RUN_ALREADY_RUNNING/);
+      assert.equal((await db.query('select count(*) n from votes')).rows[0].n, 2);
+      const finish = await command('stop');
+      expectedTime = finish.elapsed_ms;
+      frozen = finish.last_finished_participant;
+    }
     const result = await rollover('2027');
     assert.equal(result.prizeCount, 1);
     assert.equal(result.voteCount, 2);
     const archived = (await db.query("select * from voting_editions where edition_key='2026'")).rows[0];
-    assert.equal(archived.results[0].raceTimeMs, 98765);
+    assert.equal(archived.results[0].raceTimeMs, expectedTime);
     assert.equal(archived.results[0].totalScore, 18);
     assert.equal(archived.results[0].averageScore, 9);
     assert.equal(archived.results[0].place, 1);
@@ -122,8 +134,9 @@ test('0048 duration, replay, archive/prizes, privacy and repeat-safe migration',
     assert.equal((await db.query('select count(*) n from votes')).rows[0].n, 0);
     assert.equal((await db.query('select count(*) n from voting_result_notifications')).rows[0].n, 1);
     assert.equal((await snapshot()).participant, null);
+    if (central) assert.deepEqual((await snapshot()).last_finished_participant, frozen);
     await assert.rejects(rollover('2026'), /EDITION_ALREADY_EXISTS/);
-    await db.exec(migration);
+    await db.exec(centralMigration || migration);
     assert.deepEqual((await db.query("select results from voting_editions where edition_key='2026'")).rows[0].results, archived.results);
   } finally { await db.close(); }
 });

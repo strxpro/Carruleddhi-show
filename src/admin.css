@@ -234,6 +234,23 @@ body {
 .live-crop { width: 100%; max-width: 320px; height: auto; aspect-ratio: 1; background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 0 / 20px 20px; }
 .live-mask-preview { min-width: 0; }
 .live-portrait { scroll-margin-top: 80px; }
+
+.admin-run-control { min-width: 0; margin: 14px 0; }
+.admin-run-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; }
+.admin-run-current,.admin-run-last { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); }
+.admin-run-current { border-top: 3px solid #ffc928; }
+.admin-run-last { border-top: 3px solid #f6494f; }
+.admin-run-control h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.admin-run-control .live-heading { flex-wrap: wrap; gap: 8px; }
+.admin-run-identity { margin: 12px 0 4px; font-size: 20px; font-weight: 700; overflow-wrap: anywhere; line-height: 1.2; }
+.admin-run-clock { margin: 16px 0; font: 700 clamp(28px, 3.2vw, 44px)/1.15 ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: -.05em; white-space: nowrap; }
+.admin-run-primary-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-bottom: 12px; }
+.admin-run-control .live-button { min-height: 44px; padding: 10px 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
+.admin-run-control .admin-run-stop { background: #f6494f; border-color: #f6494f; color: #fff; font-size: 16px; font-weight: 800; }
+.admin-run-control .admin-run-stop:not(:disabled):hover { background: #d92f38; }
+.admin-run-control .live-button:disabled { opacity: .42; cursor: not-allowed; }
+.admin-run-hint { margin-top: 12px; }
+@media(max-width:760px){.admin-run-grid{grid-template-columns:minmax(0,1fr)}.admin-run-current,.admin-run-last{padding:14px}.admin-run-clock{font-size:38px}.admin-run-identity{font-size:18px}}
 .live-checkbox { display: flex; align-items: center; gap: .75rem; font-size: .85rem; }
 .live-checkbox input { width: 20px; height: 20px; accent-color: var(--color-primary); }
 .live-editor { margin-top: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: .75rem; }

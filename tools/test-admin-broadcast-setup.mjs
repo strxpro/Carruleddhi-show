@@ -14,9 +14,12 @@ try {
     city: 'Gallura', category: 'classic', projectName: row.cartName, photo: '', imagePath: '', active: true,
     voteCount: 0, totalScore: 0, averageScore: 0, raceTimeMs: null };
   const state = { id: 'main', revision: 1, updated_at: new Date().toISOString(), participant: null, participant_visible: false,
+    current_participant_id: null, last_finished_participant_id: null, last_finished_participant: null,
+    run_status: 'IDLE', started_at: null, stopped_at: null, elapsed_ms: 0, run_id: null, last_finished_elapsed_ms: null,
     participant_mode: 'live', sponsors_enabled: true, sponsors: [] };
   const realtime = { url: '', anonKey: null, ready: false, code: 'REALTIME_NOT_CONFIGURED' };
   let failConfirm = true, acceptConfirm = false;
+  let runSetup = 'migration';
   page.on('dialog', dialog => acceptConfirm ? dialog.accept() : dialog.dismiss());
   await page.setViewport({ width: 1440, height: 1000 });
   await page.evaluateOnNewDocument(() => {
@@ -43,11 +46,21 @@ try {
     }
     if (path.endsWith('/broadcast')) return respond({ ok: true, state, realtime, timingReady: true });
     if (path.endsWith('/broadcast-admin')) {
-      if (body.action === 'on-air') {
+      assert.equal(request.headers()['x-carruleddhi-roster-key'], 'test-key');
+      assert.ok(['state', 'start'].includes(body.action), `unexpected action: ${body.action}`);
+      if (body.action === 'start') {
+        assert.equal(runSetup, 'ready');
+        assert.deepEqual(body, { action: 'start', id: person.id });
         writes.push(body); state.revision++; state.participant_visible = true;
         const { registrationId: _private, ...visible } = person; state.participant = visible;
+        Object.assign(state, { current_participant_id: person.id, run_status: 'RUNNING', run_id: 'run-one',
+          started_at: new Date().toISOString(), stopped_at: null, elapsed_ms: 0 });
       }
-      return respond({ ok: true, state, realtime, timingReady: true, participants: row.status === 'confirmed' ? [person] : [], sponsors: [] });
+      const response = { ok: true, state: { ...state }, realtime, timingReady: true, runReady: runSetup !== 'migration',
+        serverNow: new Date().toISOString(), participants: row.status === 'confirmed' ? [person] : [], sponsors: [] };
+      if (runSetup === 'missing-clock') delete response.serverNow;
+      if (runSetup === 'partial-state') delete response.state.last_finished_participant;
+      return respond(response);
     }
     if (path.endsWith('/voting-admin')) return respond({ ok: true, timingReady: true, status: 'voting', phase: 'voting',
       participants: [person], podium: [], prizes: [], editions: [], totalVotes: 0, scoreMin: 3, scoreMax: 10, durationMinutes: 60,
@@ -68,11 +81,29 @@ try {
   assert.equal(await page.$eval('[data-roster-activate]', el => el.disabled), true);
   failConfirm = false;
   await page.click('[data-roster-confirm]');
-  await ready('[data-roster-activate]');
-  assert.equal(await page.$('[data-roster-confirm]'), null);
+  await page.waitForSelector('[data-roster-confirm]', { hidden: true });
   assert.equal(state.participant, null, 'confirming does not automatically go on air');
+  const writesBeforeSetup = writes.length;
+  for (const setup of ['migration', 'missing-clock', 'partial-state']) {
+    runSetup = setup;
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.waitForSelector('[data-run-unavailable]');
+    assert.match(await page.$eval('[data-run-unavailable]', el => el.textContent), /0050_broadcast_run_control\.sql.*RUN_MIGRATION_REQUIRED/);
+    assert.equal(await page.$eval('[data-roster-activate]', el => el.disabled), true, `${setup} disables roster START`);
+    assert.equal(await page.$eval('[data-run-start]', el => el.disabled), true);
+    assert.equal(await page.$eval('[data-run-stop]', el => el.disabled), true);
+    assert.equal(await page.$eval('[data-run-elapsed]', el => el.textContent), '--:--.---', 'no fallback local clock');
+    await page.click('[data-roster-activate]');
+    assert.equal(writes.length, writesBeforeSetup, `${setup} must not send a run command`);
+  }
+  runSetup = 'ready';
+  await page.reload({ waitUntil: 'networkidle0' });
+  await ready('[data-roster-activate]');
+  assert.equal(await page.$('[data-run-unavailable]'), null);
   await page.click('[data-roster-activate]');
-  await page.waitForFunction(() => document.querySelector('[data-roster-current]')?.textContent.includes('Giovanni Rossi'));
+  await page.waitForFunction(() => document.querySelector('[data-run-current]')?.textContent === '#7 Giovanni Rossi');
+  assert.deepEqual(writes.at(-1), { action: 'start', id: person.id });
+  await ready('[data-run-stop]');
   await page.click('header button[title="Italiano"]');
   await page.waitForFunction(() => document.documentElement.lang === 'it' && document.body.textContent.includes('Confermata'));
   assert.ok((await page.$eval('body', el => el.textContent)).includes('Manca la chiave pubblica'));
@@ -98,5 +129,5 @@ try {
   await page.$eval('[data-race-time-editor]', el => el.closest('li').scrollIntoView({ block: 'center' }));
   await page.screenshot({ path: 'shots/admin-voting-it-mobile.png' });
   assert.deepEqual(errors, []);
-  console.log('PASS: explicit confirmation/cancel/failure/retry, no automatic ON AIR, exact activation, missing-key guidance, header IT switch, voting layout desktop/mobile, Italian labels.');
+  console.log('PASS: explicit confirmation/cancel/failure/retry, no automatic ON AIR, migration/clock/partial-state gating, exact START identity, missing-key guidance, header IT switch, voting layout desktop/mobile, Italian labels.');
 } finally { await browser.close(); }

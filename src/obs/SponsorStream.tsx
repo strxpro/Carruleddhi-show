@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { SponsorQueue } from './sponsor-queue';
+import { sponsorRoster } from './sponsor-roster';
 import type { Sponsor } from './types';
 
 const TRACK_WIDTH = 944;
@@ -14,8 +15,9 @@ export function SponsorStream({ sponsors, enabled }: { sponsors: Sponsor[]; enab
 
   useEffect(() => {
     let cancelled = false;
+    const roster = sponsorRoster(sponsors);
     const disposers: (() => void)[] = [];
-    const urls = [...new Set(sponsors.filter((s) => s.active && s.logo && !warmed.current.has(s.logo)).map((s) => s.logo))];
+    const urls = [...new Set(roster.filter((s) => s.logo && !warmed.current.has(s.logo)).map((s) => s.logo))];
     const loading = urls.map((url) => new Promise<void>((resolve) => {
       const image = new Image();
       const finish = () => {
@@ -33,17 +35,18 @@ export function SponsorStream({ sponsors, enabled }: { sponsors: Sponsor[]; enab
     }));
     void Promise.all(loading).then(() => {
       if (cancelled) return;
-      engine.current.update(sponsors, Boolean(reduced));
+      engine.current.update(roster);
       redraw((v) => v + 1);
     });
     return () => { cancelled = true; disposers.forEach((dispose) => dispose()); };
-  }, [sponsors, reduced]);
+  }, [sponsors]);
 
   useEffect(() => {
     let frame = 0;
     let previous = 0;
     const tick = (now: number) => {
-      if (enabled && !reduced && previous) {
+      // Continuous logo rotation is essential content; reduced motion only removes reveals.
+      if (enabled && previous) {
         const changed = engine.current.advance((now - previous) / 1000);
         for (const slot of engine.current.slots) {
           const node = nodes.current.get(slot.key);
@@ -56,7 +59,7 @@ export function SponsorStream({ sponsors, enabled }: { sponsors: Sponsor[]; enab
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [enabled, reduced]);
+  }, [enabled]);
 
   const visible = enabled && engine.current.slots.length > 0;
   return <motion.section className="obs-sponsors" aria-label="Partner della manifestazione"
@@ -77,6 +80,13 @@ export function SponsorStream({ sponsors, enabled }: { sponsors: Sponsor[]; enab
 function SponsorMark({ sponsor }: { sponsor: Sponsor }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [sponsor.logo]);
+  if (sponsor.id.startsWith('house:')) return <div className={`obs-house obs-house-${sponsor.id.split(':')[1]}`} data-sponsor-id={sponsor.id}>
+    <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="25" /><circle cx="32" cy="32" r="9" /><path d="M32 7v16m0 18v16M7 32h16m18 0h16M14 14l12 12m12 12 12 12M14 50l12-12m12-12 12-12" /></svg>
+    <div>{sponsor.id === 'house:brand' ? <><strong>Carruleddhi</strong><span>SHOW</span></>
+      : sponsor.id === 'house:town' ? <><small>IL CUORE DELLA CORSA</small><strong>Santa Teresa</strong><span>GALLURA</span></>
+        : <><small>INSIEME SI CORRE</small><strong>Partner</strong><span>DELL'EVENTO</span></>}</div>
+    <span className="obs-sponsor-divider" aria-hidden="true" />
+  </div>;
   return <div className="obs-sponsor-mark" data-sponsor-id={sponsor.id}>
     {sponsor.logo && !failed
       ? <img src={sponsor.logo} alt={sponsor.name} onError={() => setFailed(true)} draggable={false} />

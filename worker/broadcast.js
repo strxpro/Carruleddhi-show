@@ -42,10 +42,11 @@ async function db(env, path, body) {
   } catch { throw Object.assign(new Error('BROADCAST_UNAVAILABLE'), { status: 502 }); }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    const known = String(data?.message || '').match(/\bBROADCAST_[A-Z_]+\b/)?.[0];
+    const known = String(data?.message || '').match(/\b(?:BROADCAST|RUN)_[A-Z_]+\b/)?.[0];
     const missing = ['PGRST202', 'PGRST205', '42P01', '42883'].includes(data?.code);
     throw Object.assign(new Error(known || (missing ? 'BROADCAST_MIGRATION_REQUIRED' : 'BROADCAST_UNAVAILABLE')),
-      { status: known ? (known.includes('CONFLICT') ? 409 : 422) : missing ? 503 : 502,
+      { status: known ? (known.startsWith('RUN_') || known.includes('CONFLICT') ? 409 : 422) : missing ? 503 : 502,
+        missingSchema: missing,
         missingTimingMode: isMissingTimingColumn(data, 'participant_mode') });
   }
   return data;
@@ -57,12 +58,29 @@ export function isMissingTimingColumn(error, column = 'race_time_ms') {
     && new RegExp(`\\b${column}\\b`).test(String(error?.message || ''));
 }
 
-function timingState(state) {
-  return { ...state, participant_mode: state.participant_mode ?? 'live',
-    participant: state.participant ? { ...state.participant, raceTimeMs: state.participant.raceTimeMs ?? null } : null };
+export function timingState(state) {
+  const fields = ['id','revision','participant_visible','sponsors_enabled','sponsors','updated_at',
+    'current_participant_id','last_finished_participant_id','run_status','started_at','stopped_at',
+    'elapsed_ms','run_id','last_finished_elapsed_ms'];
+  const person = (value) => value ? { ...Object.fromEntries(
+    ['id','firstName','lastName','startNumber','city','projectName','category','photo']
+      .filter((key) => Object.hasOwn(value, key)).map((key) => [key, value[key]])), raceTimeMs: value.raceTimeMs ?? null } : null;
+  return { ...Object.fromEntries(fields.filter((key) => Object.hasOwn(state, key)).map((key) => [key, state[key]])),
+    participant_mode: state.participant_mode ?? 'live', participant: person(state.participant),
+    ...(Object.hasOwn(state, 'last_finished_participant') ? { last_finished_participant: person(state.last_finished_participant) } : {}) };
 }
 
-async function readBroadcastState(env) {
+export async function readBroadcastState(env) {
+  try {
+    const snapshot = await db(env, 'rpc/broadcast_snapshot', {});
+    if (!snapshot?.state || !snapshot.serverNow) throw new Error('BROADCAST_UNAVAILABLE');
+    return { state: timingState(snapshot.state), serverNow: snapshot.serverNow,
+      timingReady: Object.hasOwn(snapshot.state, 'participant_mode'),
+      runReady: Object.hasOwn(snapshot.state, 'run_status') };
+  } catch (error) {
+    if (!error.missingSchema) throw error;
+  }
+  // Only a missing 0050 RPC permits base reads against deployed 0047/0048.
   const columns = 'id,revision,participant,participant_visible,sponsors_enabled,sponsors,updated_at';
   let rows;
   try {
@@ -72,11 +90,39 @@ async function readBroadcastState(env) {
     rows = await db(env, `broadcast_state?id=eq.main&select=${columns}&limit=1`);
   }
   if (!rows?.[0]) throw Object.assign(new Error('BROADCAST_MIGRATION_REQUIRED'), { status: 503 });
-  return { state: timingState(rows[0]), timingReady: Object.hasOwn(rows[0], 'participant_mode') };
+  return { state: timingState(rows[0]), timingReady: Object.hasOwn(rows[0], 'participant_mode'),
+    runReady: false, serverNow: null };
 }
 
 export function broadcastCommand(env, action, payload = {}) {
   return db(env, 'rpc/broadcast_command', { p_action: action, p_payload: payload });
+}
+
+export async function broadcastRunCommand(env, action, payload = {}) {
+  if (payload.runId !== undefined && (typeof payload.runId !== 'string' || !UUID.test(payload.runId))) {
+    throw new Error('BROADCAST_BAD_RUN_ID');
+  }
+  const id = payload.participantId ?? payload.id;
+  if (['start','on-air'].includes(action) && (typeof id !== 'string' || !UUID.test(id))) throw new Error('BROADCAST_BAD_ID');
+  const before = await readBroadcastState(env);
+  if (!before.runReady) throw Object.assign(new Error('RUN_MIGRATION_REQUIRED'), { status: 503 });
+  const command = { ...(id ? { id } : {}), ...(payload.runId !== undefined ? { runId: payload.runId } : {}) };
+  if (['start','on-air'].includes(action) && before.state.run_status !== 'RUNNING'
+      && !(payload.runId && payload.runId === before.state.run_id)) {
+    const source = await db(env, 'rpc/broadcast_photo_source', { p_id: id });
+    if (!source || source.id !== id) throw new Error('BROADCAST_PARTICIPANT_INELIGIBLE');
+    if (!source.photo && source.imagePath) {
+      const path = source.imagePath;
+      if (typeof path !== 'string' || path.length > 240 || !PARTICIPANT_PATH.test(path) || path.includes('..')) {
+        throw new Error('BROADCAST_BAD_PHOTO_PATH');
+      }
+      const image = await storedImage(env, 'participant-photos', path, 5 * MAX_IMAGE);
+      command.preparedPhoto = await upload(env, image, 'participants');
+      command.sourcePath = path;
+    }
+  }
+  // Eligibility, photo source and run identity are rechecked under the DB row locks.
+  return broadcastCommand(env, action === 'on-air' ? 'start' : action, command);
 }
 
 export function decodeBroadcastImage(value) {
@@ -184,41 +230,25 @@ export async function broadcastPublic(env, payload, cors) {
   if ((payload.action || 'state') !== 'state') return response({ ok: false, code: 'BROADCAST_UNKNOWN_ACTION' }, 400, cors);
   try {
     return response({ ok: true, ...await readBroadcastState(env), realtime: realtimeConfig(env) }, 200, cors);
-  } catch (error) { return fail(error, cors); }
+  } catch (error) { return broadcastFail(error, cors); }
 }
 
-function fail(error, cors) {
-  const code = /^BROADCAST_[A-Z_]+$/.test(error.message) ? error.message : 'BROADCAST_UNAVAILABLE';
+export function broadcastFail(error, cors) {
+  const code = /^(?:BROADCAST|RUN)_[A-Z_]+$/.test(error.message) ? error.message : 'BROADCAST_UNAVAILABLE';
   return response({ ok: false, code }, error.status || (code.includes('BAD_') || code.includes('INELIGIBLE') ? 422 : 502), cors);
 }
 
 export async function broadcastAdmin(env, payload, cors) {
   const action = payload.action || 'state';
   try {
-    if (['on-air','participant-photo'].includes(action) && !UUID.test(payload.id || '')) throw new Error('BROADCAST_BAD_ID');
-    if (action === 'on-air') {
+    let commandState;
+    if (action === 'participant-photo' && !UUID.test(payload.id || '')) throw new Error('BROADCAST_BAD_ID');
+    if (action === 'on-air' || action === 'start') {
       if (Object.hasOwn(payload, 'mode') && !['live','replay'].includes(payload.mode)) throw new Error('BROADCAST_BAD_MODE');
-      // 0047 ignores unknown RPC payload keys. Never let a replay request go live.
-      if (payload.mode === 'replay' && !(await readBroadcastState(env)).timingReady) {
-        throw Object.assign(new Error('BROADCAST_TIMING_MIGRATION_REQUIRED'), { status: 503 });
-      }
-      // Explicit ON AIR intent authorizes publishing this existing voting photo.
-      // Only the selected eligible row is inspected, never the entire roster.
-      const source = await db(env, 'rpc/broadcast_photo_source', { p_id: payload.id });
-      if (!source || source.id !== payload.id) throw new Error('BROADCAST_PARTICIPANT_INELIGIBLE');
-      const command = { id: payload.id, ...(payload.mode !== undefined ? { mode: payload.mode } : {}) };
-      if (!source.photo && source.imagePath) {
-        const path = source.imagePath;
-        if (typeof path !== 'string' || path.length > 240 || !PARTICIPANT_PATH.test(path) || path.includes('..')) {
-          throw new Error('BROADCAST_BAD_PHOTO_PATH');
-        }
-        const image = await storedImage(env, 'participant-photos', path, 5 * MAX_IMAGE);
-        command.preparedPhoto = await upload(env, image, 'participants');
-        command.sourcePath = path;
-      }
-      // SQL rechecks eligibility/source and commits cache + selection together.
-      // A crop uploaded in the meantime wins over this original-photo fallback.
-      await broadcastCommand(env, action, command);
+      // Compatibility replay buttons are read-only; replay has its own frozen source.
+      if (payload.mode !== 'replay') commandState = await broadcastRunCommand(env, action, payload);
+    } else if (['stop','show','show-participant'].includes(action)) {
+      commandState = await broadcastRunCommand(env, action, payload);
     } else if (action === 'participant-photo') {
       const image = decodeBroadcastImage(payload.image);
       const before = await db(env, 'rpc/broadcast_admin_state', {});
@@ -248,8 +278,8 @@ export async function broadcastAdmin(env, payload, cors) {
     } else if (action === 'sponsors-toggle') {
       if (typeof payload.enabled !== 'boolean') throw new Error('BROADCAST_BAD_ENABLED');
       await broadcastCommand(env, action, { enabled: payload.enabled });
-    } else if (['hide','clear'].includes(action)) {
-      await broadcastCommand(env, action, {});
+    } else if (['hide','hide-participant','clear','show-sponsors','hide-sponsors'].includes(action)) {
+      commandState = await broadcastCommand(env, action, {});
     } else if (action !== 'state') {
       return response({ ok: false, code: 'BROADCAST_UNKNOWN_ACTION' }, 400, cors);
     }
@@ -279,11 +309,12 @@ export async function broadcastAdmin(env, payload, cors) {
         if (UUID.test(link.id) && UUID.test(link.registration_id)) registrations.set(link.id, link.registration_id);
       }
     }
-    return response({ ok: true, ...data, state: timingState(data.state),
+    return response({ ok: true, ...data, state: timingState(commandState || data.state),
+      runReady: Object.hasOwn(data.state, 'run_status'), serverNow: data.serverNow ?? null,
       timingReady: Object.hasOwn(data.state, 'participant_mode'),
       participants: data.participants.map((p) => ({ ...p, raceTimeMs: p.raceTimeMs ?? null, registrationId: registrations.get(p.id) || null })),
       sponsors: data.sponsors.map((s) => ({ ...s,
       logoUrl: data.state.sponsors.find((v) => v.id === s.id)?.logo || '' })),
       assetWarnings, realtime: realtimeConfig(env) }, 200, cors);
-  } catch (error) { return fail(error, cors); }
+  } catch (error) { return broadcastFail(error, cors); }
 }

@@ -131,9 +131,10 @@ try {
 
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
   publish({ sponsors: [{ ...state.sponsors[0], name: 'Updated static sponsor', logo: '' }] });
-  await page.waitForFunction(() => document.querySelector('.obs-sponsor-fallback')?.textContent === 'Updated static sponsor');
+  await page.waitForFunction(() => [...document.querySelectorAll('.obs-sponsor-fallback')].some(el => el.textContent === 'Updated static sponsor'));
   publish({ sponsors: [] });
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.obs-sponsors')).opacity === '0');
+  await page.waitForFunction(() => !!document.querySelector('.obs-house'));
+  assert.equal(await page.$eval('.obs-sponsors', el => getComputedStyle(el).opacity), '1', 'house cards keep an enabled empty belt intentional');
 
   await page.setViewport({ width: 960, height: 540 });
   await sleep(200);

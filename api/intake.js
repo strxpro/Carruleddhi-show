@@ -59,16 +59,22 @@ const ctx = {
 };
 
 /** Collects a Node request body. Returns undefined for GET, which may not have one. */
-function readBody(req) {
+function readBody(req, limit = 1536 * 1024) {
   if (req.method === 'GET' || req.method === 'HEAD') return Promise.resolve(undefined);
   // Vercel's Node runtime often parses JSON for us; when it has, re-reading the
   // stream yields nothing and the body has to come back from req.body.
   if (req.body !== undefined && req.body !== null) {
-    return Promise.resolve(typeof req.body === 'string' ? req.body : JSON.stringify(req.body));
+    const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    if (Buffer.byteLength(body) > limit) return Promise.reject(new Error('PAYLOAD_TOO_LARGE'));
+    return Promise.resolve(body);
   }
   return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
+    const chunks = []; let length = 0;
+    req.on('data', (chunk) => {
+      length += Buffer.byteLength(chunk);
+      if (length > limit) { reject(new Error('PAYLOAD_TOO_LARGE')); return; }
+      chunks.push(Buffer.from(chunk));
+    });
     req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
@@ -91,6 +97,12 @@ function readBody(req) {
 function normalise(rawUrl, origin) {
   const url = new URL(rawUrl, origin);
   if (url.pathname === '/api/intake' || url.pathname === '/api/intake/') {
+    const broadcastAction = url.searchParams.get('broadcastAction');
+    if (broadcastAction !== null) {
+      url.pathname = /^[a-z-]{1,24}$/.test(broadcastAction) ? `/api/broadcast/${broadcastAction}` : '/api/broadcast/invalid';
+      url.searchParams.delete('broadcastAction');
+      return url.toString();
+    }
     const type = url.searchParams.get('type') || '';
     // Letters and dashes only. The pattern cannot produce anything else, and a path
     // built from an unchecked value is not worth the saving.
@@ -117,12 +129,22 @@ export default async function handler(first, second) {
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const origin = `${proto}://${host}`;
 
-  const request = new Request(normalise(req.url, origin), {
+  const normalized = normalise(req.url, origin);
+  let body;
+  try { body = await readBody(req, new URL(normalized).pathname.startsWith('/api/broadcast/') ? 2048 : 1536 * 1024); }
+  catch (error) {
+    res.statusCode = error.message === 'PAYLOAD_TOO_LARGE' ? 413 : 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify({ ok: false, code: error.message === 'PAYLOAD_TOO_LARGE' ? error.message : 'INVALID_BODY' }));
+    return undefined;
+  }
+  const request = new Request(normalized, {
     method: req.method,
     headers: new Headers(
       Object.entries(req.headers).map(([key, value]) => [key, Array.isArray(value) ? value.join(', ') : String(value)])
     ),
-    body: await readBody(req)
+    body
   });
 
   const response = await worker.fetch(request, process.env, ctx);

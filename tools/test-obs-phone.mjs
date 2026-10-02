@@ -14,7 +14,10 @@ try {
     localStorage.setItem('carruleddhi.admin.locale', 'pl');
   });
   const participants = ['Ada', 'Anna'].map((firstName, i) => ({ id: `p${i + 1}`, firstName, lastName: 'Rossi', startNumber: i + 1, city: 'Gallura', category: 'classic', projectName: 'Cart', photo: '' }));
-  const state = { id: 'main', revision: 1, updated_at: new Date().toISOString(), participant: null, participant_visible: false, sponsors_enabled: false, sponsors: [] };
+  const state = { id: 'main', revision: 1, updated_at: new Date().toISOString(), participant: null, participant_visible: false,
+    current_participant_id: null, last_finished_participant_id: null, last_finished_participant: null,
+    run_status: 'IDLE', started_at: null, stopped_at: null, elapsed_ms: 0, run_id: null, last_finished_elapsed_ms: null,
+    sponsors_enabled: false, sponsors: [] };
   const realtime = { url: '', anonKey: null, ready: false, code: 'REALTIME_NOT_CONFIGURED' };
   await page.setRequestInterception(true);
   page.on('request', request => {
@@ -27,15 +30,28 @@ try {
     if (path.endsWith('/broadcast-admin')) {
       assert.equal(request.headers()['x-carruleddhi-roster-key'], 'test-key');
       if (body.action !== 'state') {
+        assert.ok(['participant-photo', 'start', 'stop'].includes(body.action), `unexpected action: ${body.action}`);
         actions.push(body);
         state.revision++;
+        state.updated_at = new Date().toISOString();
       }
       if (body.action === 'participant-photo') participants.find(p => p.id === body.id).photo = body.image;
-      if (body.action === 'on-air') {
+      if (body.action === 'start') {
+        assert.notEqual(state.run_status, 'RUNNING', 'STOP is required before starting another rider');
         state.participant = { ...participants.find(p => p.id === body.id) };
         state.participant_visible = true;
+        Object.assign(state, { current_participant_id: body.id, run_status: 'RUNNING', run_id: `run-${state.revision}`,
+          started_at: new Date().toISOString(), stopped_at: null, elapsed_ms: 0 });
       }
-      return respond({ ok: true, state, participants, sponsors: [], realtime });
+      if (body.action === 'stop') {
+        assert.equal(state.run_status, 'RUNNING');
+        assert.deepEqual(body, { action: 'stop', runId: state.run_id });
+        const elapsed = Math.max(0, Date.now() - Date.parse(state.started_at));
+        Object.assign(state, { run_status: 'FINISHED', stopped_at: new Date().toISOString(), elapsed_ms: elapsed,
+          last_finished_participant_id: state.current_participant_id,
+          last_finished_participant: { ...state.participant, raceTimeMs: elapsed }, last_finished_elapsed_ms: elapsed });
+      }
+      return respond({ ok: true, state, participants, sponsors: [], realtime, runReady: true, serverNow: new Date().toISOString() });
     }
     return respond({ ok: false });
   });
@@ -65,17 +81,32 @@ try {
     await page.evaluate(() => [...document.querySelectorAll('.live-portrait button')].find(b => b.textContent === 'Zapisz zdjęcie zawodnika').click());
     await page.waitForSelector('.live-portrait', { hidden: true });
     assert.equal(state.participant, null, 'preparing a photo must not activate a rider');
+    assert.equal(state.run_status, 'IDLE', 'photo upload must not start a run');
     assert.match(participant.photo, /^data:image\/webp;base64,/);
   }
   assert.notEqual(participants[0].photo, participants[1].photo);
+  let frozen = null;
   for (const participant of participants) {
-    await page.click(`button[aria-label="Zjeżdża / ON AIR: #${participant.startNumber} ${participant.firstName} Rossi"]`);
-    await page.waitForFunction(name => document.querySelector('.live-current .live-rider-details strong')?.textContent === name, {}, `${participant.firstName} Rossi`);
+    const start = `[data-live-start="${participant.id}"]`;
+    await page.waitForFunction(selector => document.querySelector(selector)?.disabled === false, {}, start);
+    await page.click(start);
+    await page.waitForFunction(name => document.querySelector('[data-run-current]')?.textContent === name
+      && document.querySelector('[data-run-control]')?.dataset.runStatus === 'RUNNING', {}, `#${participant.startNumber} ${participant.firstName} Rossi`);
     assert.equal(state.participant.photo, participant.photo);
-    assert.deepEqual(actions.at(-1), { action: 'on-air', id: participant.id, mode: 'live' });
+    assert.deepEqual(actions.at(-1), { action: 'start', id: participant.id });
+    assert.deepEqual(state.last_finished_participant, frozen, 'starting the next rider preserves the frozen replay');
+    assert.equal(await page.$$eval('[data-live-start]', buttons => buttons.every(button => button.disabled)), true);
+    const runId = state.run_id;
+    await page.waitForFunction(() => document.querySelector('[data-run-stop]')?.disabled === false);
+    await page.click('[data-run-stop]');
+    await page.waitForSelector('[data-run-status="FINISHED"]');
+    assert.deepEqual(actions.at(-1), { action: 'stop', runId });
+    assert.equal(state.last_finished_participant.photo, participant.photo);
+    assert.match(await page.$eval('[data-run-last]', el => el.textContent), new RegExp(`${participant.firstName} Rossi`));
+    frozen = structuredClone(state.last_finished_participant);
   }
   assert.deepEqual(errors, []);
-  console.log('PASS: mobile camera input, gallery fallback, shared mask, two saved photos, save without activation, one-click rider switch, no mobile overflow. Camera hardware is not exercised.');
+  console.log('PASS: mobile camera input, gallery fallback, shared mask, two saved photos, save without activation, START/STOP rider switching, frozen replay retained on next START, no mobile overflow. Camera hardware is not exercised.');
 } finally {
   await browser.close();
 }

@@ -5,6 +5,10 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/api/broadcast/:action",
+      "destination": "/api/intake?broadcastAction=:action"
+    },
+    {
       "source": "/obs/replay",
       "destination": "/obs-replay"
     },

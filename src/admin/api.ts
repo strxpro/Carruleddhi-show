@@ -458,6 +458,10 @@ export interface BroadcastAdminParticipant extends Participant {
 
 export interface BroadcastAdminResponse {
   timingReady?: boolean;
+  runReady?: boolean;
+  serverNow?: string;
+  /** Browser monotonic receipt time, never sent to the server. */
+  receivedAt?: number;
   ok: true;
   state: BroadcastState;
   participants: BroadcastAdminParticipant[];
@@ -467,7 +471,9 @@ export interface BroadcastAdminResponse {
 }
 
 export type BroadcastAction =
-  | { action: 'state' | 'hide' | 'clear' }
+  | { action: 'state' | 'hide' | 'show' | 'clear' }
+  | { action: 'start'; id: string }
+  | { action: 'stop'; runId: string }
   | { action: 'sponsor-delete'; id: string }
   | { action: 'on-air'; id: string; mode?: 'live' | 'replay' }
   | { action: 'sponsors-toggle'; enabled: boolean }
@@ -477,6 +483,7 @@ export type BroadcastAction =
 
 export async function broadcastAdmin(key: string, action: BroadcastAction): Promise<BroadcastAdminResponse> {
   const response = await call<BroadcastAdminResponse>('broadcast-admin', key, action);
+  const receivedAt = performance.now();
   const participantValid = (value: Participant | null) => value !== null && typeof value === 'object'
     && ['id', 'firstName', 'lastName', 'city', 'projectName', 'category', 'photo']
       .every((field) => typeof value[field as keyof Participant] === 'string')
@@ -504,7 +511,26 @@ export async function broadcastAdmin(key: string, action: BroadcastAction): Prom
     || typeof response.realtime?.ready !== 'boolean') {
     throw new ApiError('BROADCAST_INVALID_RESPONSE', 502, 'BROADCAST_INVALID_RESPONSE');
   }
-  return response;
+  // Old/partial deployments keep sponsor editing available, but never enable a clock
+  // command without a complete authoritative state and a database time sample.
+  const state = response.state;
+  const timeValid = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 2147483647;
+  const dateValid = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value));
+  response.runReady = response.runReady === true
+    && dateValid(response.serverNow)
+    && ['IDLE', 'RUNNING', 'FINISHED'].includes(state.run_status ?? '')
+    && (state.current_participant_id === null || typeof state.current_participant_id === 'string')
+    && (state.last_finished_participant_id === null || typeof state.last_finished_participant_id === 'string')
+    && (state.run_id === null || typeof state.run_id === 'string')
+    && (state.started_at === null || dateValid(state.started_at))
+    && (state.stopped_at === null || dateValid(state.stopped_at))
+    && timeValid(state.elapsed_ms)
+    && (state.last_finished_elapsed_ms === null || timeValid(state.last_finished_elapsed_ms))
+    && (state.last_finished_participant === null || participantValid(state.last_finished_participant ?? null))
+    && (state.run_status !== 'RUNNING' || (!!state.run_id && dateValid(state.started_at)
+      && state.current_participant_id === state.participant?.id))
+    && (state.run_status !== 'FINISHED' || dateValid(state.stopped_at));
+  return { ...response, receivedAt };
 }
 
 export const uploadGalleryImage = (key: string, photo: string) =>

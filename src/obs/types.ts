@@ -26,6 +26,16 @@ export interface BroadcastState {
   participant: Participant | null;
   participant_visible: boolean;
   participant_mode?: 'live' | 'replay';
+  /** Optional only for deployments before the authoritative run migration. */
+  current_participant_id?: string | null;
+  last_finished_participant_id?: string | null;
+  last_finished_participant?: Participant | null;
+  run_status?: 'IDLE' | 'RUNNING' | 'FINISHED';
+  started_at?: string | null;
+  stopped_at?: string | null;
+  elapsed_ms?: number;
+  run_id?: string | null;
+  last_finished_elapsed_ms?: number | null;
   sponsors_enabled: boolean;
   sponsors: Sponsor[];
   updated_at: string;

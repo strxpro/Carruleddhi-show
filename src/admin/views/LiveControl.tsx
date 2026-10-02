@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, ExternalLink, ImagePlus, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { broadcastAdmin, uploadSponsorLogo, type BroadcastAction, type BroadcastAdminResponse, type BroadcastSponsorEdit } from '../api';
 import type { TranslateKey } from '../i18n';
 import { subscribeBroadcast } from '../../obs/live-client';
@@ -8,9 +8,8 @@ import { ActionButton } from './ActionButton';
 import { BroadcastPortrait } from './BroadcastPortrait';
 import { downscaleSponsorLogo } from './SettingsView';
 import { formatRaceTime } from '../../lib/race-time';
+import { RunControl } from './RunControl';
 
-const tone = 'bg-primary text-primary-foreground hover:bg-primary/90';
-const quietTone = 'bg-muted text-foreground hover:bg-accent';
 type SponsorDraft = Omit<BroadcastSponsorEdit, 'id'> & {
   id?: string;
   expectedSponsor?: Omit<BroadcastSponsorEdit, 'logoUrl'>;
@@ -85,7 +84,8 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
 
   async function run(action: BroadcastAction, message: TranslateKey = 'live.saved'): Promise<boolean> {
     if (locked.current || loading || !admin || uncertain
-      || (action.action === 'on-air' && action.mode === 'replay' && admin.timingReady !== true)) return false;
+      || (['start', 'stop', 'on-air'].includes(action.action) && !admin.runReady)
+      || (['start', 'on-air', 'clear'].includes(action.action) && state?.run_status === 'RUNNING')) return false;
     locked.current = true;
     setPending(true); setError(''); setNote(null);
     try {
@@ -135,7 +135,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
     `${one.startNumber} ${one.firstName} ${one.lastName} ${one.projectName} ${one.city}`.toLocaleLowerCase().includes(needle));
   const sponsors = [...(admin?.sponsors ?? [])].sort((a, b) => a.order - b.order);
   const realtimeMissing = admin?.realtime.ready === false;
-  const errorKey: TranslateKey = /CONFLICT/.test(error) ? 'live.sponsorConflict' : /MIGRATION|SCHEMA|ROW_MISSING|NOT_CONFIGURED|INVALID_RESPONSE/.test(error)
+  const errorKey: TranslateKey = /RUN_/.test(error) ? 'run.failed' : /CONFLICT/.test(error) ? 'live.sponsorConflict' : /MIGRATION|SCHEMA|ROW_MISSING|NOT_CONFIGURED|INVALID_RESPONSE/.test(error)
     ? 'live.migration' : /IMAGE|PHOTO/.test(error) ? 'set.uploadFailed' : 'live.failed';
   const validUrl = !draft?.url.trim() || /^https?:\/\/[^\s]+$/i.test(draft.url.trim());
 
@@ -175,33 +175,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
     {loading && <p className="live-help" role="status">{t('common.loading')}</p>}
 
     {admin && state && <>
-      <section className="live-panel live-current" aria-labelledby="live-current-title" aria-busy={pending}>
-        <div className="live-heading"><h3 id="live-current-title">{t('live.current')}</h3>
-          <span className={current && state.participant_visible ? 'live-badge live-on-air' : 'live-badge'}>
-            {current ? t(state.participant_visible ? 'live.onAir' : 'live.hidden') : t('live.noSelection')}
-          </span>
-        </div>
-        {current && <div className="live-rider">
-          {current.photo ? <img src={current.photo} className="live-rider-photo" alt="" /> : <span className="live-rider-photo live-placeholder"><ImagePlus aria-hidden="true" /></span>}
-          <span className="live-number">#{current.startNumber}</span>
-          <div className="live-rider-details"><strong>{current.firstName} {current.lastName}</strong>
-            <span>{current.projectName}</span><span className="live-help">{[current.city, current.category].filter(Boolean).join(' / ')}</span>
-            <span data-live-mode>{t(state.participant_mode === 'replay' ? 'live.replay' : 'live.modeLive')}</span>
-            {formatRaceTime(current.raceTimeMs) && <span>{t('vote.raceTime')}: {formatRaceTime(current.raceTimeMs)}</span>}
-          </div>
-        </div>}
-        <p className="live-help">{t('live.controlsHint')}</p>
-        <div className="live-actions">
-          <ActionButton label={t('reg.liveShow')} tone={tone} reason={reason || (!current ? t('live.noSelection') : state.participant_visible ? t('live.onAir') : state.participant_mode === 'replay' && admin.timingReady !== true ? t('vote.timingUnavailable') : '')}
-            onPress={() => { if (current) void run({ action: 'on-air', id: current.id, mode: state.participant_mode ?? 'live' }); }} />
-          <ActionButton label={t('live.replay')} tone={quietTone} reason={reason || (admin.timingReady !== true ? t('vote.timingUnavailable') : !current ? t('live.noSelection') : '')}
-            onPress={() => { if (current) void run({ action: 'on-air', id: current.id, mode: 'replay' }); }} />
-          <ActionButton label={t('live.hide')} tone={quietTone} reason={reason || (!current ? t('live.noSelection') : !state.participant_visible ? t('live.hidden') : '')}
-            onPress={() => void run({ action: 'hide' })} />
-          <ActionButton label={t('live.clear')} tone="bg-destructive/15 text-destructive hover:bg-destructive/25" reason={reason || (!current ? t('live.noSelection') : '')}
-            onPress={() => void run({ action: 'clear' })} />
-        </div>
-      </section>
+      <RunControl state={state} sample={admin} ready={admin.runReady === true} disabled={busy} t={t} run={run} />
 
       <section className="live-panel" aria-labelledby="live-participants-title">
         <h3 id="live-participants-title">{t('live.participants')} ({participants.length})</h3>
@@ -213,16 +187,14 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
               {one.photo && <img src={one.photo} className="live-rider-photo" alt="" loading="lazy" />}
               <span className="live-number">#{one.startNumber}</span>
               <div className="live-rider-details"><strong>{one.firstName} {one.lastName}</strong><span>{one.projectName}</span><span className="live-help">{[one.city, one.category].filter(Boolean).join(' / ')}</span>
-                {formatRaceTime(one.raceTimeMs) && <span>{t('vote.raceTime')}: {formatRaceTime(one.raceTimeMs)}</span>}
+                {!(state.run_status === 'RUNNING' && current?.id === one.id) && formatRaceTime(one.raceTimeMs) && <span>{t('vote.raceTime')}: {formatRaceTime(one.raceTimeMs)}</span>}
               </div>
             </div>
             <div className="live-actions">
-              <button type="button" className="live-button" disabled={busy || admin.timingReady !== true}
-                onClick={() => void run({ action: 'on-air', id: one.id, mode: 'replay' })}>{t('live.replay')}</button>
               <button type="button" className="live-button" disabled={busy} aria-label={`${t('live.photo')}: ${one.firstName} ${one.lastName}`} onClick={() => setPortrait(one)}>{t('live.photo')}</button>
-              <button type="button" className="live-button live-button-primary" disabled={busy || (current?.id === one.id && state.participant_visible && state.participant_mode !== 'replay')}
-                aria-label={`${t('live.onAir')}: #${one.startNumber} ${one.firstName} ${one.lastName}`} aria-pressed={current?.id === one.id && state.participant_visible && state.participant_mode !== 'replay'}
-                onClick={() => void run({ action: 'on-air', id: one.id, mode: 'live' })}>{t('live.onAir')}</button>
+              <button type="button" className="live-button live-button-primary" data-live-start={one.id} disabled={busy || !admin.runReady || state.run_status === 'RUNNING'}
+                aria-label={`${t('live.onAir')}: #${one.startNumber} ${one.firstName} ${one.lastName}`} aria-pressed={current?.id === one.id && state.run_status === 'RUNNING'}
+                onClick={() => void run({ action: 'start', id: one.id })}>{t(current?.id === one.id && state.run_status === 'RUNNING' ? 'run.running' : 'live.onAir')}</button>
             </div>
           </li>)}
         </ul>
