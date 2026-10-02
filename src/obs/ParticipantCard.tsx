@@ -28,16 +28,15 @@ export function ParticipantCard({ participant, visible, mode = 'live' }: { parti
         animate={{ opacity: 1, x: 0, clipPath: 'inset(0 0% 0 0)' }}
         exit={{ opacity: 0, x: reduced ? 0 : 24, clipPath: reduced ? 'inset(0 0 0 0)' : 'inset(0 100% 0 0)' }}
         transition={{ duration: reduced ? 0 : mode === 'replay' ? .48 : .42, ease: [.22, 1, .36, 1] }}>
-        <div className="obs-card-back"><WheelDetail /><div className="obs-card-seam" /></div>
+        <div className="obs-card-back" />
         <div className="obs-photo-frame"><Portrait participant={ready} /></div>
-        <motion.div className="obs-race-number" initial={{ y: reduced ? 0 : 18, rotate: reduced ? 0 : -5 }}
-          animate={{ y: 0, rotate: 0 }} transition={{ type: 'spring', stiffness: 250, damping: 23, delay: reduced ? 0 : .12 }}>
-          <span>PARTENZA</span><strong style={{ fontSize: String(ready.startNumber).length > 3 ? 44 : undefined }}>{ready.startNumber}</strong>
-          <svg viewBox="0 0 72 12" aria-hidden="true"><path d="M0 6h52m-8-5 10 5-10 5m14-10 10 5-10 5" /></svg>
+        <div className="obs-eyebrow"><span className="obs-on-track">{mode === 'replay' ? 'REPLAY' : 'IN PISTA'}</span>{ready.category && <span>{ready.category}</span>}</div>
+        <motion.div className="obs-race-number" initial={{ y: reduced ? 0 : 10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }} transition={{ duration: reduced ? 0 : .3, delay: reduced ? 0 : .1, ease: [.22, 1, .36, 1] }}>
+          <span>N°</span><strong style={{ fontSize: String(ready.startNumber).length > 3 ? 20 : String(ready.startNumber).length > 2 ? 27 : undefined }}>{ready.startNumber}</strong>
         </motion.div>
         <motion.div className="obs-participant-copy" initial={{ opacity: 0, y: reduced ? 0 : 10 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: reduced ? 0 : .32, delay: reduced ? 0 : .15 }}>
-          <div className="obs-eyebrow"><span className="obs-on-track"><i />{mode === 'replay' ? 'REPLAY' : 'IN PISTA'}</span>{ready.category && <span>{ready.category}</span>}</div>
           <div className="obs-first-name">{ready.lastName ? ready.firstName : ''}</div>
           <ParticipantName name={ready.lastName || ready.firstName} />
           <div className="obs-participant-meta">
@@ -45,7 +44,7 @@ export function ParticipantCard({ participant, visible, mode = 'live' }: { parti
             {ready.projectName && <span className="obs-project">{ready.projectName}</span>}
           </div>
         </motion.div>
-        {mode === 'replay' && formatRaceTime(ready.raceTimeMs) && <div className="obs-race-time"><span>TEMPO</span><strong>{formatRaceTime(ready.raceTimeMs)}</strong></div>}
+        {mode === 'replay' && formatRaceTime(ready.raceTimeMs) && <div className="obs-race-time"><span>TEMPO<br />FINALE</span><strong style={{ fontSize: formatRaceTime(ready.raceTimeMs).length > 10 ? 24 : undefined }}>{formatRaceTime(ready.raceTimeMs)}</strong></div>}
       </motion.article>}
     </AnimatePresence>
   </div>;
@@ -58,11 +57,13 @@ function ParticipantName({ name }: { name: string }) {
     const fit = () => {
       const node = heading.current;
       if (!node || cancelled) return;
-      let size = 45;
+      let size = 32;
+      node.style.maxHeight = '';
       node.style.fontSize = `${size}px`;
-      while (size > 22 && (node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1)) {
+      while (size > 18 && (node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1)) {
         node.style.fontSize = `${--size}px`;
       }
+      if (node.scrollHeight > node.clientHeight + 1) node.style.maxHeight = 'none';
     };
     fit();
     void document.fonts.ready.then(fit);
@@ -77,12 +78,4 @@ function Portrait({ participant }: { participant: Participant }) {
   return participant.photo && !failed
     ? <img className="obs-portrait broadcast-photo-mask" src={participant.photo} alt="" onError={() => setFailed(true)} draggable={false} />
     : <div className="obs-portrait-fallback broadcast-photo-mask"><svg viewBox="0 0 160 180" aria-hidden="true"><circle cx="80" cy="57" r="31" /><path d="M19 176v-29a61 61 0 0 1 122 0v29" /></svg></div>;
-}
-
-function WheelDetail() {
-  return <svg className="obs-wheel" viewBox="0 0 220 220" aria-hidden="true">
-    <circle cx="110" cy="110" r="96" /><circle cx="110" cy="110" r="66" />
-    <circle cx="110" cy="110" r="13" />
-    <path d="M110 14v83m0 26v83M14 110h83m26 0h83M42 42l59 59m18 18 59 59M42 178l59-59m18-18 59-59" />
-  </svg>;
 }

@@ -55,6 +55,12 @@ try {
     return b.left >= card.left && b.right <= card.right && b.top >= card.top && b.bottom <= card.bottom;
   });
   assert.ok(fits, 'replay time must remain inside the animated clipping mask');
+  const readable = await page.$eval('.obs-race-time', badge => {
+    const copy = badge.closest('.obs-participant').querySelector('.obs-participant-copy').getBoundingClientRect();
+    const time = badge.getBoundingClientRect();
+    return time.top >= copy.bottom && parseFloat(getComputedStyle(badge.querySelector('strong')).fontSize) >= 30;
+  });
+  assert.ok(readable, 'final time has its own readable row without covering identity or photo');
   await page.screenshot({ path: 'shots/obs-replay-time-visible.png', omitBackground: true });
   await open('/obs/participant');
   await page.waitForSelector('.obs-participant');

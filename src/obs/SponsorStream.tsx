@@ -65,7 +65,7 @@ export function SponsorStream({ sponsors, enabled }: { sponsors: Sponsor[]; enab
   return <motion.section className="obs-sponsors" aria-label="Partner della manifestazione"
     initial={false} animate={{ opacity: visible ? 1 : 0, y: visible ? 0 : 24 }}
     transition={{ duration: reduced ? 0 : .32, ease: [.22, 1, .36, 1] }} aria-hidden={!visible}>
-    <div className="obs-sponsor-label"><span>INSIEME</span><strong>SI CORRE.</strong><i aria-hidden="true" /></div>
+    <div className="obs-sponsor-label"><span>PARTNER</span><strong>DELL'EVENTO</strong></div>
     <div className="obs-sponsor-track">
       {engine.current.slots.map((slot) => <div className="obs-sponsor-slot" key={slot.key}
         ref={(node) => { if (node) nodes.current.set(slot.key, node); else nodes.current.delete(slot.key); }}
@@ -73,7 +73,6 @@ export function SponsorStream({ sponsors, enabled }: { sponsors: Sponsor[]; enab
         <SponsorMark sponsor={slot.sponsor} />
       </div>)}
     </div>
-    <div className="obs-belt-seam" aria-hidden="true" />
   </motion.section>;
 }
 
@@ -81,10 +80,9 @@ function SponsorMark({ sponsor }: { sponsor: Sponsor }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [sponsor.logo]);
   if (sponsor.id.startsWith('house:')) return <div className={`obs-house obs-house-${sponsor.id.split(':')[1]}`} data-sponsor-id={sponsor.id}>
-    <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="25" /><circle cx="32" cy="32" r="9" /><path d="M32 7v16m0 18v16M7 32h16m18 0h16M14 14l12 12m12 12 12 12M14 50l12-12m12-12 12-12" /></svg>
     <div>{sponsor.id === 'house:brand' ? <><strong>Carruleddhi</strong><span>SHOW</span></>
-      : sponsor.id === 'house:town' ? <><small>IL CUORE DELLA CORSA</small><strong>Santa Teresa</strong><span>GALLURA</span></>
-        : <><small>INSIEME SI CORRE</small><strong>Partner</strong><span>DELL'EVENTO</span></>}</div>
+      : sponsor.id === 'house:town' ? <><strong>Santa Teresa</strong><span>GALLURA</span></>
+        : <><strong>Partner</strong><span>DELL'EVENTO</span></>}</div>
     <span className="obs-sponsor-divider" aria-hidden="true" />
   </div>;
   return <div className="obs-sponsor-mark" data-sponsor-id={sponsor.id}>

@@ -69,7 +69,7 @@ try {
   await page.evaluate(() => document.fonts.ready);
   await sleep(700);
   assert.equal(await page.$eval('.obs-participant h1', el => el.textContent), 'Murru');
-  assert.ok(await page.$eval('.obs-participant h1', el => parseFloat(getComputedStyle(el).fontSize) >= 36), 'short surnames retain display typography');
+  assert.ok(await page.$eval('.obs-participant h1', el => parseFloat(getComputedStyle(el).fontSize) >= 28), 'short surnames retain readable display typography');
   assert.equal(await page.$eval('body', el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
   const geometry = await page.evaluate(() => {
     const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom }; };
@@ -77,10 +77,11 @@ try {
   });
   assert.ok(geometry.participant.x >= 96 && geometry.participant.bottom < geometry.sponsors.y);
   assert.ok(geometry.participant.x >= 1500 && geometry.participant.right <= 1824.1, 'participant template stays on the right within the safe area');
-  assert.ok(geometry.participant.right - geometry.participant.x <= 245, 'participant template remains compact');
+  assert.ok(geometry.participant.right - geometry.participant.x <= 285, 'participant template remains compact');
+  assert.ok(await page.$eval('.obs-participant-meta', el => parseFloat(getComputedStyle(el).fontSize) >= 18), 'metadata is readable without scaling down the whole card');
   assert.ok(geometry.sponsors.right <= 1824 && geometry.sponsors.bottom <= 1026);
-  assert.ok(geometry.sponsors.x >= 670 && geometry.sponsors.right - geometry.sponsors.x <= 1152, 'sponsor belt is smaller and right aligned');
-  assert.ok(Math.abs(geometry.participant.right - geometry.sponsors.right) < .1, 'both modules share the right safe edge');
+  assert.ok(Math.abs(geometry.sponsors.x - 384) < .1 && geometry.sponsors.right - geometry.sponsors.x <= 1152, 'sponsor belt keeps equal side margins');
+  assert.ok(Math.abs((geometry.sponsors.x + geometry.sponsors.right) / 2 - 960) < .1, 'sponsor belt is centered independently of the right-side participant');
   await page.screenshot({ path: 'shots/obs-overlay-transparent.png', omitBackground: true });
   await page.addStyleTag({ content: 'body::before{content:"";position:fixed;inset:0;background:linear-gradient(0deg,rgba(7,26,61,.15),transparent 65%),url(/assets/images/zjazd.webp) center/cover;z-index:-1}' });
   await sleep(400);

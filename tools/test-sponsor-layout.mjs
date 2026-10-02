@@ -18,6 +18,9 @@ try {
       sponsors: Array.from({ length: count }, (_, i) => ({ id: `real-${i}`, name: `Sponsor ${i}`, logo: logos[i % logos.length], url: '', active: true, order: i, tier: 'partner' })) };
     await page.goto(`${process.env.OBS_TEST_ORIGIN || 'http://127.0.0.1:5199'}/obs/sponsors`, { waitUntil: 'networkidle0' });
     await page.waitForFunction(() => document.querySelector('.obs-sponsor-slot') && getComputedStyle(document.querySelector('.obs-sponsors')).opacity === '1');
+    const position = await page.$eval('.obs-sponsors', el => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, bottom: r.bottom }; });
+    assert.ok(Math.abs(position.left - 384) < .1 && Math.abs(position.right - 1536) < .1, 'sponsors have equal 384px margins at 1920x1080');
+    assert.ok(Math.abs(position.bottom - 1026) < .1, 'bottom broadcast safe margin remains 54px');
     const marks = await page.$$eval('.obs-sponsor-mark img', images => images.map(img => ({ fit: getComputedStyle(img).objectFit, loaded: img.complete && img.naturalWidth > 0, width: img.clientWidth, height: img.clientHeight })));
     for (const mark of marks) { assert.equal(mark.fit, 'contain'); assert.ok(mark.loaded && mark.width > 0 && mark.height > 0); }
     if (count < 3) assert.ok(await page.$('.obs-house')); else assert.equal(await page.$('.obs-house'), null);
@@ -28,6 +31,10 @@ try {
   const x = await page.$eval('.obs-sponsor-slot', el => el.style.transform);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   assert.notEqual(await page.$eval('.obs-sponsor-slot', el => el.style.transform), x, 'all logos remain in rotation with reduced motion');
+  for (const viewport of [{ width: 960, height: 540 }, { width: 390, height: 844 }]) {
+    await page.setViewport(viewport);
+    await page.waitForFunction(() => { const r = document.querySelector('.obs-sponsors').getBoundingClientRect(); return Math.abs((r.left + r.right) / 2 - innerWidth / 2) < .1 && r.left >= 0 && r.right <= innerWidth; });
+  }
   assert.deepEqual(errors, []);
-  console.log('PASS sponsor layouts: 0/1/3/10, wide/tall/square image containment, branded fallback, transparency and continuous essential motion.');
+  console.log('PASS sponsor layouts: 0/1/3/10, wide/tall/square image containment, branded fallback, transparency, continuous motion and exact horizontal centering at full, half and phone sizes.');
 } finally { await browser.close(); }
