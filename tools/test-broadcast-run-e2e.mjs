@@ -180,7 +180,9 @@ try {
   assert.equal(await replay.$eval('.obs-first-name', el => el.textContent), 'Bianca');
   await admin.setViewport({ width: 390, height: 844 });
   await admin.bringToFront();
-  await admin.$eval('header button[aria-label="Menu"]', button => button.click());
+  const sidebarVisible = await admin.evaluate(() => (document.querySelector('aside')?.getBoundingClientRect().width ?? 0) > 65);
+  if (sidebarVisible) await admin.$eval('header button[aria-label="Menu"]', button => button.click());
+  await admin.waitForFunction(() => (document.querySelector('aside')?.getBoundingClientRect().width ?? 0) <= 65);
   await admin.$eval('[data-run-control]', el => el.scrollIntoView({ block: 'start' }));
   await admin.screenshot({ path: 'shots/broadcast-central-admin-mobile.png' });
   const overflow = await admin.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth,
