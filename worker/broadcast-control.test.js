@@ -168,7 +168,11 @@ test('Vercel Edge and Node adapters restore scoped routes and enforce the small 
     const preserved = await intake(new Request('https://example.test/api/broadcast/state?broadcastAction=state'));
     assert.equal(preserved.status, 200);
     assert.equal((await preserved.json()).serverNow, snapshot.serverNow);
-    for (const query of ['broadcastAction=stop', 'broadcastAction=state&broadcastAction=state', 'broadcastAction=state&token=bad']) {
+    for (const path of ['/api/broadcast/state?broadcastAction=state&action=state', '/api/intake?broadcastAction=state&action=state']) {
+      const forwarded = await intake(new Request(`https://example.test${path}`));
+      assert.equal(forwarded.status, 200);
+    }
+    for (const query of ['broadcastAction=stop', 'broadcastAction=state&broadcastAction=state', 'broadcastAction=state&token=bad', 'broadcastAction=state&action=stop', 'action=state&action=state']) {
       const rejected = await intake(new Request(`https://example.test/api/broadcast/state?${query}`));
       assert.equal(rejected.status, 400);
       assert.equal((await rejected.json()).code, 'BROADCAST_QUERY_NOT_ALLOWED');
@@ -179,7 +183,7 @@ test('Vercel Edge and Node adapters restore scoped routes and enforce the small 
     assert.equal(unauthorized.status, 401);
     let nodeOutput;
     const nodeResponse = { setHeader() {}, end(value) { nodeOutput = value; } };
-    await intake({ url: '/api/broadcast/state?broadcastAction=state', method: 'GET', headers: { host: 'example.test' } }, nodeResponse);
+    await intake({ url: '/api/broadcast/state?broadcastAction=state&action=state', method: 'GET', headers: { host: 'example.test' } }, nodeResponse);
     assert.equal(nodeResponse.statusCode, 200);
     assert.equal(JSON.parse(nodeOutput).serverNow, snapshot.serverNow);
     const req = new EventEmitter();
