@@ -30,7 +30,7 @@ node tools/race-timer.mjs stop --run-id UUID-ORYGINALNEGO-PRZEJAZDU
 
 W drugim poleceniu identyfikator musi być rzeczywistym UUID przejazdu. Powtórzony STOP tego samego zakończonego przejazdu zwraca ten sam wynik. Gdy zaczęto nowy przejazd, stary `runId` powoduje odmowę zamiast zatrzymania nowej osoby. Klient sprawdza identyfikator przed wysłaniem, a backend ponownie pod blokadą bazy. Nowe naciśnięcie zwykłego STOP bez identyfikatora jest **nową komendą dla aktualnego przejazdu**, nie automatycznym ponowieniem starej. Nie ponawiaj go w ciemno po zmianie zawodnika. Nie da się odtworzyć momentu fizycznego kliknięcia, które nie dotarło do klienta/serwera.
 
-Istniejące VBS mają ogólny komunikat „ponów STOP”. Po migracji obowiązuje powyższa procedura sprawdzenia stanu i oryginalnego `runId`, nie bezwarunkowe naciskanie przycisku.
+Launchery VBS pokazują błąd braku potwierdzenia i kierują do sprawdzenia stanu. Nie zalecają ponownego STOP bez sprawdzenia pierwotnego `runId`.
 
 ## OBS i Ulanzi
 
@@ -50,9 +50,9 @@ REPLAY używa osobnej sceny MASTER_REPLAY i źródła ZAWODNIK POWTORKA. POWTORK
 | STOP ZAPIS | Centralny STOP z `runId`; oczekiwanie na odpowiedź backendu |
 | POWTORKA | Scena REPLAY, bez mutacji przejazdu |
 | LIVE | Scena LIVE, bez mutacji przejazdu |
-| CZAS INFO | Otwiera diagnostyczny `status.txt`, **nie stan na żywo** |
+| STAN CZASU | Odczytuje serwer i otwiera nową migawkę `status.txt` |
 
-Inspekcja tylko do odczytu 02.10.2026 potwierdziła: profil Ulanzi `ProfilesV2` wskazuje `start.vbs`, `stop.vbs` i `status.txt` w `%LOCALAPPDATA%\Carruleddhi\race-timer`. VBS wywołują Node.js i `F:\!!CAR\tools\race-timer.mjs start|stop`, oczekując na zakończenie komendy. Istnieje również `status.vbs`, lecz przycisk CZAS INFO otwiera plik tekstowy, nie ten skrypt. **Ścieżek, profilu, VBS ani konfiguracji OBS nie trzeba zmieniać.** Nie modyfikowano ich w tej aktualizacji.
+Aktualizacja układu Ulanzi 02.10.2026 przeniosła sterowanie do folderu ZAWODNICY. START CZAS i STOP ZAPIS nadal wywołują `start.vbs` oraz `stop.vbs`, oczekując na zakończenie komendy. Nowy przycisk **STAN CZASU** uruchamia `status.vbs`, odczytuje backend, a dopiero potem otwiera diagnostykę. Układ folderów, nowe skróty replay i instrukcja obsługi są w [ULANZI-OBSLUGA.md](ULANZI-OBSLUGA.md).
 
 `status.txt` jest tylko migawką diagnostyczną ostatniego wywołania, wyraźnie oznaczoną jako potencjalnie nieaktualna. Samo ponowne otwarcie pliku nie odpyta serwera. Po zmianie w panelu uruchom `node tools/race-timer.mjs status` lub istniejący `status.vbs`, a następnie otwórz plik ponownie. W razie błędu połączenia diagnostyka zastępuje poprzedni sukces komunikatem o nieznanym stanie. Błąd zapisu diagnostyki nie cofa zaakceptowanej operacji backendu.
 
