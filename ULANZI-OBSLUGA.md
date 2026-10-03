@@ -3,10 +3,10 @@
 ## Ekran główny
 
 Górny rząd: **ZAWODNICY · POWTÓRKI · SCENY · KAMERY · AUDIO**.
-Drugi rząd: **GRAFIKI · INSTRUKCJA**. Pozostałe miejsca są celowo wolne — funkcje nie są kopiowane na ekran główny.
+Drugi rząd: **GRAFIKI · EFEKTY · INSTRUKCJA**. Pozostałe miejsca są celowo wolne — funkcje nie są kopiowane na ekran główny.
 Przycisk INSTRUKCJA otwiera ten dokument. W każdym folderze lewy górny przycisk wraca wyżej. Mały ekran urządzenia pozostaje zachowany.
 
-Kolory: złoty — zawodnicy/grafiki, fioletowy — replay, niebieski — sceny, zielony — obraz na żywo, koralowy — audio. Ikony są animowanymi plikami GIF w jednym stylu: ciemne tło, delikatny ruch obramowania i symbolu, nieruchomy podpis. Animacja jest dekoracyjna i nie sygnalizuje stanu urządzenia.
+Kolory: złoty — zawodnicy/grafiki, fioletowy — replay, niebieski — sceny, zielony — obraz na żywo, koralowy — audio. Ikony są animowanymi plikami GIF w jednym stylu: ciemne szkło, miękkie światło i nieruchomy podpis. Przyciski OBS korzystają z lokalnego modułu Carruleddhi Motion: przy naciśnięciu symbol sprężyście się ugina i pojawia się krótki świetlny pierścień. Foldery i przyciski panelu/czasu zachowują natywne działanie Ulanzi. Animacja jest dekoracyjna i nie sygnalizuje stanu urządzenia.
 
 ## Przejazd zawodnika
 
@@ -39,7 +39,7 @@ Folder **EDYCJA KLIPU**: krok o jedną klatkę, przycięcie początku/końca, co
 
 ## Sceny i kamery
 
-Folder SCENY ma polskie podpisy: NA ŻYWO, SCENA REPLAY, ZACZYNAMY, PRZERWA, GŁOSOWANIE, WYNIKI, OCZEKIWANIE, ZAKOŃCZENIE i INTRO. Nazwy samych scen OBS pozostały bez zmian, aby istniejące automatyzacje dalej działały. Wcześniej puste sceny otrzymały plansze po włosku. RESULTS jest planszą „wyniki wkrótce”, nie automatyczną tabelą wyników. VOTING zawiera istniejący QR. INTRO korzysta z istniejącego filmu.
+Folder SCENY ma polskie podpisy: NA ŻYWO, SCENA REPLAY, ZACZYNAMY, PRZERWA, GŁOSOWANIE, WYNIKI, OCZEKIWANIE, ZAKOŃCZENIE i INTRO. Nazwy samych scen OBS pozostały bez zmian, aby istniejące automatyzacje dalej działały. Wszystkie siedem plansz jest teraz źródłami przeglądarkowymi z domeny carruleddhishow.com, po włosku, 1920×1080. Każda ma pod spodem FEELWORLD ustawiony na X=544, Y=80 i 1280×720. Plansze korzystają z pełnego tła poza przezroczystym oknem kamery (`background=solid`). WYNIKI pokazują publiczne podium po zakończeniu głosowania; wcześniej komunikat oczekiwania. Sponsorzy i QR są wbudowane — nie dodano ich drugi raz przez MASTER_OVERLAY. Poprzednia kompozycja jest w kopii zapasowej.
 
 KAMERY zawiera **PULPIT ON/OFF** (Ctrl+Alt+Shift+F7). Ten przycisk włącza/wyłącza warstwę pulpitu nad wejściem FEELWORLD w LIVE. Gdy pulpit jest włączony, zasłania mikser. Nie zmieniono początkowej widoczności tej warstwy.
 
@@ -47,7 +47,7 @@ PTZ_1_CROP i PTZ_2_CROP nie mają podłączonych fizycznych kamer, dlatego nie o
 
 ## Audio i grafiki
 
-Folder AUDIO: osobne przełączniki wyciszenia mikrofonu, dźwięku komputera, replay, intro oraz FEELWORLD. Drugi klik przywraca dźwięk. Ikony mają animację dekoracyjną — aktualny stan wyciszenia sprawdzaj w mikserze OBS.
+Folder AUDIO: osobne przełączniki wyciszenia mikrofonu, dźwięku komputera, replay oraz FEELWORLD. Drugi klik przywraca dźwięk. Ikony mają animację dekoracyjną — aktualny stan wyciszenia sprawdzaj w mikserze OBS.
 
 GRAFIKI: logo ON/OFF, odświeżenie nakładek OBS, pokaż/ukryj zawodnika i sponsorów. Przełącznik logo obejmuje LIVE i REPLAY (Ctrl+Alt+Shift+F6). Istniejąca automatyka przejść OBS pozostaje zachowana.
 
@@ -63,6 +63,23 @@ Mechanizm ładowania sceny i skróty replay opierają się na [Replay Source](ht
 
 ## Kontrola wykonanej konfiguracji
 
-Generator sprawdza brak powielonych funkcji i przepełnionych folderów. Każda ikona ma 24 klatki, cykl 2,16 sekundy i nieruchomy podpis. Powtarza się tylko przycisk POWRÓT, potrzebny w każdym folderze. Zachowano kopię konfiguracji sprzed zmian.
+Generator sprawdza brak powielonych funkcji i przepełnionych folderów. Każda nowa ikona ma 40 klatek, cykl 2,4 sekundy i nieruchomy podpis. Animacja kliknięcia ma 16 klatek i 0,64 sekundy. Animacja potwierdza odebranie kliknięcia przez moduł, nie zapis wyniku ani stan OBS. Powtarza się tylko przycisk POWRÓT, potrzebny w każdym folderze. Zachowano kopię konfiguracji sprzed zmian.
 
 Potwierdzono w logu OBS: pobranie 25 sekund bufora, przejście do REPLAY oraz automatyczny powrót do LIVE. Test przeglądarkowy czatu przeszedł na komputerze i telefonie; test centralnego przejazdu sprawdził START/STOP, bazę i zamrożoną powtórkę. Fizyczne naciśnięcia i odtwarzanie GIF na ekranie D200H wymagają potwierdzenia użytkownika, ponieważ narzędzie nie może kliknąć podglądu Ulanzi. Starszy test `test-race-time-ui.mjs` zatrzymuje się na usuniętym przycisku dawnego modelu replay; aktualny `test-broadcast-run-e2e.mjs` przeszedł.
+
+## Wdrożone plansze i efekty
+
+Źródła CARRULEDDHI STARTING, INTRO, BREAK, VOTING, RESULTS, STANDBY i ENDING wskazują na `/obs/<nazwa>?background=solid`. LIVE używa `/obs/participant`, REPLAY `/obs/replay`, a osobne źródło SPONSORZY `/obs/sponsors`. Wszystkie mają 1920×1080. Jedyny MASTER_REPLAY jest nad filmem Replay Source; źródło filmu pozostaje zachowane.
+
+Folder EFEKTY ma cztery osobne przyciski:
+
+| Przycisk | Skrót | Zachowanie |
+| --- | --- | --- |
+| KONFETTI | Ctrl+Shift+F8 | Jednorazowa animacja, ponowne kliknięcie restartuje |
+| WSTĄŻKI | Ctrl+Shift+F9 | Jednorazowa animacja, ponowne kliknięcie restartuje |
+| GWIAZDKI | Ctrl+Shift+F10 | Jednorazowa animacja, ponowne kliknięcie restartuje |
+| EFEKTY OFF | Ctrl+Shift+F11 | Natychmiast ukrywa wszystkie trzy efekty |
+
+MASTER_EFFECTS jest najwyższą warstwą w LIVE, REPLAY i siedmiu planszach. Każdy efekt ma `?once=1`, zamyka przeglądarkę przy ukryciu i startuje ponownie po aktywacji. Lokalny skrypt OBS `carruleddhi-obs-effects.lua` ukrywa źródło, ponownie pokazuje po 150 ms i wyłącza po zakończeniu. Nie uruchamia nadawania ani nagrywania.
+
+Lokalny moduł Ulanzi Carruleddhi Motion znajduje się w katalogu Plugins. Opiera się na [oficjalnym SDK Ulanzi](https://github.com/UlanziTechnology/plugin-common-html); kod SDK i licencja Apache 2.0 są dołączone do projektu. Nie wymaga logowania ani sekretów. Skróty działają przez oficjalny interfejs Ulanzi, a animacja naciśnięcia wraca po 680 ms do spokojnej pętli. Po zmianie profilu uruchom ponownie Ulanzi Studio, aby wczytać moduł.
