@@ -83,3 +83,8 @@ Folder EFEKTY ma cztery osobne przyciski:
 MASTER_EFFECTS jest najwyższą warstwą w LIVE, REPLAY i siedmiu planszach. Każdy efekt ma `?once=1`, zamyka przeglądarkę przy ukryciu i startuje ponownie po aktywacji. Lokalny skrypt OBS `carruleddhi-obs-effects.lua` ukrywa źródło, ponownie pokazuje po 150 ms i wyłącza po zakończeniu. Nie uruchamia nadawania ani nagrywania.
 
 Lokalny moduł Ulanzi Carruleddhi Motion znajduje się w katalogu Plugins. Opiera się na [oficjalnym SDK Ulanzi](https://github.com/UlanziTechnology/plugin-common-html); kod SDK i licencja Apache 2.0 są dołączone do projektu. Nie wymaga logowania ani sekretów. Skróty działają przez oficjalny interfejs Ulanzi, a animacja naciśnięcia wraca po 680 ms do spokojnej pętli. Po zmianie profilu uruchom ponownie Ulanzi Studio, aby wczytać moduł.
+
+## Grafiki Higgsfield
+
+Osiem ikon menu głównego wygenerowano przez Higgsfield (Recraft V4.1), a następnie dodano czytelne podpisy i animacje. Pozostałe przyciski mają dotychczasowe animowane symbole funkcji. Wszystkie 65 ikon są kopiowane do folderów Images wewnątrz profilu, z poprawnymi IconRel i IconEx. Naprawia to wcześniejsze odwołania, przy których Ulanzi pokazywało domyślne symbole. Skrypt tools/ulanzi-motion/install-artwork.mjs wymaga zamkniętego Ulanzi i tworzy kopię profilu przed zmianami. Jest też wywoływany przez główny konfigurator.
+

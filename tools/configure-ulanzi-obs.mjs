@@ -155,4 +155,5 @@ await write(path.join(pluginDir,'manifest.json'),{Name:'Carruleddhi Motion',Auth
 for(const[name,data]of pages)await write(pagePath(name),data);
 await write(sceneFile,obs);
 await write(path.join(assets,'mapping.json'),{backup,sceneKeys,replayKeys,entries});
+await import('./ulanzi-motion/install-artwork.mjs');
 console.log(JSON.stringify({backup,assets,buttons:entries.length,profile,sceneFile},null,2));

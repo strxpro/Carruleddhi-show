@@ -1,0 +1,22 @@
+[
+  {
+    "created_at": "2026-10-03T00:32:56.526596Z",
+    "display_name": "Recraft V4.1",
+    "id": "aa30f751-6578-47c9-9597-8775c290bc2e",
+    "job_type": "recraft_v4_1",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_30Z3OmKz0qDEOdXwK4TgQ8RrZVi/hf_20261003_003256_aa30f751-6578-47c9-9597-8775c290bc2e_min.webp",
+    "params": {
+      "aspect_ratio": "2:3",
+      "background_color": null,
+      "batch_size": 1,
+      "colors": [],
+      "height": 2560,
+      "model_type": "standard",
+      "prompt": "A premium broadcast control deck icon atlas. Exactly 4 columns and 2 rows of eight equal square cells, no gaps. Each cell dark midnight charcoal background. Centered large luminous sculpted frosted glass 3D pictogram, sophisticated Apple Motion style, crisp bevels, gentle colored rim lighting. Absolutely no text, no letters, no numbers. Top row left to right: golden driver helmet; purple circular replay arrow with play triangle; cyan movie clapperboard; mint green broadcast video camera. Bottom row left to right: coral studio microphone; golden three adjustment sliders; violet magical sparkle stars; ice blue open instruction book. Every symbol fits within central 60 percent of its own cell with generous empty margins. Front facing orthographic, consistent size lighting and geometry, luxury professional sports broadcast controls, simple readable silhouettes. Flat contact sheet, no perspective of the grid.",
+      "resolution": "2k",
+      "width": 1664
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_30Z3OmKz0qDEOdXwK4TgQ8RrZVi/hf_20261003_003256_aa30f751-6578-47c9-9597-8775c290bc2e.png",
+    "status": "completed"
+  }
+]
