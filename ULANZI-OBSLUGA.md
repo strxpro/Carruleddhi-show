@@ -6,7 +6,7 @@ Górny rząd: **ZAWODNICY · POWTÓRKI · SCENY · KAMERY · AUDIO**.
 Drugi rząd: **GRAFIKI · EFEKTY · INSTRUKCJA**. Pozostałe miejsca są celowo wolne — funkcje nie są kopiowane na ekran główny.
 Przycisk INSTRUKCJA otwiera ten dokument. W każdym folderze lewy górny przycisk wraca wyżej. Mały ekran urządzenia pozostaje zachowany.
 
-Kolory: złoty — zawodnicy/grafiki, fioletowy — replay, niebieski — sceny, zielony — obraz na żywo, koralowy — audio. Ikony są animowanymi plikami GIF w jednym stylu: ciemne szkło, miękkie światło i nieruchomy podpis. Przyciski OBS korzystają z lokalnego modułu Carruleddhi Motion: przy naciśnięciu symbol sprężyście się ugina i pojawia się krótki świetlny pierścień. Foldery i przyciski panelu/czasu zachowują natywne działanie Ulanzi. Animacja jest dekoracyjna i nie sygnalizuje stanu urządzenia.
+Aktualnie włączona jest wersja stabilna: 73 nieruchome ikony PNG z nazwami, bez pulsowania, tunelu ani zależności od modułu Carruleddhi Motion. Wszystkie 46 skrótów OBS i dźwięków korzysta z wbudowanych akcji System → Hotkey. Foldery i przyciski panelu/czasu korzystają z natywnych akcji Ulanzi. Kolory: złoty — zawodnicy/grafiki, fioletowy — replay, niebieski — sceny, zielony — obraz na żywo, koralowy — audio.
 
 ## Przejazd zawodnika
 
@@ -63,9 +63,9 @@ Mechanizm ładowania sceny i skróty replay opierają się na [Replay Source](ht
 
 ## Kontrola wykonanej konfiguracji
 
-Generator sprawdza brak powielonych funkcji i przepełnionych folderów. Każda nowa ikona ma 40 klatek, cykl 2,4 sekundy i nieruchomy podpis. Animacja kliknięcia ma 16 klatek i 0,64 sekundy. Animacja potwierdza odebranie kliknięcia przez moduł, nie zapis wyniku ani stan OBS. Powtarza się tylko przycisk POWRÓT, potrzebny w każdym folderze. Zachowano kopię konfiguracji sprzed zmian.
+Generator sprawdza brak powielonych funkcji i przepełnionych folderów. Test test-ulanzi-installed-media.mjs sprawdza obrazy PNG, ścieżki, istnienie podfolderów, natywne skróty, pliki WAV oraz pojedyncze źródło dźwięku. Powtarza się tylko przycisk POWRÓT, potrzebny w każdym folderze. Zachowano kopię konfiguracji sprzed zmian.
 
-Potwierdzono w logu OBS: pobranie 25 sekund bufora, przejście do REPLAY oraz automatyczny powrót do LIVE. Test przeglądarkowy czatu przeszedł na komputerze i telefonie; test centralnego przejazdu sprawdził START/STOP, bazę i zamrożoną powtórkę. Fizyczne naciśnięcia i odtwarzanie GIF na ekranie D200H wymagają potwierdzenia użytkownika, ponieważ narzędzie nie może kliknąć podglądu Ulanzi. Starszy test `test-race-time-ui.mjs` zatrzymuje się na usuniętym przycisku dawnego modelu replay; aktualny `test-broadcast-run-e2e.mjs` przeszedł.
+Potwierdzono w logu OBS: pobranie 25 sekund bufora, przejście do REPLAY oraz automatyczny powrót do LIVE. Test przeglądarkowy czatu przeszedł na komputerze i telefonie; test centralnego przejazdu sprawdził START/STOP, bazę i zamrożoną powtórkę. Fizyczne naciśnięcia na D200H wymagają potwierdzenia użytkownika, ponieważ narzędzie nie może kliknąć podglądu Ulanzi. Starszy test `test-race-time-ui.mjs` zatrzymuje się na usuniętym przycisku dawnego modelu replay; aktualny `test-broadcast-run-e2e.mjs` przeszedł.
 
 ## Wdrożone plansze i efekty
 
@@ -82,8 +82,22 @@ Folder EFEKTY ma cztery osobne przyciski:
 
 MASTER_EFFECTS jest najwyższą warstwą w LIVE, REPLAY i siedmiu planszach. Każdy efekt ma `?once=1`, zamyka przeglądarkę przy ukryciu i startuje ponownie po aktywacji. Lokalny skrypt OBS `carruleddhi-obs-effects.lua` ukrywa źródło, ponownie pokazuje po 150 ms i wyłącza po zakończeniu. Nie uruchamia nadawania ani nagrywania.
 
-Lokalny moduł Ulanzi Carruleddhi Motion znajduje się w katalogu Plugins. Opiera się na [oficjalnym SDK Ulanzi](https://github.com/UlanziTechnology/plugin-common-html); kod SDK i licencja Apache 2.0 są dołączone do projektu. Nie wymaga logowania ani sekretów. Skróty działają przez oficjalny interfejs Ulanzi, a animacja naciśnięcia wraca po 680 ms do spokojnej pętli. Po zmianie profilu uruchom ponownie Ulanzi Studio, aby wczytać moduł.
+Moduł Carruleddhi Motion pozostaje w plikach, ale aktywny profil nie korzysta z jego akcji. Stabilne przyciski nie wymagają tego modułu.
 
 ## Grafiki Higgsfield
 
-Osiem ikon menu głównego wygenerowano przez Higgsfield (Recraft V4.1), a następnie dodano czytelne podpisy i animacje. Pozostałe przyciski mają dotychczasowe animowane symbole funkcji. Wszystkie 65 ikon są kopiowane do folderów Images wewnątrz profilu, z poprawnymi IconRel i IconEx. Naprawia to wcześniejsze odwołania, przy których Ulanzi pokazywało domyślne symbole. Skrypt tools/ulanzi-motion/install-artwork.mjs wymaga zamkniętego Ulanzi i tworzy kopię profilu przed zmianami. Jest też wywoływany przez główny konfigurator.
+Osiem grafik menu głównego pochodzi z Higgsfield (Recraft V4.1). Pozostałe ikony mają odrębne symbole funkcji. Wszystkie obrazy mają czytelne podpisy i są zapisane w folderach Images wewnątrz profilu. Skrypt stabilize-profile.mjs przywraca nieruchome PNG i natywne akcje, tworząc wcześniej kopię profilu; główny konfigurator uruchamia go na końcu.
+
+## Efekty dźwiękowe
+
+W AUDIO → DŹWIĘKI są SWOOSH, IMPACT, ZWYCIĘSTWO, ODLICZANIE, DZWONEK oraz STOP DŹWIĘK. To krótkie, oryginalne syntezowane WAV 48 kHz, bez cudzych nagrań. Jednocześnie gra jeden efekt; następny zastępuje poprzedni. Przyciski używają Ctrl+Alt+Shift oraz kolejno Left, Right, Up, Down, Home; End zatrzymuje odtwarzanie.
+
+Źródło SFX CARRULEDDHI w MASTER_EFFECTS kieruje dźwięk na odsłuch OBS (obecnie M-Audio Fast Track). OBS przechwytuje ten sam Fast Track jako „Urządzenie audio”, więc widzowie i operator słyszą jedną kopię. Źródło SFX nie wysyła drugiej kopii bezpośrednio na ścieżki. Wyciszenie „Urządzenie audio” wycisza te efekty dla widzów; zmiana domyślnego urządzenia wymaga ponownego sprawdzenia odsłuchu i przechwytywania. Klikanie zwykłych przycisków nie dodaje dźwięków na transmisję.
+
+Skrypty konfiguracji: install-sounds.mjs dodaje soundboard przy zamkniętych OBS i Ulanzi; stabilize-profile.mjs przywraca stabilne ikony przy zamkniętym Ulanzi. Animacje apply-depth.mjs są eksperymentalne i nie są uruchamiane przez główny konfigurator. Kopie konfiguracji pozostają w lokalnym folderze Carruleddhi/backups.
+
+### Skąd brać kolejne materiały
+
+- [Mixkit — efekty dźwiękowe](https://mixkit.co/free-sound-effects/): swooshe, uderzenia, sygnały i inne krótkie dźwięki. [Licencja SFX](https://mixkit.co/license/modal/sfxFree/) dopuszcza projekty komercyjne; nie wolno rozpowszechniać samych plików jako własnej biblioteki.
+- [ProductionCrate](https://www.productioncrate.com/): efekty wizualne i materiały do kompozycji; [SoundsCrate](https://soundscrate.productioncrate.com/) zawiera muzykę i SFX. Dostęp zależy od konkretnego materiału i planu.
+- W OBS najłatwiej wykorzystać nakładki WebM z przezroczystością oraz dźwięki WAV. Szablony After Effects/Motion wymagają najpierw wyrenderowania do pliku; same pliki projektu nie są źródłem OBS.
