@@ -1,0 +1,15 @@
+.show-sequence{position:absolute;inset:0;overflow:hidden;background:transparent;color:#fff6e7;pointer-events:none;font-family:ObsBaloo,'Baloo 2',sans-serif}
+.show-sequence-video{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;object-position:center;background:transparent}
+.show-countdown{position:absolute;left:96px;bottom:96px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle at 40% 30%,#193863a8,#071a3dd9);backdrop-filter:blur(12px);box-shadow:0 12px 40px #071a3d24;display:flex;align-items:center;justify-content:center;flex-direction:column;isolation:isolate}
+.show-countdown-ring{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke-width:5;transform:rotate(-90deg)}
+.show-countdown-track{stroke:#fff6e726}
+.show-countdown-progress{stroke:#ffc928;stroke-linecap:round}
+.show-countdown-label{position:absolute;top:42px;font-size:19px;font-weight:800;letter-spacing:.12em;color:#fff6e7d9}
+.show-countdown-number{font-family:ObsBungee,Bungee,sans-serif;font-weight:400;font-size:62px;line-height:1.2;letter-spacing:-.045em;color:#fff6e7;font-variant-numeric:tabular-nums;transition:font-size 650ms ease,color 650ms ease;transform-origin:center}
+.show-countdown-caption{position:absolute;bottom:43px;font-size:13px;font-weight:800;letter-spacing:.12em;color:#fff6e799}
+.show-countdown--urgent .show-countdown-number{font-size:104px;color:#ffc928}
+.show-countdown--urgent .show-countdown-progress{stroke:#f6494f}
+.show-sequence-cue{position:absolute;left:96px;top:54px;padding:7px 12px;border-radius:8px;background:#071a3dc9;color:#fff6e7;font-size:14px;font-weight:700;letter-spacing:.05em}
+.show-sequence-guides{position:absolute;top:96px;left:96px;max-width:1050px;display:flex;flex-direction:column;gap:6px;padding:16px 22px;border:1px dashed #ffc928;background:#071a3de8;font-size:18px;overflow-wrap:anywhere}
+.show-sequence-guides strong{color:#ffc928}
+@media(prefers-reduced-motion:reduce){.show-countdown-number{transition:none}}

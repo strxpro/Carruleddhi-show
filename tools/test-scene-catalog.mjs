@@ -65,7 +65,7 @@ try {
     for (const name of ['camera', 'qr', 'sponsors']) assert.equal(await page.$eval(`[name="scene-${name}"]`, el => el.checked), true);
     assert.equal(await page.$eval('[name="effect-once"]', el => el.checked), false);
 
-    async function checkUrls(sceneParams = {}, once = false) {
+    async function checkUrls(sceneParams = {}, once = false, sequenceParams = {}) {
       const rows = await page.$$eval(`${catalog} [data-obs-catalog-source]`, elements => elements.map(el => ({
         id: el.dataset.obsCatalogSource, value: el.querySelector('input').value,
         readonly: el.querySelector('input').readOnly, labeled: el.querySelector('input').labels.length > 0,
@@ -75,7 +75,7 @@ try {
       for (const row of rows) {
         const effect = effects.includes(row.id);
         const url = new URL(`${origin}/obs/${effect ? 'effects/' : ''}${row.id}`);
-        const params = effect ? (once ? { once: '1' } : {}) : sceneParams;
+        const params = effect ? (once ? { once: '1' } : {}) : { ...sceneParams, ...(sequenceParams[row.id] || {}) };
         for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
         assert.equal(row.value, url.href, `${row.id} exact generated URL`);
         if (!effect) url.searchParams.set('guides', '1');
@@ -107,6 +107,35 @@ try {
     await page.click('[name="effect-once"]');
     await checkUrls(allOptions, true);
     await page.click('[name="effect-once"]');
+    await checkUrls(allOptions);
+
+    const fill = async (name, value) => {
+      await page.focus(`[name="${name}"]`);
+      await page.keyboard.down('Control');
+      await page.keyboard.press('KeyA');
+      await page.keyboard.up('Control');
+      await page.keyboard.press('Backspace');
+      await page.type(`[name="${name}"]`, value);
+    };
+    await fill('scene-countdown', '90');
+    await page.click('[name="scene-auto"]');
+    await checkUrls(allOptions, false, { starting: { countdown: '90', auto: '1' }, intro: { auto: '1' } });
+    await page.click('[name="scene-sound"]');
+    await fill('scene-music', 'https://cdn.example.org/music.mp3');
+    await checkUrls(allOptions, false, { starting: { countdown: '90', auto: '1' }, intro: { auto: '1', sound: '1', music: 'https://cdn.example.org/music.mp3' } });
+    await page.click('[name="scene-starting-sound"]');
+    await checkUrls(allOptions, false, { starting: { countdown: '90', auto: '1', sound: '1', music: 'https://cdn.example.org/music.mp3' }, intro: { auto: '1', sound: '1', music: 'https://cdn.example.org/music.mp3' } });
+    await fill('scene-music', 'javascript:alert(1)');
+    assert.equal(await page.$eval(`${source('starting')} button`, el => el.disabled), true);
+    assert.equal(await page.$eval(`${source('intro')} button`, el => el.disabled), true);
+    assert.equal(await page.$eval(`${source('break')} button`, el => el.disabled), false);
+    await page.click('[name="scene-media"]');
+    await checkUrls(allOptions, false, { starting: { countdown: '90', media: '0' }, intro: { media: '0' } });
+    assert.equal(await page.$eval('[name="scene-auto"]', el => el.disabled && !el.checked), true);
+    await page.click('[name="scene-media"]');
+    await fill('scene-music', '');
+    await page.click('[name="scene-sound"]');
+    await fill('scene-countdown', '300');
     await checkUrls(allOptions);
 
     for (const id of ['starting', 'confetti']) {

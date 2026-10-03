@@ -7,7 +7,7 @@ const settings = (overrides = {}) => ({ ok: true, settings: {
   eventYear: '2026', eventLocation: 'Santa Teresa Gallura', ...overrides,
 } });
 const rider = (id, overrides = {}) => ({
-  id, firstName: 'Ada', lastName: 'Rossi', startNumber: 7, projectName: 'Cart',
+  id, category: 'art', firstName: 'Ada', lastName: 'Rossi', startNumber: 7, projectName: 'Cart',
   photo: 'https://example.test/photo.jpg?token=public-signed-photo',
   totalScore: 100, voteCount: 10, averageScore: 10, raceTimeMs: 12_345, ...overrides,
 });
@@ -80,7 +80,7 @@ async function harness(t, responses = []) {
     await flush();
   };
   return {
-    requests, responses, timers, document, window, navigator, advance,
+    requests, responses, timers, document, window, navigator, advance, refresh: adapter.refreshSceneEvent,
     subscribe(voting = true) {
       const data = [];
       const statuses = [];
@@ -98,7 +98,7 @@ test('settings-only subscribers share one read and preserve metadata across unmo
   assert.equal(a.latest().phase, 'unknown');
   await h.advance(0);
   assert.equal(h.requests.length, 1);
-  assert.deepEqual(a.latest(), { eventName: 'Carruleddhi Show', eventYear: '2026', eventLocation: 'Santa Teresa Gallura', phase: 'unknown', results: [] });
+  assert.deepEqual(a.latest(), { eventName: 'Carruleddhi Show', eventYear: '2026', eventLocation: 'Santa Teresa Gallura', phase: 'unknown', results: [], raceResults: [] });
   assert.deepEqual(b.latest(), a.latest());
   assert.equal(a.statuses.at(-1).status, 'ready');
   assert.equal(h.timers.size, 0);
@@ -138,6 +138,7 @@ test('scheduled and voting never expose scores, ranks, counts, prizes or device 
     assert.equal(s.latest().phase, phase);
     assert.deepEqual(s.latest().results, []);
     assert.equal(s.latest().totalVotes, undefined);
+    assert.deepEqual(s.latest().raceResults.map(row => row.id), ['unranked']);
     assert.doesNotMatch(JSON.stringify(s.latest()), /private|score|winner|position/i);
   });
 });
@@ -157,6 +158,56 @@ test('closed canonical podium order and explicit tied positions survive without 
   assert.equal(s.latest().results[2].raceTimeMs, null);
   assert.deepEqual(Object.keys(s.latest().results[0]), ['id', 'firstName', 'lastName', 'startNumber', 'projectName', 'photo', 'totalScore', 'raceTimeMs', 'position']);
   assert.doesNotMatch(JSON.stringify(s.latest()), /private|registrationId|voteCount|averageScore/);
+});
+
+test('public race DTO uses every current participant before closure without leaking voting or private fields', async t => {
+  const participants = Array.from({ length: 30 }, (_, i) => rider(`r-${i}`, {
+    category: i % 2 ? 'classic' : 'art', raceTimeMs: i === 0 ? 0 : i === 1 ? null : i * 1000,
+    email: 'private', registrationId: 'private', phone: 'private', position: 1,
+  }));
+  const h = await harness(t, [settings(), state({ phase: 'voting', participants, podium: [rider('not-a-race-source')] })]);
+  const s = h.subscribe();
+  await h.advance(0);
+  assert.equal(s.latest().raceResults.length, 30);
+  assert.equal(s.latest().raceResults[0].raceTimeMs, 0);
+  assert.equal(s.latest().raceResults[1].raceTimeMs, null);
+  assert.deepEqual(Object.keys(s.latest().raceResults[0]), ['id', 'category', 'firstName', 'lastName', 'startNumber', 'projectName', 'raceTimeMs']);
+  assert.doesNotMatch(JSON.stringify(s.latest().raceResults), /private|score|position|vote|photo/i);
+  s.latest().raceResults[0].firstName = 'Mutation';
+  const second = h.subscribe();
+  assert.equal(second.latest().raceResults[0].firstName, 'Ada');
+});
+
+test('missing participants/current-edition proof never fall back to podium or stored archives', async t => {
+  for (const override of [{ participants: undefined }, { participants: {} }, { participants: [] },
+    { selectedEdition: undefined }, { isArchive: undefined }]) await t.test(JSON.stringify(override), async t => {
+    const h = await harness(t, [settings(), state({ ...override, phase: 'voting', editions: [{ key: '2025', participants: [rider('old')] }] })]);
+    const s = h.subscribe();
+    await h.advance(0);
+    assert.deepEqual(s.latest().raceResults, []);
+  });
+});
+
+test('malformed race rows are omitted and malformed timing is labelled untimed, never zero', async t => {
+  const h = await harness(t, [settings(), state({ phase: 'scheduled', participants: [null, {},
+    rider('bad-category', { category: 'other' }), rider('bad-number', { startNumber: '1' }),
+    rider('bad-name', { firstName: {} }), rider('valid', { raceTimeMs: '00:12.345' }), rider('valid'),
+    rider('zero', { raceTimeMs: 0 }), rider('negative', { raceTimeMs: -10 }),
+  ] })]);
+  const s = h.subscribe();
+  await h.advance(0);
+  assert.deepEqual(s.latest().raceResults.map(row => [row.id, row.raceTimeMs]), [['valid', null], ['zero', 0], ['negative', null]]);
+  assert.equal(s.latest().phase, 'scheduled');
+});
+
+test('public race times wait for settings confirmation so an old edition cannot flash', async t => {
+  const h = await harness(t, [new Error('offline'), state({ phase: 'voting', selectedEdition: { key: '2025', status: 'active' } }), settings(), state({ phase: 'voting' })]);
+  const s = h.subscribe();
+  await h.advance(0);
+  assert.deepEqual(s.latest().raceResults, []);
+  await h.advance(30_000);
+  assert.ok(s.data.filter(value => value.raceResults.length).every(value => value.eventYear === '2026'));
+  assert.equal(s.latest().raceResults.length, 1);
 });
 
 test('ordered results payload is accepted; an empty podium is authoritative over participants/results', async t => {
@@ -182,6 +233,7 @@ test('historical editions are never selected from archives or the editions listi
     await h.advance(0);
     assert.equal(s.latest().phase, 'unknown');
     assert.deepEqual(s.latest().results, []);
+    assert.deepEqual(s.latest().raceResults, []);
     assert.equal(s.statuses.at(-1).status, 'error');
   });
   await t.test('old editions listing ignored for an explicitly current response', async t => {
@@ -395,4 +447,38 @@ test('removing the last voting subscriber stops polling without dropping setting
   await h.advance(0);
   assert.equal(h.requests.length, 3);
   assert.equal(resumed.latest().phase, 'voting');
+});
+
+test('confirmed-finish refresh uses one shared public read and never rereads settings or merges snapshots', async t => {
+  const h = await harness(t, [settings(), state({ phase: 'voting' }), state({ phase: 'voting', participants: [rider('edited', { raceTimeMs: 9876 })] })]);
+  const a = h.subscribe();
+  const b = h.subscribe();
+  await h.advance(0);
+  h.refresh();
+  await h.advance(0);
+  assert.equal(h.requests.length, 3);
+  assert.deepEqual(a.latest().raceResults, b.latest().raceResults);
+  assert.deepEqual(a.latest().raceResults.map(row => [row.id, row.raceTimeMs]), [['edited', 9876]]);
+  assert.equal(a.latest().results.length, 0);
+  h.document.hidden = true;
+  h.document.dispatchEvent(new Event('visibilitychange'));
+  h.refresh();
+  await h.advance(30_000);
+  assert.equal(h.requests.length, 3, 'hidden refresh makes no request');
+  a.stop(); b.stop(); h.refresh();
+  await h.advance(30_000);
+  assert.equal(h.requests.length, 3, 'refresh without subscribers makes no request');
+});
+
+test('finish notifications during an in-flight read coalesce into one follow-up read', async t => {
+  let resolve;
+  const h = await harness(t, [settings(), () => new Promise(accept => { resolve = accept; }), state({ phase: 'voting', participants: [rider('new-time', { raceTimeMs: 2000 })] })]);
+  const s = h.subscribe();
+  await h.advance(0);
+  h.refresh(); h.refresh(); h.refresh();
+  assert.equal(h.requests.length, 2);
+  resolve({ ok: true, json: async () => state({ phase: 'voting', participants: [rider('old-time')] }) });
+  await h.advance(0);
+  assert.equal(h.requests.length, 3);
+  assert.deepEqual(s.latest().raceResults.map(row => row.id), ['new-time']);
 });

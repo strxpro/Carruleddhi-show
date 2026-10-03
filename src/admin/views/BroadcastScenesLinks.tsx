@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { TranslateKey } from '../i18n';
 import { CAMERA, EFFECTS, SCENES, VOTE_URL } from '../../obs/scenes/presets';
+import { safeMusicUrl } from '../../obs/scenes/show-sequence';
 
 const messages = {
   pl: {
@@ -17,6 +18,14 @@ const messages = {
     previewHint: 'Podgląd scen dodaje guides=1 (prowadnice); kopiowany adres ich nie zawiera.',
     copy: 'Kopiuj', preview: 'Podgląd', copied: 'Skopiowano adres.',
     copyFailed: 'Schowek niedostępny. Adres zaznaczono; skopiuj go ręcznie.',
+    sequence: 'STARTING → INTRO → LIVE', countdown: 'Odliczanie STARTING (sekundy)', automatic: 'Automatycznie przełączaj sceny w OBS',
+    media: 'Odtwarzaj filmy w źródle Przeglądarka', sound: 'Dźwięk wejścia INTRO z płynnym narastaniem', startingSound: 'Dźwięk także podczas odliczania STARTING', volume: 'Głośność docelowa', music: 'Własna muzyka: publiczny adres HTTPS (opcjonalnie)',
+    musicInvalid: 'Podaj poprawny publiczny adres HTTPS bez loginu i hasła albo ścieżkę na tej stronie. Plik z dysku komputera dodaj jako osobne źródło multimedialne OBS.',
+    sequenceHint: 'STARTING zapętla intro.webm; ostatnie 10 sekund powiększa cyfry. INTRO odtwarza wejscie.webm raz i przechodzi do LIVE dopiero po końcu filmu. Odliczanie planszy nie zmienia czasu zawodnika.',
+    permissions: 'Automatyka wymaga w obu źródłach Przeglądarka uprawnień strony Advanced / Zaawansowane. Nazwy scen: STARTING, INTRO, LIVE. Nie uruchamiaj równolegle drugiej automatyki przełączania tej samej sekwencji.',
+    musicHint: 'Bez własnego linku używany jest dźwięk filmu. Własna muzyka zastępuje jego ścieżkę, żeby nie grały dwa podkłady. Podgląd w zwykłej przeglądarce pozostaje wyciszony.',
+    mediaHint: 'Jeżeli używasz lokalnych plików i Advanced Scene Switcher, wyłącz filmy tutaj. Dodaj intro.webm / wejscie.webm jako osobne Źródła multimedialne pod nakładką; plugin musi obserwować faktyczny koniec wejscie.webm, nie sztywny timer 30 sekund.',
+    resultsHint: 'RESULTS jest pełnoekranową nakładką: kamera 1920 × 1080, X=0, Y=0. Po prawej są wyniki czasu ART / CLASSIC, TOP 3 pozostaje nieruchome, reszta przewija się. QR i adres strony są po lewej, sponsorzy na dole.',
   },
   it: {
     title: 'Scene ed effetti OBS',
@@ -31,11 +40,19 @@ const messages = {
     previewHint: 'L’anteprima delle scene aggiunge guides=1 (guide); il link copiato non le contiene.',
     copy: 'Copia', preview: 'Anteprima', copied: 'Indirizzo copiato.',
     copyFailed: 'Appunti non disponibili. Indirizzo selezionato: copialo manualmente.',
+    sequence: 'STARTING → INTRO → LIVE', countdown: 'Conto alla rovescia STARTING (secondi)', automatic: 'Cambia automaticamente le scene OBS',
+    media: 'Riproduci i filmati nella sorgente Browser', sound: 'Audio INTRO con ingresso graduale', startingSound: 'Audio anche durante il countdown STARTING', volume: 'Volume finale', music: 'Musica personalizzata: indirizzo HTTPS pubblico (facoltativo)',
+    musicInvalid: 'Inserisci un indirizzo HTTPS pubblico senza credenziali oppure un percorso di questo sito. Un file locale va aggiunto come sorgente multimediale separata in OBS.',
+    sequenceHint: 'STARTING ripete intro.webm; negli ultimi 10 secondi i numeri diventano più grandi. INTRO riproduce wejscie.webm una volta e passa a LIVE soltanto alla fine del filmato. Questo countdown non modifica il tempo del pilota.',
+    permissions: 'L’automatismo richiede i permessi pagina Advanced in entrambe le sorgenti Browser. Nomi scene: STARTING, INTRO, LIVE. Non usare contemporaneamente un secondo automatismo per la stessa sequenza.',
+    musicHint: 'Senza un link personalizzato viene usato l’audio del filmato. La musica personalizzata lo sostituisce per evitare due tracce. L’anteprima nel browser normale resta silenziosa.',
+    mediaHint: 'Se usi file locali e Advanced Scene Switcher, disabilita qui i filmati. Aggiungi intro.webm / wejscie.webm come sorgenti multimediali sotto la grafica; il plugin deve rilevare la fine reale di wejscie.webm, non un timer fisso di 30 secondi.',
+    resultsHint: 'RESULTS è una grafica a pieno schermo: camera 1920 × 1080, X=0, Y=0. A destra tempi ART / CLASSIC, TOP 3 fisso e altri piloti a scorrimento. QR e sito a sinistra, sponsor in basso.',
   },
 };
 
-function SourceLink({ id, label, url, preview, text }: {
-  id: string; label: string; url: string; preview: string; text: typeof messages.it;
+function SourceLink({ id, label, url, preview, text, disabled = false }: {
+  id: string; label: string; url: string; preview: string; text: typeof messages.it; disabled?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<'copied' | 'copyFailed' | null>(null);
@@ -44,7 +61,7 @@ function SourceLink({ id, label, url, preview, text }: {
       <input ref={input} type="text" readOnly value={url} onFocus={(event) => event.target.select()} />
     </label>
     <div className="live-actions">
-      <button type="button" className="live-button" aria-label={`${text.copy}: ${label}`} onClick={async () => {
+      <button type="button" className="live-button" disabled={disabled} aria-label={`${text.copy}: ${label}`} onClick={async () => {
         try {
           await navigator.clipboard.writeText(url);
           setNotice('copied');
@@ -54,7 +71,7 @@ function SourceLink({ id, label, url, preview, text }: {
           setNotice('copyFailed');
         }
       }}><Copy size={16} aria-hidden="true" />{text.copy}</button>
-      <a className="live-button" href={preview} target="_blank" rel="noopener noreferrer" aria-label={`${text.preview}: ${label}`}>
+      <a className="live-button" href={disabled ? undefined : preview} aria-disabled={disabled} tabIndex={disabled ? -1 : undefined} target="_blank" rel="noopener noreferrer" aria-label={`${text.preview}: ${label}`}>
         <ExternalLink size={16} aria-hidden="true" />{text.preview}
       </a>
     </div>
@@ -71,13 +88,21 @@ export function BroadcastScenesLinks({ t }: { t: (key: TranslateKey) => string }
   const [qr, setQr] = useState(true);
   const [sponsors, setSponsors] = useState(true);
   const [once, setOnce] = useState(false);
+  const [countdown, setCountdown] = useState('300');
+  const [automatic, setAutomatic] = useState(false);
+  const [media, setMedia] = useState(true);
+  const [sound, setSound] = useState(false);
+  const [startingSound, setStartingSound] = useState(false);
+  const [volume, setVolume] = useState(.7);
+  const [music, setMusic] = useState('');
+  const countdownSeconds = countdown.trim() && Number.isFinite(Number(countdown)) ? Math.max(1, Math.min(3600, Math.round(Number(countdown)))) : 300;
+  const musicValid = !music.trim() || !!safeMusicUrl(music.trim(), window.location.origin);
   const params = new URLSearchParams();
   if (language === 'pl') params.set('lang', 'pl');
   if (background === 'solid') params.set('background', 'solid');
   if (!camera) params.set('camera', '0');
   if (!qr) params.set('qr', '0');
   if (!sponsors) params.set('sponsors', '0');
-  const query = params.size ? `?${params}` : '';
 
   return <details className="live-panel scene-catalog" data-obs-scene-catalog>
     <summary>{text.title}</summary>
@@ -102,13 +127,38 @@ export function BroadcastScenesLinks({ t }: { t: (key: TranslateKey) => string }
         <label className="live-checkbox"><input name="scene-sponsors" type="checkbox" checked={sponsors} onChange={(event) => setSponsors(event.target.checked)} /><span>{text.sponsors}</span></label>
       </div>
       <p className="live-help">{text.sponsorsHint}</p>
+      <p className="live-help">{text.resultsHint}</p>
+    </fieldset>
+    <fieldset className="scene-catalog-options">
+      <legend>{text.sequence}</legend>
+      <div className="live-form-grid">
+        <label className="live-field"><span>{text.countdown}</span><input name="scene-countdown" type="number" min={1} max={3600} step={1} value={countdown} onChange={event => setCountdown(event.target.value)} onBlur={() => setCountdown(String(countdownSeconds))} /></label>
+        <label className="live-checkbox"><input name="scene-auto" type="checkbox" checked={automatic} disabled={!media} onChange={event => setAutomatic(event.target.checked)} /><span>{text.automatic}</span></label>
+        <label className="live-checkbox"><input name="scene-media" type="checkbox" checked={media} onChange={event => { setMedia(event.target.checked); if (!event.target.checked) setAutomatic(false); }} /><span>{text.media}</span></label>
+        <label className="live-checkbox"><input name="scene-sound" type="checkbox" checked={sound} disabled={!media} onChange={event => setSound(event.target.checked)} /><span>{text.sound}</span></label>
+        <label className="live-checkbox"><input name="scene-starting-sound" type="checkbox" checked={startingSound} disabled={!media || !sound} onChange={event => setStartingSound(event.target.checked)} /><span>{text.startingSound}</span></label>
+        <label className="live-field"><span>{text.volume}: {Math.round(volume * 100)}%</span><input name="scene-volume" type="range" min={0} max={1} step={.05} value={volume} disabled={!media || !sound} onChange={event => setVolume(event.target.valueAsNumber)} /></label>
+        <label className="live-field"><span>{text.music}</span><input name="scene-music" type="text" inputMode="url" maxLength={2048} value={music} disabled={!media || !sound} onChange={event => setMusic(event.target.value)} placeholder="https://…/music.mp3" /></label>
+      </div>
+      <p className="live-help">{text.sequenceHint}</p><p className="live-help">{text.permissions}</p><p className="live-help">{text.musicHint}</p><p className="live-help">{text.mediaHint}</p>
+      {media && sound && !musicValid && <p className="live-error" role="alert">{text.musicInvalid}</p>}
     </fieldset>
     <p className="live-help">{text.previewHint}</p>
     <ul className="live-list">
       {Object.entries(SCENES).map(([id, scene]) => {
+        const current = new URLSearchParams(params);
+        const sequence = id === 'starting' || id === 'intro';
+        const hasSound = sound && media && (id === 'intro' || (id === 'starting' && startingSound));
+        if (id === 'starting' && countdownSeconds !== 300) current.set('countdown', String(countdownSeconds));
+        if (sequence) {
+          if (automatic && media) current.set('auto', '1');
+          if (!media) current.set('media', '0');
+          if (hasSound) { current.set('sound', '1'); if (volume !== .7) current.set('volume', String(volume)); if (music.trim() && musicValid) current.set('music', music.trim()); }
+        }
+        const query = current.size ? `?${current}` : '';
         const url = `${window.location.origin}/obs/${id}${query}`;
         return <SourceLink key={id} id={id} label={pl ? scene.labelPl : scene.label} url={url}
-          preview={`${url}${query ? '&' : '?'}guides=1`} text={text} />;
+          preview={`${url}${query ? '&' : '?'}guides=1`} text={text} disabled={hasSound && !musicValid} />;
       })}
     </ul>
     <fieldset className="scene-catalog-options">

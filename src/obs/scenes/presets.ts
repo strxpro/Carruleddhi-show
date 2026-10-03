@@ -1,4 +1,5 @@
 export const VOTE_URL = 'https://www.carruleddhishow.com/votazione';
+export const SITE_LABEL = 'www.carruleddhishow.com';
 export const CAMERA = { x: 544, y: 80, width: 1280, height: 720 } as const;
 
 export type SceneId = 'starting' | 'intro' | 'break' | 'voting' | 'results' | 'standby' | 'ending';
@@ -29,9 +30,9 @@ export const SCENES: Record<SceneId, ScenePreset> = {
     kicker: ['PREMIO DEL PUBBLICO', 'NAGRODA PUBLICZNOŚCI'], title: [['IL TUO', 'VOTO', 'CONTA.'], ['TWÓJ', 'GŁOS SIĘ', 'LICZY.']],
     description: ['Scegli il carruleddhu che ti ha conquistato. Il protagonista sei anche tu.', 'Wybierz pojazd, który zdobył Twoje serce. Ty też tworzysz to wydarzenie.'],
     footnote: ['SCANSIONA. SCEGLI. PARTECIPA.', 'ZESKANUJ. WYBIERZ. ZAGŁOSUJ.'] },
-  results: { label: 'Results', labelPl: 'Wyniki', theme: 'cream',
-    kicker: ['PREMIO DEL PUBBLICO', 'NAGRODA PUBLICZNOŚCI'], title: [['IL VOSTRO', 'PODIO.'], ['WASZE', 'PODIUM.']],
-    description: ['I protagonisti scelti dal pubblico.', 'Uczestnicy wybrani przez publiczność.'],
+  results: { label: 'Results', labelPl: 'Wyniki czasowe', theme: 'cream',
+    kicker: ['TEMPI DI DISCESA', 'CZASY PRZEJAZDÓW'], title: [['TEMPI', 'IN PISTA.'], ['CZASY', 'NA TRASIE.']],
+    description: ['Classifiche separate ART e CLASSIC, dal tempo migliore.', 'Osobne klasyfikacje ART i CLASSIC, od najlepszego czasu.'],
     footnote: ['APPLAUSI PER TUTTI', 'BRAWA DLA WSZYSTKICH'] },
   standby: { label: 'Standby', labelPl: 'Oczekiwanie', theme: 'blue',
     kicker: ['STIAMO PREPARANDO LA DIRETTA', 'PRZYGOTOWUJEMY TRANSMISJĘ'], title: [['RESTA', 'CON NOI.'], ['ZOSTAŃ', 'Z NAMI.']],

@@ -1,8 +1,11 @@
+import type { RaceResult } from './race-results';
+
 export interface SceneEventData {
   eventName: string;
   eventYear: string;
   eventLocation: string;
   phase: 'scheduled' | 'voting' | 'closed' | 'unknown';
+  raceResults: RaceResult[];
   results: Array<{
     id: string;
     firstName: string;
@@ -23,7 +26,7 @@ export interface SceneEventStatus {
 }
 
 type Metadata = Pick<SceneEventData, 'eventName' | 'eventYear' | 'eventLocation'>;
-type Voting = Pick<SceneEventData, 'phase' | 'results' | 'totalVotes'> & { editionYear: string };
+type Voting = Pick<SceneEventData, 'phase' | 'results' | 'raceResults' | 'totalVotes'> & { editionYear: string };
 type Subscriber = {
   onData: (data: SceneEventData) => void;
   onStatus?: (status: SceneEventStatus) => void;
@@ -36,13 +39,14 @@ const POLL_MS = 30_000;
 const subscribers = new Set<Subscriber>();
 let metadata: Metadata = { eventName: '', eventYear: '', eventLocation: '' };
 let settingsReady = false;
-let voting: Voting = { phase: 'unknown', results: [], editionYear: '' };
+let voting: Voting = { phase: 'unknown', results: [], raceResults: [], editionYear: '' };
 let votingReady = false;
 const due: Record<Endpoint, number> = { settings: 0, voting: 0 };
 const failures: Record<Endpoint, number> = { settings: 0, voting: 0 };
 const errors: Record<Endpoint, string> = { settings: '', voting: '' };
 let timer: ReturnType<typeof setTimeout> | undefined;
 let request: PendingRequest | undefined;
+let refreshVotingAfterRequest = false;
 
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid public response');
@@ -92,6 +96,27 @@ function parseSettings(body: Record<string, unknown>): Metadata {
   };
 }
 
+function parseRaceResults(value: unknown): RaceResult[] {
+  if (!Array.isArray(value) || value.length > 400) return [];
+  const ids = new Set<string>();
+  return value.flatMap(value => {
+    try {
+      const row = record(value);
+      const id = text(row.id);
+      if (!id || ids.has(id) || (row.category !== 'art' && row.category !== 'classic')) return [];
+      const result: RaceResult = {
+        id, category: row.category,
+        firstName: text(row.firstName), lastName: text(row.lastName),
+        startNumber: integer(row.startNumber, 1), projectName: text(row.projectName, 500),
+        raceTimeMs: typeof row.raceTimeMs === 'number' && Number.isInteger(row.raceTimeMs)
+          && row.raceTimeMs >= 0 && row.raceTimeMs <= 2147483647 ? row.raceTimeMs : null,
+      };
+      ids.add(id);
+      return [result];
+    } catch { return []; }
+  });
+}
+
 function parseVoting(body: Record<string, unknown>): Voting {
   const phase = body.phase;
   if (phase !== 'scheduled' && phase !== 'voting' && phase !== 'closed') throw new Error('Invalid public phase');
@@ -104,8 +129,10 @@ function parseVoting(body: Record<string, unknown>): Voting {
     if (!editionYear) throw new Error('Invalid current edition');
   }
   if (body.isArchive === true || (metadata.eventYear && editionYear && metadata.eventYear !== editionYear)) throw new Error('Not the current edition');
+  // Race times are already public during the race; never derive them from a voting podium/archive.
+  const raceResults = editionYear && body.isArchive === false ? parseRaceResults(body.participants) : [];
   // Deny scores, ranks and counts before closure, even if an API accidentally supplies them.
-  if (phase !== 'closed') return { phase, results: [], editionYear };
+  if (phase !== 'closed') return { phase, results: [], raceResults, editionYear };
   // The worker's participants array is category/start-number ordered, not a ranking.
   // Its podium is authoritative, including tie-break order. Never re-sort or invent positions.
   const rows = body.podium !== undefined ? body.podium : body.results;
@@ -129,7 +156,7 @@ function parseVoting(body: Record<string, unknown>): Voting {
     if (row.position !== undefined) result.position = integer(row.position, 1);
     return result;
   });
-  return { phase, results, editionYear, ...(body.totalVotes === undefined ? {} : { totalVotes: integer(body.totalVotes) }) };
+  return { phase, results, raceResults, editionYear, ...(body.totalVotes === undefined ? {} : { totalVotes: integer(body.totalVotes) }) };
 }
 
 function wantsVoting(): boolean {
@@ -148,6 +175,7 @@ function publish(subscriber?: Subscriber): void {
       ...metadata,
       phase: showVoting ? voting.phase : 'unknown',
       results: showVoting ? voting.results.map(row => ({ ...row })) : [],
+      raceResults: showVoting && settingsReady ? voting.raceResults.map(row => ({ ...row })) : [],
       ...(showVoting && voting.totalVotes !== undefined ? { totalVotes: voting.totalVotes } : {}),
     };
     target.onData(data);
@@ -209,12 +237,17 @@ async function refresh(): Promise<void> {
     publish();
   } finally {
     clearTimeout(current.timeout);
-    if (request === current) { request = undefined; schedule(); }
+    if (request === current) {
+      request = undefined;
+      if (refreshVotingAfterRequest) { due.voting = 0; refreshVotingAfterRequest = false; }
+      schedule();
+    }
   }
 }
 
 function pause(): void {
   clearTimer();
+  refreshVotingAfterRequest = false;
   const previous = request;
   request = undefined;
   if (previous) clearTimeout(previous.timeout);
@@ -226,6 +259,15 @@ function resume(): void {
   // A successful settings read is page-cached; reconnect only retries an unsuccessful one.
   if (!settingsReady) due.settings = 0;
   if (wantsVoting()) due.voting = 0;
+  clearTimer();
+  void refresh();
+}
+
+/** Refetch the public state after a confirmed race finish; never synthesize or merge a result. */
+export function refreshSceneEvent(): void {
+  if (!wantsVoting()) return;
+  due.voting = 0;
+  if (request?.endpoint === 'voting') { refreshVotingAfterRequest = true; return; }
   clearTimer();
   void refresh();
 }

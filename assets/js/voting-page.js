@@ -459,8 +459,9 @@ import {
       /* Powłoka odsłonięta także PRZED pierwszym odczytem, żeby było gdzie pokazać szkielet.
          Wcześniej warunek brzmiał „otwarte albo zamknięte", więc przez cały czas oczekiwania na
          odpowiedź strona była pusta — a to jest ten moment, w którym ktoś zamyka kartę. Po
-         odczycie warunek wraca do swojego: powłoki nie ma, gdy głosowanie jeszcze nie ruszyło. */
-      shell.hidden = state.loaded && !(open || closed);
+         odczycie pokazujemy także listę startową i zapisane czasy przed otwarciem głosowania.
+         Same kontrolki oceniania nadal powstają wyłącznie w fazie voting. */
+      shell.hidden = state.loaded && !(open || closed || state.participants.length > 0);
       shell.classList.toggle('is-closed', closed);
     }
 
@@ -904,7 +905,7 @@ import {
       const rank = closed ? index + 1 : 0;
       const mine = state.myVote;
       const key = [
-        row.photo, row.voteCount, row.totalScore, row.averageScore, row.raceTimeMs,
+        state.phase, row.photo, row.voteCount, row.totalScore, row.averageScore, row.raceTimeMs,
         rank, badgeByParticipant.get(row.id) || '',
         /* CAŁY mój głos, nie tylko „czy to mój kafelek".
            ---------------------------------------------------------------------------

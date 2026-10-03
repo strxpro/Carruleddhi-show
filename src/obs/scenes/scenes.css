@@ -38,9 +38,12 @@
 .scene-vote-cue{position:absolute;left:1144px;top:810px;width:416px;height:120px;padding:16px 20px;border-radius:18px;background:#071a3df2;color:#fff6e7;border-left:4px solid #ffc928;display:flex;align-items:center;overflow:hidden}
 .scene-vote-cue strong{display:block;font-family:ObsBungee,sans-serif;font-size:22px;font-weight:400;line-height:1.2;letter-spacing:-.02em;color:#ffc928}
 .scene-vote-cue p{font-size:20px;font-weight:600;line-height:1.25;margin:8px 0 0}
-.scene-qr{position:absolute;left:1600px;top:802px;width:224px;height:224px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;border-radius:18px;background:#fff;color:#071a3d;padding:10px}
+.scene-qr{position:absolute;left:1600px;top:802px;width:224px;height:224px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;border-radius:18px;background:#fff;color:#071a3d;padding:10px}
 .scene-qr svg{display:block;flex:none}
-.scene-qr>span{font-size:11px;font-weight:800;letter-spacing:.04em;line-height:1.2}
+.scene-qr>span{font-size:13px;font-weight:800;letter-spacing:0;line-height:1.15;white-space:nowrap}
+.scene-results-full .scene-qr{left:96px}
+.scene-results-full .scene-vote-cue{left:360px}
+.scene-results-full .scene-event-line{top:80px}
 .scene-guides-note{position:absolute;left:96px;top:28px;padding:7px 12px;border-radius:6px;background:#071a3d;color:#ffc928;font-size:16px;font-weight:700}
 .scene-vote-status{display:inline-flex;align-self:flex-start;max-width:100%;margin-top:24px;padding:9px 12px;border:1px solid currentColor;border-radius:999px;font-size:14px;font-weight:800;line-height:1.2;letter-spacing:.05em}
 .scene-poster-results .scene-title{margin-top:26px;font-size:43px;margin-bottom:16px}
