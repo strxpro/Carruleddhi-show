@@ -23,7 +23,7 @@ for(let i=0;i<names.length;i++){
   const raw=await sharp({create:{width:144,height:144,channels:4,background:'#15141e'}}).composite([{input:icon,left:Math.floor((144-size)/2),top:Math.floor((114-size)/2) < 0 ? 0:Math.floor((114-size)/2)},{input:overlay}]).raw().toBuffer();
   (pressed?press:normal).push(raw);
  }
- for(const [frames,suffix,delay]of [[normal,'',60],[press,'-press',40]])await sharp(Buffer.concat(frames),{raw:{width:144,height:144*frames.length,channels:4,pageHeight:144}}).gif({loop:0,delay,colours:128}).toFile(path.join(assets,names[i]+suffix+'.gif'));
+ for(const [frames,suffix,delay]of [[normal,'',60],[press,'-press',40]])await sharp(Buffer.concat(frames),{raw:{width:144,height:144*frames.length,channels:4,pageHeight:144}}).gif({loop:0,delay:Array(frames.length).fill(delay),colours:128}).toFile(path.join(assets,names[i]+suffix+'.gif'));
  await sharp(normal[0],{raw:{width:144,height:144,channels:4}}).png().toFile(path.join(assets,names[i]+'.png'));
 }
 let count=0;
@@ -34,11 +34,17 @@ for(const folder of await fs.readdir(path.join(profile,'Profiles'))){
   if(!action.ViewParam?.[0]?.Icon)continue;
   const name=path.basename(action.ViewParam[0].Icon),dest=path.join(dir,'Images',name);
   try{await fs.access(path.join(assets,name));}catch{continue;}
-  await fs.mkdir(path.dirname(dest),{recursive:true});await fs.copyFile(path.join(assets,name),dest);
+  await fs.mkdir(path.dirname(dest),{recursive:true});
+  const input=await fs.readFile(path.join(assets,name));
+  const metadata=await sharp(input,{animated:true}).metadata();
+  await sharp(input,{animated:true}).gif({loop:0,delay:Array(metadata.pages).fill(60)}).toFile(dest);
   Object.assign(action.ViewParam[0],{Icon:dest.replaceAll('\\','/'),IconRel:'Images/'+name,IconEx:'Images/'+name,Text:''});
   if(action.ActionParam?.IdleIcon){
    action.ActionParam.IdleIcon=dest.replaceAll('\\','/');
-   const pressName=name.replace('.gif','-press.gif');await fs.copyFile(path.join(assets,pressName),path.join(dir,'Images',pressName));
+   const pressName=name.replace('.gif','-press.gif');
+   const pressed=await fs.readFile(path.join(assets,pressName));
+   const pm=await sharp(pressed,{animated:true}).metadata();
+   await sharp(pressed,{animated:true}).gif({loop:0,delay:Array(pm.pages).fill(40)}).toFile(path.join(dir,'Images',pressName));
    action.ActionParam.PressIcon=path.join(dir,'Images',pressName).replaceAll('\\','/');
   }
   count++;

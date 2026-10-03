@@ -35,7 +35,7 @@ export async function renderMotionIcon(directory, key, label, symbol, color, big
   const normal=[],pressed=[];
   for(let i=0;i<40;i++)normal.push(await sharp(Buffer.from(frame(i))).ensureAlpha().raw().toBuffer());
   for(let i=0;i<16;i++)pressed.push(await sharp(Buffer.from(frame(i,true))).ensureAlpha().raw().toBuffer());
-  const gif=async(frames,name,delay)=>sharp(Buffer.concat(frames),{raw:{width:144,height:144*frames.length,channels:4,pageHeight:144}}).gif({loop:0,delay,colours:96,dither:0}).toFile(path.join(directory,name));
+  const gif=async(frames,name,delay)=>sharp(Buffer.concat(frames),{raw:{width:144,height:144*frames.length,channels:4,pageHeight:144}}).gif({loop:0,delay:Array(frames.length).fill(delay),colours:96,dither:0}).toFile(path.join(directory,name));
   await gif(normal,key+'.gif',60);
   await gif(pressed,key+'-press.gif',40);
   await sharp(normal[0],{raw:{width:144,height:144,channels:4}}).png().toFile(path.join(directory,key+'.png'));

@@ -87,4 +87,3 @@ Lokalny moduł Ulanzi Carruleddhi Motion znajduje się w katalogu Plugins. Opier
 ## Grafiki Higgsfield
 
 Osiem ikon menu głównego wygenerowano przez Higgsfield (Recraft V4.1), a następnie dodano czytelne podpisy i animacje. Pozostałe przyciski mają dotychczasowe animowane symbole funkcji. Wszystkie 65 ikon są kopiowane do folderów Images wewnątrz profilu, z poprawnymi IconRel i IconEx. Naprawia to wcześniejsze odwołania, przy których Ulanzi pokazywało domyślne symbole. Skrypt tools/ulanzi-motion/install-artwork.mjs wymaga zamkniętego Ulanzi i tworzy kopię profilu przed zmianami. Jest też wywoływany przez główny konfigurator.
-
