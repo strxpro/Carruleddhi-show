@@ -18,7 +18,7 @@ try {
     await page.evaluateOnNewDocument(locale => {
       sessionStorage.setItem('carruleddhi.admin.key', 'test-key');
       sessionStorage.setItem('carruleddhi.admin.tab', 'live');
-      localStorage.setItem('carruleddhi.admin.locale', locale);
+      localStorage.setItem('carruleddhi.admin.locale.v2', locale);
       window.catalogCopied = [];
       window.catalogCopyFails = false;
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {

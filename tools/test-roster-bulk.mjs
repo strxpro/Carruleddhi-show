@@ -27,7 +27,7 @@ try {
   await page.evaluateOnNewDocument(() => {
     sessionStorage.setItem('carruleddhi.admin.key', 'test-key');
     sessionStorage.setItem('carruleddhi.admin.tab', 'registrations');
-    if (!localStorage.getItem('carruleddhi.admin.locale')) localStorage.setItem('carruleddhi.admin.locale', 'pl');
+    if (!localStorage.getItem('carruleddhi.admin.locale.v2')) localStorage.setItem('carruleddhi.admin.locale.v2', 'pl');
   });
   await page.setRequestInterception(true);
   page.on('request', request => {
@@ -179,7 +179,7 @@ try {
   await page.waitForSelector(select(0), { hidden: true });
   await selectedCount(0);
   assert.equal(writes.length, 1, 'existing single confirmation preserved');
-  await page.evaluate(() => localStorage.setItem('carruleddhi.admin.locale', 'it'));
+  await page.evaluate(() => localStorage.setItem('carruleddhi.admin.locale.v2', 'it'));
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForSelector(button);
   assert.equal(await page.$eval(button, el => el.textContent), 'Conferma selezionate');

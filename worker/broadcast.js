@@ -144,7 +144,7 @@ function validateImage(bytes, mime, limit) {
 
 async function storedImage(env, bucket, path, limit) {
   const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/authenticated/${bucket}/${path}`, {
-    headers: headers(env), redirect: 'error', signal: AbortSignal.timeout(15000)
+    headers: headers(env), redirect: 'manual', signal: AbortSignal.timeout(15000)
   });
   if (!res.ok) throw new Error('BROADCAST_ASSET_READ_FAILED');
   const mime = (res.headers.get('Content-Type') || '').split(';')[0];

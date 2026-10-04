@@ -25,7 +25,7 @@ try {
   await page.evaluateOnNewDocument(() => {
     sessionStorage.setItem('carruleddhi.admin.key', 'test-key');
     if (!sessionStorage.getItem('carruleddhi.admin.tab')) sessionStorage.setItem('carruleddhi.admin.tab', 'registrations');
-    if (!localStorage.getItem('carruleddhi.admin.locale')) localStorage.setItem('carruleddhi.admin.locale', 'pl');
+    if (!localStorage.getItem('carruleddhi.admin.locale.v2')) localStorage.setItem('carruleddhi.admin.locale.v2', 'pl');
   });
   await page.setRequestInterception(true);
   page.on('request', request => {

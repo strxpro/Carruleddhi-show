@@ -11,7 +11,7 @@ try {
   await page.evaluateOnNewDocument(() => {
     sessionStorage.setItem('carruleddhi.admin.key', 'test-key');
     sessionStorage.setItem('carruleddhi.admin.tab', 'live');
-    localStorage.setItem('carruleddhi.admin.locale', 'pl');
+    localStorage.setItem('carruleddhi.admin.locale.v2', 'pl');
   });
   const participants = ['Ada', 'Anna'].map((firstName, i) => ({ id: `p${i + 1}`, firstName, lastName: 'Rossi', startNumber: i + 1, city: 'Gallura', category: 'classic', projectName: 'Cart', photo: '' }));
   const state = { id: 'main', revision: 1, updated_at: new Date().toISOString(), participant: null, participant_visible: false,

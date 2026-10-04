@@ -87,7 +87,7 @@ async function admin(tab) {
   const script = await page.evaluateOnNewDocument(tab => {
     sessionStorage.setItem('carruleddhi.admin.key', 'test-key');
     sessionStorage.setItem('carruleddhi.admin.tab', tab);
-    localStorage.setItem('carruleddhi.admin.locale', 'pl');
+    localStorage.setItem('carruleddhi.admin.locale.v2', 'pl');
   }, tab);
   await page.goto(`${origin}/admin.html`, { waitUntil: 'networkidle0' });
   await page.removeScriptToEvaluateOnNewDocument(script.identifier);

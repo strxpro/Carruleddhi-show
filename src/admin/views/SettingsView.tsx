@@ -27,6 +27,7 @@ import {
 import { PurgePanel } from './PurgePanel';
 import { EditionWizard } from './EditionWizard';
 import { SponsorLeads } from './SponsorLeads';
+import { SponsorFields } from './SponsorFields';
 
 function ArmedDeleteButton({ onConfirm, title }: { onConfirm: () => void, title: string }) {
   const [armed, setArmed] = useState(false);
@@ -375,6 +376,7 @@ export function SettingsView({
   const sponsorsTouched = useRef(false);
   const [sponsorError, setSponsorError] = useState('');
   const [sponsorSaving, setSponsorSaving] = useState(false);
+  const [sponsorSyncFailed, setSponsorSyncFailed] = useState(false);
   // Unrelated saves/refreshes may contain newer sponsors, but cannot rebase a dirty editor.
   const receiveSettings = useCallback((next: SiteSettings, replaceSponsors = false) => {
     const preserveSponsors = sponsorsTouched.current && !replaceSponsors;
@@ -431,6 +433,28 @@ export function SettingsView({
       alive = false;
     };
   }, [apiKey, receiveSettings]);
+
+  useEffect(() => {
+    if (!loaded || loadFailed || sponsorSaving) return;
+    let cancelled = false;
+    let pending = false;
+    const refresh = async () => {
+      if (pending || sponsorsTouched.current || document.visibilityState === 'hidden') return;
+      pending = true;
+      try {
+        const response = await fetchSettings(apiKey);
+        if (cancelled || sponsorsTouched.current) return;
+        setSettings(current => ({ ...current, sponsors: response.settings.sponsors }));
+        setSavedSponsors(response.settings.sponsors);
+        setSponsorSyncFailed(false);
+      } catch {
+        if (!cancelled) setSponsorSyncFailed(true);
+      } finally { pending = false; }
+    };
+    const timer = window.setInterval(() => { void refresh(); }, 5000);
+    window.addEventListener('focus', refresh);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [apiKey, loaded, loadFailed, sponsorSaving]);
 
   /**
    * Przyjmuje świeże ustawienia z serwera i przepisuje nimi WSZYSTKIE kopie na tym ekranie.
@@ -1121,6 +1145,7 @@ export function SettingsView({
           </div>
           <span className="text-[12px] font-semibold text-white/40">{settings.sponsors.length}</span>
         </div>
+        {sponsorSyncFailed && <p role="status" className="mt-2 text-xs text-yellow">{t('set.sponsorSyncFailed')}</p>}
 
         <input
           ref={fileInput}
@@ -1136,54 +1161,8 @@ export function SettingsView({
               key={index}
               className="rounded-xl border border-white/10 bg-navy-900/60 p-3 sm:flex sm:items-start sm:gap-3"
             >
-              <button
-                type="button"
-                onClick={() => pickLogo(index)}
-                title={t('set.sponsorLogo')}
-                className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-dashed border-white/20 bg-white/5 text-white/40 hover:border-yellow hover:text-yellow"
-              >
-                {sponsor.logoUrl || logoSrc(sponsor.logo) ? (
-                  <img
-                    src={sponsor.logoUrl || logoSrc(sponsor.logo)}
-                    alt={sponsor.name || t('set.sponsorLogo')}
-                    className="size-full object-contain"
-                  />
-                ) : (
-                  <ImagePlus className="size-5" />
-                )}
-              </button>
-
-              <div className="mt-3 flex min-w-0 flex-1 flex-col gap-2 sm:mt-0">
-                <input
-                  value={sponsor.name}
-                  onChange={(event) => editSponsor(index, { name: event.target.value })}
-                  placeholder={t('set.sponsorName')}
-                  aria-label={t('set.sponsorName')}
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-yellow focus:outline-none"
-                />
-                <input
-                  value={sponsor.url}
-                  onChange={(event) => editSponsor(index, { url: event.target.value })}
-                  onBlur={(event) => {
-                    let val = event.target.value.trim();
-                    if (!val) return;
-                    if (val.startsWith('http://') || val.startsWith('https://')) {
-                      // zostawiamy jak jest
-                    } else if (val.startsWith('www.')) {
-                      val = 'https://' + val;
-                    } else {
-                      val = 'https://www.' + val;
-                    }
-                    if (val !== sponsor.url) {
-                      editSponsor(index, { url: val });
-                    }
-                  }}
-                  placeholder="https://…"
-                  aria-label={t('set.sponsorUrl')}
-                  inputMode="url"
-                  className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[13px] text-white placeholder:text-white/30 focus:border-yellow focus:outline-none"
-                />
-              </div>
+              <SponsorFields t={t} name={sponsor.name} url={sponsor.url} logo={sponsor.logoUrl || logoSrc(sponsor.logo)}
+                onName={name => editSponsor(index, { name })} onUrl={url => editSponsor(index, { url })} onLogo={() => pickLogo(index)} />
 
               <div className="mt-3 flex shrink-0 gap-1 sm:mt-0 sm:flex-col">
                 <button

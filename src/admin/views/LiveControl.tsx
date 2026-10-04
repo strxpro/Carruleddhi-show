@@ -10,6 +10,7 @@ import { downscaleSponsorLogo } from './SettingsView';
 import { formatRaceTime } from '../../lib/race-time';
 import { RunControl } from './RunControl';
 import { BroadcastScenesLinks } from './BroadcastScenesLinks';
+import { SponsorFields } from './SponsorFields';
 
 type SponsorDraft = Omit<BroadcastSponsorEdit, 'id'> & {
   id?: string;
@@ -33,6 +34,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
   const [preview, setPreview] = useState(false);
   const [copyNote, setCopyNote] = useState<TranslateKey | null>(null);
   const alive = useRef(true);
+  const logoInput = useRef<HTMLInputElement>(null);
   const overlaySources = [
     { path: '/obs/participant', label: t('live.participantSource') },
     { path: '/obs/replay', label: t('live.replay') },
@@ -251,13 +253,15 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
         }}>
           <h4>{t(draft.id ? 'live.edit' : 'set.sponsorAdd')}</h4>
           <fieldset disabled={busy}>
-            <div className="live-form-grid">
-              <label className="live-field"><span>{t('set.sponsorName')}</span><input autoFocus required maxLength={80} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>
-              <label className="live-field"><span>{t('set.sponsorUrl')}</span><input type="url" maxLength={2048} placeholder="https://" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} /></label>
-              <label className="live-field"><span>{t('live.tier')}</span><input required maxLength={40} value={draft.tier} onChange={(e) => setDraft({ ...draft, tier: e.target.value })} /></label>
-              <label className="live-checkbox"><input type="checkbox" checked={draft.active} onChange={(e) => setDraft({ ...draft, active: e.target.checked })} /><span>{t('live.active')}</span></label>
-              <label className="live-field"><span>{t('set.sponsorLogo')} (JPG, PNG, WebP; max. 10 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => { void logo(e.target.files?.[0]); e.target.value = ''; }} /></label>
-              {draft.logoUrl && <img src={draft.logoUrl} alt={draft.name || t('set.sponsorLogo')} className="live-logo" />}
+            <div className="rounded-xl border border-white/10 bg-navy-900/60 p-3">
+              <SponsorFields t={t} name={draft.name} url={draft.url} logo={draft.logoUrl || ''} autoFocus
+                onName={name => setDraft({ ...draft, name })} onUrl={url => setDraft({ ...draft, url })} onLogo={() => logoInput.current?.click()} />
+              <input ref={logoInput} type="file" className="hidden" aria-label={t('set.sponsorLogo')} accept="image/png,image/jpeg,image/webp"
+                onChange={e => { void logo(e.target.files?.[0]); e.target.value = ''; }} />
+              <div className="live-form-grid mt-3">
+                <label className="live-field"><span>{t('live.tier')}</span><input required maxLength={40} value={draft.tier} onChange={e => setDraft({ ...draft, tier: e.target.value })} /></label>
+                <label className="live-checkbox"><input type="checkbox" checked={draft.active} onChange={e => setDraft({ ...draft, active: e.target.checked })} /><span>{t('live.active')}</span></label>
+              </div>
             </div>
             {!validUrl && <p className="live-error">{t('live.invalidUrl')}</p>}
             <p className="live-help">{t('set.dirty')}</p>

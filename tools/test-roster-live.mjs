@@ -66,7 +66,7 @@ try {
   await page.evaluateOnNewDocument(() => {
     sessionStorage.setItem('carruleddhi.admin.key', 'test-key');
     sessionStorage.setItem('carruleddhi.admin.tab', 'registrations');
-    if (!localStorage.getItem('carruleddhi.admin.locale')) localStorage.setItem('carruleddhi.admin.locale', 'pl');
+    if (!localStorage.getItem('carruleddhi.admin.locale.v2')) localStorage.setItem('carruleddhi.admin.locale.v2', 'pl');
   });
   await page.setRequestInterception(true);
   page.on('request', request => {
@@ -267,7 +267,7 @@ try {
   readFailure = false;
   await page.$eval('[data-roster-live] [role="alert"] button', el => el.click());
   await waitEnabled(activate('r-new'));
-  await page.evaluate(() => localStorage.setItem('carruleddhi.admin.locale', 'it'));
+  await page.evaluate(() => localStorage.setItem('carruleddhi.admin.locale.v2', 'it'));
   await page.reload({ waitUntil: 'networkidle0' });
   await page.waitForSelector('[data-run-show]');
   assert.equal(await page.$eval('[data-run-show]', el => el.textContent), 'SHOW / Mostra selezionato');

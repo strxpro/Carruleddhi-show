@@ -89,7 +89,7 @@ async function pageFor(path, admin = false) {
   page.on('pageerror', error => errors.push(error.message));
   await page.setViewport({ width: 1920, height: 1080 });
   if (admin) await page.evaluateOnNewDocument(() => {
-    sessionStorage.setItem('carruleddhi.admin.key', 'test-admin'); sessionStorage.setItem('carruleddhi.admin.tab', 'live'); localStorage.setItem('carruleddhi.admin.locale', 'pl');
+    sessionStorage.setItem('carruleddhi.admin.key', 'test-admin'); sessionStorage.setItem('carruleddhi.admin.tab', 'live'); localStorage.setItem('carruleddhi.admin.locale.v2', 'pl');
   });
   await page.setRequestInterception(true);
   page.on('request', async request => {

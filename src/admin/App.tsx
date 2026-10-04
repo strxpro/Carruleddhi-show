@@ -49,7 +49,7 @@ import { Subscribers } from './views/Subscribers';
 import { NotificationBell } from './views/NotificationBell';
 import { SettingsView } from './views/SettingsView';
 
-const LOCALE_KEY = 'carruleddhi.admin.locale';
+const LOCALE_KEY = 'carruleddhi.admin.locale.v2';
 const TAB_KEY = 'carruleddhi.admin.tab';
 
 /** How often the bell asks. Ten seconds is invisible to a person and free to the API:
@@ -77,9 +77,8 @@ export default function App() {
   const [locale, setLocale] = useState<PanelLocale>(() => {
     const stored = localStorage.getItem(LOCALE_KEY);
     if (stored === 'pl' || stored === 'it') return stored;
-    // Italian for anyone whose browser is Italian; Polish otherwise. The event is in
-    // Italy and half the people running it are not Polish.
-    return navigator.language?.startsWith('it') ? 'it' : 'pl';
+    // Italian is the default; an explicit saved language choice wins.
+    return 'it';
   });
 
   useEffect(() => {

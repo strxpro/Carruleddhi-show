@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from './index.js';
-import { realtimeConfig, cleanBroadcastSponsor, decodeBroadcastImage, broadcastPublic, broadcastAdmin } from './broadcast.js';
+import { realtimeConfig, cleanBroadcastSponsor, decodeBroadcastImage, broadcastPublic, broadcastAdmin, prepareBroadcastLogos } from './broadcast.js';
 
 const env = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SERVICE_KEY: 'private-service-key', ROSTER_KEY: 'admin-password' };
 const id = '11111111-1111-4111-8111-111111111111';
@@ -9,6 +9,36 @@ const state = { id: 'main', revision: 3, participant: null, participant_visible:
   participant_mode: 'live', sponsors_enabled: false, sponsors: [], updated_at: '2026-10-01T00:00:00Z', run_status: 'IDLE' };
 const data = { state, participants: [], sponsors: [], serverNow: '2026-10-01T00:00:01Z' };
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+test('Sponsor logo preparation accepts the edge-supported manual redirect mode and publishes once', async (t) => {
+  const png=Buffer.alloc(64);png.set([137,80,78,71,13,10,26,10]);
+  const writes=[];
+  t.mock.method(globalThis,'fetch',async(url,options={})=>{
+    if(url.includes('broadcast_assets?'))return reply([]);
+    if(url.includes('/object/authenticated/')){
+      assert.equal(options.redirect,'manual');
+      return new Response(png,{headers:{'Content-Type':'image/png'}});
+    }
+    writes.push(url);return reply({});
+  });
+  await prepareBroadcastLogos(env,[{logo:'sponsors/new.png'}]);
+  assert.equal(writes.length,2);
+  assert.match(writes[0],/\/object\/broadcast-assets\/sponsors\//);
+  assert.match(writes[1],/broadcast_command$/);
+});
+
+test('Sponsor logo redirects never forward credentials or publish an asset', async(t)=>{
+  let reads=0;
+  t.mock.method(globalThis,'fetch',async(url,options={})=>{
+    if(url.includes('broadcast_assets?'))return reply([]);
+    reads++;
+    assert.match(url,/\/object\/authenticated\/wall-photos\/sponsors\/new.png$/);
+    assert.equal(options.redirect,'manual');
+    return new Response(null,{status:302,headers:{Location:'https://other.example/logo.png'}});
+  });
+  await assert.rejects(()=>prepareBroadcastLogos(env,[{logo:'sponsors/new.png'}]),/BROADCAST_ASSET_READ_FAILED/);
+  assert.equal(reads,1);
+});
 const jwt = (role) => `header.${btoa(JSON.stringify({ role }))}.signature`;
 const request = (route, body, authenticated = false) => new Request(`https://example.test/api/carruleddhi/${route}`, {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { 'X-Carruleddhi-Roster-Key': env.ROSTER_KEY } : {}) },
@@ -266,7 +296,7 @@ test('ON AIR copies only the selected eligible voting photo once and reuses its 
         return reply({});
       }
       assert.equal(url, `${env.SUPABASE_URL}/storage/v1/object/authenticated/participant-photos/participants/existing.png`);
-      assert.equal(options.redirect, 'error');
+      assert.equal(options.redirect, 'manual');
       return new Response(png, { headers: { 'Content-Type': 'image/png' } });
     }
     if (url.endsWith('broadcast_command')) {
