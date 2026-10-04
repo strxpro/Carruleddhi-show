@@ -216,7 +216,7 @@ export function LiveControl({ t, apiKey }: { t: (key: TranslateKey) => string; a
         </div>
         <p className="live-help">{t('live.sponsorsToggleHint')}</p><p className="live-help">{t('live.sponsorsHint')}</p>
         {(!sponsors.some(s => s.active) || !state.sponsors_enabled) && <p className="live-warning" role="status" data-sponsor-empty-guide>{t(!sponsors.length ? 'live.sponsorSetupEmpty' : !sponsors.some(s => s.active) ? 'live.sponsorSetupInactive' : 'live.sponsorSetupOff')}</p>}
-        <ul className="live-list">
+        <ul className="live-list max-h-[60vh] overflow-y-auto overscroll-contain pr-2">
           {sponsors.map((one, index) => <li key={one.id} className="live-list-row">
             <div className="live-sponsor-identity">
               {one.logoUrl ? <img src={one.logoUrl} alt="" className="live-logo" /> : <span className="live-logo live-placeholder">{t('set.sponsorNoLogo')}</span>}

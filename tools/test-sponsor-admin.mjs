@@ -78,6 +78,25 @@ try {
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await new Promise(resolve => setTimeout(resolve, 600));
   assert.equal(await page.$eval('[data-sponsor-fields] input', el => el.value), 'Aggiornato altrove bozza');
+  settings.sponsors = Array.from({ length: 9 }, (_, order) => ({ id: `s${order}`, name: `Sponsor ${order + 1}`,
+    logo: '', url: '', active: true, order, tier: 'partner' }));
+  await page.reload({ waitUntil: 'networkidle0' });
+  for (let count = 10; count <= 12; count++) {
+    await clickText('Aggiungi sponsor');
+    await page.waitForFunction(count => document.querySelectorAll('[data-settings-sponsors] li').length === count, {}, count);
+    await page.type('[data-settings-sponsors] li:last-child input', `Sponsor ${count}`);
+    assert.equal(await page.$eval('[data-settings-sponsors] li:last-child input', el => document.activeElement === el), true);
+  }
+  const geometry = await page.$eval('[data-settings-sponsors]', el => ({ height: el.clientHeight, content: el.scrollHeight,
+    viewport: innerHeight, controlsBeforeList: [...el.parentElement.querySelectorAll('button')].some(button =>
+      button.textContent.trim() === 'Aggiungi sponsor' && !!(button.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) }));
+  assert.ok(geometry.content > geometry.height && geometry.height <= geometry.viewport * 0.61);
+  assert.equal(geometry.controlsBeforeList, true);
+  await clickText('Salva');
+  await page.waitForFunction(() => !document.body.textContent.includes('Modifiche non salvate'));
+  assert.equal(settings.sponsors.length, 12);
+  await page.reload({ waitUntil: 'networkidle0' });
+  assert.equal(await page.$$eval('[data-settings-sponsors] li', rows => rows.length), 12);
   await page.evaluate(() => sessionStorage.setItem('carruleddhi.admin.tab', 'live'));
   await page.reload({ waitUntil: 'networkidle0' });
   try { await page.waitForSelector('#live-sponsors-title', { timeout: 10000 }); }
@@ -89,5 +108,5 @@ try {
   assert.equal(settings.sponsors.at(-1).name, 'Sponsor diretta');
   assert.equal(writes.filter(w => w.action === 'sponsor-save').length, 1);
   assert.deepEqual(errors, []);
-  console.log('PASS: Italian default, compact sponsor fields, failed-save retry, settings sync, draft preservation, LIVE creation');
+  console.log('PASS: Italian default, sponsor save/retry/sync, draft preservation, 9 to 12 sponsors with save/reload, scrollable list and accessible controls, LIVE creation');
 } finally { await browser.close(); }

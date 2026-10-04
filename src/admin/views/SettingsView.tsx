@@ -1143,7 +1143,7 @@ export function SettingsView({
             <h3 className="text-sm font-bold text-white">{t('set.sponsors')}</h3>
             <p className="mt-1 text-[13px] text-white/55">{t('set.sponsorsLead')}</p>
           </div>
-          <span className="text-[12px] font-semibold text-white/40">{settings.sponsors.length}</span>
+          <span className="text-[12px] font-semibold text-white/40">{settings.sponsors.length} / 30</span>
         </div>
         {sponsorSyncFailed && <p role="status" className="mt-2 text-xs text-yellow">{t('set.sponsorSyncFailed')}</p>}
 
@@ -1155,7 +1155,60 @@ export function SettingsView({
           className="hidden"
         />
 
-        <ul className="mt-4 flex flex-col gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={settings.sponsors.length >= 30}
+            onClick={() => {
+              if (settings.sponsors.length >= 30) return;
+              sponsorsTouched.current = true;
+              setSettings((current) => ({
+                ...current,
+                sponsors: [...current.sponsors, { name: '', url: '', logo: '' }]
+              }));
+              requestAnimationFrame(() => {
+                const input = document.querySelector<HTMLInputElement>('[data-settings-sponsors] li:last-child input');
+                input?.focus({ preventScroll: true });
+                input?.scrollIntoView({ block: 'nearest' });
+              });
+            }}
+            className="flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2 text-xs font-semibold text-white/80 hover:border-white/60 hover:text-white"
+          >
+            <Plus className="size-3.5" />
+            {t('set.sponsorAdd')}
+          </button>
+
+          <button
+            type="button"
+            disabled={!sponsorsDirty || status === 'saving' || uploading || loadFailed}
+            onClick={() =>
+              push({
+                // A row with no name is a row somebody started and abandoned; it would
+                // render as an empty tile on the public page.
+                sponsors: settings.sponsors.filter((sponsor) => sponsor.name.trim())
+                  .map(({ logoUrl: _preview, ...sponsor }, order) => ({ ...sponsor, order }))
+              })
+            }
+            className="rounded-full bg-yellow px-4 py-2 text-xs font-bold text-navy-950 disabled:opacity-40"
+          >
+            {status === 'saving' ? t('set.saving') : t('set.save')}
+          </button>
+
+          {uploading ? <span className="text-[12px] text-white/50">{t('set.uploading')}</span> : null}
+          {uploadError ? <span className="text-[12px] text-coral">{t('set.uploadFailed')}</span> : null}
+          {sponsorsDirty && status !== 'saving' ? (
+            <span className="text-[12px] text-yellow">{t('set.dirty')}</span>
+          ) : null}
+          {status === 'saved' ? (
+            <span className="text-[12px] text-emerald-300">{t('set.saved')}</span>
+          ) : null}
+          {status === 'failed' && !sponsorError ? (
+            <span className="text-[12px] text-coral">{t('set.saveFailed')}</span>
+          ) : null}
+        </div>
+        {settings.sponsors.length >= 30 && <p className="mt-2 text-xs text-white/60">{t('set.leadListFull')}</p>}
+
+        <ul data-settings-sponsors className="mt-4 flex max-h-[60vh] flex-col gap-3 overflow-y-auto overscroll-contain pr-2">
           {settings.sponsors.map((sponsor, index) => (
             <li
               key={index}
@@ -1216,50 +1269,7 @@ export function SettingsView({
           </div>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              sponsorsTouched.current = true;
-              setSettings((current) => ({
-                ...current,
-                sponsors: [...current.sponsors, { name: '', url: '', logo: '' }]
-              }));
-            }}
-            className="flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2 text-xs font-semibold text-white/80 hover:border-white/60 hover:text-white"
-          >
-            <Plus className="size-3.5" />
-            {t('set.sponsorAdd')}
-          </button>
 
-          <button
-            type="button"
-            disabled={!sponsorsDirty || status === 'saving' || uploading || loadFailed}
-            onClick={() =>
-              push({
-                // A row with no name is a row somebody started and abandoned; it would
-                // render as an empty tile on the public page.
-                sponsors: settings.sponsors.filter((sponsor) => sponsor.name.trim())
-                  .map(({ logoUrl: _preview, ...sponsor }, order) => ({ ...sponsor, order }))
-              })
-            }
-            className="rounded-full bg-yellow px-4 py-2 text-xs font-bold text-navy-950 disabled:opacity-40"
-          >
-            {status === 'saving' ? t('set.saving') : t('set.save')}
-          </button>
-
-          {uploading ? <span className="text-[12px] text-white/50">{t('set.uploading')}</span> : null}
-          {uploadError ? <span className="text-[12px] text-coral">{t('set.uploadFailed')}</span> : null}
-          {sponsorsDirty && status !== 'saving' ? (
-            <span className="text-[12px] text-yellow">{t('set.dirty')}</span>
-          ) : null}
-          {status === 'saved' ? (
-            <span className="text-[12px] text-emerald-300">{t('set.saved')}</span>
-          ) : null}
-          {status === 'failed' && !sponsorError ? (
-            <span className="text-[12px] text-coral">{t('set.saveFailed')}</span>
-          ) : null}
-        </div>
         </fieldset>
         {sponsorError && <p role="alert" className="mt-3 text-xs leading-relaxed text-coral">
           {t(sponsorError.includes('CONFLICT') ? 'set.sponsorsConflict' : 'set.saveFailed')}
