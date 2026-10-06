@@ -30,6 +30,10 @@ const ALLOWED_TYPES = new Set([
   /* Statystyki odwiedzin. `visit` to sonda ze strony — publiczna, bo wysyła ją przeglądarka
      zwiedzającego; `stats` to odczyt dla panelu, za tym samym hasłem co reszta panelu. */
   'visit', 'stats',
+  /* Skany kodu QR ze spotu TV (migracja 0052). Sam skan to GET na /api/carruleddhi/qr
+     i NIE przechodzi tędy — patrz wyjątek dla GET w `fetch()`. Tu jest tylko odczyt dla
+     panelu, za tym samym hasłem co `stats`. */
+  'qr-stats',
   // Listy przypomnień i newslettera dla panelu. Za passphrase, jak roster.
   'subscribers',
   // Public wall. `wall` reads approved messages, `wall-post` adds one,
@@ -138,7 +142,7 @@ const ALLOWED_TYPES = new Set([
 /** These never reach Make; they are served from Supabase by the Worker itself. */
 const SUPABASE_TYPES = new Set([
   'broadcast', 'broadcast-admin',
-  'visit', 'stats',
+  'visit', 'stats', 'qr-stats',
   'wall', 'wall-post', 'wall-translate', 'wall-admin',
   'settings', 'settings-admin', 'reminders-due', 'purge',
   'unsub-start', 'unsub-confirm', 'notify-code', 'notify-off', 'sponsor-lead',
@@ -201,6 +205,8 @@ const PROTECTED_TYPES = new Set([
      musiałoby stać w kodzie strony — czyli nie byłoby hasłem. Odczyt statystyk to co innego:
      to są liczby organizatora i nikt poza nim nie ma powodu ich widzieć. */
   'stats',
+  // Skany QR — te same liczby organizatora, to samo hasło.
+  'qr-stats',
   /* Otwarcie i zamkniecie transmisji widza wszyscy odwiedzajacy naraz, wiec ten przelacznik
      nalezy do organizatora. Sam ODCZYT stanu jest publiczny — patrz `stream` wyzej. */
   'stream-admin'
@@ -277,6 +283,8 @@ const FIELD_WHITELIST = {
   visit: ['path', 'ref', 'q', 'lang', 'width'],
   // Odczyt statystyk: jedna liczba, ile godzin wstecz.
   stats: ['hours'],
+  // Odczyt skanów QR: to samo — jedna liczba, ile godzin wstecz.
+  'qr-stats': ['hours'],
   // A public read takes no input at all, which is the shortest possible answer to
   // "what can a visitor ask this endpoint to do".
   settings: [],
@@ -3360,6 +3368,146 @@ async function siteStats(env, payload, cors) {
   }
   const stats = await response.json().catch(() => null);
   if (!stats) return json({ ok: false, code: 'STATS_FAILED' }, 502, cors);
+  return json({ ok: true, stats }, 200, cors);
+}
+
+/* ============================================================================
+   Kod QR ze spotu telewizyjnego / QR dello spot TV  (migracja 0052)
+   ============================================================================
+   Widz skanuje kod → GET /api/carruleddhi/qr → jeden anonimowy wiersz w `qr_scans`
+   → 302 na post na Facebooku. Panel czyta to przez `qr-stats`.
+
+   ZASADY
+     - Przekierowanie ZAWSZE. Brak bazy, błąd zapisu, wolna sieć — widz i tak ląduje na
+       Facebooku. Licznik nie ma prawa zepsuć tego, po co ktoś zeskanował kod.
+     - Zapis czeka najwyżej 1,5 s. Czekamy na niego (zamiast puścić w tle), bo na Vercelu
+       funkcja po oddaniu odpowiedzi może zostać zatrzymana, a z nią niewysłany zapis.
+     - Żadnych identyfikatorów: bez IP, bez user-agenta, bez skrótu. Patrz nagłówek 0052.
+     - Podglądy linków (Facebook, WhatsApp, Telegram …) i wstępne ładowanie przeglądarki
+       przekierowujemy, ale NIE liczymy — to nie są ludzie ze spotu.
+   ========================================================================== */
+
+/* Post z programem Festy Patronalej. Bez `locale=…` z adresu, który był skopiowany —
+   Facebook sam dobierze język widza. Można nadpisać zmienną QR_TARGET_URL na Vercelu,
+   bez wdrażania kodu; przyjmowany jest wyłącznie adres https. */
+const QR_TARGET_DEFAULT = 'https://www.facebook.com/photo?fbid=1502097991950819&set=pcb.1502098041950814';
+
+const QR_BOT_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|facebot|whatsapp|telegram|discord|slack|skype|linkedin|embedly|pinterest|vkshare|curl|wget|python-requests|okhttp|httpclient|headless|lighthouse/i;
+
+function qrTarget(env) {
+  const raw = String(env.QR_TARGET_URL || '').trim();
+  if (raw) {
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol === 'https:') return parsed.toString();
+    } catch { /* zły adres w zmiennej — zostaje domyślny */ }
+  }
+  return QR_TARGET_DEFAULT;
+}
+
+/** Telefon, tablet czy komputer — z user-agenta, który potem NIE jest zapisywany. */
+function qrDevice(ua) {
+  if (/ipad|tablet|kindle|silk|playbook/i.test(ua) || (/android/i.test(ua) && !/mobile/i.test(ua))) return 'tablet';
+  if (/mobi|iphone|ipod|android|windows phone/i.test(ua)) return 'mobile';
+  return 'desktop';
+}
+
+function qrOs(ua) {
+  if (/iphone|ipad|ipod/i.test(ua)) return 'iOS';
+  if (/android/i.test(ua)) return 'Android';
+  if (/windows/i.test(ua)) return 'Windows';
+  if (/mac os x|macintosh/i.test(ua)) return 'macOS';
+  if (/linux|cros/i.test(ua)) return 'Linux';
+  return 'other';
+}
+
+/* Kolejność ma znaczenie: przeglądarka wbudowana w Facebooka/Instagrama podaje też
+   „Safari" i „Chrome", a Edge i Opera podają „Chrome". */
+function qrBrowser(ua) {
+  if (/FBAN|FBAV|FB_IAB|FBIOS/i.test(ua)) return 'Facebook';
+  if (/Instagram/i.test(ua)) return 'Instagram';
+  if (/SamsungBrowser/i.test(ua)) return 'Samsung';
+  if (/EdgA?\/|EdgiOS/i.test(ua)) return 'Edge';
+  if (/OPR\/|Opera/i.test(ua)) return 'Opera';
+  if (/Firefox|FxiOS/i.test(ua)) return 'Firefox';
+  if (/CriOS|Chrome\//i.test(ua)) return 'Chrome';
+  if (/Safari\//i.test(ua)) return 'Safari';
+  return 'other';
+}
+
+/** Nagłówek platformy jako krótki, czysty tekst albo null. Vercel koduje miasto w %XX. */
+function qrHeader(request, name, max) {
+  let value = request.headers.get(name) || '';
+  try { value = decodeURIComponent(value); } catch { /* zostaje surowy */ }
+  value = value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max);
+  return value || null;
+}
+
+async function qrRedirect(env, request, url) {
+  const target = qrTarget(env);
+  const go = () => new Response(null, {
+    status: 302,
+    headers: {
+      Location: target,
+      'Cache-Control': 'no-store, max-age=0',
+      'Referrer-Policy': 'no-referrer',
+      'X-Robots-Tag': 'noindex, nofollow'
+    }
+  });
+
+  const ua = request.headers.get('User-Agent') || '';
+  const prefetch = /prefetch|prerender/i.test(
+    `${request.headers.get('Sec-Purpose') || ''} ${request.headers.get('Purpose') || ''} ${request.headers.get('X-Moz') || ''}`
+  );
+  if (request.method !== 'GET' || !wallReady(env) || !ua || prefetch || QR_BOT_UA.test(ua)) return go();
+
+  try {
+    const cf = request.cf || {};
+    const campaign = String(url.searchParams.get('c') || 'tv')
+      .toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24) || 'tv';
+    const row = {
+      campaign,
+      country: (qrHeader(request, 'x-vercel-ip-country', 2) || qrHeader(request, 'cf-ipcountry', 2) || '')
+        .toUpperCase() || null,
+      region: qrHeader(request, 'x-vercel-ip-country-region', 40) || (cf.regionCode ? String(cf.regionCode).slice(0, 40) : null),
+      city: qrHeader(request, 'x-vercel-ip-city', 80) || (cf.city ? String(cf.city).slice(0, 80) : null),
+      device: qrDevice(ua),
+      os: qrOs(ua),
+      browser: qrBrowser(ua),
+      lang: String(request.headers.get('Accept-Language') || '').split(/[,;]/)[0].trim().toLowerCase().split('-')[0].slice(0, 5) || null
+    };
+    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/qr_scans`, {
+      method: 'POST',
+      headers: supabaseHeaders(env, { Prefer: 'return=minimal' }),
+      body: JSON.stringify(row),
+      signal: AbortSignal.timeout(1500)
+    });
+    if (!response.ok) console.warn('qr: zapis odrzucony —', response.status, (await response.text()).slice(0, 200));
+  } catch (problem) {
+    console.warn('qr: nie zapisano —', problem?.message || problem);
+  }
+  return go();
+}
+
+/** Ekran „Skany QR" w panelu, jednym zapytaniem (funkcja `qr_stats`, migracja 0052). */
+async function qrStats(env, payload, cors) {
+  if (!wallReady(env)) return json({ ok: false, code: 'STATS_DISABLED' }, 503, cors);
+  const hours = Math.min(Math.max(Number.parseInt(payload.hours, 10) || 168, 1), 8760);
+
+  const response = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/qr_stats`, {
+    method: 'POST',
+    headers: supabaseHeaders(env),
+    body: JSON.stringify({ window_hours: hours })
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    /* Funkcji nie ma = migracja 0052 nie została jeszcze uruchomiona. Panel mówi to wprost
+       zamiast ogólnego „nie udało się". */
+    const missing = response.status === 404 || /qr_stats|PGRST202|42883/.test(detail);
+    return json({ ok: false, code: missing ? 'QR_NOT_MIGRATED' : 'QR_STATS_FAILED', detail }, 502, cors);
+  }
+  const stats = await response.json().catch(() => null);
+  if (!stats) return json({ ok: false, code: 'QR_STATS_FAILED' }, 502, cors);
   return json({ ok: true, stats }, 200, cors);
 }
 
@@ -10257,6 +10405,17 @@ export default {
 
        Ochroną jest token w adresie (patrz printableForm), a nie metoda HTTP. */
     if (request.method === 'GET' && pathType === 'form') return printableForm(env, url, cors);
+
+    /* DRUGI WYJĄTEK: KOD QR ZE SPOTU TV.
+       ---------------------------------------------------------------------------
+       Telefon po zeskanowaniu kodu otwiera adres — to zawsze GET (czasem najpierw HEAD).
+       Ta trasa niczego nie zapisuje w imieniu kogokolwiek i niczego nie zwraca poza
+       przekierowaniem na stały, wpisany w kod adres (patrz `qrTarget`), więc reguła
+       „tylko POST" nie ma tu czego chronić. Zapis skanu jest anonimowy i nie może
+       opóźnić ani zablokować przekierowania — patrz `qrRedirect`. */
+    if ((request.method === 'GET' || request.method === 'HEAD') && pathType === 'qr') {
+      return qrRedirect(env, request, url);
+    }
     if (request.method !== 'POST') return json({ ok: false, code: 'METHOD_NOT_ALLOWED' }, 405, cors);
 
     /* `settings-admin` is on this list because a sponsor logo arrives the same way a
@@ -10368,6 +10527,7 @@ export default {
       if (type === 'voting-admin') return votingAdmin(env, payload, cors);
       if (type === 'visit') return recordVisit(env, request, payload, cors);
       if (type === 'stats') return siteStats(env, payload, cors);
+      if (type === 'qr-stats') return qrStats(env, payload, cors);
       return wallAdmin(env, payload, cors);
     }
 

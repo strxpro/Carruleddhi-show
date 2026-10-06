@@ -326,6 +326,48 @@ export const resetStreamHearts = (key: string) =>
 export const fetchStats = (key: string, hours: number) =>
   call<{ ok: true; stats: SiteStats }>('stats', key, { hours });
 
+/* ------------------------------------------------------------- skany QR
+   Kod QR ze spotu TV prowadzi na /api/carruleddhi/qr (anonimowy zapis + przekierowanie na
+   Facebooka). Tu jest tylko odczyt dla zakladki „Skany QR". Ksztalt odpowiada funkcji
+   `qr_stats` w bazie (migracja 0052). */
+export interface QrCount { name: string; scans: number; country?: string | null }
+export interface QrScan {
+  at: string;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  device: string;
+  os: string | null;
+  browser: string | null;
+  campaign: string;
+}
+export interface QrStats {
+  windowHours: number;
+  generatedAt: string;
+  total: number;
+  previous: number;
+  allTime: number;
+  today: number;
+  lastHour: number;
+  firstAt: string | null;
+  lastAt: string | null;
+  countries: QrCount[];
+  regions: QrCount[];
+  cities: QrCount[];
+  devices: QrCount[];
+  os: QrCount[];
+  browsers: QrCount[];
+  langs: QrCount[];
+  campaigns: QrCount[];
+  hours: { hour: number; scans: number }[];
+  series: { at: string; scans: number }[];
+  seriesStep: 'hour' | 'day';
+  recent: QrScan[];
+}
+
+export const fetchQrStats = (key: string, hours: number) =>
+  call<{ ok: true; stats: QrStats }>('qr-stats', key, { hours });
+
 export const verifyKey = (key: string) => call<Inbox>('inbox', key, { action: 'counts' });
 
 export const fetchInbox = (key: string) => call<Inbox>('inbox', key, { action: 'counts' });

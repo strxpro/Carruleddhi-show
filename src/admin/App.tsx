@@ -16,6 +16,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  QrCode,
   RefreshCw,
   Search,
   Send,
@@ -40,6 +41,7 @@ import { Registrations } from './views/Registrations';
 import { Voting } from './views/Voting';
 import { Prizes } from './views/Prizes';
 import { Stats } from './views/Stats';
+import { QrScans } from './views/QrScans';
 import { Stream } from './views/Stream';
 import { LiveControl } from './views/LiveControl';
 import { Season } from './views/Season';
@@ -59,6 +61,7 @@ const INBOX_INTERVAL_MS = 10_000;
 type TabId =
   | 'dashboard'
   | 'stats'
+  | 'qr'
   | 'stream'
   | 'live'
   | 'season'
@@ -173,6 +176,9 @@ export default function App() {
              wydarzenia, które się prowadzi. Bez plakietki — statystyki nie mają stanu
              „nowe od ostatniego razu", mają zakres czasu wybierany na miejscu. */
           { id: 'stats', title: t('nav.stats'), icon: BarChart3 },
+          /* Skany kodu QR ze spotu TV — obok statystyk, bo to ten sam rodzaj ekranu: odczyt
+             liczb z wybranym zakresem czasu, bez plakietki. */
+          { id: 'qr', title: t('nav.qr'), icon: QrCode },
           /* Transmisja obok statystyk, a nie w grupie „wydarzenie": to jest przelacznik,
              ktory wlacza i wylacza zakladke WSZYSTKIM odwiedzajacym naraz, wiec ma stac
              tam, gdzie sie na niego patrzy przed startem, a nie miedzy listami. */
@@ -470,6 +476,7 @@ export default function App() {
             <Registrations t={t} locale={locale} apiKey={key} onChanged={refreshInbox} highlightQuery={highlightQuery} />
           ) : null}
           {tab === 'stats' ? <Stats t={t} apiKey={key} /> : null}
+          {tab === 'qr' ? <QrScans t={t} apiKey={key} /> : null}
           {tab === 'stream' ? <Stream t={t} apiKey={key} pl={locale === 'pl'} /> : null}
           {tab === 'live' ? <LiveControl t={t} apiKey={key} /> : null}
           {tab === 'season' ? <Season t={t} apiKey={key} /> : null}
